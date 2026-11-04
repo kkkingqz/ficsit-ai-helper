@@ -25,6 +25,10 @@ from cc_lib import (BASE_H, CEIL, CORNER, D, DOOR_H, DOOR_W, DOOR_X, FLOOR_Z, RO
                     bevel, boolean, box, chamfer_rect, cylinder, prism, run, shear_y, shell_volume)
 from cc_interior import build_interior
 
+# personnel door, revised after the turnaround review: 2.0 x 2.8 read as a hatch next to the 6.8 m body.
+# 2.4 x 3.2 gives a clear walk-in entrance with headroom for a pioneer with backpack/jetpack (blockout keeps 2.0 x 2.8)
+DOOR_W, DOOR_H = 2.4, 3.2
+
 FRONT_CH, SIDE_CH, BACK_CH = 1.4, 1.4, 1.2      # outer top chamfers
 IN_FRONT_CH, IN_SIDE_CH, IN_BACK_CH = 1.0, 1.0, 0.9
 WIN_Z0, WIN_TOP = 2.15, 5.6                     # window rises under the front chamfer
@@ -51,9 +55,9 @@ FRONT_SECTIONS = ((-5.75, -3.6), (-3.52, -2.18), (2.18, 4.1), (4.18, 5.75))
 VISOR_SEAT = (-2.1, 2.1)
 FRONT_PLATE_T = 0.07
 # back wall zones (x ranges; seen from behind they read right-to-left)
-BACK_MODULE_X = (-2.75, 0.75)       # rear service module around the door, z 0.15..3.9
-BACK_COOLING_X = (-5.65, -2.85)     # cooling block with two fans
-BACK_CABLE_X = (0.85, 2.2)          # cable entry zone above the plinth power socket
+BACK_MODULE_X = (-2.95, 0.95)       # rear service module around the door, z 0.15..3.9 (door 2.4 + frames + cheeks)
+BACK_COOLING_X = (-5.65, -3.05)     # cooling block with two fans
+BACK_CABLE_X = (1.05, 2.2)          # cable entry zone above the plinth power socket
 BACK_CABINET_X = (2.3, 5.65)        # power cabinet: two doors + breaker column
 BACK_BAND_Z = (4.0, 5.5)            # upper band over the module: hatch | radiator | tech panel
 # left side = external utility cluster (y ranges; front is -y)
@@ -342,14 +346,14 @@ def build_back(M, exp, by):
     boolean(mod, box("tmp_mo", (DOOR_X, by, (DOOR_H + FRAME_MAJOR) / 2 - 0.01),
                      (DOOR_W + 2 * FRAME_MAJOR, 1.0, DOOR_H + FRAME_MAJOR),
                      M["M_MetalDark"], exp))
-    boolean(mod, box("tmp_ml", (DOOR_X, by + 0.16, DOOR_H + 0.62), (1.7, 0.1, 0.12), M["M_MetalDark"], exp))
+    boolean(mod, box("tmp_ml", (DOOR_X, by + 0.16, DOOR_H + 0.42), (1.7, 0.1, 0.12), M["M_MetalDark"], exp))
     bevel(mod, 0.05)
     for k, s in enumerate((-1, 1)):          # vertical ribs on the module cheeks
         cx = DOOR_X + s * (DOOR_W / 2 + FRAME_MAJOR + (mx1 - mx0 - DOOR_W - 2 * FRAME_MAJOR) / 4)
         box(f"BACK_SERVICE_MODULE_rib_{k}", (cx, by + 0.175, 1.9), (0.08, 0.03, 3.0), M["M_MetalLight"], exp)
     # light built into the header: recessed slot + light-metal hood
-    box("LIGHTS_door", (DOOR_X, by + 0.125, DOOR_H + 0.62), (1.6, 0.02, 0.08), M["M_LightWarm"], exp)
-    bevel(box("BACK_SERVICE_MODULE_hood", (DOOR_X, by + 0.18, DOOR_H + 0.71), (1.9, 0.04, 0.06), M["M_MetalLight"], exp),
+    box("LIGHTS_door", (DOOR_X, by + 0.125, DOOR_H + 0.42), (1.6, 0.02, 0.08), M["M_LightWarm"], exp)
+    bevel(box("BACK_SERVICE_MODULE_hood", (DOOR_X, by + 0.18, DOOR_H + 0.51), (1.9, 0.04, 0.06), M["M_MetalLight"], exp),
           0.01)
     # heavy door frame
     dfr = box("DOOR_FRAME", (DOOR_X, by + 0.0, (DOOR_H + FRAME_MAJOR) / 2),
@@ -397,7 +401,7 @@ def build_back(M, exp, by):
     box("BACK_BAND_hatch_handle", (hc - 0.4, by + 0.145, zc), (0.05, 0.03, 0.3), M["M_MetalDark"], exp)
     box("BACK_BAND_hatch_label", (hc, by + 0.132, zc + 0.38), (0.4, 0.004, 0.12), M["M_Hazard"], exp)
     # radiator: deepest section, framed vertical fins
-    rx0, rx1 = -1.22, 0.72
+    rx0, rx1 = -1.22, BACK_MODULE_X[1] + 0.02
     rad = box("BACK_BAND_radiator", ((rx0 + rx1) / 2, by + 0.08, zc), (rx1 - rx0, 0.16, bz1 - bz0), M["M_MetalDark"], exp)
     boolean(rad, box("tmp_rr", ((rx0 + rx1) / 2, by + 0.16, zc), (rx1 - rx0 - 2 * FRAME_MINOR, 0.2,
                                                                      bz1 - bz0 - 2 * FRAME_MINOR), M["M_MetalDark"], exp))
@@ -405,7 +409,7 @@ def build_back(M, exp, by):
     louvre("BACK_BAND_radiator", "+y", (rx0 + rx1) / 2, rx1 - rx0 - 2 * FRAME_MINOR - 0.04, bz0 + FRAME_MINOR,
            bz1 - FRAME_MINOR, by + 0.1, M, exp)
     # tech panel: shallow, gauges + toggles
-    tx0, tx1 = 0.8, 2.2
+    tx0, tx1 = BACK_CABLE_X[0], 2.2
     back_box("BACK_BAND_techpanel", tx0, tx1, bz0, bz1, 0.06, M["M_MetalDark"], exp, by)
     tc = (tx0 + tx1) / 2
     for k, x in enumerate((tc - 0.3, tc + 0.3)):
@@ -897,14 +901,36 @@ def build(mats, exp, ref):
                M["M_MetalDark"], exp)
     r1 = prism("ROOF_top", [(x, y + ry + 0.05) for x, y in chamfer_rect(2.6, 1.15, 0.6)], "z", ROOF + 0.35,
                ROOF + 0.75, M["M_MetalLight"], exp)
+    # recessed seat for the service hatch on the left shoulder (cut before the bevel)
+    sh = (-3.3, ry, 0.9, 1.3)                       # x, y, width, length of the hatch lid
+    boolean(r0, box("tmp_shr", (sh[0], sh[1], ROOF + 0.35), (sh[2] + 2 * FRAME_MINOR, sh[3] + 2 * FRAME_MINOR, 0.08),
+                    M["M_MetalDark"], exp))
     bevel(r0, 0.06)
     bevel(r1, 0.06)
+    # low rim around the fan tier (structural edge; keeps the roof silhouette)
+    rim = prism("ROOF_top_rim", [(x, y + ry + 0.05) for x, y in chamfer_rect(2.6, 1.15, 0.6)], "z", ROOF + 0.75,
+                ROOF + 0.85, M["M_MetalDark"], exp)
+    boolean(rim, prism("tmp_rimi", [(x, y + ry + 0.05) for x, y in chamfer_rect(2.5, 1.05, 0.55)], "z", ROOF, ROOF + 2,
+                       None, exp))
+    bevel(rim, 0.012)
     for k, x in enumerate((-1.6, 1.6)):     # intake grilles on the front face of the plinth
         bevel(box(f"ROOF_grille_{k}", (x, ry - 1.5 - 0.01, ROOF + 0.15), (1.5, 0.03, 0.26), M["M_MetalDark"], exp), 0.0)
         louvre(f"ROOF_grille_{k}", "-y", x, 1.4, ROOF + 0.04, ROOF + 0.28, ry - 1.53, M, exp)
-    for k, x in enumerate((-3.3, 3.3)):     # flush access overlays on the plinth shoulders
-        bevel(box(f"ROOF_overlay_{k}", (x, ry, ROOF + 0.36), (0.9, 1.7, 0.02), M["M_MetalLight"], exp), 0.005)
-        box(f"ROOF_overlay_{k}_seam", (x, ry, ROOF + 0.372), (0.02, 1.5, 0.006), M["M_MetalDark"], exp)
+    # service hatch in the recessed seat: lid, rubber seal, two hinges, two latches, warning sign
+    zl = ROOF + 0.31 + 0.025
+    bevel(box("ROOF_service_hatch", (sh[0], sh[1], zl), (sh[2], sh[3], 0.05), M["M_MetalLight"], exp), 0.012)
+    seal = box("ROOF_service_hatch_seal", (sh[0], sh[1], zl - 0.015), (sh[2] + 0.04, sh[3] + 0.04, 0.02), M["M_Rubber"], exp)
+    boolean(seal, box("tmp_shs", (sh[0], sh[1], zl), (sh[2], sh[3], 0.2), None, exp))
+    for k, dy in enumerate((-0.38, 0.38)):          # hinges on the outer (-x) edge
+        cylinder(f"ROOF_service_hatch_hinge_{k}", (sh[0] - sh[2] / 2 - 0.02, sh[1] + dy, zl + 0.02), 0.03, 0.22,
+                 M["M_MetalBare"], exp, 8, axis="Y")
+    for k, dy in enumerate((-0.4, 0.4)):            # latches on the inner edge
+        bevel(box(f"ROOF_service_hatch_latch_{k}", (sh[0] + sh[2] / 2 - 0.06, sh[1] + dy, zl + 0.035),
+                  (0.08, 0.14, 0.03), M["M_MetalDark"], exp), 0.012)
+    box("ROOF_service_hatch_handle", (sh[0] + 0.2, sh[1], zl + 0.035), (0.05, 0.4, 0.025), M["M_MetalBare"], exp)
+    box("ROOF_service_hatch_sign", (sh[0] - 0.12, sh[1] + 0.35, zl + 0.027), (0.28, 0.28, 0.004), M["M_Hazard"], exp,
+        rot_z=math.radians(45))
+    box("ROOF_service_hatch_label", (sh[0] - 0.12, sh[1] - 0.3, zl + 0.027), (0.3, 0.12, 0.004), M["M_Decal"], exp)
     for f, x in enumerate((-1.3, 1.3)):
         zt = ROOF + 0.75
         bevel(cylinder(f"ROOF_fan_{f}_housing", (x, ry + 0.05, zt + 0.11), 0.5, 0.22, M["M_MetalDark"], exp, 24), 0.02)
@@ -916,8 +942,19 @@ def build(mats, exp, ref):
             a = math.radians(b * 72 + (20 if f else 50))
             box(f"ROOF_fan_{f}_blade_{b}", (x + 0.26 * math.cos(a), ry + 0.05 + 0.26 * math.sin(a), zt + 0.228),
                 (0.3, 0.11, 0.012), M["M_MetalDark"], exp, rot=(math.radians(12), 0, a))
-        for g in (-0.22, 0.22):
-            box(f"ROOF_fan_{f}_guard_{g:+.2f}", (x, ry + 0.05 + g, zt + 0.25), (0.98, 0.025, 0.012), M["M_MetalDark"], exp)
+        # protective grille: parallel bars + cross bar resting on the ring
+        for g in (-0.32, -0.16, 0.0, 0.16, 0.32):
+            ln = 2 * math.sqrt(max(0.0, 0.46 ** 2 - g ** 2))
+            box(f"ROOF_fan_{f}_guard_{g:+.2f}", (x, ry + 0.05 + g, zt + 0.255), (ln, 0.02, 0.012), M["M_MetalBare"], exp)
+        box(f"ROOF_fan_{f}_guard_cross", (x, ry + 0.05, zt + 0.265), (0.03, 0.92, 0.012), M["M_MetalBare"], exp)
+        # mounting feet with bolts at four points around the housing
+        for q in range(4):
+            a = math.radians(45 + q * 90)
+            fx_, fy_ = x + 0.56 * math.cos(a), ry + 0.05 + 0.56 * math.sin(a)
+            bevel(box(f"ROOF_fan_{f}_foot_{q}", (fx_, fy_, zt + 0.04), (0.2, 0.12, 0.08), M["M_MetalDark"], exp,
+                      rot_z=a), 0.012)
+            cylinder(f"ROOF_fan_{f}_bolt_{q}", (x + 0.6 * math.cos(a), ry + 0.05 + 0.6 * math.sin(a), zt + 0.09), 0.025,
+                     0.03, M["M_MetalBare"], exp, 8)
     # 2) back service zone: maintenance hatch on the door axis
     hy_ = 2.2
     bevel(box("ROOF_hatch_frame", (DOOR_X, hy_, ROOF + 0.03), (1.3, 0.75, 0.06), M["M_MetalDark"], exp), 0.015)
