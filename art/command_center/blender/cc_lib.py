@@ -368,7 +368,7 @@ def render_all(out, only=None, suffix=""):
         "20_detail_front_band": ((-4.0, -10.0, 7.6), (-2.5, -3.4, 6.2), None, 45),
         # interior views (stage 4)
         "21_interior_main": ((6.3, 2.45, 3.1), (-2.5, -2.6, 2.3), None, 18),
-        "22_interior_alt": ((-6.4, -1.9, 3.1), (2.6, 2.6, 2.4), None, 18),
+        "22_interior_alt": ((-5.5, -0.9, 3.1), (2.6, 2.6, 2.4), None, 18),
         "23_interior_console": ((-3.0, 1.2, 2.9), (-3.0, -3.0, 2.3), None, 24),
         "24_interior_console_side": ((-0.2, 0.2, 2.15), (-3.3, -2.6, 2.05), None, 28),
         "25_interior_entrance": ((-1.0, 2.0, 2.7), (-1.5, -3.4, 2.4), None, 20),
