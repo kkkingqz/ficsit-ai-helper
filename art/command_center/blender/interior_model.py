@@ -459,51 +459,157 @@ def build_kiosk(M, exp):
     box("KIOSK_led", (x + 0.135, y + 0.22, F + 0.9), (0.004, 0.06, 0.03), M["M_Beacon"], exp)
 
 
+def _facet_frame(hx, hy, i, r):
+    """Centre point, outward angle of facet i of an octagon(r) built by cc_lib.octagon (vertices at pi/8 + k*pi/4)."""
+    a = i * math.pi / 4 + math.pi / 4          # facet normal sits halfway between two vertices
+    rf = r * math.cos(math.pi / 8)
+    return (hx + rf * math.cos(a), hy + rf * math.sin(a)), a
+
+
 def build_holo(M, exp):
-    """Holo platform: two-tier octagonal pedestal, emitter, floating island projection with rings, beam,
-    and the ceiling projector above it."""
+    """Holo platform v2 — a technical node: segmented pedestal with service / vent / light facets, energy node and
+    floor cable channel; mechanical ceiling emitter on a bolted frame; systemic hologram (object, rings, beams, UI)."""
     hx, hy = HOLO_XY
-    prism("HOLO_PEDESTAL", octagon(1.35, hx, hy), "z", F, F + 0.22, M["M_MetalDark"], exp)
-    mid = prism("HOLO_PEDESTAL_body", octagon(1.18, hx, hy), "z", F + 0.22, F + 0.78, M["M_MetalDark"], exp)
-    bevel(mid, 0.03)
-    prism("HOLO_PEDESTAL_band", octagon(1.24, hx, hy), "z", F + 0.6, F + 0.74, M["M_PaintOrange"], exp)
-    prism("HOLO_PEDESTAL_top", octagon(1.25, hx, hy), "z", F + 0.78, F + 0.86, M["M_MetalLight"], exp)
-    for i in range(8):                       # light strip + vent on every facet
-        a = math.pi / 8 + i * math.pi / 4 + math.pi / 8
-        r = 1.18 * math.cos(math.pi / 8)
-        px, py = hx + (r + 0.005) * math.cos(a), hy + (r + 0.005) * math.sin(a)
-        box(f"HOLO_PEDESTAL_light_{i}", (px, py, F + 0.47), (0.01, 0.5, 0.06), M["M_LightWarm"], exp, rot_z=a)
-        box(f"HOLO_PEDESTAL_vent_{i}", (px, py, F + 0.33), (0.01, 0.6, 0.12), M["M_Rubber"], exp, rot_z=a)
-    cylinder("HOLO_EMITTER", (hx, hy, F + 0.89), 0.95, 0.04, M["M_Holo"], exp, 32)
-    ring = cylinder("HOLO_EMITTER_ring", (hx, hy, F + 0.9), 1.08, 0.05, M["M_MetalBare"], exp, 32)
-    boolean(ring, cylinder("tmp_er", (hx, hy, F + 0.9), 0.98, 0.2, None, exp, 32))
-    # projection: floating island (terrain cone on top, rock cone below) + two orbit rings
+    # ---- pedestal: plinth, core, 8 separate facet panels with corner ribs, top ring --------------------------------
+    bevel(prism("HOLO_PEDESTAL", octagon(1.35, hx, hy), "z", F, F + 0.2, M["M_MetalDark"], exp), 0.03)
+    prism("HOLO_PEDESTAL_core", octagon(1.1, hx, hy), "z", F + 0.2, F + 0.8, M["M_MetalDark"], exp)
+    side = 2 * 1.18 * math.sin(math.pi / 8)                      # facet width of octagon(1.18)
+    kinds = ("service", "vent", "light", "vent") * 2
+    for i, kind in enumerate(kinds):
+        (px, py), a = _facet_frame(hx, hy, i, 1.18)
+        P = lambda u, n, a=a, px=px, py=py: (px + n * math.cos(a) - u * math.sin(a), py + n * math.sin(a) + u * math.cos(a))  # noqa: E731
+        rz = a - math.pi / 2                                       # box local x along the facet
+        bevel(box(f"HOLO_PEDESTAL_panel_{i}", (*P(0, -0.03), F + 0.5), (side - 0.06, 0.06, 0.56), M["M_MetalDark"], exp,
+                  rot_z=rz), 0.012)
+        if kind == "service":
+            bevel(box(f"HOLO_PEDESTAL_hatch_{i}", (*P(0, 0.006), F + 0.5), (side - 0.2, 0.02, 0.42), M["M_MetalLight"], exp,
+                      rot_z=rz), 0.012)
+            for s in (-1, 1):
+                box(f"HOLO_PEDESTAL_hatch_{i}_screw_{s:+d}", (*P(s * (side / 2 - 0.16), 0.02), F + 0.66), (0.025, 0.01, 0.025),
+                    M["M_MetalBare"], exp, rot_z=rz)
+            box(f"HOLO_PEDESTAL_hatch_{i}_label", (*P(0, 0.019), F + 0.35), (0.2, 0.004, 0.05), M["M_Decal"], exp, rot_z=rz)
+        elif kind == "vent":
+            box(f"HOLO_PEDESTAL_vent_{i}_well", (*P(0, 0.002), F + 0.5), (side - 0.18, 0.01, 0.42), M["M_Rubber"], exp,
+                rot_z=rz)
+            for k in range(3):
+                box(f"HOLO_PEDESTAL_vent_{i}_slat_{k}", (*P(0, 0.015), F + 0.36 + k * 0.12), (side - 0.24, 0.03, 0.06),
+                    M["M_MetalBare"], exp, rot=(LOUVRE_ANGLE, 0, rz))
+        else:
+            box(f"HOLO_PEDESTAL_light_{i}", (*P(0, 0.004), F + 0.5), (side - 0.2, 0.01, 0.07), M["M_LightWarm"], exp,
+                rot_z=rz)
+            box(f"HOLO_PEDESTAL_light_{i}_hazard", (*P(0, 0.004), F + 0.33), (side - 0.2, 0.01, 0.06), M["M_Hazard"], exp,
+                rot_z=rz)
+    for i in range(8):                                             # corner ribs = segmentation
+        a = math.pi / 8 + i * math.pi / 4
+        box(f"HOLO_PEDESTAL_rib_{i}", (hx + 1.19 * math.cos(a), hy + 1.19 * math.sin(a), F + 0.5), (0.07, 0.07, 0.6),
+            M["M_MetalDark"], exp, rot_z=a)
+    prism("HOLO_PEDESTAL_band", octagon(1.26, hx, hy), "z", F + 0.8, F + 0.88, M["M_PaintOrange"], exp)
+    bevel(prism("HOLO_PEDESTAL_top", octagon(1.24, hx, hy), "z", F + 0.88, F + 0.94, M["M_MetalLight"], exp), 0.012)
+    # ---- energy node at the back + floor cable channel to the back-wall cabinets ------------------------------------
+    ex, ey = hx + 0.45, hy + 1.32
+    bevel(box("HOLO_ENERGY_node", (ex, ey + 0.18, F + 0.35), (0.7, 0.36, 0.7), M["M_MetalDark"], exp), 0.03)
+    bevel(box("HOLO_ENERGY_node_cover", (ex, ey + 0.365, F + 0.4), (0.56, 0.02, 0.44), M["M_MetalLight"], exp), 0.012)
+    box("HOLO_ENERGY_node_label", (ex - 0.1, ey + 0.378, F + 0.55), (0.24, 0.004, 0.08), M["M_Hazard"], exp)
+    box("HOLO_ENERGY_node_led", (ex + 0.17, ey + 0.378, F + 0.55), (0.06, 0.004, 0.03), M["M_Beacon"], exp)
+    for k, dx in enumerate((-0.2, 0.0, 0.2)):                      # thick feed cables from the node into the floor channel
+        cylinder(f"HOLO_ENERGY_cable_{k}", (ex + dx, ey + 0.42, F + 0.09), 0.05, 0.16, M["M_Rubber"], exp, 10)
+        cylinder(f"HOLO_ENERGY_gland_{k}", (ex + dx, ey + 0.42, F + 0.18), 0.07, 0.04, M["M_MetalBare"], exp, 10)
+    route = [(ex, ey + 0.42), (ex, 2.35), (4.95, 2.35), (4.95, YW - 0.55)]
+    for k, (a, b) in enumerate(zip(route[:-1], route[1:])):
+        _seg(f"FLOOR_cable_channel_{k}", a, b, 0.34, F + 0.012, 0.024, M["M_MetalLight"], exp)
+        for s in (-1, 1):                                          # hazard edges of the channel cover
+            dx, dy = b[0] - a[0], b[1] - a[1]
+            ln = math.hypot(dx, dy)
+            nx, ny = -dy / ln * 0.18 * s, dx / ln * 0.18 * s
+            _seg(f"FLOOR_cable_channel_{k}_edge_{s:+d}", (a[0] + nx, a[1] + ny), (b[0] + nx, b[1] + ny), 0.03, F + 0.026,
+                 0.004, M["M_Hazard"], exp)
+    # ---- emitter: disc, lens rings, four emitter nodes ---------------------------------------------------------------
+    cylinder("HOLO_EMITTER", (hx, hy, F + 0.96), 0.9, 0.03, M["M_Holo"], exp, 32)
+    for i, (r0, r1) in enumerate(((1.1, 0.98), (0.62, 0.56))):
+        ring = cylinder(f"HOLO_EMITTER_ring_{i}", (hx, hy, F + 0.97), r0, 0.05, M["M_MetalBare"], exp, 32)
+        boolean(ring, cylinder("tmp_er", (hx, hy, F + 0.97), r1, 0.2, None, exp, 32))
+    for i in range(4):
+        a = math.pi / 4 + i * math.pi / 2
+        nx_, ny_ = hx + 1.04 * math.cos(a), hy + 1.04 * math.sin(a)
+        bevel(box(f"HOLO_EMITTER_node_{i}", (nx_, ny_, F + 1.0), (0.14, 0.14, 0.1), M["M_MetalDark"], exp, rot_z=a), 0.012)
+        cylinder(f"HOLO_EMITTER_node_{i}_lens", (nx_, ny_, F + 1.055), 0.04, 0.01, M["M_Holo"], exp, 10)
+    # ---- hologram: central object + two rings + thin vertical beams + scale ring + floating UI panels --------------
     bm = bmesh.new()
-    top = bmesh.ops.create_cone(bm, cap_ends=False, segments=9, radius1=0.75, radius2=0.0, depth=0.85)
-    bmesh.ops.translate(bm, vec=(0, 0, 0.425), verts=top["verts"])
-    for v in top["verts"]:                    # jagged ridge line
+    top = bmesh.ops.create_cone(bm, cap_ends=False, segments=9, radius1=0.7, radius2=0.0, depth=0.8)
+    bmesh.ops.translate(bm, vec=(0, 0, 0.4), verts=top["verts"])
+    for v in top["verts"]:
         if v.co.z > 0.01:
             v.co.x *= 1.0 + 0.25 * math.sin(v.co.y * 9)
-    low = bmesh.ops.create_cone(bm, cap_ends=False, segments=9, radius1=0.0, radius2=0.75, depth=0.45)
-    bmesh.ops.translate(bm, vec=(0, 0, -0.225), verts=low["verts"])
+    low = bmesh.ops.create_cone(bm, cap_ends=False, segments=9, radius1=0.0, radius2=0.7, depth=0.4)
+    bmesh.ops.translate(bm, vec=(0, 0, -0.2), verts=low["verts"])
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=0.001)
-    bmesh.ops.translate(bm, vec=(hx, hy, F + 2.0), verts=bm.verts)
+    bmesh.ops.translate(bm, vec=(hx, hy, F + 2.05), verts=bm.verts)
     mesh_object("HOLO_PROJECTION", bm, M["M_Holo"], exp)
-    for i, (r, z) in enumerate(((1.15, F + 1.85), (0.9, F + 2.35))):
-        rr = cylinder(f"HOLO_PROJECTION_ring_{i}", (hx, hy, z), r, 0.02, M["M_Holo"], exp, 40)
-        boolean(rr, cylinder("tmp_pr", (hx, hy, z), r - 0.04, 0.2, None, exp, 40))
-    # beam = ring of thin light strips (a solid translucent cylinder hid the projection)
-    bz0, bz1 = F + 0.92, CEIL - 0.31
-    for i in range(12):
+    for i, (r, z) in enumerate(((1.05, F + 1.9), (0.8, F + 2.45))):
+        rr = cylinder(f"HOLO_PROJECTION_ring_{i}", (hx, hy, z), r, 0.015, M["M_Holo"], exp, 48)
+        boolean(rr, cylinder("tmp_pr", (hx, hy, z), r - 0.03, 0.2, None, exp, 48))
+    scale = cylinder("HOLO_PROJECTION_scale", (hx, hy, F + 1.08), 1.2, 0.006, M["M_Holo"], exp, 48)
+    boolean(scale, cylinder("tmp_sc", (hx, hy, F + 1.08), 1.17, 0.2, None, exp, 48))
+    for i in range(24):                                          # scale ticks
+        a = i * math.pi / 12
+        box(f"HOLO_PROJECTION_tick_{i}", (hx + 1.23 * math.cos(a), hy + 1.23 * math.sin(a), F + 1.08),
+            (0.06 if i % 3 else 0.12, 0.008, 0.006), M["M_Holo"], exp, rot_z=a)
+    bz0, bz1 = F + 1.06, CEIL - 0.42
+    for i in range(4):                                           # beams from the emitter nodes up to the ceiling emitter
+        a = math.pi / 4 + i * math.pi / 2
+        box(f"HOLO_BEAM_{i}", (hx + 1.04 * math.cos(a), hy + 1.04 * math.sin(a), (bz0 + bz1) / 2), (0.012, 0.012, bz1 - bz0),
+            M["M_Holo"], exp)
+    for i in range(8):                                           # thin inner light lines
+        a = i * math.pi / 4 + math.pi / 8
+        box(f"HOLO_BEAM_inner_{i}", (hx + 0.72 * math.cos(a), hy + 0.72 * math.sin(a), (F + 1.0 + F + 2.9) / 2),
+            (0.006, 0.03, 1.9), M["M_Holo"], exp, rot_z=a)
+    for i, a in enumerate((math.radians(200), math.radians(270), math.radians(340))):   # UI cards facing outwards
+        cx_, cy_ = hx + 1.55 * math.cos(a), hy + 1.55 * math.sin(a)
+        box(f"HOLO_UI_card_{i}", (cx_, cy_, F + 2.1), (0.5, 0.006, 0.32), M["M_Holo"], exp, rot_z=a + math.pi / 2)
+        for k in range(3):
+            box(f"HOLO_UI_card_{i}_bar_{k}", (cx_ + 0.01 * math.cos(a), cy_ + 0.01 * math.sin(a), F + 2.18 - k * 0.07),
+                (0.36 - k * 0.08, 0.004, 0.025), M["M_Holo"], exp, rot_z=a + math.pi / 2)
+    # ---- ceiling emitter: bolted frame, hangers, stacked mechanical housing, segmented lens, actuators -------------
+    zc = CEIL
+    frame = prism("HOLO_PROJECTOR_frame", octagon(1.42, hx, hy), "z", zc - 0.05, zc, M["M_MetalDark"], exp)
+    boolean(frame, prism("tmp_pf", octagon(1.2, hx, hy), "z", zc - 1, zc + 1, None, exp))
+    for i in range(8):
+        a = math.pi / 8 + i * math.pi / 4
+        cylinder(f"HOLO_PROJECTOR_frame_bolt_{i}", (hx + 1.32 * math.cos(a), hy + 1.32 * math.sin(a), zc - 0.06), 0.025,
+                 0.02, M["M_MetalBare"], exp, 8)
+    for i in range(4):                                           # hangers from the frame to the drum
+        a = i * math.pi / 2
+        box(f"HOLO_PROJECTOR_hanger_{i}", (hx + 1.18 * math.cos(a), hy + 1.18 * math.sin(a), zc - 0.15), (0.08, 0.16, 0.2),
+            M["M_MetalBare"], exp, rot_z=a)
+    bevel(cylinder("HOLO_PROJECTOR", (hx, hy, zc - 0.17), 1.05, 0.2, M["M_MetalDark"], exp, 32), 0.03)   # upper drum
+    for i in range(8):                                           # radial ribs on the drum
+        a = i * math.pi / 4
+        box(f"HOLO_PROJECTOR_rib_{i}", (hx + 1.07 * math.cos(a), hy + 1.07 * math.sin(a), zc - 0.17), (0.08, 0.05, 0.2),
+            M["M_MetalDark"], exp, rot_z=a)
+    bevel(cylinder("HOLO_PROJECTOR_band", (hx, hy, zc - 0.31), 1.25, 0.08, M["M_PaintOrange"], exp, 32), 0.012)
+    for i in range(12):                                          # vent slots in the band
         a = i * math.pi / 6
-        box(f"HOLO_BEAM_{i}", (hx + 0.82 * math.cos(a), hy + 0.82 * math.sin(a), (bz0 + bz1) / 2), (0.012, 0.05, bz1 - bz0),
+        box(f"HOLO_PROJECTOR_slot_{i}", (hx + 1.252 * math.cos(a), hy + 1.252 * math.sin(a), zc - 0.31), (0.01, 0.14, 0.03),
+            M["M_Rubber"], exp, rot_z=a)
+    bevel(cylinder("HOLO_PROJECTOR_lower", (hx, hy, zc - 0.4), 1.12, 0.1, M["M_MetalDark"], exp, 32), 0.012)
+    for i in range(8):                                           # segmented lens
+        a = i * math.pi / 4 + math.pi / 8
+        # ring of 8 separate lens segments between the core and the light ring (gaps keep them from reading as blades)
+        box(f"HOLO_PROJECTOR_lens_{i}", (hx + 0.64 * math.cos(a), hy + 0.64 * math.sin(a), zc - 0.455), (0.32, 0.34, 0.01),
             M["M_Holo"], exp, rot_z=a)
-    # ceiling projector
-    bevel(cylinder("HOLO_PROJECTOR", (hx, hy, CEIL - 0.15), 1.25, 0.3, M["M_MetalDark"], exp, 32), 0.03)
-    cylinder("HOLO_PROJECTOR_band", (hx, hy, CEIL - 0.2), 1.28, 0.08, M["M_PaintOrange"], exp, 32)
-    cylinder("HOLO_PROJECTOR_lens", (hx, hy, CEIL - 0.305), 0.85, 0.01, M["M_Holo"], exp, 32)
-    r2 = cylinder("HOLO_PROJECTOR_ring", (hx, hy, CEIL - 0.31), 1.05, 0.02, M["M_LightWarm"], exp, 32)
-    boolean(r2, cylinder("tmp_pjr", (hx, hy, CEIL - 0.31), 0.97, 0.2, None, exp, 32))
+    cylinder("HOLO_PROJECTOR_lens_core", (hx, hy, zc - 0.46), 0.22, 0.02, M["M_LightWarm"], exp, 16)
+    r2 = cylinder("HOLO_PROJECTOR_ring", (hx, hy, zc - 0.455), 1.04, 0.012, M["M_LightWarm"], exp, 32)
+    boolean(r2, cylinder("tmp_pjr", (hx, hy, zc - 0.455), 0.98, 0.2, None, exp, 32))
+    for i in range(4):                                           # actuators: block + piston down to the lens ring
+        a = math.pi / 4 + i * math.pi / 2
+        axx, ayy = hx + 1.0 * math.cos(a), hy + 1.0 * math.sin(a)
+        bevel(box(f"HOLO_PROJECTOR_actuator_{i}", (axx, ayy, zc - 0.5), (0.16, 0.16, 0.12), M["M_MetalLight"], exp, rot_z=a),
+              0.012)
+        cylinder(f"HOLO_PROJECTOR_actuator_{i}_piston", (axx, ayy, zc - 0.6), 0.03, 0.12, M["M_MetalBare"], exp, 8)
+        cylinder(f"HOLO_PROJECTOR_actuator_{i}_lens", (axx, ayy, zc - 0.665), 0.045, 0.01, M["M_Holo"], exp, 10)
+    jx = hx + 1.3                                                # junction box where the ceiling tray arrives
+    bevel(box("HOLO_PROJECTOR_junction", (jx, 0.6, zc - 0.17), (0.3, 0.36, 0.26), M["M_MetalDark"], exp), 0.012)
+    box("HOLO_PROJECTOR_junction_led", (jx - 0.152, 0.6, zc - 0.17), (0.004, 0.06, 0.03), M["M_Beacon"], exp)
 
 
 def build_ceiling(M, exp):
@@ -521,7 +627,7 @@ def build_ceiling(M, exp):
         ob.location = (x, y, zc - 0.1)
         bpy.context.scene.collection.objects.link(ob)
     # cable tray: right wall duct -> projector
-    x0, x1 = HOLO_XY[0] + 1.25, XW - 0.3
+    x0, x1 = HOLO_XY[0] + 1.45, XW - 0.3        # from the projector junction box to the wall duct
     bevel(box("CEILING_cable_tray", ((x0 + x1) / 2, 0.6, zc - 0.07), (x1 - x0, 0.3, 0.1), M["M_MetalDark"], exp), 0.012)
     box("CEILING_cable_tray_cover", ((x0 + x1) / 2, 0.6, zc - 0.125), (x1 - x0 - 0.06, 0.24, 0.01), M["M_MetalLight"], exp)
 
