@@ -578,17 +578,28 @@ def build_operator_mat(M, exp):
         box(f"PROP_MAT_operator_edge_{s_:+d}", (x, y + 0.15 + s_ * 0.44, F + 0.012), (2.6, 0.03, 0.01), M["M_Hazard"], exp)
 
 
-def build_kiosk(M, exp):
-    """Access terminal next to the door on the back wall (entry zone), facing into the room (-y)."""
-    x, y = -3.6, YW - 0.5                 # clear of the door casing and the door control panel
-    bevel(box("KIOSK_base", (x, y, F + 0.04), (0.5, 0.6, 0.08), M["M_MetalDark"], exp), 0.012)
-    bevel(box("KIOSK_column", (x, y, F + 0.55), (0.22, 0.26, 0.95), M["M_MetalDark"], exp), 0.03)
-    box("KIOSK_column_trim", (x, y - 0.132, F + 0.55), (0.18, 0.004, 0.8), M["M_PaintOrange"], exp)
-    bevel(box("KIOSK_head", (x, y - 0.05, F + 1.12), (0.62, 0.18, 0.42), M["M_MetalDark"], exp,
-              rot=(math.radians(-35), 0, 0)), 0.012)
-    box("KIOSK_screen", (x, y - 0.105, F + 1.15), (0.52, 0.01, 0.32), M["M_ScreenStatic"], exp,
-        rot=(math.radians(-35), 0, 0))
-    box("KIOSK_led", (x + 0.22, y - 0.135, F + 0.9), (0.06, 0.004, 0.03), M["M_Beacon"], exp)
+def build_service_console(M, exp):
+    """Wall-mounted service console for the three service cabinets (replaces the free-standing kiosk, which duplicated
+    the door control and broke up the entrance). Sits on the back wall between the logo panel and the cabinets."""
+    x, yw = 3.22, YW
+    bevel(box("SERVICE_CONSOLE_backplate", (x, yw - 0.015, F + 1.3), (0.56, 0.03, 1.3), M["M_MetalDark"], exp), 0.012)
+    bevel(box("SERVICE_CONSOLE_housing", (x, yw - 0.12, F + 1.5), (0.5, 0.2, 0.42), M["M_MetalDark"], exp,
+              rot=(math.radians(-20), 0, 0)), 0.03)
+    box("SERVICE_CONSOLE_screen", (x, yw - 0.222, F + 1.52), (0.42, 0.01, 0.3), M["M_ScreenStatic"], exp,
+        rot=(math.radians(-20), 0, 0))
+    box("SERVICE_CONSOLE_trim", (x, yw - 0.2, F + 1.27), (0.5, 0.02, 0.03), M["M_PaintOrange"], exp)
+    bevel(box("SERVICE_CONSOLE_shelf", (x, yw - 0.15, F + 1.18), (0.5, 0.24, 0.04), M["M_MetalLight"], exp,
+              rot=(math.radians(15), 0, 0)), 0.012)
+    for r in range(2):
+        for c in range(5):
+            box(f"SERVICE_CONSOLE_key_{r}_{c}", (x - 0.16 + c * 0.08, yw - 0.12 - r * 0.08, F + 1.21 - r * 0.02), (0.05, 0.05, 0.02),
+                M["M_Beacon"] if (r, c) == (0, 4) else M["M_MetalBare"], exp, rot=(math.radians(15), 0, 0))
+    box("SERVICE_CONSOLE_label", (x - 0.06, yw - 0.032, F + 1.85), (0.32, 0.004, 0.08), M["M_Decal"], exp)
+    box("SERVICE_CONSOLE_led", (x + 0.19, yw - 0.032, F + 1.85), (0.05, 0.004, 0.03), M["M_Beacon"], exp)
+    # conduits: down into the floor and across to the first service cabinet
+    cylinder("SERVICE_CONSOLE_conduit_down", (x + 0.18, yw - 0.07, F + 0.33), 0.035, 0.66, M["M_Rubber"], exp, 8)
+    cylinder("SERVICE_CONSOLE_conduit_gland", (x + 0.18, yw - 0.07, F + 0.03), 0.05, 0.06, M["M_MetalBare"], exp, 8)
+    cylinder("SERVICE_CONSOLE_conduit_cabinet", (x + 0.3, yw - 0.08, F + 1.75), 0.035, 0.12, M["M_MetalBare"], exp, 8, axis="X")
 
 
 def _facet_frame(hx, hy, i, r):
@@ -1281,7 +1292,7 @@ def build_interior_v2(M, exp, ref, door):
     build_walls(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h))
     segs = build_console(M, exp, ref)
     build_operator_mat(M, exp)
-    build_kiosk(M, exp)
+    build_service_console(M, exp)
     build_holo(M, exp)
     build_ceiling(M, exp)
     build_services(M, exp)
