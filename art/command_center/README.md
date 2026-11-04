@@ -102,6 +102,7 @@ cd art/command_center/blender
 blender -b -P build_model.py -- --out ../export --render ../renders/stage3
 # либо: python build_model.py --out ../export --render ../renders/stage3 [--blend] [--samples 48] [--shots 01_three_quarter,02_front]
 # рендер по материалам: добавить --matid 01_three_quarter,09_rear_three_quarter
+# облёт 8 ракурсов + сверху: добавить --turnaround ../renders/turnaround
 # блокаут этапа 1 (для сравнения): python build_blockout.py --out ../export
 ```
 
@@ -124,6 +125,7 @@ blender -b -P build_model.py -- --out ../export --render ../renders/stage3
 | `blender/build_model.py` | **текущая модель**: детализированный корпус (этап 3) + интерьер |
 | `blender/build_blockout.py` | блокаут этапа 1, сохранён для сравнения |
 | `export/` | FBX для UE, GLB для просмотра: `SM_CommandCenter*` и `SM_CommandCenter_Blockout*` |
+| `renders/turnaround/` | облёт: 8 перспективных ракурсов через 45° (`T000_front` … `T315_front_left`), вид сверху, 4 ортогональных вида, сводные листы `00_turnaround_sheet` и `00_ortho_sheet` (64 сэмпла) |
 | `renders/stage3/`, `renders/blockout/` | 3/4 спереди, сзади, слева и справа, вид на крышу, четыре ортогональных вида, крупные планы узла связи и цоколя, сверху, интерьер, сравнения с концептом, крупный план фронта |
 | `reference/` | пакет референсов (JPG ≤ 2400 px, без изменений по содержанию) и `README_modeling.md` |
 
