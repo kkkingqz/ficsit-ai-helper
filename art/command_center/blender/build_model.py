@@ -34,6 +34,7 @@ TILT = math.radians(15)                         # glass leans inwards at the top
 PYLON = 2.2                                     # corner pylon wraps this much of each face
 ARMOR_T = 0.18                                  # pylon skin thickness
 CORE = 0.12                                     # plinth core inset; panels bring it back to 16 x 8
+LOUVRE_PYLONS = ((-1, -1), (-1, 1), (1, 1))     # front-right pylon carries the logo instead
 
 
 def outer_shell(name, inset, z0, top, mat, coll):
@@ -97,6 +98,66 @@ def on_chamfer(name, mid, normal_axis, sign, size, offset, mat, coll):
     return box(name, ctr, (size[1], size[0], size[2]), mat, coll, rot=(0, math.radians(-45 * sign), 0))
 
 
+def face_pt(side, a, inward, z):
+    """World point on an outer footprint face: a = coordinate along the face, inward = distance from the edge."""
+    if side == "-y":
+        return (a, -D / 2 + inward, z)
+    if side == "+y":
+        return (a, D / 2 - inward, z)
+    if side == "-x":
+        return (-W / 2 + inward, a, z)
+    return (W / 2 - inward, a, z)
+
+
+def face_size(side, along, thick, height):
+    return (along, thick, height) if side[1] == "y" else (thick, along, height)
+
+
+def plinth_face(side, mods, pilasters, M, exp, ref):
+    """One face of the plinth: recessed modules (light / hazard / hatch / socket / plain) + proud pilasters."""
+    tag = {"-y": "f", "+y": "b", "-x": "L", "+x": "R"}[side]
+    for i, (a0, a1, kind) in enumerate(mods):
+        ac = (a0 + a1) / 2
+        if kind == "hazard":
+            box(f"DECALS_hazard_{tag}{i}", face_pt(side, ac, CORE + 0.01, 0.62), face_size(side, a1 - a0 - 0.3, 0.04, 0.5),
+                M["M_Hazard"], exp)
+            face_panels(f"BASE_PANELS_{tag}{i}_top", side, [(a0, a1)], 1.05, 1.84, 0.1, M["M_MetalDark"], exp,
+                        recess=0.05)
+            for k, h in enumerate((a0 + 0.95, a1 - 0.95) if a1 - a0 > 2.6 else (ac,)):
+                bevel(box(f"BASE_hatch_{tag}{i}_{k}", face_pt(side, h, 0.035, 1.45), face_size(side, 0.9, 0.03, 0.42),
+                          M["M_MetalLight"], exp), 0.01)
+            continue
+        blk = face_panels(f"BASE_PANELS_{tag}{i}", side, [(a0, a1)], 0.2, 1.84, CORE + 0.02, M["M_MetalDark"], exp,
+                          recess=0.05)[0]
+        if kind == "light":
+            boolean(blk, box("tmp_niche", face_pt(side, ac, 0.0, 0.75), face_size(side, 1.0, 0.16, 0.34),
+                             M["M_MetalLight"], exp))
+            # niche floor is 0.08 in from the edge (cutter depth 0.16 centred on the footprint edge)
+            box(f"LIGHTS_base_{tag}{i}", face_pt(side, ac, 0.065, 0.75), face_size(side, 0.9, 0.03, 0.26),
+                M["M_LightWarm"], exp)
+        elif kind == "hatch":
+            bevel(box(f"BASE_hatch_{tag}{i}", face_pt(side, ac, 0.03, 0.95), face_size(side, 1.4, 0.04, 1.0),
+                      M["M_MetalLight"], exp), 0.02)
+            box(f"LIGHTS_base_hatch_{tag}{i}", face_pt(side, ac, 0.02, 1.62), face_size(side, 0.5, 0.03, 0.1),
+                M["M_LightWarm"], exp)
+        elif kind == "socket":   # power connection point (open question §6.1) lives in this module
+            bevel(box("POWER_SOCKET", face_pt(side, ac, 0.1, 1.0), face_size(side, 0.7, 0.2, 0.7), M["M_MetalLight"],
+                      exp), 0.02)
+            cylinder("POWER_SOCKET_plug", face_pt(side, ac, 0.011, 1.0), 0.16, 0.02, M["M_Rubber"], exp, 12,
+                     axis="Y" if side[1] == "y" else "X")
+            e = bpy.data.objects.new("SOCKET_power", None)
+            e.location = face_pt(side, ac, 0.0, 1.0)
+            ref.objects.link(e)
+        else:  # plain: small hatch + amber indicator
+            bevel(box(f"BASE_hatch_{tag}{i}", face_pt(side, ac, 0.035, 1.25), face_size(side, 0.7, 0.03, 0.5),
+                      M["M_MetalLight"], exp), 0.01)
+    for k, a_ in enumerate(pilasters):
+        face_panels(f"BASE_PILASTER_{tag}{k}", side, [(a_ - 0.2, a_ + 0.2)], 0.15, 1.86, 0.25, M["M_MetalDark"], exp,
+                    gap=0.0, bev=0.06)
+        box(f"LIGHTS_indicator_{tag}{k}", face_pt(side, a_, 0.0095, 1.6), face_size(side, 0.18, 0.015, 0.06),
+            M["M_Beacon"], exp)
+
+
 def build(mats, exp, ref):
     M = mats
     fy = -(D / 2 - SHELL_INSET)          # outer front face of the shell
@@ -123,50 +184,20 @@ def build(mats, exp, ref):
     boolean(skirt, box("tmp_sd", (DOOR_X, D / 2, 0.1), (DOOR_W, 1.0, 0.4), M["M_MetalLight"], exp))
     bevel(skirt, 0.03)
 
-    # front modules: light block | hazard bay | hatch block | hazard bay | light block
+    # plinth modules on all four faces (concept: same rhythm front and back, hazard bay in the middle of the sides)
     fx = W / 2 - 1.0 - CORE
-    mods = [(-fx, -5.3, "light"), (-5.3, -1.5, "hazard"), (-1.5, 1.5, "hatch"), (1.5, 5.3, "hazard"),
-            (5.3, fx, "light")]
-    for i, (x0, x1, kind) in enumerate(mods):
-        if kind == "hazard":
-            box(f"DECALS_hazard_{i}", ((x0 + x1) / 2, -D / 2 + CORE + 0.01, 0.62), (x1 - x0 - 0.3, 0.04, 0.5),
-                M["M_Hazard"], exp)
-            face_panels(f"BASE_PANELS_f{i}_top", "-y", [(x0, x1)], 1.05, 1.84, 0.1, M["M_MetalDark"], exp,
-                        recess=0.05)
-            for k, hx_ in enumerate((x0 + 0.95, x1 - 0.95)):
-                bevel(box(f"BASE_hatch_f{i}_{k}", (hx_, -D / 2 + 0.05 - 0.015, 1.45), (0.9, 0.03, 0.42),
-                          M["M_MetalLight"], exp), 0.01)
-            continue
-        blk = face_panels(f"BASE_PANELS_f{i}", "-y", [(x0, x1)], 0.2, 1.84, CORE + 0.02, M["M_MetalDark"], exp,
-                          recess=0.05)[0]
-        cx = (x0 + x1) / 2
-        if kind == "light":
-            boolean(blk, box("tmp_niche", (cx, -D / 2, 0.75), (1.0, 0.16, 0.34), M["M_MetalLight"], exp))
-            # niche floor is at -D/2 + 0.08 (cutter depth 0.16 centred on the footprint edge)
-            box(f"LIGHTS_base_{i}", (cx, -D / 2 + 0.065, 0.75), (0.9, 0.03, 0.26), M["M_LightWarm"], exp)
-        else:
-            bevel(box("BASE_hatch", (cx, -D / 2 + 0.05 - 0.02, 0.95), (1.4, 0.04, 1.0), M["M_MetalLight"], exp), 0.02)
-            box("LIGHTS_base_hatch", (cx, -D / 2 + 0.05 - 0.03, 1.62), (0.5, 0.03, 0.1), M["M_LightWarm"], exp)
-    # pilasters between the front modules (stand proud to the footprint edge) with amber indicators
-    for k, x in enumerate((-5.3, -1.5, 1.5, 5.3)):
-        face_panels(f"BASE_PILASTER_f{k}", "-y", [(x - 0.2, x + 0.2)], 0.15, 1.86, 0.25, M["M_MetalDark"], exp,
-                    gap=0.0, bev=0.06)
-        box(f"LIGHTS_indicator_f{k}", (x, -D / 2 + 0.0075 + 0.002, 1.6), (0.18, 0.015, 0.06), M["M_Beacon"], exp)
-    # back / sides: plain panel rows, the door bay stays open
     sy = D / 2 - 1.0 - CORE
-    face_panels("BASE_PANELS_b", "+y", [(-fx, -4.6), (-4.6, DOOR_X - DOOR_W / 2 - 0.25),
-                                        (DOOR_X + DOOR_W / 2 + 0.25, 2.2), (2.2, fx)],
-                0.2, 1.84, CORE + 0.02, M["M_MetalDark"], exp, recess=0.05)
-    for k, x in enumerate((-4.6, 2.2)):
-        face_panels(f"BASE_PILASTER_b{k}", "+y", [(x - 0.2, x + 0.2)], 0.15, 1.86, 0.25, M["M_MetalDark"], exp,
-                    gap=0.0, bev=0.06)
-    for side in ("-x", "+x"):
-        nm = f"{'L' if side[0] == '-' else 'R'}"
-        face_panels(f"BASE_PANELS_{nm}", side, [(-sy, -1.2), (-1.2, 1.2), (1.2, sy)], 0.2, 1.84, CORE + 0.02,
-                    M["M_MetalDark"], exp, recess=0.05)
-        for k, y in enumerate((-1.2, 1.2)):
-            face_panels(f"BASE_PILASTER_{nm}{k}", side, [(y - 0.2, y + 0.2)], 0.15, 1.86, 0.25, M["M_MetalDark"],
-                        exp, gap=0.0, bev=0.06)
+    dl, dr = DOOR_X - DOOR_W / 2 - 0.25, DOOR_X + DOOR_W / 2 + 0.25          # door bay in the back
+    layout = {
+        "-y": ([(-fx, -5.3, "light"), (-5.3, -1.5, "hazard"), (-1.5, 1.5, "hatch"), (1.5, 5.3, "hazard"),
+                (5.3, fx, "light")], (-5.3, -1.5, 1.5, 5.3)),
+        "+y": ([(-fx, -5.3, "light"), (-5.3, dl - 0.4, "hazard"), (dr + 0.4, 2.6, "socket"), (2.6, 5.3, "hazard"),
+                (5.3, fx, "light")], (-5.3, dl - 0.2, dr + 0.2, 2.6, 5.3)),
+        "-x": ([(-sy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, sy, "plain")], (-1.2, 1.2)),
+        "+x": ([(-sy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, sy, "plain")], (-1.2, 1.2)),
+    }
+    for side, (mods, pilasters) in layout.items():
+        plinth_face(side, mods, pilasters, M, exp, ref)
     # chunky corner blocks wrapping the 45° plinth corners
     for s_x in (-1, 1):
         for s_y in (-1, 1):
@@ -180,9 +211,18 @@ def build(mats, exp, ref):
     cap = prism("BASE_cap", chamfer_rect(W / 2, D / 2, 1.0), "z", 1.86, 1.98, M["M_MetalLight"], exp)
     boolean(cap, prism("tmp_capi", chamfer_rect(W / 2 - 0.4, D / 2 - 0.4, 0.85), "z", 1.0, 3.0, None, exp))
     boolean(cap, box("tmp_capd", (DOOR_X, D / 2, 1.9), (DOOR_W + 0.5, 1.2, 0.5), None, exp))
-    for x in (-5.3, -1.5, 1.5, 5.3):  # segment joints
-        boolean(cap, box("tmp_capj", (x, -D / 2, 1.98), (0.04, 0.9, 0.05), M["M_MetalDark"], exp))
+    for side, (_, pilasters) in layout.items():   # segment joints above every pilaster
+        for a_ in pilasters:
+            c_ = face_pt(side, a_, 0.0, 1.98)
+            boolean(cap, box("tmp_capj", c_, face_size(side, 0.04, 0.9, 0.05), M["M_MetalDark"], exp))
     bevel(cap, 0.02)
+    # amber markers on the 45° faces of the plinth corner blocks
+    for s_x in (-1, 1):
+        for s_y in (-1, 1):
+            k = math.sqrt(0.5)
+            box(f"LIGHTS_indicator_corner_{s_x:+d}{s_y:+d}", (s_x * (W / 2 - 0.5) - s_x * k * 0.005,
+                s_y * (D / 2 - 0.5) - s_y * k * 0.005, 1.6), (0.3, 0.015, 0.07), M["M_Beacon"], exp,
+                rot_z=math.atan2(s_x, -s_y))
 
     # ===================================================================== FLOOR
     hx, hy = W / 2 - SHELL_INSET - WALL, D / 2 - SHELL_INSET - WALL
@@ -254,8 +294,8 @@ def build(mats, exp, ref):
             pa = (-ARMOR_T - 0.1, ROOF + 0.3, -ARMOR_T + 0.04, ROOF + ARMOR_T * 0.6 - 0.04)
             boolean(a, skin("tmp_ps", box("tmp_pr", (0, 0, 4.35), (W + 2, D + 2, 0.05), None, exp), *pa,
                             M["M_MetalDark"], exp))
-            if s_x < 0 and s_y < 0:   # tall recessed louvre on the left side of the front-left pylon
-                reg = box("tmp_lv", (-W / 2, -2.85, 3.8), (1.0, 0.9, 2.9), None, exp)
+            if (s_x, s_y) in LOUVRE_PYLONS:   # tall recessed louvre on the side face of the pylon
+                reg = box("tmp_lv", (s_x * W / 2, s_y * 2.85, 3.8), (1.0, 0.9, 2.9), None, exp)
                 boolean(a, skin("tmp_lvs", reg, -ARMOR_T - 0.1, ROOF + 0.3, -ARMOR_T + 0.12, ROOF, M["M_MetalDark"], exp))
             if s_x > 0 and s_y < 0:   # dark logo panel + two slots on the 45° face of the front-right pylon
                 ax, ay = sx_out + ARMOR_T, D / 2 - SHELL_INSET + ARMOR_T
@@ -269,9 +309,11 @@ def build(mats, exp, ref):
                                     M["M_MetalDark"], exp))
                 logo_at = (mid[0] - 0.05, mid[1] + 0.05)
             bevel(a, 0.05)
-    lx = -(sx_out + ARMOR_T) + 0.1          # slats sit inside the left pylon recess
-    for i in range(10):
-        box(f"VENTS_pylon_L_slat_{i}", (lx, -2.85, 2.55 + i * 0.27), (0.03, 0.82, 0.07), M["M_MetalLight"], exp)
+    for s_x, s_y in LOUVRE_PYLONS:          # slats sit inside the recesses
+        lx = s_x * (sx_out + ARMOR_T - 0.1)
+        for i in range(10):
+            box(f"VENTS_pylon_{s_x:+d}{s_y:+d}_slat_{i}", (lx, s_y * 2.85, 2.55 + i * 0.27), (0.03, 0.82, 0.07),
+                M["M_MetalLight"], exp)
     # FICSIT logo placeholder inside the dark panel (texture/decal later)
     box("DECALS_logo", (logo_at[0], logo_at[1], 3.85), (0.95, 0.01, 0.26), M["M_MetalLight"], exp,
         rot_z=math.radians(45))
@@ -295,27 +337,47 @@ def build(mats, exp, ref):
             bevel(box(f"SIDE_PANEL_{nm}_{j}", (s_x * (sx_out + 0.025), 0.0, (z0 + z1) / 2),
                       (0.05, 2 * free_y, z1 - z0), M["M_MetalDark"], exp), 0.015)
     free_x = W / 2 - PYLON - 0.05
-    spans = [(-free_x, DOOR_X - DOOR_W / 2 - 0.35), (DOOR_X + DOOR_W / 2 + 0.35, 2.2), (2.2, free_x)]
+    dfl, dfr_ = DOOR_X - DOOR_W / 2 - 0.25, DOOR_X + DOOR_W / 2 + 0.25      # door frame edges
+    bz0, bz1 = BASE_H + 0.1, ROOF - BACK_CH - 0.1                           # up to the back chamfer
+    spans = [(-free_x, -4.05), (-4.05, dfl - 0.1), (dfr_ + 0.1, 2.1), (2.1, 3.9), (3.9, free_x)]
     for j, (x0, x1) in enumerate(spans):
-        bevel(box(f"BACK_PANEL_{j}", ((x0 + x1) / 2, by + 0.025, BASE_H + 1.6), (x1 - x0 - 0.08, 0.05, 2.9),
-                  M["M_MetalDark"], exp), 0.015)
-        n = max(1, int((x1 - x0) / 1.1))
-        for r in range(1, n):   # vertical stiffener ribs
-            box(f"BACK_PANEL_{j}_rib_{r}", (x0 + (x1 - x0) * r / n, by + 0.07, BASE_H + 1.6), (0.08, 0.04, 2.7),
+        xc, w = (x0 + x1) / 2, x1 - x0 - 0.08
+        bevel(box(f"BACK_PANEL_{j}", (xc, by + 0.03, (bz0 + bz1) / 2), (w, 0.06, bz1 - bz0), M["M_MetalDark"], exp),
+              0.015)
+        if j % 2 == 0:   # raised inner plate
+            bevel(box(f"BACK_PANEL_{j}_plate", (xc, by + 0.075, (bz0 + bz1) / 2 + 0.2), (w - 0.36, 0.03, bz1 - bz0 - 1.0),
+                      M["M_MetalDark"], exp), 0.01)
+        else:            # vertical conduit with clamps
+            cx_ = x0 + 0.35
+            cylinder(f"BACK_PANEL_{j}_conduit", (cx_, by + 0.12, (bz0 + bz1) / 2), 0.05, bz1 - bz0 - 0.2,
+                     M["M_MetalLight"], exp, 10)
+            for k, z in enumerate((bz0 + 0.5, (bz0 + bz1) / 2, bz1 - 0.5)):
+                box(f"BACK_PANEL_{j}_clamp_{k}", (cx_, by + 0.11, z), (0.16, 0.1, 0.06), M["M_MetalDark"], exp)
+            box(f"BACK_PANEL_{j}_rib", (x0 + (x1 - x0) * 0.65, by + 0.075, (bz0 + bz1) / 2), (0.08, 0.03, bz1 - bz0 - 0.3),
                 M["M_MetalLight"], exp)
-    # door: frame + two leaves + header light
+    bevel(box("BACK_PANEL_header", (DOOR_X, by + 0.03, (DOOR_H + 0.45 + bz1) / 2), (dfr_ - dfl, 0.06, bz1 - DOOR_H - 0.45),
+              M["M_MetalDark"], exp), 0.015)
+    jb = box("BACK_junction_box", (3.0, by + 0.13, 4.5), (0.6, 0.14, 0.75), M["M_MetalLight"], exp)
+    bevel(jb, 0.02)
+    box("BACK_junction_box_label", (3.0, by + 0.205, 4.65), (0.3, 0.01, 0.12), M["M_ScreenStatic"], exp)
+    # door: frame + two louvred leaves + header light
     dfr = box("DOOR_FRAME", (DOOR_X, D / 2 - 0.12, (DOOR_H + 0.35) / 2), (DOOR_W + 0.5, 0.24, DOOR_H + 0.35),
               M["M_MetalLight"], exp)
     boolean(dfr, box("tmp_df", (DOOR_X, D / 2, DOOR_H / 2 - 0.01), (DOOR_W, 1.0, DOOR_H), None, exp))
     bevel(dfr, 0.03)
     for k, s in enumerate((-1, 1)):
-        bevel(box(f"DOOR_leaf_{k}", (DOOR_X + s * DOOR_W / 4, by - WALL / 2, DOOR_H / 2),
-                  (DOOR_W / 2 - 0.03, 0.1, DOOR_H - 0.04), M["M_MetalDark"], exp), 0.015)
+        lx_ = DOOR_X + s * DOOR_W / 4
+        bevel(box(f"DOOR_leaf_{k}", (lx_, by - WALL / 2, DOOR_H / 2), (DOOR_W / 2 - 0.03, 0.1, DOOR_H - 0.04),
+                  M["M_MetalDark"], exp), 0.015)
+        for i in range(6):
+            box(f"DOOR_leaf_{k}_louvre_{i}", (lx_, by - WALL / 2 + 0.055, 1.35 + i * 0.16), (DOOR_W / 2 - 0.35, 0.02, 0.05),
+                M["M_MetalLight"], exp)
+        box(f"DOOR_leaf_{k}_handle", (DOOR_X + s * 0.15, by - WALL / 2 + 0.07, 1.1), (0.05, 0.04, 0.35),
+            M["M_MetalLight"], exp)
     box("LIGHTS_door", (DOOR_X, D / 2 + 0.0, DOOR_H + 0.22), (0.8, 0.04, 0.1), M["M_LightWarm"], exp)
-    bevel(box("POWER_SOCKET", (4.5, D / 2 - 0.05, 1.3), (0.7, 0.2, 0.7), M["M_MetalLight"], exp), 0.02)
-    e = bpy.data.objects.new("SOCKET_power", None)
-    e.location = (4.5, D / 2 + 0.06, 1.3)
-    ref.objects.link(e)
+    for s in (-1, 1):   # hazard strips on the door frame jambs
+        box(f"DECALS_hazard_door_{s:+d}", (DOOR_X + s * (DOOR_W / 2 + 0.125), D / 2 + 0.005, 1.1),
+            (0.18, 0.01, 1.6), M["M_Hazard"], exp)
 
     # ===================================================================== PIPES (left, embedded in the wall)
     # orange side module up top; the pipes rise from the plinth into its underside (concept 00)
@@ -335,14 +397,18 @@ def build(mats, exp, ref):
     bevel(box("EXHAUST_PIPES_bracket", (-(sx_out + 0.06), -0.72, 3.15), (0.12, 1.3, 0.16), M["M_MetalDark"], exp),
           0.02)
 
-    # ===================================================================== VENTS (right)
-    vx = sx_out + 0.07
-    vh = box("VENTS_housing", (vx, 0.0, 3.6), (0.14, 2.0, 2.0), M["M_MetalDark"], exp)
-    boolean(vh, box("tmp_vh", (vx + 0.1, 0.0, 3.6), (0.14, 1.8, 1.8), M["M_MetalDark"], exp))
-    bevel(vh, 0.02)
+    # ===================================================================== EQUIPMENT CABINET (right)
+    cx0 = sx_out + 0.09
+    cab = box("SIDE_CABINET_R", (cx0, -0.15, 3.55), (0.18, 2.6, 2.3), M["M_MetalDark"], exp)
+    boolean(cab, box("tmp_cg", (sx_out + 0.2, 0.55, 3.55), (0.14, 0.8, 1.9), M["M_MetalDark"], exp))   # louvre bay
+    boolean(cab, box("tmp_cs", (sx_out + 0.18, -0.2, 3.55), (0.03, 0.03, 2.1), M["M_MetalDark"], exp))   # door seam
+    bevel(cab, 0.04)
     for i in range(8):
-        box(f"VENTS_slat_{i}", (vx + 0.02, 0.0, 2.8 + i * 0.22), (0.03, 1.78, 0.18), M["M_MetalLight"], exp,
+        box(f"VENTS_slat_{i}", (sx_out + 0.12, 0.55, 2.75 + i * 0.23), (0.03, 0.74, 0.17), M["M_MetalLight"], exp,
             rot=(0, math.radians(-35), 0))
+    box("SIDE_CABINET_R_handle", (sx_out + 0.2, -0.4, 3.6), (0.04, 0.06, 0.4), M["M_MetalLight"], exp)
+    box("SIDE_CABINET_R_label", (sx_out + 0.185, -0.85, 4.3), (0.01, 0.5, 0.18), M["M_ScreenStatic"], exp)
+    bevel(box("SIDE_CABINET_R_cap", (sx_out + 0.1, -0.15, 4.75), (0.2, 2.7, 0.1), M["M_PaintOrange"], exp), 0.02)
 
     # ===================================================================== ROOF BOX (stepped) + vents
     ry = 0.3
