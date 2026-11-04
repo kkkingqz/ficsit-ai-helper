@@ -124,58 +124,161 @@ def build_floor(M, exp, pit):
 
 
 # ---------------------------------------------------------------------------------------------------------
+def _wp(wall, a, d, z):
+    """Point on a wall: a = coordinate along the wall, d = distance into the room, z = height."""
+    return {"L": (-XW + d, a, z), "R": (XW - d, a, z), "B": (a, YW - d, z), "F": (a, -YW + d, z)}[wall]
+
+
+def _ws(wall, along, depth, h):
+    return (depth, along, h) if wall in "LR" else (along, depth, h)
+
+
+FACING = {"L": "+x", "R": "-x", "B": "-y", "F": "+y"}
+
+
+def _plane(wall, d):
+    return {"L": -XW + d, "R": XW - d, "B": YW - d, "F": -YW + d}[wall]
+
+
 def build_walls(M, exp, door):
-    """Modular wall lining: dark dado with intake louvres + orange upper panels with dark inset stripes.
-    Side walls and the back wall; the window wall gets dado panels where the console does not stand."""
+    """Wall lining with functional zoning (stage 4 v2):
+       left  = TECHNICAL zone: full-height vent section, open cable ladder, two equipment racks, air-handling unit
+               feeding the ceiling duct (the exterior left side is the engineering side as well);
+       right = CLEAN background: large plain panels, one light line, only the cable duct to the projector;
+       back  = ENTRY and SERVICE: door, access terminal + door control, logo panel, service cabinets, access hatches;
+       front = under-window dado with intake louvres right of the console."""
     door_x0, door_x1, door_h = door
     dz1 = F + 0.9                       # dado top
     uz0, uz1 = dz1 + 0.06, WALL_TOP - 0.15
 
-    def panel_run(prefix, axis, sign, spans, skip_upper=()):
-        for i, (a0, a1) in enumerate(spans):
-            a0, a1 = a0 + 0.03, a1 - 0.03
-            ac, ln = (a0 + a1) / 2, a1 - a0
-            if axis == "x":      # side wall, panels run along y
-                plane = sign * XW
-                c = lambda t, z, d: (plane - sign * d / 2, ac, z)           # noqa: E731
-                size = lambda d, h: (d, ln, h)                              # noqa: E731
-                side = "+x" if sign < 0 else "-x"
-            else:                # back / front wall, panels run along x
-                plane = sign * YW
-                c = lambda t, z, d: (ac, plane - sign * d / 2, z)           # noqa: E731
-                size = lambda d, h: (ln, d, h)                              # noqa: E731
-                side = "+y" if sign < 0 else "-y"
-            bevel(box(f"{prefix}_dado_{i}", c(0, (F + dz1) / 2, 0.06), size(0.06, dz1 - F), M["M_MetalDark"], exp), 0.012)
-            pl = (plane - sign * 0.075)
-            louvre(f"{prefix}_dado_{i}_vent", side, ac, min(ln - 0.3, 0.9), F + 0.25, F + 0.61, pl, M, exp)
-            if i in skip_upper:
-                continue
-            bevel(box(f"{prefix}_upper_{i}", c(0, (uz0 + uz1) / 2, 0.05), size(0.05, uz1 - uz0), M["M_PaintOrange"], exp),
-                  0.03)
-            bevel(box(f"{prefix}_upper_{i}_stripe", c(0, uz0 + 0.55, 0.07), size(0.07, 0.18), M["M_MetalDark"], exp),
-                  0.012)
-        # cornice under the ceiling chamfer
-        a0, a1 = spans[0][0], spans[-1][1]
-        if axis == "x":
-            box(f"{prefix}_cornice", (sign * (XW - 0.05), (a0 + a1) / 2, WALL_TOP - 0.08), (0.1, a1 - a0, 0.1),
-                M["M_MetalDark"], exp)
-        else:
-            box(f"{prefix}_cornice", ((a0 + a1) / 2, sign * (YW - 0.05), WALL_TOP - 0.08), (a1 - a0, 0.1, 0.1),
-                M["M_MetalDark"], exp)
+    def upper(name, wall, a0, a1, z0=uz0, stripe=True):
+        ac, ln = (a0 + a1) / 2, a1 - a0
+        bevel(box(f"{name}_upper", _wp(wall, ac, 0.025, (z0 + uz1) / 2), _ws(wall, ln, 0.05, uz1 - z0), M["M_PaintOrange"],
+                  exp), 0.03)
+        if stripe:
+            bevel(box(f"{name}_upper_stripe", _wp(wall, ac, 0.035, z0 + 0.55), _ws(wall, ln, 0.07, 0.18), M["M_MetalDark"],
+                      exp), 0.012)
 
-    side_spans = [(-2.65, -1.35), (-1.35, 0.0), (0.0, 1.35), (1.35, 2.65)]
-    panel_run("WALL_L", "x", -1, side_spans)
-    panel_run("WALL_R", "x", 1, side_spans, skip_upper=(2,))        # cable duct runs in front of panel 2
-    back_spans = [(-6.65, -5.3), (-5.3, -3.95), (-3.95, door_x0 - 0.35), (door_x1 + 0.35, 1.55), (1.55, 2.9),
-                  (2.9, 4.25), (4.25, 5.6), (5.6, 6.65)]
-    panel_run("WALL_B", "y", 1, back_spans, skip_upper=(3, 4))        # logo panel there
+    def dado(name, wall, a0, a1, d=0.06):
+        bevel(box(f"{name}_dado", _wp(wall, (a0 + a1) / 2, d / 2, (F + dz1) / 2), _ws(wall, a1 - a0, d, dz1 - F),
+                  M["M_MetalDark"], exp), 0.012)
+
+    def zone(wall, kind, a0, a1, i):
+        a0, a1 = a0 + 0.03, a1 - 0.03
+        ac, ln = (a0 + a1) / 2, a1 - a0
+        name = f"WALL_{wall}_{i}_{kind}"
+        if kind == "clean":                       # plain panel pair, no vents
+            dado(name, wall, a0, a1)
+            upper(name, wall, a0, a1, stripe=False)
+        elif kind == "access":                    # service access hatch in the dado
+            dado(name, wall, a0, a1)
+            bevel(box(f"{name}_hatch", _wp(wall, ac, 0.07, (F + dz1) / 2), _ws(wall, ln - 0.3, 0.02, dz1 - F - 0.2),
+                      M["M_MetalLight"], exp), 0.012)
+            for s in (-1, 1):
+                box(f"{name}_hatch_latch_{s:+d}", _wp(wall, ac + s * (ln / 2 - 0.25), 0.085, dz1 - 0.2),
+                    _ws(wall, 0.06, 0.02, 0.08), M["M_MetalDark"], exp)
+            box(f"{name}_hatch_label", _wp(wall, ac, 0.082, F + 0.3), _ws(wall, 0.3, 0.004, 0.1), M["M_Hazard"], exp)
+            upper(name, wall, a0, a1)
+        elif kind == "vent":                      # full-height vent section in an orange frame
+            bevel(box(f"{name}_panel", _wp(wall, ac, 0.05, (F + uz1) / 2), _ws(wall, ln, 0.1, uz1 - F), M["M_MetalDark"],
+                      exp), 0.012)
+            for s in (-1, 1):
+                box(f"{name}_frame_{s:+d}", _wp(wall, ac + s * (ln / 2 - 0.05), 0.11, (F + uz1) / 2),
+                    _ws(wall, 0.1, 0.04, uz1 - F), M["M_PaintOrange"], exp)
+            for g, (z0, z1) in enumerate(((F + 0.3, F + 1.5), (F + 1.9, uz1 - 0.3))):
+                box(f"{name}_well_{g}", _wp(wall, ac, 0.102, (z0 + z1) / 2), _ws(wall, ln - 0.3, 0.004, z1 - z0 + 0.06),
+                    M["M_Rubber"], exp)
+                louvre(f"{name}_louvre_{g}", FACING[wall], ac, ln - 0.34, z0, z1, _plane(wall, 0.12), M, exp)
+        elif kind == "cable":                     # open cable ladder floor-to-cornice
+            bevel(box(f"{name}_back", _wp(wall, ac, 0.02, (F + uz1) / 2), _ws(wall, ln, 0.04, uz1 - F), M["M_MetalDark"],
+                      exp), 0.012)
+            for s in (-1, 1):
+                box(f"{name}_rail_{s:+d}", _wp(wall, ac + s * (ln / 2 - 0.08), 0.1, (F + WALL_TOP) / 2),
+                    _ws(wall, 0.05, 0.12, WALL_TOP - F), M["M_MetalBare"], exp)
+            for r in range(int((WALL_TOP - F) / 0.35)):
+                box(f"{name}_rung_{r}", _wp(wall, ac, 0.07, F + 0.2 + r * 0.35), _ws(wall, ln - 0.16, 0.04, 0.03),
+                    M["M_MetalBare"], exp)
+            for c, da in enumerate((-0.18, -0.06, 0.06, 0.18)):
+                cylinder(f"{name}_cable_{c}", _wp(wall, ac + da, 0.12, (F + WALL_TOP) / 2), 0.035, WALL_TOP - F,
+                         M["M_Rubber"], exp, 8)
+            for r, z in enumerate((F + 0.9, F + 2.1, F + 3.2)):
+                box(f"{name}_clamp_{r}", _wp(wall, ac, 0.15, z), _ws(wall, ln - 0.12, 0.03, 0.06), M["M_PaintOrange"], exp)
+            bevel(box(f"{name}_floor_box", _wp(wall, ac, 0.2, F + 0.12), _ws(wall, ln, 0.4, 0.24), M["M_MetalDark"], exp),
+                  0.012)
+        elif kind == "rack":                      # equipment rack behind a glazed door
+            dpt, h = 0.6, 2.3
+            bevel(box(f"{name}_body", _wp(wall, ac, dpt / 2, F + h / 2), _ws(wall, ln - 0.04, dpt, h), M["M_MetalDark"],
+                      exp), 0.03)
+            bevel(box(f"{name}_door", _wp(wall, ac, dpt + 0.01, F + 1.15), _ws(wall, ln - 0.14, 0.02, 1.9),
+                      M["M_MetalDark"], exp), 0.012)
+            box(f"{name}_glass", _wp(wall, ac, dpt + 0.022, F + 1.25), _ws(wall, ln - 0.3, 0.006, 1.5), M["M_Glass"], exp)
+            for r in range(6):
+                for c in range(5):
+                    m = M["M_Beacon"] if (r + c) % 3 == 0 else M["M_ScreenStatic"]
+                    box(f"{name}_led_{r}_{c}", _wp(wall, ac - 0.24 + c * 0.12, dpt - 0.02, F + 0.65 + r * 0.24),
+                        _ws(wall, 0.05, 0.01, 0.02), m, exp)
+            box(f"{name}_label", _wp(wall, ac, dpt + 0.022, F + 2.08), _ws(wall, 0.34, 0.004, 0.08), M["M_Decal"], exp)
+            louvre(f"{name}_vent", FACING[wall], ac, ln - 0.3, F + 0.12, F + 0.36, _plane(wall, dpt + 0.02), M, exp)
+            bevel(box(f"{name}_cap", _wp(wall, ac, dpt / 2, F + h + 0.03), _ws(wall, ln, dpt + 0.04, 0.06),
+                      M["M_PaintOrange"], exp), 0.012)
+            upper(name, wall, a0, a1, z0=F + h + 0.12, stripe=False)
+        elif kind == "hvac":                      # air-handling unit + riser up to the ceiling duct
+            dpt, h = 0.6, 2.5
+            bevel(box(f"{name}_body", _wp(wall, ac, dpt / 2, F + h / 2), _ws(wall, ln - 0.04, dpt, h), M["M_MetalLight"],
+                      exp), 0.03)
+            fz = F + 1.7
+            ax = "X" if wall in "LR" else "Y"
+            ring = cylinder(f"{name}_fan_ring", _wp(wall, ac, dpt + 0.015, fz), 0.42, 0.03, M["M_MetalBare"], exp, 24, axis=ax)
+            boolean(ring, cylinder("tmp_hr", _wp(wall, ac, dpt + 0.015, fz), 0.35, 0.2, None, exp, 24, axis=ax))
+            cylinder(f"{name}_fan_well", _wp(wall, ac, dpt + 0.004, fz), 0.36, 0.006, M["M_Rubber"], exp, 24, axis=ax)
+            cylinder(f"{name}_fan_hub", _wp(wall, ac, dpt + 0.012, fz), 0.08, 0.02, M["M_MetalBare"], exp, 12, axis=ax)
+            for g in (-0.2, 0.0, 0.2):
+                box(f"{name}_fan_guard_{g:+.1f}", _wp(wall, ac + g, dpt + 0.03, fz), _ws(wall, 0.02, 0.01, 0.78),
+                    M["M_MetalDark"], exp)
+            box(f"{name}_well", _wp(wall, ac, dpt + 0.004, F + 0.75), _ws(wall, ln - 0.3, 0.006, 0.8), M["M_Rubber"], exp)
+            louvre(f"{name}_intake", FACING[wall], ac, ln - 0.34, F + 0.38, F + 1.12, _plane(wall, dpt + 0.02), M, exp)
+            box(f"{name}_label", _wp(wall, ac - 0.25, dpt + 0.005, F + 2.3), _ws(wall, 0.36, 0.004, 0.1), M["M_Hazard"], exp)
+            for k in range(3):
+                box(f"{name}_led_{k}", _wp(wall, ac + 0.25 + k * 0.07, dpt + 0.005, F + 2.3), _ws(wall, 0.04, 0.004, 0.03),
+                    M["M_Beacon"] if k == 0 else M["M_ScreenStatic"], exp)
+            rz0, rz1 = F + h, 5.25
+            bevel(box(f"{name}_riser", _wp(wall, ac, 0.3, (rz0 + rz1) / 2), _ws(wall, 0.5, 0.42, rz1 - rz0),
+                      M["M_MetalLight"], exp), 0.012)
+            box(f"{name}_riser_flange", _wp(wall, ac, 0.3, rz0 + 0.6), _ws(wall, 0.56, 0.48, 0.05), M["M_MetalDark"], exp)
+            bevel(box(f"{name}_elbow", _wp(wall, ac, 0.55, 5.4), _ws(wall, 0.5, 0.6, 0.36), M["M_MetalLight"], exp), 0.012)
+        elif kind == "behind":                    # wall behind free-standing cabinets: upper panel only
+            dado(name, wall, a0, a1, d=0.04)
+            upper(name, wall, a0, a1, z0=F + 2.45, stripe=False)
+        elif kind == "terminal":                  # zone of the access terminal next to the door
+            dado(name, wall, a0, a1)
+            upper(name, wall, a0, a1)
+            dc = door_x0 - 0.42
+            bevel(box("WALL_door_control", _wp(wall, dc, 0.04, F + 1.35), _ws(wall, 0.22, 0.08, 0.34), M["M_MetalDark"],
+                      exp), 0.012)
+            box("WALL_door_control_screen", _wp(wall, dc, 0.082, F + 1.42), _ws(wall, 0.15, 0.004, 0.1), M["M_ScreenStatic"],
+                exp)
+            box("WALL_door_control_button", _wp(wall, dc, 0.085, F + 1.27), _ws(wall, 0.08, 0.01, 0.08), M["M_Beacon"], exp)
+        # cornice piece over every zone
+        box(f"{name}_cornice", _wp(wall, ac, 0.05, WALL_TOP - 0.08), _ws(wall, a1 - a0 + 0.06, 0.1, 0.1), M["M_MetalDark"],
+            exp)
+
+    left = [("vent", -2.65, -1.35), ("cable", -1.35, -0.45), ("rack", -0.45, 0.5), ("rack", 0.5, 1.45),
+            ("hvac", 1.45, 2.65)]
+    right = [("clean", -2.65, 0.37), ("clean", 0.83, 2.65)]          # the cable duct runs in the gap at y 0.6
+    back = [("access", -6.65, -5.3), ("access", -5.3, -3.95), ("terminal", -3.95, door_x0 - 0.35),
+            ("behind", 2.9, 3.55), ("behind", 3.55, 6.35), ("access", 6.35, 6.65)]
+    for wall, zones in (("L", left), ("R", right), ("B", back)):
+        for i, (kind, a0, a1) in enumerate(zones):
+            zone(wall, kind, a0, a1, i)
+    # clean wall: one continuous light line
+    box("LIGHTS_wall_R", _wp("R", 0.0, 0.06, F + 2.6), _ws("R", 5.1, 0.02, 0.05), M["M_LightWarm"], exp)   # proud of the 5 cm panels
     front_spans = [(0.45, 2.45), (2.45, 4.45), (4.45, 6.45)]          # under the window, right of the console
     for i, (a0, a1) in enumerate(front_spans):
         ac = (a0 + a1) / 2
         bevel(box(f"WALL_F_dado_{i}", (ac, -YW + 0.03, (F + 2.1) / 2), (a1 - a0 - 0.06, 0.06, 2.1 - F), M["M_MetalDark"],
                   exp), 0.012)
         louvre(f"WALL_F_dado_{i}_vent", "+y", ac, 1.2, F + 0.25, F + 0.61, -YW + 0.075, M, exp)
-    # orange structural columns: window ends + back corners + door jambs
+    # orange structural columns: window ends + back corners
     for i, (x, y) in enumerate(((-6.75, -YW + 0.17), (6.75, -YW + 0.17), (-6.75, YW - 0.17), (6.75, YW - 0.17))):
         bevel(box(f"WALL_column_{i}", (x, y, (F + WALL_TOP) / 2), (0.32, 0.34, WALL_TOP - F), M["M_PaintOrange"], exp),
               0.03)
@@ -195,6 +298,7 @@ def build_walls(M, exp, door):
     for j in range(4):
         box(f"WALL_logo_panel_stripe_{j}", (lx0 + 0.4 + j * 0.22, YW - 0.083, uz0 + 1.2), (0.12, 0.006, 0.3),
             M["M_PaintOrange"], exp, rot=(0, math.radians(-25), 0))
+    dado("WALL_logo_panel", "B", lx0, lx1)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -447,16 +551,16 @@ def build_operator_mat(M, exp):
 
 
 def build_kiosk(M, exp):
-    """Standing terminal at the left wall (concept: kiosk next to the console)."""
-    x, y = -XW + 0.55, 0.6                # mid left wall (the console end tower took its old spot)
-    bevel(box("KIOSK_base", (x, y, F + 0.04), (0.6, 0.5, 0.08), M["M_MetalDark"], exp), 0.012)
-    bevel(box("KIOSK_column", (x, y, F + 0.55), (0.26, 0.22, 0.95), M["M_MetalDark"], exp), 0.03)
-    box("KIOSK_column_trim", (x + 0.132, y, F + 0.55), (0.004, 0.18, 0.8), M["M_PaintOrange"], exp)
-    bevel(box("KIOSK_head", (x + 0.05, y, F + 1.12), (0.18, 0.62, 0.42), M["M_MetalDark"], exp,
-              rot=(0, math.radians(-35), 0)), 0.012)
-    box("KIOSK_screen", (x + 0.105, y, F + 1.15), (0.01, 0.52, 0.32), M["M_ScreenStatic"], exp,
-        rot=(0, math.radians(-35), 0))
-    box("KIOSK_led", (x + 0.135, y + 0.22, F + 0.9), (0.004, 0.06, 0.03), M["M_Beacon"], exp)
+    """Access terminal next to the door on the back wall (entry zone), facing into the room (-y)."""
+    x, y = -3.25, YW - 0.5
+    bevel(box("KIOSK_base", (x, y, F + 0.04), (0.5, 0.6, 0.08), M["M_MetalDark"], exp), 0.012)
+    bevel(box("KIOSK_column", (x, y, F + 0.55), (0.22, 0.26, 0.95), M["M_MetalDark"], exp), 0.03)
+    box("KIOSK_column_trim", (x, y - 0.132, F + 0.55), (0.18, 0.004, 0.8), M["M_PaintOrange"], exp)
+    bevel(box("KIOSK_head", (x, y - 0.05, F + 1.12), (0.62, 0.18, 0.42), M["M_MetalDark"], exp,
+              rot=(math.radians(-35), 0, 0)), 0.012)
+    box("KIOSK_screen", (x, y - 0.105, F + 1.15), (0.52, 0.01, 0.32), M["M_ScreenStatic"], exp,
+        rot=(math.radians(-35), 0, 0))
+    box("KIOSK_led", (x + 0.22, y - 0.135, F + 0.9), (0.06, 0.004, 0.03), M["M_Beacon"], exp)
 
 
 def _facet_frame(hx, hy, i, r):
@@ -728,9 +832,8 @@ def build_services(M, exp):
                  M["M_Rubber"], exp, 8)
     for j, z in enumerate((F + 0.6, F + 1.5, F + 2.4, F + 3.3)):
         box(f"INT_CABLE_DUCT_clamp_{j}", (dx - 0.13, 0.6, z), (0.06, 0.38, 0.08), M["M_PaintOrange"], exp)
-    # service cabinets: two on the right wall (equipment / power), two at the back-right
-    cabs = [((XW - 0.27, 1.25), (0.5, 0.9), math.radians(90)), ((XW - 0.27, 2.2), (0.5, 0.9), math.radians(90)),
-            ((4.95, YW - 0.27), (0.9, 0.5), 0.0), ((5.9, YW - 0.27), (0.9, 0.5), 0.0)]
+    # service cabinets: three at the back wall (service zone); the right wall stays clean
+    cabs = [((4.0, YW - 0.27), (0.9, 0.5), 0.0), ((4.95, YW - 0.27), (0.9, 0.5), 0.0), ((5.9, YW - 0.27), (0.9, 0.5), 0.0)]
     for i, ((x, y), (sx, sy), rz) in enumerate(cabs):
         h = 2.2
         bevel(box(f"INT_CABINET_{i}", (x, y, F + h / 2), (sx, sy, h), M["M_MetalDark"], exp), 0.03)
