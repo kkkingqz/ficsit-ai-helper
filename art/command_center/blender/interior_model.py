@@ -257,11 +257,10 @@ def build_walls(M, exp, door):
             bevel(box(f"{name}_door", _wp(wall, ac, dpt + 0.01, F + 1.15), _ws(wall, ln - 0.14, 0.02, 1.9),
                       M["M_MetalDark"], exp), 0.012)
             box(f"{name}_glass", _wp(wall, ac, dpt + 0.022, F + 1.25), _ws(wall, ln - 0.3, 0.006, 1.5), M["M_Glass"], exp)
-            for r in range(6):
-                for c in range(5):
-                    m = M["M_Beacon"] if (r + c) % 3 == 0 else M["M_ScreenStatic"]
-                    box(f"{name}_led_{r}_{c}", _wp(wall, ac - 0.24 + c * 0.12, dpt - 0.02, F + 0.65 + r * 0.24),
-                        _ws(wall, 0.05, 0.01, 0.02), m, exp)
+            for c, da in enumerate((-0.12, 0.12)):    # two indicator strips behind the glass (not a grid of dots)
+                box(f"{name}_led_strip_{c}", _wp(wall, ac + da, dpt - 0.02, F + 1.25), _ws(wall, 0.03, 0.01, 1.3),
+                    M["M_ScreenStatic"], exp)
+            box(f"{name}_led_status", _wp(wall, ac, dpt - 0.02, F + 1.95), _ws(wall, 0.08, 0.01, 0.04), M["M_Beacon"], exp)
             box(f"{name}_label", _wp(wall, ac, dpt + 0.022, F + 2.08), _ws(wall, 0.34, 0.004, 0.08), M["M_Decal"], exp)
             louvre(f"{name}_vent", FACING[wall], ac, ln - 0.3, F + 0.12, F + 0.36, _plane(wall, dpt + 0.02), M, exp)
             bevel(box(f"{name}_cap", _wp(wall, ac, dpt / 2, F + h + 0.03), _ws(wall, ln, dpt + 0.04, 0.06),
@@ -693,10 +692,10 @@ def build_holo(M, exp):
         boolean(rr, cylinder("tmp_pr", (hx, hy, z), r - 0.03, 0.2, None, exp, 48))
     scale = cylinder("HOLO_PROJECTION_scale", (hx, hy, F + 1.08), 1.2, 0.006, M["M_Holo"], exp, 48)
     boolean(scale, cylinder("tmp_sc", (hx, hy, F + 1.08), 1.17, 0.2, None, exp, 48))
-    for i in range(24):                                          # scale ticks
-        a = i * math.pi / 12
+    for i in range(8):                                           # eight major scale ticks
+        a = i * math.pi / 4
         box(f"HOLO_PROJECTION_tick_{i}", (hx + 1.23 * math.cos(a), hy + 1.23 * math.sin(a), F + 1.08),
-            (0.06 if i % 3 else 0.12, 0.008, 0.006), M["M_Holo"], exp, rot_z=a)
+            (0.12, 0.008, 0.006), M["M_Holo"], exp, rot_z=a)
     bz0, bz1 = F + 1.06, CEIL - 0.42
     for i in range(4):                                           # beams from the emitter nodes up to the ceiling emitter
         a = math.pi / 4 + i * math.pi / 2
@@ -952,8 +951,6 @@ def build_entrance(M, exp, door, pit):
         box(f"LIGHTS_door_jamb_{s:+d}", (xc + s * 0.02, YW - 0.203, door_h / 2 + 0.1), (0.03, 0.01, door_h - 0.6),
             M["M_LightWarm"], exp)
         box(f"DECALS_hazard_door_in_{s:+d}", (xc + s * 0.11, YW - 0.203, 0.85), (0.16, 0.008, 1.3), M["M_Hazard"], exp)
-        for k, z in enumerate((0.25, door_h + 0.3)):
-            box(f"DOOR_IN_casing_{s:+d}_bolt_{k}", (xc - s * 0.12, YW - 0.205, z), (0.04, 0.01, 0.04), M["M_MetalBare"], exp)
     hw = door_x1 - door_x0 + 2 * cw
     bevel(box("DOOR_IN_header", (dx, YW - 0.1, door_h + 0.3), (hw, 0.2, 0.5), M["M_MetalDark"], exp), 0.03)
     bevel(box("DOOR_IN_frame_top", (dx, YW - 0.225, door_h + 0.06), (door_x1 - door_x0 + 0.24, 0.05, 0.12),
@@ -1035,7 +1032,7 @@ def build_ref(M, ref, door_x):
 
 
 # ---------------------------------------------------------------------------------------------------------
-# Surface break-up pass: chamfers, seams, panel splits, inset / onlay plates, vent slots, fixings.
+# Small-detail helpers (kept for the few places that still need fixings)
 SCREW = (0.03, 0.012, 0.03)              # screw / bolt head (along, proud, height) on a vertical face
 
 
@@ -1050,163 +1047,73 @@ def _slots(prefix, centre_fn, n, pitch, size, M, exp, rot_z=0.0):
         box(f"{prefix}_slot_{k}", centre_fn((k - (n - 1) / 2) * pitch), size, M["M_Rubber"], exp, rot_z=rot_z)
 
 
+# ---------------------------------------------------------------------------------------------------------
+# Surface break-up, CALMED (detail rule): every element is either a FUNCTIONAL object or part of a RHYTHM
+# (a repeated module). Pure "so it is not empty" filler — screws, small slot rows, gussets, frame lines — is not added:
+# Satisfactory reads details large and functional, not as fine hard-surface noise.
+
+
 def _detail_console(M, exp, segs):
+    """Rear service panels (access from the window side) with one seam; seams between the control groups on the deck;
+    a service cover on the outer side of each end tower."""
     d = CONSOLE_DEPTH
     for name, P, w, rot, s in segs:
-        # rear face (towards the window, visible from outside): two access panels, seams, slot row, screws
         ry = -d / 2 - 0.011
         for j, u in enumerate((-w / 4, w / 4)):
             bevel(box(f"CONSOLE_rear_{name}_{j}", (*P(u, ry), F + 0.5), (w / 2 - 0.14, 0.02, 0.66), M["M_MetalLight"], exp,
                       rot_z=rot), 0.012)
-            _screws(f"CONSOLE_rear_{name}_{j}", [(*P(u + a * (w / 4 - 0.12), ry - 0.012), F + z) for a in (-1, 1)
-                                                for z in (0.22, 0.78)], M, exp, rot_z=rot)
-            _slots(f"CONSOLE_rear_{name}_{j}", lambda o, u=u: (*P(u + o, ry - 0.011), F + 0.7), 5, 0.09, (0.05, 0.006, 0.12),
-                   M, exp, rot_z=rot)
         box(f"CONSOLE_rear_{name}_seam", (*P(0, ry - 0.002), F + 0.5), (0.02, 0.006, 0.8), M["M_Rubber"], exp, rot_z=rot)
-        # deck: seams between control groups + corner screws; shelf seams
         pt, drot = _deck(P, rot)
         for u in ((-0.55, 0.55) if name == "centre" else (0.0,)):
             box(f"CONTROL_DECK_{name}_seam_{u:+.2f}", pt(u, DECK_LEN / 2, 0.003), (0.012, DECK_LEN * 0.92, 0.004), M["M_Rubber"],
                 exp, rot=drot)
-        for k, (u, v) in enumerate(((-w / 2 + 0.06, 0.04), (w / 2 - 0.06, 0.04), (-w / 2 + 0.06, DECK_LEN - 0.04),
-                                    (w / 2 - 0.06, DECK_LEN - 0.04))):
-            box(f"CONTROL_DECK_{name}_screw_{k}", pt(u, v, 0.004), (0.03, 0.03, 0.008), M["M_MetalBare"], exp, rot=drot)
-        for u in ((-0.8, 0.8) if name == "centre" else (0.0,)):
-            box(f"CONSOLE_shelf_{name}_seam_{u:+.1f}", (*P(u, -0.3), F + 1.206), (0.015, 0.22, 0.004), M["M_Rubber"], exp,
-                rot_z=rot)
         if name == "centre":
             continue
-        # tech tower outer side: two onlay plates, slot row, bolts
-        lx = s * (WING_W / 2 + 0.3)
-        side_lx = lx + s * 0.301
-        for j, z in enumerate((0.55, 1.3)):
-            bevel(box(f"CONSOLE_TOWER_{name}_side_{j}", (*P(side_lx + s * 0.01, 0.0), F + z), (0.02, 0.7, 0.55), M["M_MetalLight"],
-                      exp, rot_z=rot), 0.012)
-            _screws(f"CONSOLE_TOWER_{name}_side_{j}", [(*P(side_lx + s * 0.022, b * 0.3), F + z + c * 0.22) for b in (-1, 1)
-                                                      for c in (-1, 1)], M, exp, rot_z=rot + math.pi / 2)
-        _slots(f"CONSOLE_TOWER_{name}_side", lambda o: (*P(side_lx + s * 0.012, o), F + 1.62), 6, 0.1, (0.006, 0.05, 0.1),
-               M, exp, rot_z=rot)
-    # screws on the joint pillars
-    for name, P, w, rot, s in segs[1:]:
-        inner = (CONSOLE_X + s * CONSOLE_W / 2, CONSOLE_Y)
-        jp = _frame(*inner, rot / 2)
-        _screws(f"CONSOLE_JOINT_{name}", [(*jp(0, CONSOLE_DEPTH / 2 + 0.075), F + z) for z in (0.15, 0.95)], M, exp,
-                rot_z=rot / 2)
+        side_lx = s * (WING_W / 2 + 0.3) + s * 0.301
+        bevel(box(f"CONSOLE_TOWER_{name}_side_cover", (*P(side_lx + s * 0.01, 0.0), F + 0.9), (0.02, 0.7, 1.2),
+                  M["M_MetalLight"], exp, rot_z=rot), 0.012)
 
 
 def _detail_door_walls(M, exp, door):
-    """Back wall around the door: split upper panels with onlay vent plates, dado slots, gussets, kick plates."""
+    """Panel-split seams on the upper panels next to the door (rhythm) and kick plates on the casing (function)."""
     door_x0, door_x1, door_h = door
     uz0, uz1 = F + 0.96, WALL_TOP - 0.15
     for name, a0, a1 in (("terminal", -3.92, door_x0 - 0.38), ("logo_r", 2.9 - 0.4, 2.87)):
-        ac, ln = (a0 + a1) / 2, a1 - a0
-        box(f"WALL_B_{name}_seam_h", _wp("B", ac, 0.052, uz0 + 1.4), _ws("B", ln - 0.06, 0.006, 0.02), M["M_Rubber"], exp)
-    a0, a1 = -3.92, door_x0 - 0.45                          # terminal zone upper panel
-    ac, ln = (a0 + a1) / 2, a1 - a0
+        box(f"WALL_B_{name}_seam_h", _wp("B", (a0 + a1) / 2, 0.052, uz0 + 1.4), _ws("B", a1 - a0 - 0.06, 0.006, 0.02),
+            M["M_Rubber"], exp)
+    ac = (-3.92 + door_x0 - 0.45) / 2
     box("WALL_B_terminal_seam_v", _wp("B", ac, 0.052, (uz0 + uz1) / 2), _ws("B", 0.02, 0.006, uz1 - uz0 - 0.06), M["M_Rubber"],
         exp)
-    for j, sgn in enumerate((-1, 1)):
-        u = ac + sgn * ln / 4
-        bevel(box(f"WALL_B_terminal_plate_{j}", _wp("B", u, 0.06, uz0 + 2.2), _ws("B", ln / 2 - 0.2, 0.02, 0.7), M["M_MetalDark"],
-                  exp), 0.012)
-        _slots(f"WALL_B_terminal_plate_{j}", lambda o, u=u: _wp("B", u + o, 0.071, uz0 + 2.2), 4, 0.1, (0.05, 0.006, 0.4),
-               M, exp)
-        _screws(f"WALL_B_terminal_plate_{j}", [_wp("B", u + a * (ln / 4 - 0.14), 0.072, uz0 + 2.2 + c * 0.3)
-                                             for a in (-1, 1) for c in (-1, 1)], M, exp)
-    _slots("WALL_B_terminal_dado", lambda o: _wp("B", ac + o, 0.061, F + 0.72), 7, 0.11, (0.06, 0.006, 0.18), M, exp)
-    # door casing: gusset plates at the casing / header joints, kick plates, mid seams
     cw = 0.42
     for s, xc in ((-1, door_x0 - cw / 2), (1, door_x1 + cw / 2)):
-        bevel(box(f"DOOR_IN_gusset_{s:+d}", (xc + s * 0.05, YW - 0.205, door_h - 0.05), (0.26, 0.012, 0.26), M["M_MetalLight"],
-                  exp, rot=(0, math.radians(45), 0)), 0.012)
-        _screws(f"DOOR_IN_gusset_{s:+d}", [(xc + s * 0.05 + a * 0.07, YW - 0.215, door_h - 0.05 + a * 0.07 * b)
-                                          for a in (-1, 1) for b in (-1, 1)], M, exp)
         bevel(box(f"DOOR_IN_kick_{s:+d}", (xc, YW - 0.206, 0.18), (cw - 0.06, 0.012, 0.3), M["M_MetalBare"], exp), 0.012)
-        box(f"DOOR_IN_casing_{s:+d}_seam", (xc, YW - 0.201, door_h * 0.55), (cw - 0.04, 0.004, 0.02), M["M_Rubber"], exp)
-    # logo panel: inner frame line + screws
-    lx0, lx1 = door_x1 + 0.35, 2.9
-    for k, (cx, cz, sx, sz) in enumerate((((lx0 + lx1) / 2, uz0 + 0.12, lx1 - lx0 - 0.3, 0.02),
-                                          ((lx0 + lx1) / 2, uz1 - 0.12, lx1 - lx0 - 0.3, 0.02),
-                                          (lx0 + 0.15, (uz0 + uz1) / 2, 0.02, uz1 - uz0 - 0.24),
-                                          (lx1 - 0.15, (uz0 + uz1) / 2, 0.02, uz1 - uz0 - 0.24))):
-        box(f"WALL_logo_panel_frame_{k}", (cx, YW - 0.082, cz), (sx, 0.006, sz), M["M_Rubber"], exp)
-    _screws("WALL_logo_panel", [(x, YW - 0.086, z) for x in (lx0 + 0.08, lx1 - 0.08) for z in (uz0 + 0.06, uz1 - 0.06)], M, exp)
-
-
-def _detail_holo_base(M, exp):
-    hx, hy = HOLO_XY
-    side_p = 2 * 1.35 * math.sin(math.pi / 8)
-    for i in range(8):
-        (px, py), a = _facet_frame(hx, hy, i, 1.35)
-        rz = a - math.pi / 2
-        for k in range(4):                                     # slot row on every plinth facet
-            o = (k - 1.5) * 0.16
-            box(f"HOLO_PEDESTAL_plinth_{i}_slot_{k}", (px + 0.004 * math.cos(a) - o * math.sin(a), py + 0.004 * math.sin(a)
-                + o * math.cos(a), F + 0.1), (0.1, 0.008, 0.06), M["M_Rubber"], exp, rot_z=rz)
-        va = math.pi / 8 + i * math.pi / 4                     # bolts on the plinth corners
-        box(f"HOLO_PEDESTAL_plinth_bolt_{i}", (hx + 1.27 * math.cos(va), hy + 1.27 * math.sin(va), F + 0.206), (0.04, 0.04, 0.012),
-            M["M_MetalBare"], exp, rot_z=va)
-        # radial seams + screws on the top plate
-        box(f"HOLO_PEDESTAL_top_seam_{i}", (hx + 1.17 * math.cos(va), hy + 1.17 * math.sin(va), F + 0.942), (0.14, 0.012, 0.004),
-            M["M_Rubber"], exp, rot_z=va)
-        box(f"HOLO_PEDESTAL_top_screw_{i}", (hx + 1.17 * math.cos(a), hy + 1.17 * math.sin(a), F + 0.944), (0.03, 0.03, 0.008),
-            M["M_MetalBare"], exp)
-        # four screws on each facet panel
-        (fx, fy), _ = _facet_frame(hx, hy, i, 1.18)
-        side = 2 * 1.18 * math.sin(math.pi / 8)
-        for u in (-(side / 2 - 0.08), side / 2 - 0.08):
-            for z in (F + 0.27, F + 0.73):
-                box(f"HOLO_PEDESTAL_panel_{i}_screw_{u:+.2f}_{z:.2f}", (fx + 0.006 * math.cos(a) - u * math.sin(a),
-                    fy + 0.006 * math.sin(a) + u * math.cos(a), z), SCREW, M["M_MetalBare"], exp, rot_z=rz)
-    del side_p
 
 
 def _detail_ceiling(M, exp):
+    """Splice plates where the beams cross (structure) and joints of the window header segments (rhythm)."""
     zc = CEIL
-    for i, x in enumerate(BEAMS_X):                           # splice plates where the beams cross
+    for i, x in enumerate(BEAMS_X):
         for j, y in enumerate(LONG_Y):
             bevel(box(f"CEILING_splice_{i}_{j}", (x, y, zc - 0.272), (0.5, 0.5, 0.02), M["M_MetalLight"], exp), 0.012)
-            for a in (-1, 1):
-                for b in (-1, 1):
-                    box(f"CEILING_splice_{i}_{j}_bolt_{a:+d}{b:+d}", (x + a * 0.18, y + b * 0.18, zc - 0.287), (0.04, 0.04, 0.012),
-                        M["M_MetalBare"], exp)
-    bays = [CEIL_FLAT_X[0]] + list(BEAMS_X) + [CEIL_FLAT_X[1]]
-    for i, (x0, x1) in enumerate(zip(bays[:-1], bays[1:])):
-        if i == 3:
-            continue
-        xc, bw = (x0 + x1) / 2, x1 - x0
-        box(f"CEILING_panel_{i}_seam_x", (xc, -1.0, zc - 0.032), (bw - 0.4, 0.02, 0.004), M["M_Rubber"], exp)
-        box(f"CEILING_panel_{i}_seam_y", (xc + (0.0 if bw < 2 else bw / 4), 0.0, zc - 0.032), (0.02, 2.8, 0.004), M["M_Rubber"],
-            exp)
-        for a in (-1, 1):
-            for b in (-1, 1):
-                box(f"CEILING_panel_{i}_screw_{a:+d}{b:+d}", (xc + a * (bw / 2 - 0.24), b * 1.33, zc - 0.034), (0.03, 0.03, 0.008),
-                    M["M_MetalBare"], exp)
     span = CEIL_FLAT_X[1] - CEIL_FLAT_X[0]
-    for k in range(1, 6):                                      # header beam segment joints with bolt pairs
+    for k in range(1, 6):
         x = CEIL_FLAT_X[0] + k * span / 6
         box(f"CEILING_header_beam_seam_{k}", (x, -2.33, zc - 0.242), (0.02, 0.37, 0.006), M["M_Rubber"], exp)
-        for b in (-1, 1):
-            box(f"CEILING_header_beam_bolt_{k}_{b:+d}", (x + b * 0.08, -2.33, zc - 0.246), (0.035, 0.035, 0.012), M["M_MetalBare"],
-                exp)
 
 
 def _detail_window_band(M, exp):
-    """Interior lower band under the window (right of the console): split onlay panels, kick plate, slots, screws,
-    plus an interior window ledge on brackets."""
+    """Interior window ledge on brackets along the glazing."""
     x0, x1 = 0.45, 6.5
     bevel(box("WALL_F_ledge", ((x0 + x1) / 2, -YW + 0.13, 2.13), (x1 - x0, 0.26, 0.05), M["M_MetalLight"], exp), 0.012)
     box("WALL_F_ledge_trim", ((x0 + x1) / 2, -YW + 0.262, 2.13), (x1 - x0, 0.012, 0.05), M["M_PaintOrange"], exp)
     for k in range(7):
         x = x0 + 0.3 + k * (x1 - x0 - 0.6) / 6
         box(f"WALL_F_ledge_bracket_{k}", (x, -YW + 0.1, 2.05), (0.05, 0.18, 0.12), M["M_MetalDark"], exp)
-        box(f"WALL_F_ledge_bolt_{k}", (x, -YW + 0.2, 2.158), (0.035, 0.035, 0.008), M["M_MetalBare"], exp)
 
 
 def build_surface_detail(M, exp, segs, door):
     _detail_console(M, exp, segs)
     _detail_door_walls(M, exp, door)
-    _detail_holo_base(M, exp)
     _detail_ceiling(M, exp)
     _detail_window_band(M, exp)
 
@@ -1233,14 +1140,10 @@ def build_window_band(M, exp):
         n = f"WALL_F_band_{i}_{kind}"
         if kind == "service":
             bevel(box(n, _wp("F", ac, 0.07, zm), _ws("F", w, 0.04, hm), M["M_MetalLight"], exp), 0.012)
-            _screws(n, [_wp("F", ac + a * (w / 2 - 0.07), 0.092, zm + c * (hm / 2 - 0.07)) for a in (-1, 1) for c in (-1, 1)],
-                    M, exp)
             for s in (-1, 1):
                 box(f"{n}_latch_{s:+d}", _wp("F", ac + s * (w / 2 - 0.12), 0.095, zm), _ws("F", 0.05, 0.02, 0.09), M["M_MetalDark"], exp)
             box(f"{n}_handle", _wp("F", ac, 0.1, zm - 0.15), _ws("F", min(0.3, w - 0.3), 0.02, 0.035), M["M_MetalBare"], exp)
             box(f"{n}_label", _wp("F", ac, 0.092, zm + 0.16), _ws("F", min(0.36, w - 0.25), 0.004, 0.08), M["M_Hazard"], exp)
-            _slots(n, lambda o, ac=ac: _wp("F", ac + o, 0.091, zm + 0.02), max(2, int((w - 0.3) / 0.1)), 0.1, (0.05, 0.006, 0.12),
-                   M, exp)
         elif kind == "vent":
             for s in (-1, 1):
                 box(f"{n}_frame_{s:+d}", _wp("F", ac + s * (w / 2 - 0.03), 0.09, zm), _ws("F", 0.06, 0.06, hm), M["M_MetalDark"], exp)
