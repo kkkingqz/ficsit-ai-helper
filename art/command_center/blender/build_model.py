@@ -33,7 +33,11 @@ MULLION_X = 2.4
 TILT = math.radians(15)                         # glass leans inwards at the top
 PYLON = 2.2                                     # corner pylon wraps this much of each face
 ARMOR_T = 0.18                                  # pylon skin thickness
-CORE = 0.12                                     # plinth core inset; panels bring it back to 16 x 8
+CORE = 0.12                                     # plinth core inset behind the module faces
+PLINTH_SETBACK = 0.12                           # plinth body stands back from the mounting plate edge
+PLATFORM_H = 0.15                               # bolted mounting plate on the foundation (full 16 x 8)
+KICK_Z = 0.3                                    # shadow recess between plate and modules
+CORNER_WRAP = 1.7                               # corner supports wrap this much of each face
 LOUVRE_PYLONS = ((-1, -1), (-1, 1), (1, 1))     # front-right pylon carries the logo instead
 # upper front band: separate orange sections (deliberately unequal widths) around a dark visor seat
 FRONT_SECTIONS = ((-5.75, -3.6), (-3.52, -2.18), (2.18, 4.1), (4.18, 5.75))
@@ -81,7 +85,7 @@ def face_panels(prefix, side, spans, z0, z1, depth, mat, coll, gap=0.08, recess=
     for i, (a0, a1) in enumerate(spans):
         a0, a1 = a0 + gap / 2, a1 - gap / 2
         c, l = (a0 + a1) / 2, a1 - a0
-        n = half - recess - depth / 2
+        n = half - PLINTH_SETBACK - recess - depth / 2
         if side == "-y":
             ctr, size = (c, -n, (z0 + z1) / 2), (l, depth, z1 - z0)
         elif side == "+y":
@@ -118,6 +122,7 @@ def on_chamfer(name, mid, normal_axis, sign, size, offset, mat, coll):
 
 def face_pt(side, a, inward, z):
     """World point on an outer footprint face: a = coordinate along the face, inward = distance from the edge."""
+    inward += PLINTH_SETBACK
     if side == "-y":
         return (a, -D / 2 + inward, z)
     if side == "+y":
@@ -136,8 +141,8 @@ def plinth_face(side, mods, pilasters, M, exp, ref):
     tag = {"-y": "f", "+y": "b", "-x": "L", "+x": "R"}[side]
     for i, (a0, a1, kind) in enumerate(mods):
         ac = (a0 + a1) / 2
-        if kind in ("vent", "power"):
-            plinth_bay(side, tag, i, a0, a1, kind, M, exp)
+        if kind in ("vent", "power", "power_socket"):
+            plinth_bay(side, tag, i, a0, a1, kind, M, exp, ref)
             continue
         if kind == "service":
             plinth_service(side, tag, i, a0, a1, M, exp)
@@ -151,7 +156,7 @@ def plinth_face(side, mods, pilasters, M, exp, ref):
                 bevel(box(f"BASE_hatch_{tag}{i}_{k}", face_pt(side, h, 0.035, 1.45), face_size(side, 0.9, 0.03, 0.42),
                           M["M_MetalLight"], exp), 0.01)
             continue
-        blk = face_panels(f"BASE_PANELS_{tag}{i}", side, [(a0, a1)], 0.2, 1.84, CORE + 0.02, M["M_MetalDark"], exp,
+        blk = face_panels(f"BASE_PANELS_{tag}{i}", side, [(a0, a1)], KICK_Z, 1.84, CORE + 0.02, M["M_MetalDark"], exp,
                           recess=0.05)[0]
         if kind == "light":
             boolean(blk, box("tmp_niche", face_pt(side, ac, 0.0, 0.75), face_size(side, 1.0, 0.16, 0.34),
@@ -176,13 +181,16 @@ def plinth_face(side, mods, pilasters, M, exp, ref):
             bevel(box(f"BASE_hatch_{tag}{i}", face_pt(side, ac, 0.035, 1.25), face_size(side, 0.7, 0.03, 0.5),
                       M["M_MetalLight"], exp), 0.01)
     for k, a_ in enumerate(pilasters):
-        face_panels(f"BASE_PILASTER_{tag}{k}", side, [(a_ - 0.2, a_ + 0.2)], 0.15, 1.86, 0.25, M["M_MetalDark"], exp,
+        face_panels(f"BASE_PILASTER_{tag}{k}", side, [(a_ - 0.2, a_ + 0.2)], PLATFORM_H, 1.86, 0.25, M["M_MetalDark"], exp,
                     gap=0.0, bev=0.06)
         box(f"LIGHTS_indicator_{tag}{k}", face_pt(side, a_, 0.0095, 1.6), face_size(side, 0.18, 0.015, 0.06),
             M["M_Beacon"], exp)
+        for b, da in enumerate((-0.13, 0.13)):   # anchor bolts on the mounting plate ledge
+            cylinder(f"BASE_bolt_{tag}{k}_{b}", face_pt(side, a_ + da, -0.06, PLATFORM_H + 0.015), 0.03, 0.03,
+                     M["M_MetalLight"], exp, 8)
 
 
-def plinth_bay(side, tag, i, a0, a1, kind, M, exp):
+def plinth_bay(side, tag, i, a0, a1, kind, M, exp, ref=None):
     """Front side bays: same hazard strip, different function above it (ventilation vs. power)."""
     ac = (a0 + a1) / 2
     box(f"DECALS_hazard_{tag}{i}", face_pt(side, ac, CORE + 0.01, 0.62), face_size(side, a1 - a0 - 0.3, 0.04, 0.5),
@@ -212,13 +220,24 @@ def plinth_bay(side, tag, i, a0, a1, kind, M, exp):
         for g in (-0.2, 0.0, 0.2):   # cable glands under the breaker box
             cylinder(f"POWER_gland_{tag}{i}_{k}_{g:+.1f}", face_pt(side, bx_ + g, 0.035, 1.09), 0.035, 0.1,
                      M["M_Rubber"], exp, 8)
+    if kind == "power_socket":     # external power connection point (open question §6.1) at the bay end
+        sx_ = a1 - 0.7
+        bevel(box("POWER_SOCKET", face_pt(side, sx_, 0.035, 1.42), face_size(side, 0.6, 0.06, 0.5), M["M_MetalLight"],
+                  exp), 0.015)
+        cylinder("POWER_SOCKET_plug", face_pt(side, sx_, 0.0, 1.42), 0.14, 0.02, M["M_Rubber"], exp, 12,
+                 axis="Y" if side[1] == "y" else "X")
+        cylinder("POWER_SOCKET_ring", face_pt(side, sx_, 0.004, 1.42), 0.17, 0.008, M["M_Beacon"], exp, 12,
+                 axis="Y" if side[1] == "y" else "X")
+        e = bpy.data.objects.new("SOCKET_power", None)
+        e.location = face_pt(side, sx_, -0.01, 1.42)
+        ref.objects.link(e)
 
 
 def plinth_service(side, tag, i, a0, a1, M, exp):
     """Main service block in the middle of the front plinth: proud housing with a recessed bay holding
     a latched service cover, connector panel, status screen and a light strip; hazard edging."""
     ac = (a0 + a1) / 2
-    blk = face_panels(f"BASE_SERVICE_{tag}{i}", side, [(a0, a1)], 0.2, 1.84, CORE + 0.12, M["M_MetalDark"], exp,
+    blk = face_panels(f"BASE_SERVICE_{tag}{i}", side, [(a0, a1)], KICK_Z, 1.84, CORE + 0.12, M["M_MetalDark"], exp,
                       recess=0.0, bev=0.05)[0]
     boolean(blk, box("tmp_sb", face_pt(side, ac, 0.0, 0.98), face_size(side, a1 - a0 - 0.5, 0.16, 1.3),
                      M["M_MetalDark"], exp))   # bay floor 0.08 in from the edge
@@ -561,7 +580,8 @@ def build(mats, exp, ref):
     win_depth = (fy - 0.5, fy + 1.7)      # window cutter: through the wall and under the chamfer
 
     # ===================================================================== PLINTH
-    base = prism("BASE", chamfer_rect(W / 2 - CORE, D / 2 - CORE, 1.0), "z", 0.0, BASE_H, M["M_MetalDark"], exp)
+    base = prism("BASE", chamfer_rect(W / 2 - CORE - PLINTH_SETBACK, D / 2 - CORE - PLINTH_SETBACK, 1.0), "z", 0.0,
+                 BASE_H, M["M_MetalDark"], exp)
     boolean(base, shell_volume("tmp_in", WALL, FLOOR_Z, M["M_MetalDark"], exp, CEIL))
     wall_in = D / 2 - SHELL_INSET - WALL
     pit_y0 = wall_in - 4 * 0.3
@@ -573,41 +593,55 @@ def build(mats, exp, ref):
         h = 0.25 * (i + 1)
         bevel(box(f"STEPS_{i}", (DOOR_X, wall_in - 0.3 * i - 0.15, h / 2), (DOOR_W + 0.2, 0.3, h),
                   M["M_MetalLight"], exp), 0.02)
-    skirt = prism("BASE_skirt", chamfer_rect(W / 2, D / 2, 1.05), "z", 0.0, 0.15, M["M_MetalLight"], exp)
-    boolean(skirt, box("tmp_sd", (DOOR_X, D / 2, 0.1), (DOOR_W, 1.0, 0.4), M["M_MetalLight"], exp))
-    bevel(skirt, 0.03)
+    # bolted mounting plate: the only part that reaches the 16 x 8 edge, so the plinth reads as set on a platform
+    # dark so it separates from the grey foundation; the bevel catches a light edge
+    plate = prism("BASE_platform", chamfer_rect(W / 2, D / 2, 1.05), "z", 0.0, PLATFORM_H, M["M_MetalDark"], exp)
+    boolean(plate, box("tmp_sd", (DOOR_X, D / 2, 0.1), (DOOR_W, 1.0, 0.4), M["M_MetalLight"], exp))
+    for x in (-W / 4, W / 4):              # joints between the plate segments, one per foundation half
+        boolean(plate, box("tmp_pj", (x, 0, PLATFORM_H), (0.03, D + 1, 0.04), M["M_MetalDark"], exp))
+    boolean(plate, box("tmp_pj", (0, 0, PLATFORM_H), (0.03, D + 1, 0.04), M["M_MetalDark"], exp))
+    bevel(plate, 0.04)
 
-    # plinth modules on all four faces (concept: same rhythm front and back, hazard bay in the middle of the sides)
-    fx = W / 2 - 1.0 - CORE
-    sy = D / 2 - 1.0 - CORE
-    dl, dr = DOOR_X - DOOR_W / 2 - 0.25, DOOR_X + DOOR_W / 2 + 0.25          # door bay in the back
+    # plinth: one structural rhythm on every face — corner | intermediate | central | intermediate | corner
+    cfx, cfy = W / 2 - CORNER_WRAP, D / 2 - CORNER_WRAP      # where the corner supports start
+    mx0, mx1 = BACK_MODULE_X
     layout = {
-        "-y": ([(-fx, -5.3, "light"), (-5.3, -1.7, "vent"), (-1.7, 1.7, "service"), (1.7, 5.3, "power"),
-                (5.3, fx, "light")], (-5.3, -1.7, 1.7, 5.3)),
-        # back: the rear service module (BACK_MODULE_X) replaces the plinth in the door span
-        "+y": ([(-fx, -5.3, "light"), (-5.3, BACK_MODULE_X[0] - 0.4, "hazard"), (BACK_MODULE_X[1] + 0.4, 2.6, "socket"),
-                (2.6, 5.3, "hazard"), (5.3, fx, "light")],
-               (-5.3, BACK_MODULE_X[0] - 0.2, BACK_MODULE_X[1] + 0.2, 2.6, 5.3)),
-        "-x": ([(-sy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, sy, "plain")], (-1.2, 1.2)),
-        "+x": ([(-sy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, sy, "plain")], (-1.2, 1.2)),
+        "-y": ([(-cfx, -1.7, "vent"), (-1.7, 1.7, "service"), (1.7, cfx, "power")], (-1.7, 1.7)),
+        # back: the rear service module around the door is the central element
+        "+y": ([(-cfx, mx0 - 0.4, "vent"), (mx1 + 0.4, cfx, "power_socket")], (mx0 - 0.2, mx1 + 0.2)),
+        "-x": ([(-cfy, -1.2, "vent"), (-1.2, 1.2, "hazard"), (1.2, cfy, "vent")], (-1.2, 1.2)),     # technical side
+        "+x": ([(-cfy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, cfy, "plain")], (-1.2, 1.2)),   # cleaner side
     }
     for side, (mods, pilasters) in layout.items():
         plinth_face(side, mods, pilasters, M, exp, ref)
-    # chunky corner blocks wrapping the 45° plinth corners
+    # corner supports: heavy L-blocks wrapping the 45° corners, with a light niche, a seam and anchor bolts
+    ox, oy = W / 2 - PLINTH_SETBACK, D / 2 - PLINTH_SETBACK
     for s_x in (-1, 1):
         for s_y in (-1, 1):
-            cb = prism(f"BASE_CORNER_{s_x:+d}{s_y:+d}", chamfer_rect(W / 2, D / 2, 1.0), "z", 0.15, 1.86,
+            cb = prism(f"BASE_CORNER_{s_x:+d}{s_y:+d}", chamfer_rect(ox, oy, 1.0), "z", PLATFORM_H, 2.05,
                        M["M_MetalDark"], exp)
-            boolean(cb, box("tmp_cq", (s_x * (W / 2 - 0.75), s_y * (D / 2 - 0.75), 1.0), (1.5, 1.5, 3.0), None, exp),
-                    "INTERSECT")
-            boolean(cb, prism("tmp_cc", chamfer_rect(W / 2 - 0.22, D / 2 - 0.22, 0.95), "z", -1, 3, None, exp))
-            bevel(cb, 0.06)
+            boolean(cb, box("tmp_cq", (s_x * (W / 2 - CORNER_WRAP / 2), s_y * (D / 2 - CORNER_WRAP / 2), 1.0),
+                            (CORNER_WRAP, CORNER_WRAP, 3.0), None, exp), "INTERSECT")
+            boolean(cb, prism("tmp_cc", chamfer_rect(ox - 0.3, oy - 0.3, 0.88), "z", -1, 3, None, exp))
+            seam = prism("tmp_cs", chamfer_rect(W / 2 + 0.5, D / 2 + 0.5, 1.0), "z", 1.48, 1.52, M["M_Rubber"], exp)
+            boolean(seam, prism("tmp_csi", chamfer_rect(ox - 0.04, oy - 0.04, 1.0), "z", 0, 3, None, exp))
+            boolean(cb, seam)
+            lx = s_x * (W / 2 - CORNER_WRAP + (CORNER_WRAP - 1.0) / 2 + 0.05)   # middle of the flat front/back part
+            boolean(cb, box("tmp_cn", (lx, s_y * oy, 0.9), (0.5, 0.16, 0.32), M["M_MetalLight"], exp))
+            bevel(cb, 0.07)
+            box(f"LIGHTS_base_corner_{s_x:+d}{s_y:+d}", (lx, s_y * (oy - 0.065), 0.9), (0.42, 0.03, 0.24),
+                M["M_LightWarm"], exp)
+            for b, (bx_, by_) in enumerate(((lx - 0.25, s_y * (oy + 0.06)), (lx + 0.25, s_y * (oy + 0.06)),
+                                           (s_x * (ox + 0.06), s_y * (D / 2 - 1.3)), (s_x * (ox + 0.06), s_y * (D / 2 - 0.85)))):
+                cylinder(f"BASE_bolt_corner_{s_x:+d}{s_y:+d}_{b}", (bx_, by_, PLATFORM_H + 0.015), 0.03, 0.03,
+                         M["M_MetalLight"], exp, 8)
     # light-metal cap ledge on top of the plinth, open at the door
     cap = prism("BASE_cap", chamfer_rect(W / 2, D / 2, 1.0), "z", 1.86, 1.98, M["M_MetalLight"], exp)
     boolean(cap, prism("tmp_capi", chamfer_rect(W / 2 - 0.4, D / 2 - 0.4, 0.85), "z", 1.0, 3.0, None, exp))
     boolean(cap, box("tmp_capd", (DOOR_X, D / 2, 1.9), (BACK_MODULE_X[1] - BACK_MODULE_X[0], 1.2, 0.5), None, exp))
-    for side, (_, pilasters) in layout.items():   # segment joints above every pilaster
-        for a_ in pilasters:
+    joints = {"-y": (cfx, -cfx), "+y": (cfx, -cfx), "-x": (cfy, -cfy), "+x": (cfy, -cfy)}
+    for side, (_, pilasters) in layout.items():   # segment joints above every pilaster and corner support
+        for a_ in tuple(pilasters) + joints[side]:
             c_ = face_pt(side, a_, 0.0, 1.98)
             boolean(cap, box("tmp_capj", c_, face_size(side, 0.04, 0.9, 0.05), M["M_MetalDark"], exp))
     bevel(cap, 0.02)
@@ -615,8 +649,8 @@ def build(mats, exp, ref):
     for s_x in (-1, 1):
         for s_y in (-1, 1):
             k = math.sqrt(0.5)
-            box(f"LIGHTS_indicator_corner_{s_x:+d}{s_y:+d}", (s_x * (W / 2 - 0.5) - s_x * k * 0.005,
-                s_y * (D / 2 - 0.5) - s_y * k * 0.005, 1.6), (0.3, 0.015, 0.07), M["M_Beacon"], exp,
+            box(f"LIGHTS_indicator_corner_{s_x:+d}{s_y:+d}", (s_x * (ox - 0.5) + s_x * k * 0.004,
+                s_y * (oy - 0.5) + s_y * k * 0.004, 1.75), (0.3, 0.015, 0.07), M["M_Beacon"], exp,
                 rot_z=math.atan2(s_x, -s_y))
 
     # ===================================================================== FLOOR
