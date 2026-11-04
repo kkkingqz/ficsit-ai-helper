@@ -314,6 +314,7 @@ def render_all(out, only=None):
         "07_interior": ((6.8, 2.6, 2.8), (-3.0, -3.0, 2.6), None, 18),
         "09_rear_three_quarter": ((14.0, 17.0, 5.5), (0.0, 1.0, 3.0), None, 35),
         "10_left_three_quarter": ((-19.0, -6.0, 5.0), (-6.0, -0.3, 3.4), None, 35),
+        "11_right_three_quarter": ((19.0, -6.0, 6.5), (6.0, 0.3, 3.8), None, 35),
     }
     for name, (loc, tgt, ortho, lens) in shots.items():
         if only and name not in only:

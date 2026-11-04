@@ -48,6 +48,11 @@ BACK_BAND_Z = (4.0, 5.5)            # upper band over the module: hatch | radiat
 # left side = external utility cluster (y ranges; front is -y)
 LEFT_TRENCH_Y = (-1.73, -0.05)      # recessed pipe run between pump block and header
 LEFT_TECH_Y = (0.05, 1.73)          # tall vertical tech block
+# right side = electrical / comms side
+RIGHT_CABINET_Y = (-1.65, 0.15)     # light-grey double-door electrical cabinet
+RIGHT_NICHE_Y = (0.3, 0.9)          # vertical cable riser niche (cut into the wall)
+RIGHT_IFACE_Y = (1.0, 1.65)         # small interface block + cable entry
+COMMS_XY = (5.15, 0.6)              # beacon pedestal on the roof, in line with the riser
 
 
 def outer_shell(name, inset, z0, top, mat, coll):
@@ -476,6 +481,76 @@ def build_left_utility(M, exp, sx_out):
         lbox(f"LEFT_TECHBLOCK_cap_{k}", vy0 - 0.03, vy1 + 0.03, z0_, z1_, 0.19, M["M_PaintOrange"], 0.02)
 
 
+def build_right_service(M, exp, sx_out):
+    """Right side = electrical / comms side (no pipes): grey double-door cabinet with round exhaust vents,
+    a cable riser niche feeding the roof comms node, an interface block with a cable entry below."""
+    wx = sx_out
+    k = math.sqrt(0.5)
+
+    def rbox(name, y0, y1, z0, z1, depth, mat, bev_w=0.03):
+        return bevel(box(name, (wx + depth / 2 - 0.01, (y0 + y1) / 2, (z0 + z1) / 2), (depth + 0.02, y1 - y0, z1 - z0),
+                         mat, exp), bev_w)
+
+    # ---- electrical cabinet (light grey to set it apart from the dark left side) --------------
+    cy0, cy1 = RIGHT_CABINET_Y
+    cz0, cz1 = BASE_H + 0.1, 4.85
+    face = wx + 0.16
+    cab = box("RIGHT_CABINET", (wx + 0.075, (cy0 + cy1) / 2, (cz0 + cz1) / 2), (0.17, cy1 - cy0, cz1 - cz0),
+              M["M_MetalLight"], exp)
+    seam = (cy0 + cy1) / 2
+    boolean(cab, box("tmp_rcs", (face, seam, (cz0 + cz1) / 2), (0.04, 0.03, cz1 - cz0 - 0.15), M["M_MetalDark"], exp))
+    for j, (a, b) in enumerate(((cy0 + 0.12, seam - 0.1), (seam + 0.1, cy1 - 0.12))):   # recessed door fields
+        boolean(cab, box("tmp_rcf", (face, (a + b) / 2, (cz0 + cz1) / 2 - 0.15), (0.03, b - a, cz1 - cz0 - 0.9),
+                         M["M_MetalLight"], exp))
+    bevel(cab, 0.03)
+    for j, y in enumerate((cy0 + 0.04, cy1 - 0.04)):                                 # hinges
+        for h, z in enumerate((2.6, 3.5, 4.4)):
+            cylinder(f"RIGHT_CABINET_hinge_{j}_{h}", (face + 0.0, y, z), 0.035, 0.2, M["M_MetalDark"], exp, 8)
+    for j, y in enumerate((seam - 0.12, seam + 0.12)):                               # handles
+        box(f"RIGHT_CABINET_handle_{j}", (face + 0.02, y, 3.55), (0.03, 0.05, 0.42), M["M_MetalDark"], exp)
+    box("RIGHT_CABINET_window", (face + 0.004, (cy0 + seam) / 2, 4.3), (0.006, 0.45, 0.3), M["M_ScreenStatic"], exp)
+    box("RIGHT_CABINET_window_frame", (face + 0.002, (cy0 + seam) / 2, 4.3), (0.004, 0.55, 0.4), M["M_MetalDark"], exp)
+    box("RIGHT_CABINET_hazard", (face + 0.004, (seam + cy1) / 2, 4.3), (0.006, 0.4, 0.4), M["M_Hazard"], exp)
+    box("RIGHT_CABINET_plate", (face + 0.004, (seam + cy1) / 2, 2.6), (0.006, 0.5, 0.14), M["M_MetalDark"], exp)
+    # ---- round exhaust vents above the cabinet (different shape from the left louvres) --------
+    rbox("RIGHT_VENT_band", cy0, cy1, cz1 + 0.08, 5.35, 0.09, M["M_MetalDark"], 0.02)
+    for j in range(4):
+        y = cy0 + 0.3 + j * (cy1 - cy0 - 0.6) / 3
+        zc = (cz1 + 0.08 + 5.35) / 2
+        ring = cylinder(f"RIGHT_VENT_ring_{j}", (wx + 0.1, y, zc), 0.16, 0.04, M["M_MetalLight"], exp, 16, axis="X")
+        boolean(ring, cylinder("tmp_vr", (wx + 0.1, y, zc), 0.12, 0.2, None, exp, 16, axis="X"))
+        cylinder(f"RIGHT_VENT_well_{j}", (wx + 0.085, y, zc), 0.125, 0.01, M["M_Rubber"], exp, 16, axis="X")
+        box(f"RIGHT_VENT_bar_{j}", (wx + 0.11, y, zc), (0.01, 0.24, 0.025), M["M_MetalLight"], exp)
+    # ---- cable riser niche: tray, three cables, clamps, entry box, cover over the wall top -------
+    ny0, ny1 = RIGHT_NICHE_Y
+    nyc = (ny0 + ny1) / 2
+    back = wx - 0.2
+    box("RIGHT_RISER_tray", (back + 0.015, nyc, 3.75), (0.03, ny1 - ny0 - 0.1, 3.05), M["M_MetalLight"], exp)
+    for j, dy in enumerate((-0.15, 0.0, 0.15)):
+        cylinder(f"RIGHT_RISER_cable_{j}", (back + 0.09, nyc + dy, 3.8), 0.045, 3.1, M["M_Rubber"], exp, 8)
+    for j, z in enumerate((2.7, 3.4, 4.1, 4.8)):
+        box(f"RIGHT_RISER_clamp_{j}", (back + 0.1, nyc, z), (0.1, ny1 - ny0 - 0.08, 0.05), M["M_MetalDark"], exp)
+    rbox("RIGHT_RISER_entry", ny0 - 0.02, ny1 + 0.02, BASE_H + 0.05, BASE_H + 0.45, 0.18, M["M_MetalDark"], 0.02)
+    bevel(box("RIGHT_RISER_cap", (wx - 0.02, nyc, 5.38), (0.26, ny1 - ny0 + 0.06, 0.18), M["M_MetalDark"], exp), 0.02)
+    mid = (wx - SIDE_CH / 2, nyc, ROOF - SIDE_CH / 2)
+    bevel(on_chamfer("RIGHT_RISER_chamfer_cover", mid, "x", 1, (ny1 - ny0 + 0.06, 0.1, SIDE_CH * math.sqrt(2) + 0.05),
+                     0.05, M["M_MetalDark"], exp), 0.015)
+    on_chamfer("RIGHT_RISER_chamfer_strip", mid, "x", 1, (0.3, 0.01, SIDE_CH * math.sqrt(2) - 0.1), 0.105,
+               M["M_MetalLight"], exp)
+    # ---- interface block + cable entry -----------------------------------------------------------
+    iy0, iy1 = RIGHT_IFACE_Y
+    iyc = (iy0 + iy1) / 2
+    rbox("RIGHT_IFACE", iy0, iy1, 3.05, 3.95, 0.14, M["M_MetalDark"], 0.03)
+    box("RIGHT_IFACE_screen", (wx + 0.133, iyc, 3.68), (0.006, 0.45, 0.3), M["M_ScreenStatic"], exp)
+    box("RIGHT_IFACE_keypad", (wx + 0.135, iyc, 3.3), (0.01, 0.3, 0.18), M["M_MetalLight"], exp)
+    box("RIGHT_IFACE_led", (wx + 0.133, iy1 - 0.08, 3.3), (0.006, 0.05, 0.05), M["M_Beacon"], exp)
+    rbox("RIGHT_IFACE_hood", iy0 - 0.03, iy1 + 0.03, 3.97, 4.03, 0.19, M["M_PaintOrange"], 0.01)
+    rbox("RIGHT_IFACE_entry", iy0 + 0.08, iy1 - 0.08, 2.2, 2.6, 0.12, M["M_MetalLight"], 0.015)
+    for j, dy in enumerate((-0.15, 0.0, 0.15)):
+        cylinder(f"RIGHT_IFACE_gland_{j}", (wx + 0.07, iyc + dy, 2.16), 0.04, 0.08, M["M_MetalDark"], exp, 8)
+        cylinder(f"RIGHT_IFACE_cable_{j}", (wx + 0.07, iyc + dy, 2.06), 0.03, 0.14, M["M_Rubber"], exp, 8)
+
+
 def build(mats, exp, ref):
     M = mats
     fy = -(D / 2 - SHELL_INSET)          # outer front face of the shell
@@ -575,19 +650,22 @@ def build(mats, exp, ref):
     # recessed dark louvre bays on both side chamfers (concept: dark vents along the top edges)
     # left = the technical side (big bay, more slats, hood), right = secondary and cleaner
     k = math.sqrt(0.5)
-    for s, length, slope, n in ((-1, 3.3, 1.15, 7), (1, 2.0, 0.8, 4)):
-        mid = (s * (sx_out - SIDE_CH / 2), 0.0, ROOF - SIDE_CH / 2)
+    for s, length, slope, n, yc in ((-1, 3.3, 1.15, 7, 0.0), (1, 1.4, 0.8, 4, -0.95)):
+        mid = (s * (sx_out - SIDE_CH / 2), yc, ROOF - SIDE_CH / 2)
         reg = on_chamfer("tmp_cr", mid, "x", s, (length, 0.5, slope), 0.0, None, exp)
         boolean(shell, skin("tmp_bay", reg, -0.1, ROOF + 0.1, 0.07, ROOF - 0.07, M["M_MetalDark"], exp))
         for i in range(n):
             o = (i - (n - 1) / 2) * (slope - 0.15) / (n - 1)
-            on_chamfer(f"VENTS_chamfer_{'L' if s < 0 else 'R'}_slat_{i}", (mid[0] - s * k * o, 0.0, mid[2] + k * o),
+            on_chamfer(f"VENTS_chamfer_{'L' if s < 0 else 'R'}_slat_{i}", (mid[0] - s * k * o, yc, mid[2] + k * o),
                        "x", s, (length - 0.1, 0.03, 0.07), -0.04, M["M_MetalLight"], exp)
     hood_mid = (-(sx_out - SIDE_CH / 2) + k * 0.66, 0.0, ROOF - SIDE_CH / 2 + k * 0.66)
     bevel(on_chamfer("VENTS_chamfer_L_hood", hood_mid, "x", -1, (3.5, 0.14, 0.16), 0.03, M["M_PaintOrange"], exp), 0.02)
     # utility trench on the left wall for the pipe run (0.26 deep, wall stays 0.09 thick)
     boolean(shell, box("tmp_trench", (-sx_out, (LEFT_TRENCH_Y[0] + LEFT_TRENCH_Y[1]) / 2, (2.75 + 4.5) / 2),
                        (0.52, LEFT_TRENCH_Y[1] - LEFT_TRENCH_Y[0], 1.75), M["M_MetalDark"], exp))
+    # vertical cable niche on the right wall (riser to the comms node on the roof)
+    ny0, ny1 = RIGHT_NICHE_Y
+    boolean(shell, box("tmp_niche_r", (sx_out, (ny0 + ny1) / 2, 3.75), (0.4, ny1 - ny0, 3.1), M["M_MetalDark"], exp))
     bevel(shell, 0.05)
 
     # ===================================================================== WINDOW (tilted 15°)
@@ -694,28 +772,11 @@ def build(mats, exp, ref):
     bevel(on_chamfer("LIGHTS_back_housing", cb, "y", 1, (2.6, 0.14, 0.62), 0.04, M["M_MetalDark"], exp), 0.02)
     on_chamfer("LIGHTS_back", cb, "y", 1, (2.2, 0.04, 0.36), 0.12, M["M_LightWarm"], exp)
 
-    # ===================================================================== SIDE / BACK PANELS
-    free_y = D / 2 - PYLON - 0.05
-    for s_x, nm in ((1, "R"),):   # the left side is the utility cluster (build_left_utility)
-        for j, (z0, z1) in enumerate(((BASE_H + 0.3, 3.75), (3.85, 5.2))):
-            bevel(box(f"SIDE_PANEL_{nm}_{j}", (s_x * (sx_out + 0.025), 0.0, (z0 + z1) / 2),
-                      (0.05, 2 * free_y, z1 - z0), M["M_MetalDark"], exp), 0.015)
     build_back(M, exp, by)
 
     build_left_utility(M, exp, sx_out)
 
-    # ===================================================================== EQUIPMENT CABINET (right)
-    cx0 = sx_out + 0.09
-    cab = box("SIDE_CABINET_R", (cx0, -0.15, 3.55), (0.18, 2.6, 2.3), M["M_MetalDark"], exp)
-    boolean(cab, box("tmp_cg", (sx_out + 0.2, 0.55, 3.55), (0.14, 0.8, 1.9), M["M_MetalDark"], exp))   # louvre bay
-    boolean(cab, box("tmp_cs", (sx_out + 0.18, -0.2, 3.55), (0.03, 0.03, 2.1), M["M_MetalDark"], exp))   # door seam
-    bevel(cab, 0.04)
-    for i in range(8):
-        box(f"VENTS_slat_{i}", (sx_out + 0.12, 0.55, 2.75 + i * 0.23), (0.03, 0.74, 0.17), M["M_MetalLight"], exp,
-            rot=(0, math.radians(-35), 0))
-    box("SIDE_CABINET_R_handle", (sx_out + 0.2, -0.4, 3.6), (0.04, 0.06, 0.4), M["M_MetalLight"], exp)
-    box("SIDE_CABINET_R_label", (sx_out + 0.185, -0.85, 4.3), (0.01, 0.5, 0.18), M["M_ScreenStatic"], exp)
-    bevel(box("SIDE_CABINET_R_cap", (sx_out + 0.1, -0.15, 4.75), (0.2, 2.7, 0.1), M["M_PaintOrange"], exp), 0.02)
+    build_right_service(M, exp, sx_out)
 
     # ===================================================================== ROOF BOX (stepped) + vents
     ry = 0.3
@@ -733,33 +794,60 @@ def build(mats, exp, ref):
                 M["M_MetalLight"], exp)
     bevel(box("ROOF_hatch", (0.0, ry, ROOF + 0.84), (1.0, 0.8, 0.08), M["M_MetalDark"], exp), 0.02)
     box("ROOF_hatch_handle", (0.0, ry - 0.25, ROOF + 0.9), (0.4, 0.05, 0.05), M["M_MetalLight"], exp)
-    cylinder("ROOF_conduit", (4.38, 1.5, ROOF + 0.2), 0.08, 0.4, M["M_MetalLight"], exp, 10, axis="X")
+    cylinder("ROOF_conduit", ((4.2 + COMMS_XY[0] - 0.65) / 2, COMMS_XY[1], ROOF + 0.12), 0.07,
+             COMMS_XY[0] - 0.65 - 4.2 + 0.1, M["M_MetalLight"], exp, 10, axis="X")
     for k, x in enumerate((-2.0, 2.0)):
         bevel(box(f"ROOF_vent_{k}", (x, ry, ROOF + 0.92), (1.2, 0.9, 0.25), M["M_MetalDark"], exp), 0.03)
         for i in range(5):
             box(f"ROOF_vent_{k}_slat_{i}", (x, ry - 0.32 + i * 0.16, ROOF + 1.05), (1.05, 0.06, 0.03),
                 M["M_MetalLight"], exp)
 
-    # ===================================================================== BEACON
-    bx, byy = 5.0, 1.5
+    # ===================================================================== BEACON / COMMS NODE
+    bx, byy = COMMS_XY
+    pz = 0.22                                  # pedestal height
+    ped = prism("BEACON_pedestal", [(bx + x, byy + y) for x, y in chamfer_rect(0.65, 0.5, 0.15)], "z",
+                ROOF - 0.05, ROOF + pz, M["M_MetalDark"], exp)
+    bevel(ped, 0.03)
+    for sx_, sy_ in ((-1, -1), (-1, 1), (1, -1), (1, 1)):
+        cylinder(f"BEACON_pedestal_bolt_{sx_:+d}{sy_:+d}", (bx + sx_ * 0.5, byy + sy_ * 0.36, ROOF + pz + 0.02), 0.04,
+                 0.05, M["M_MetalLight"], exp, 8)
     housing = [(bx + x, byy + y) for x, y in chamfer_rect(0.45, 0.35, 0.12)]
-    bevel(prism("BEACON_housing", housing, "z", ROOF - 0.05, ROOF + 1.6, M["M_PaintOrange"], exp), 0.03)
-    bevel(box("BEACON_frame", (bx, byy - 0.36, ROOF + 0.85), (0.62, 0.04, 1.1), M["M_MetalDark"], exp), 0.015)
-    box("BEACON_window", (bx, byy - 0.385, ROOF + 1.05), (0.34, 0.02, 0.36), M["M_LightWarm"], exp)
-    box("BEACON_indicator", (bx, byy - 0.385, ROOF + 0.55), (0.3, 0.02, 0.14), M["M_ScreenStatic"], exp)
-    bevel(box("BEACON_cap", (bx, byy, ROOF + 1.65), (0.75, 0.55, 0.1), M["M_MetalDark"], exp), 0.02)
+    bevel(prism("BEACON_housing", housing, "z", ROOF + pz, ROOF + pz + 1.6, M["M_PaintOrange"], exp), 0.03)
+    bevel(box("BEACON_frame", (bx, byy - 0.36, ROOF + pz + 0.85), (0.62, 0.04, 1.1), M["M_MetalDark"], exp), 0.015)
+    box("BEACON_window", (bx, byy - 0.385, ROOF + pz + 1.05), (0.34, 0.02, 0.36), M["M_LightWarm"], exp)
+    box("BEACON_indicator", (bx, byy - 0.385, ROOF + pz + 0.55), (0.3, 0.02, 0.14), M["M_ScreenStatic"], exp)
+    bevel(box("BEACON_cap", (bx, byy, ROOF + pz + 1.65), (0.75, 0.55, 0.1), M["M_MetalDark"], exp), 0.02)
     # centre mast carries the lamp, two thinner antennas flank it
-    cylinder("BEACON_mast", (bx, byy, ROOF + 2.5), 0.06, 1.7, M["M_MetalLight"], exp, 10)
-    cylinder("BEACON_mast_collar", (bx, byy, ROOF + 1.85), 0.1, 0.25, M["M_MetalDark"], exp, 10)
-    cylinder("BEACON_lamp", (bx, byy, ROOF + 3.48), 0.11, 0.26, M["M_Beacon"], exp, 12)
-    cylinder("BEACON_lamp_cap", (bx, byy, ROOF + 3.64), 0.13, 0.06, M["M_MetalDark"], exp, 12)
-    cylinder("BEACON_lamp_base", (bx, byy, ROOF + 3.33), 0.13, 0.05, M["M_MetalDark"], exp, 12)
+    z0 = ROOF + pz
+    cylinder("BEACON_mast", (bx, byy, z0 + 2.5), 0.06, 1.7, M["M_MetalLight"], exp, 10)
+    cylinder("BEACON_mast_collar", (bx, byy, z0 + 1.85), 0.1, 0.25, M["M_MetalDark"], exp, 10)
+    cylinder("BEACON_lamp", (bx, byy, z0 + 3.48), 0.11, 0.26, M["M_Beacon"], exp, 12)
+    cylinder("BEACON_lamp_cap", (bx, byy, z0 + 3.64), 0.13, 0.06, M["M_MetalDark"], exp, 12)
+    cylinder("BEACON_lamp_base", (bx, byy, z0 + 3.33), 0.13, 0.05, M["M_MetalDark"], exp, 12)
     for dx, h in ((-0.27, 1.9), (0.27, 1.5)):
-        cylinder(f"BEACON_antenna_{dx:+.2f}", (bx + dx, byy, ROOF + 1.7 + h / 2), 0.03, h, M["M_MetalLight"],
-                 exp, 8)
-        cylinder(f"BEACON_antenna_{dx:+.2f}_base", (bx + dx, byy, ROOF + 1.8), 0.07, 0.2, M["M_MetalDark"], exp, 8)
-        cylinder(f"BEACON_antenna_{dx:+.2f}_ring", (bx + dx, byy, ROOF + 1.7 + h * 0.6), 0.05, 0.05,
+        cylinder(f"BEACON_antenna_{dx:+.2f}", (bx + dx, byy, z0 + 1.7 + h / 2), 0.03, h, M["M_MetalLight"], exp, 8)
+        cylinder(f"BEACON_antenna_{dx:+.2f}_base", (bx + dx, byy, z0 + 1.8), 0.07, 0.2, M["M_MetalDark"], exp, 8)
+        cylinder(f"BEACON_antenna_{dx:+.2f}_ring", (bx + dx, byy, z0 + 1.7 + h * 0.6), 0.05, 0.05,
                  M["M_MetalDark"], exp, 8)
+    # comms tech box beside the mast: dark body, orange lid, panel antenna + whip, link to the pedestal
+    cbx, cby = bx, byy + 0.95
+    bevel(box("COMMS_box", (cbx, cby, ROOF + 0.27), (0.9, 0.6, 0.6), M["M_MetalDark"], exp), 0.03)
+    bevel(box("COMMS_box_lid", (cbx, cby, ROOF + 0.6), (0.96, 0.66, 0.06), M["M_PaintOrange"], exp), 0.015)
+    for k in range(3):
+        box(f"COMMS_box_slot_{k}", (cbx + 0.455, cby - 0.15 + k * 0.15, ROOF + 0.3), (0.01, 0.1, 0.25), M["M_Rubber"], exp)
+    box("COMMS_box_led", (cbx - 0.2, cby - 0.305, ROOF + 0.45), (0.1, 0.01, 0.04), M["M_Beacon"], exp)
+    box("COMMS_box_label", (cbx + 0.12, cby - 0.305, ROOF + 0.3), (0.35, 0.01, 0.12), M["M_MetalLight"], exp)
+    cylinder("COMMS_panel_pole", (cbx + 0.25, cby + 0.1, ROOF + 0.98), 0.03, 0.7, M["M_MetalLight"], exp, 8)
+    bevel(box("COMMS_panel_antenna", (cbx + 0.25, cby + 0.1, ROOF + 1.45), (0.07, 0.28, 0.5), M["M_MetalLight"], exp,
+              rot_z=math.radians(-25)), 0.01)
+    cylinder("COMMS_whip", (cbx - 0.3, cby + 0.15, ROOF + 1.15), 0.015, 1.1, M["M_MetalDark"], exp, 6)
+    cylinder("COMMS_link", (cbx, (byy + 0.5 + cby - 0.3) / 2, ROOF + 0.15), 0.06, cby - 0.3 - byy - 0.5 + 0.1,
+             M["M_MetalLight"], exp, 10, axis="Y")
+    # cable tray from the right chamfer to the pedestal (continues the wall riser)
+    tx0, tx1 = bx + 0.65, sx_out - SIDE_CH
+    bevel(box("ROOF_cable_tray", ((tx0 + tx1) / 2, byy, ROOF + 0.06), (tx1 - tx0 + 0.04, 0.5, 0.12), M["M_MetalDark"],
+              exp), 0.015)
+    box("ROOF_cable_tray_cover", ((tx0 + tx1) / 2, byy, ROOF + 0.125), (tx1 - tx0, 0.36, 0.01), M["M_MetalLight"], exp)
 
     build_interior(M, exp, ref)
 
