@@ -377,6 +377,25 @@ def matid_pass(out, shots):
     render_all(out, shots, suffix="_matid")
 
 
+TURNAROUND = ((0, "front"), (45, "front_right"), (90, "right"), (135, "back_right"),
+              (180, "back"), (225, "back_left"), (270, "left"), (315, "front_left"))
+
+
+def render_turnaround(out, radius=23.0, height=8.5, target=(0.0, 0.0, 3.4), lens=35):
+    """Eight perspective views around the building every 45° (0° = front, clockwise seen from above) + top."""
+    os.makedirs(out, exist_ok=True)
+    s = bpy.context.scene
+    for deg, name in TURNAROUND:
+        a = math.radians(deg)
+        loc = (radius * math.sin(a), -radius * math.cos(a), height)
+        s.camera = camera(f"CAM_T{deg:03d}", loc, target, None, lens)
+        s.render.filepath = os.path.join(out, f"T{deg:03d}_{name}.png")
+        bpy.ops.render.render(write_still=True)
+    s.camera = camera("CAM_Ttop", (0.0, -0.001, 34.0), (0.0, 0.0, 0.0), 18.5, 0)
+    s.render.filepath = os.path.join(out, "T_top.png")
+    bpy.ops.render.render(write_still=True)
+
+
 def triangle_count(coll):
     return sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in coll.objects if o.type == "MESH")
 
@@ -392,6 +411,7 @@ def run(build_fn, basename, label):
     ap.add_argument("--samples", type=int, default=48)
     ap.add_argument("--shots", default=None, help="comma-separated subset of render shots")
     ap.add_argument("--matid", default=None, help="comma-separated shots to re-render in material-ID colours")
+    ap.add_argument("--turnaround", default=None, help="directory for the 8-view turnaround + top")
     a = ap.parse_args(argv)
 
     reset_scene()
@@ -405,6 +425,8 @@ def run(build_fn, basename, label):
     if a.render:
         setup_render(samples=a.samples)
         render_all(a.render, a.shots.split(",") if a.shots else None)
+        if a.turnaround:
+            render_turnaround(a.turnaround)
         if a.matid:
             matid_pass(a.render, a.matid.split(","))
     print(f"[{label}] objects={len(exp.objects)} tris={triangle_count(exp)}")
