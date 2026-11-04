@@ -612,24 +612,110 @@ def build_holo(M, exp):
     box("HOLO_PROJECTOR_junction_led", (jx - 0.152, 0.6, zc - 0.17), (0.004, 0.06, 0.03), M["M_Beacon"], exp)
 
 
+LONG_Y = (-1.6, 1.6)                     # longitudinal ceiling beams
+CEIL_FLAT_X, CEIL_FLAT_Y = (-6.45, 6.45), (-2.45, 2.55)   # flat part of the ceiling (inside the inner chamfers)
+
+
+def _preview_light(name, x, y, z, sx, sy, energy):
+    """Area light for the Blender preview only (not a mesh, never exported)."""
+    L = bpy.data.lights.new(name, "AREA")
+    L.energy, L.shape, L.size, L.size_y = energy, "RECTANGLE", sx, sy
+    ob = bpy.data.objects.new(name, L)
+    ob.location = (x, y, z)
+    bpy.context.scene.collection.objects.link(ob)
+
+
+def _light_panel(name, x, y, w, d, M, exp, zc, energy=180.0):
+    bevel(box(f"CEILING_{name}_frame", (x, y, zc - 0.035), (w + 0.12, d + 0.12, 0.07), M["M_MetalDark"], exp), 0.012)
+    box(f"LIGHTS_ceiling_{name}", (x, y, zc - 0.075), (w, d, 0.02), M["M_LightWarm"], exp)
+    _preview_light(f"PREVIEW_{name}", x, y, zc - 0.12, w, d, energy)
+
+
 def build_ceiling(M, exp):
-    """Transverse beams, recessed light panels in the bays, cable tray from the right-wall duct to the projector."""
+    """Engineering ceiling module: transverse + longitudinal beams, window header, chamfer ribs, ceiling panels,
+    light panels of several sizes, strip and round downlights, HVAC duct with diffusers, ceiling diffusers, service
+    hatch, cable tray down the right chamfer, a dedicated cell for the holo projector."""
     zc = CEIL
-    for i, x in enumerate(BEAMS_X):
+    k = math.sqrt(0.5)
+    bays = [CEIL_FLAT_X[0]] + list(BEAMS_X) + [CEIL_FLAT_X[1]]
+    span_x = CEIL_FLAT_X[1] - CEIL_FLAT_X[0]
+    # ---- structure ------------------------------------------------------------------------------------------------
+    for i, x in enumerate(BEAMS_X):                                    # transverse beams (secondary)
         bevel(box(f"CEILING_beam_{i}", (x, 0.05, zc - 0.1), (0.26, 4.9, 0.2), M["M_MetalDark"], exp), 0.012)
-    lights = [(-5.65, 0.0, 1.3), (-3.2, -1.2, 2.4), (-3.2, 1.2, 2.4), (0.0, -1.2, 2.4), (0.0, 1.2, 2.4), (5.65, 0.0, 1.3)]
-    for i, (x, y, w) in enumerate(lights):
-        bevel(box(f"CEILING_light_{i}_frame", (x, y, zc - 0.03), (w + 0.12, 0.72, 0.06), M["M_MetalDark"], exp), 0.012)
-        box(f"LIGHTS_ceiling_{i}", (x, y, zc - 0.065), (w, 0.6, 0.02), M["M_LightWarm"], exp)
-        L = bpy.data.lights.new(f"PREVIEW_area_{i}", "AREA")      # preview light only (not exported: not a mesh)
-        L.energy, L.size, L.size_y, L.shape = 180.0, w, 0.6, "RECTANGLE"
-        ob = bpy.data.objects.new(f"PREVIEW_area_{i}", L)
-        ob.location = (x, y, zc - 0.1)
-        bpy.context.scene.collection.objects.link(ob)
-    # cable tray: right wall duct -> projector
-    x0, x1 = HOLO_XY[0] + 1.45, XW - 0.3        # from the projector junction box to the wall duct
-    bevel(box("CEILING_cable_tray", ((x0 + x1) / 2, 0.6, zc - 0.07), (x1 - x0, 0.3, 0.1), M["M_MetalDark"], exp), 0.012)
-    box("CEILING_cable_tray_cover", ((x0 + x1) / 2, 0.6, zc - 0.125), (x1 - x0 - 0.06, 0.24, 0.01), M["M_MetalLight"], exp)
+    for i, y in enumerate(LONG_Y):                                     # longitudinal beams (primary, deeper)
+        bevel(box(f"CEILING_long_beam_{i}", (0.0, y, zc - 0.13), (span_x, 0.3, 0.26), M["M_MetalDark"], exp), 0.03)
+        box(f"CEILING_long_beam_{i}_accent", (0.0, y, zc - 0.262), (span_x - 0.2, 0.06, 0.006), M["M_PaintOrange"], exp)
+    bevel(box("CEILING_header_beam", (0.0, -2.33, zc - 0.12), (span_x, 0.36, 0.24), M["M_MetalDark"], exp), 0.03)
+    box("LIGHTS_ceiling_cove", (0.0, -2.2, zc - 0.245), (span_x - 0.5, 0.06, 0.02), M["M_LightWarm"], exp)
+    _preview_light("PREVIEW_cove", 0.0, -2.1, zc - 0.3, span_x - 0.5, 0.1, 120.0)
+    for i, x in enumerate(BEAMS_X):                                    # ribs down the back chamfer
+        box(f"CEILING_rib_back_{i}", (x, 3.0 - 0.06 * k, 5.35 - 0.06 * k), (0.14, 0.12, 1.27), M["M_MetalDark"], exp,
+            rot=(math.radians(45), 0, 0))
+    for s in (-1, 1):                                                  # ribs down the side chamfers (end of long beams)
+        for j, y in enumerate(LONG_Y):
+            box(f"CEILING_rib_side_{'L' if s < 0 else 'R'}_{j}", (s * (6.95 - 0.06 * k), y, 5.3 - 0.06 * k),
+                (0.12, 0.3, 1.41), M["M_MetalDark"], exp, rot=(0, math.radians(-45 * s), 0))
+    # ---- front band (over the console): strip lights per bay -----------------------------------------------------------
+    for i, (x0, x1) in enumerate(zip(bays[:-1], bays[1:])):
+        if i == 3:
+            continue
+        _light_panel(f"strip_{i}", (x0 + x1) / 2, -1.97, x1 - x0 - 0.5, 0.14, M, exp, zc, 60.0)
+    # ---- middle band: ceiling panels, light panels, diffusers, service hatch -----------------------------------------
+    for i, (x0, x1) in enumerate(zip(bays[:-1], bays[1:])):
+        xc, bw = (x0 + x1) / 2, x1 - x0
+        if i == 3:     # holo projector cell: dark coffer plate, nothing else in this bay
+            bevel(box("CEILING_projector_cell", (xc, 0.0, zc - 0.01), (bw - 0.32, 2.9, 0.02), M["M_MetalDark"], exp), 0.012)
+            for s in (-1, 1):
+                for t in (-1, 1):             # knee braces from the beams to the projector frame
+                    box(f"CEILING_projector_brace_{s:+d}{t:+d}", (xc + s * 1.15, t * 1.25, zc - 0.1), (0.5, 0.08, 0.08),
+                        M["M_MetalDark"], exp, rot_z=math.radians(45 * s * t))
+            continue
+        bevel(box(f"CEILING_panel_{i}", (xc, 0.0, zc - 0.015), (bw - 0.32, 2.9, 0.03), M["M_MetalLight"], exp), 0.012)
+        box(f"CEILING_panel_{i}_seam", (xc, 0.15, zc - 0.032), (bw - 0.4, 0.02, 0.004), M["M_Rubber"], exp)
+        if i in (1, 2):                                                # large light panels + square diffusers
+            _light_panel(f"large_{i}", xc, -0.55, 2.4, 0.9, M, exp, zc, 220.0)
+            dx, dy = xc, 0.85
+            bevel(box(f"CEILING_diffuser_{i}", (dx, dy, zc - 0.045), (0.72, 0.72, 0.03), M["M_MetalLight"], exp), 0.012)
+            box(f"CEILING_diffuser_{i}_well", (dx, dy, zc - 0.062), (0.56, 0.56, 0.004), M["M_Rubber"], exp)
+            for q in range(5):
+                box(f"CEILING_diffuser_{i}_slat_{q}", (dx, dy - 0.22 + q * 0.11, zc - 0.07), (0.54, 0.04, 0.012),
+                    M["M_MetalBare"], exp, rot=(math.radians(30), 0, 0))
+        else:                                                          # small light panels
+            _light_panel(f"small_{i}", xc, -0.6, 1.1, 0.5, M, exp, zc, 110.0)
+        if i == 0:                                                     # ceiling service hatch
+            bevel(box("CEILING_service_hatch", (xc, 0.8, zc - 0.045), (1.0, 0.8, 0.03), M["M_MetalLight"], exp), 0.012)
+            for s in (-1, 1):
+                cylinder(f"CEILING_service_hatch_hinge_{s:+d}", (xc + s * 0.3, 1.21, zc - 0.05), 0.025, 0.16, M["M_MetalBare"],
+                         exp, 8, axis="X")
+            box("CEILING_service_hatch_latch", (xc, 0.41, zc - 0.065), (0.14, 0.04, 0.02), M["M_MetalDark"], exp)
+            box("CEILING_service_hatch_label", (xc, 0.8, zc - 0.062), (0.3, 0.3, 0.004), M["M_Hazard"], exp,
+                rot_z=math.radians(45))
+    # ---- back band: HVAC duct from the left (engineering) wall + round downlights over the holo side ----------------
+    dy, dz, dh = 2.1, zc - 0.3, 0.32
+    x0, x1 = -6.75, 1.3
+    bevel(box("CEILING_duct", ((x0 + x1) / 2, dy, dz), (x1 - x0, 0.5, dh), M["M_MetalLight"], exp), 0.012)
+    bevel(box("CEILING_duct_end", (x1 + 0.02, dy, dz), (0.04, 0.56, dh + 0.06), M["M_MetalDark"], exp), 0.012)
+    n = int((x1 - x0) / 1.25)
+    for j in range(1, n + 1):
+        fx = x0 + j * (x1 - x0) / (n + 1)
+        box(f"CEILING_duct_flange_{j}", (fx, dy, dz), (0.05, 0.56, dh + 0.06), M["M_MetalDark"], exp)
+        for s in (-1, 1):
+            box(f"CEILING_duct_hanger_{j}_{s:+d}", (fx, dy + s * 0.3, zc - 0.07), (0.03, 0.03, 0.14), M["M_MetalBare"], exp)
+    for j, fx in enumerate((-5.0, -2.6, -0.2)):
+        box(f"CEILING_duct_grille_{j}", (fx, dy, dz - dh / 2 - 0.006), (0.6, 0.36, 0.012), M["M_MetalDark"], exp)
+        for q in range(4):
+            box(f"CEILING_duct_grille_{j}_slat_{q}", (fx, dy - 0.12 + q * 0.08, dz - dh / 2 - 0.016), (0.56, 0.03, 0.01),
+                M["M_MetalBare"], exp, rot=(math.radians(30), 0, 0))
+    for j, fx in enumerate((2.4, 4.0, 5.6)):
+        cylinder(f"CEILING_downlight_{j}_ring", (fx, dy, zc - 0.025), 0.17, 0.05, M["M_MetalDark"], exp, 16)
+        cylinder(f"LIGHTS_ceiling_downlight_{j}", (fx, dy, zc - 0.055), 0.12, 0.012, M["M_LightWarm"], exp, 16)
+        _preview_light(f"PREVIEW_downlight_{j}", fx, dy, zc - 0.1, 0.24, 0.24, 40.0)
+    # ---- cable tray: projector junction -> along the ceiling -> down the right chamfer to the wall duct ---------------
+    tx0, tx1 = HOLO_XY[0] + 1.45, CEIL_FLAT_X[1]
+    bevel(box("CEILING_cable_tray", ((tx0 + tx1) / 2, 0.6, zc - 0.07), (tx1 - tx0, 0.3, 0.1), M["M_MetalDark"], exp), 0.012)
+    box("CEILING_cable_tray_cover", ((tx0 + tx1) / 2, 0.6, zc - 0.125), (tx1 - tx0 - 0.06, 0.24, 0.01), M["M_MetalLight"], exp)
+    bevel(box("CEILING_cable_tray_slope", (6.95 - 0.08 * k, 0.6, 5.3 - 0.08 * k), (0.1, 0.3, 1.45), M["M_MetalDark"], exp,
+              rot=(0, math.radians(-45), 0)), 0.012)
 
 
 def build_services(M, exp):

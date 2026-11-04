@@ -375,6 +375,8 @@ def render_all(out, only=None, suffix=""):
         "26_interior_holo": ((0.4, 2.2, 2.6), (3.2, 0.0, 2.6), None, 26),
         "30_detail_holo_base": ((0.6, 2.6, 1.7), (3.4, 0.6, 1.0), None, 30),
         "31_detail_holo_emitter": ((0.9, 1.6, 3.6), (3.2, 0.0, 5.3), None, 28),
+        "32_interior_ceiling": ((-1.0, 2.6, 2.2), (0.5, -1.0, 5.6), None, 16),
+        "33_interior_ceiling_left": ((1.0, -0.4, 2.3), (-3.5, 1.8, 5.6), None, 16),
         "27_interior_back_left": ((2.5, -1.2, 3.2), (-5.5, 2.6, 1.9), None, 20),
         "28_interior_front_right": ((-2.0, 0.6, 3.3), (6.3, -0.4, 2.4), None, 20),
         # plan cutaway: ortho from above, near clip removes everything above z = 4.5
