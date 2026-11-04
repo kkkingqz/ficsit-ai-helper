@@ -62,7 +62,7 @@ def build_interior(M, exp, ref):
     use.display_type = "WIRE"
     use.hide_render = True
     for i, x in enumerate((-4.0, 4.0)):
-        ob = box(f"REF_foundation_{i}", (x, 0, -0.5), (7.98, 7.98, 1.0), M["M_MetalLight"], ref)
+        ob = box(f"REF_foundation_{i}", (x, 0, -0.5), (7.98, 7.98, 1.0), M["REF_Foundation"], ref)
     # 1.8 m player capsules for scale: one inside behind the chair, one outside at the front-left
     for nm, pos in (("REF_player_inside", (-1.0, 1.8, f)), ("REF_player_outside", (-9.3, -4.6, 0.0))):
         cylinder(nm, (pos[0], pos[1], pos[2] + 0.9), 0.3, 1.8, M["M_Rubber"], ref, 12)

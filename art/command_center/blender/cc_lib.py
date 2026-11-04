@@ -30,13 +30,20 @@ MULLION_X = 2.4             # vertical mullions; angled ends -> 5 panes in total
 
 DOOR_X, DOOR_W, DOOR_H = -1.0, 2.0, 2.8   # door at ground level, 4 steps inside
 
+# Material families (final slot list, see ../README.md "Слоты материалов"). Linear-space approximations.
 COLORS = {
-    "M_PaintOrange": (0.93, 0.33, 0.016, 1.0),   # #F79A22 (linear approx.)
-    "M_MetalDark":   (0.027, 0.031, 0.039, 1.0), # #2E3238
-    "M_MetalLight":  (0.11, 0.13, 0.16, 1.0),    # #5E6770
-    "M_Rubber":      (0.011, 0.013, 0.015, 1.0), # #1C1E22
-    "M_Hazard":      (1.0, 0.58, 0.0, 1.0),      # #FFD200 (stripes come from texture later)
+    "M_PaintOrange": (0.93, 0.33, 0.016, 1.0),   # painted metal, FICSIT Orange #F79A22   (paint-gun primary)
+    "M_PaintGray":   (0.105, 0.122, 0.147, 1.0), # painted metal, Panel Gray #5B626B      (paint-gun secondary)
+    "M_MetalDark":   (0.027, 0.031, 0.039, 1.0), # structural dark metal #2E3238: frames, plinth, mullions
+    "M_MetalBare":   (0.33, 0.35, 0.38, 1.0),    # clean bare metal #9AA0A6: pipes, bolts, slats, antennas
+    "M_MetalLight":  (0.11, 0.13, 0.16, 1.0),    # legacy authoring slot, remapped to PaintGray / MetalBare
+    "M_Rubber":      (0.011, 0.013, 0.015, 1.0), # rubber / composite #1C1E22: seals, cables, joints
+    "M_Hazard":      (1.0, 0.58, 0.0, 1.0),      # service marking: black/yellow stripes #FFD200
+    "M_Decal":       (0.79, 0.79, 0.79, 1.0),    # service marking: labels, text, pictograms #E6E6E6
+    "REF_Foundation": (0.2, 0.2, 0.2, 1.0),      # reference foundations only (never exported)
 }
+METALLIC = {"M_MetalDark": 0.6, "M_MetalBare": 1.0, "M_MetalLight": 0.6}
+ROUGHNESS = {"M_MetalBare": 0.3, "M_Rubber": 0.85, "M_Decal": 0.6}
 EMISSIVE = {
     "M_LightWarm":   ((1.0, 0.91, 0.70, 1.0), 8.0),   # #FFF4D6
     "M_ScreenRT":    ((0.15, 0.55, 1.0, 1.0), 3.0),   # render-target screen (UV 0-1, 16:9)
@@ -69,8 +76,8 @@ def make_materials():
         m.use_nodes = True
         b = m.node_tree.nodes["Principled BSDF"]
         b.inputs["Base Color"].default_value = col
-        b.inputs["Roughness"].default_value = 0.55
-        b.inputs["Metallic"].default_value = 0.0 if name in ("M_PaintOrange", "M_Hazard", "M_Rubber") else 0.6
+        b.inputs["Roughness"].default_value = ROUGHNESS.get(name, 0.55)
+        b.inputs["Metallic"].default_value = METALLIC.get(name, 0.0)
         m.diffuse_color = col
         mats[name] = m
     _hazard_stripes(mats["M_Hazard"])
@@ -88,7 +95,7 @@ def make_materials():
     g = bpy.data.materials.new("M_Glass")
     g.use_nodes = True
     b = g.node_tree.nodes["Principled BSDF"]
-    b.inputs["Base Color"].default_value = (0.55, 0.7, 0.8, 1.0)
+    b.inputs["Base Color"].default_value = (0.55, 0.7, 0.8, 1.0)        # light blue-grey tint
     b.inputs["Roughness"].default_value = 0.05
     b.inputs["Transmission Weight"].default_value = 0.92
     b.inputs["IOR"].default_value = 1.45
@@ -196,8 +203,21 @@ def boolean(target, cutter, op="DIFFERENCE"):
     return target
 
 
+BEVEL_TIERS = (0.012, 0.03, 0.06)   # small details / modules & panels / structural masses
+
+
+def bevel_tier(width):
+    """Snap any requested chamfer to one of three tiers so edge highlights read the same everywhere."""
+    if width <= 0:
+        return 0.0
+    return BEVEL_TIERS[0] if width < 0.018 else BEVEL_TIERS[1] if width < 0.045 else BEVEL_TIERS[2]
+
+
 def bevel(target, width=0.04, angle_deg=40.0):
-    """Small 45° chamfer on hard edges — the 'Satisfactory panel' read from a distance."""
+    """45° chamfer on hard edges — the 'Satisfactory panel' read from a distance. Width snaps to BEVEL_TIERS."""
+    width = bevel_tier(width)
+    if width == 0.0:
+        return target
     return apply_modifier(target, "BEVEL", width=width, segments=1, limit_method="ANGLE",
                           angle_limit=math.radians(angle_deg), use_clamp_overlap=True)
 
@@ -300,7 +320,7 @@ def camera(name, loc, target, ortho=None, lens=35):
     return ob
 
 
-def render_all(out, only=None):
+def render_all(out, only=None, suffix=""):
     os.makedirs(out, exist_ok=True)
     s = bpy.context.scene
     zc = 4.0
@@ -321,8 +341,40 @@ def render_all(out, only=None):
         if only and name not in only:
             continue
         s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35)
-        s.render.filepath = os.path.join(out, name + ".png")
+        s.render.filepath = os.path.join(out, name + suffix + ".png")
         bpy.ops.render.render(write_still=True)
+
+
+MATID = {   # flat preview colours per material family (checks that zones are separated by geometry)
+    "M_PaintOrange": (0.9, 0.35, 0.02), "M_PaintGray": (0.25, 0.35, 0.55), "M_MetalDark": (0.06, 0.06, 0.07),
+    "M_MetalBare": (0.75, 0.75, 0.78), "M_Rubber": (0.25, 0.02, 0.3), "M_Glass": (0.1, 0.8, 0.8),
+    "M_LightWarm": (1.0, 1.0, 1.0), "M_Beacon": (1.0, 0.3, 0.0), "M_ScreenRT": (0.0, 0.3, 1.0),
+    "M_ScreenStatic": (0.1, 0.5, 1.0), "M_Holo": (0.0, 0.9, 1.0), "M_Hazard": (1.0, 0.85, 0.0),
+    "M_Decal": (1.0, 0.0, 0.8), "REF_Foundation": (0.45, 0.45, 0.45),
+}
+
+
+def matid_pass(out, shots):
+    """Re-render with one flat colour per material family; unknown/legacy slots show as bright green."""
+    for m in bpy.data.materials:
+        if not m.use_nodes:
+            continue
+        b = m.node_tree.nodes.get("Principled BSDF")
+        if b is None:
+            continue
+        for l in list(m.node_tree.links):
+            if l.to_node == b and l.to_socket.name == "Base Color":
+                m.node_tree.links.remove(l)
+        c = MATID.get(m.name, (0.0, 1.0, 0.0))
+        b.inputs["Base Color"].default_value = (*c, 1.0)
+        b.inputs["Metallic"].default_value = 0.0
+        b.inputs["Roughness"].default_value = 0.8
+        b.inputs["Transmission Weight"].default_value = 0.0
+        b.inputs["Alpha"].default_value = 1.0
+        b.inputs["Emission Strength"].default_value = 1.5 if m.name in ("M_LightWarm", "M_Beacon", "M_ScreenRT",
+                                                                       "M_ScreenStatic", "M_Holo") else 0.0
+        b.inputs["Emission Color"].default_value = (*c, 1.0)
+    render_all(out, shots, suffix="_matid")
 
 
 def triangle_count(coll):
@@ -339,6 +391,7 @@ def run(build_fn, basename, label):
     ap.add_argument("--blend", action="store_true", help="also save the .blend next to the exports")
     ap.add_argument("--samples", type=int, default=48)
     ap.add_argument("--shots", default=None, help="comma-separated subset of render shots")
+    ap.add_argument("--matid", default=None, help="comma-separated shots to re-render in material-ID colours")
     a = ap.parse_args(argv)
 
     reset_scene()
@@ -352,4 +405,6 @@ def run(build_fn, basename, label):
     if a.render:
         setup_render(samples=a.samples)
         render_all(a.render, a.shots.split(",") if a.shots else None)
+        if a.matid:
+            matid_pass(a.render, a.matid.split(","))
     print(f"[{label}] objects={len(exp.objects)} tris={triangle_count(exp)}")
