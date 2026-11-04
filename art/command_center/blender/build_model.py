@@ -35,6 +35,10 @@ PYLON = 2.2                                     # corner pylon wraps this much o
 ARMOR_T = 0.18                                  # pylon skin thickness
 CORE = 0.12                                     # plinth core inset; panels bring it back to 16 x 8
 LOUVRE_PYLONS = ((-1, -1), (-1, 1), (1, 1))     # front-right pylon carries the logo instead
+# upper front band: separate orange sections (deliberately unequal widths) around a dark visor seat
+FRONT_SECTIONS = ((-5.75, -3.6), (-3.52, -2.18), (2.18, 4.1), (4.18, 5.75))
+VISOR_SEAT = (-2.1, 2.1)
+FRONT_PLATE_T = 0.07
 
 
 def outer_shell(name, inset, z0, top, mat, coll):
@@ -118,6 +122,12 @@ def plinth_face(side, mods, pilasters, M, exp, ref):
     tag = {"-y": "f", "+y": "b", "-x": "L", "+x": "R"}[side]
     for i, (a0, a1, kind) in enumerate(mods):
         ac = (a0 + a1) / 2
+        if kind in ("vent", "power"):
+            plinth_bay(side, tag, i, a0, a1, kind, M, exp)
+            continue
+        if kind == "service":
+            plinth_service(side, tag, i, a0, a1, M, exp)
+            continue
         if kind == "hazard":
             box(f"DECALS_hazard_{tag}{i}", face_pt(side, ac, CORE + 0.01, 0.62), face_size(side, a1 - a0 - 0.3, 0.04, 0.5),
                 M["M_Hazard"], exp)
@@ -158,6 +168,71 @@ def plinth_face(side, mods, pilasters, M, exp, ref):
             M["M_Beacon"], exp)
 
 
+def plinth_bay(side, tag, i, a0, a1, kind, M, exp):
+    """Front side bays: same hazard strip, different function above it (ventilation vs. power)."""
+    ac = (a0 + a1) / 2
+    box(f"DECALS_hazard_{tag}{i}", face_pt(side, ac, CORE + 0.01, 0.62), face_size(side, a1 - a0 - 0.3, 0.04, 0.5),
+        M["M_Hazard"], exp)
+    top = face_panels(f"BASE_PANELS_{tag}{i}_top", side, [(a0, a1)], 1.05, 1.84, 0.1, M["M_MetalDark"], exp,
+                      recess=0.05)[0]
+    if kind == "vent":   # wide louvred intake with a frame
+        boolean(top, box("tmp_vg", face_pt(side, ac, 0.05, 1.45), face_size(side, a1 - a0 - 0.6, 0.14, 0.55),
+                         M["M_MetalDark"], exp))
+        for k in range(5):
+            box(f"VENTS_plinth_{tag}{i}_slat_{k}", face_pt(side, ac, 0.1, 1.24 + k * 0.105),
+                face_size(side, a1 - a0 - 0.7, 0.03, 0.05), M["M_MetalLight"], exp, rot=(math.radians(-30), 0, 0))
+        bevel(box(f"VENTS_plinth_{tag}{i}_filter", face_pt(side, ac, 0.055, 1.82), face_size(side, 1.2, 0.03, 0.06),
+                  M["M_MetalLight"], exp), 0.005)
+        return
+    # power: horizontal conduit, two breaker boxes with warning labels, cable glands, status lights
+    # panel face is 0.05 in from the footprint edge; everything below sits proud of it but inside the footprint
+    cylinder(f"POWER_conduit_{tag}{i}", face_pt(side, ac, 0.06, 1.74), 0.055, a1 - a0 - 0.5,
+             M["M_MetalLight"], exp, 10, axis="X")
+    for k, bx_ in enumerate((ac - 0.85, ac + 0.85)):
+        bevel(box(f"POWER_breaker_{tag}{i}_{k}", face_pt(side, bx_, 0.035, 1.38), face_size(side, 0.8, 0.06, 0.5),
+                  M["M_MetalLight"], exp), 0.015)
+        box(f"POWER_breaker_{tag}{i}_{k}_label", face_pt(side, bx_ - 0.22, 0.003, 1.5), face_size(side, 0.2, 0.006, 0.14),
+            M["M_Hazard"], exp)
+        box(f"POWER_breaker_{tag}{i}_{k}_status", face_pt(side, bx_ + 0.2, 0.003, 1.5), face_size(side, 0.16, 0.006, 0.05),
+            M["M_Beacon"], exp)
+        for g in (-0.2, 0.0, 0.2):   # cable glands under the breaker box
+            cylinder(f"POWER_gland_{tag}{i}_{k}_{g:+.1f}", face_pt(side, bx_ + g, 0.035, 1.09), 0.035, 0.1,
+                     M["M_Rubber"], exp, 8)
+
+
+def plinth_service(side, tag, i, a0, a1, M, exp):
+    """Main service block in the middle of the front plinth: proud housing with a recessed bay holding
+    a latched service cover, connector panel, status screen and a light strip; hazard edging."""
+    ac = (a0 + a1) / 2
+    blk = face_panels(f"BASE_SERVICE_{tag}{i}", side, [(a0, a1)], 0.2, 1.84, CORE + 0.12, M["M_MetalDark"], exp,
+                      recess=0.0, bev=0.05)[0]
+    boolean(blk, box("tmp_sb", face_pt(side, ac, 0.0, 0.98), face_size(side, a1 - a0 - 0.5, 0.16, 1.3),
+                     M["M_MetalDark"], exp))   # bay floor 0.08 in from the edge
+    cov_x = ac - 0.35
+    bevel(box(f"BASE_SERVICE_cover", face_pt(side, cov_x, 0.06, 0.95), face_size(side, 1.3, 0.04, 1.05),
+              M["M_MetalLight"], exp), 0.02)
+    box("BASE_SERVICE_cover_handle", face_pt(side, cov_x, 0.03, 0.8), face_size(side, 0.45, 0.03, 0.06),
+        M["M_MetalDark"], exp)
+    for k, dz in enumerate((0.28, -0.28)):   # latches
+        bevel(box(f"BASE_SERVICE_latch_{k}", face_pt(side, cov_x + 0.72, 0.045, 0.95 + dz), face_size(side, 0.14, 0.06, 0.18),
+                  M["M_MetalDark"], exp), 0.01)
+    # connector panel: three ports with amber rings
+    bevel(box("BASE_SERVICE_ports", face_pt(side, ac + 0.85, 0.065, 0.95), face_size(side, 0.5, 0.03, 0.95),
+              M["M_Rubber"], exp), 0.01)
+    for k, dz in enumerate((0.3, 0.0, -0.3)):
+        cylinder(f"BASE_SERVICE_port_{k}", face_pt(side, ac + 0.85, 0.045, 0.95 + dz), 0.09, 0.02, M["M_Beacon"],
+                 exp, 12, axis="Y")
+        cylinder(f"BASE_SERVICE_port_{k}_plug", face_pt(side, ac + 0.85, 0.035, 0.95 + dz), 0.06, 0.02,
+                 M["M_MetalDark"], exp, 12, axis="Y")
+    box("BASE_SERVICE_screen", face_pt(side, cov_x, 0.075, 1.6), face_size(side, 0.6, 0.01, 0.16), M["M_ScreenStatic"],
+        exp)
+    box("LIGHTS_base_service", face_pt(side, ac, 0.005, 1.75), face_size(side, a1 - a0 - 0.8, 0.01, 0.05),
+        M["M_LightWarm"], exp)
+    for k, e in enumerate((a0 + 0.17, a1 - 0.17)):   # hazard edging on the block jambs
+        box(f"DECALS_hazard_service_{k}", face_pt(side, e, 0.004, 0.98), face_size(side, 0.12, 0.008, 1.3),
+            M["M_Hazard"], exp)
+
+
 def build(mats, exp, ref):
     M = mats
     fy = -(D / 2 - SHELL_INSET)          # outer front face of the shell
@@ -189,8 +264,8 @@ def build(mats, exp, ref):
     sy = D / 2 - 1.0 - CORE
     dl, dr = DOOR_X - DOOR_W / 2 - 0.25, DOOR_X + DOOR_W / 2 + 0.25          # door bay in the back
     layout = {
-        "-y": ([(-fx, -5.3, "light"), (-5.3, -1.5, "hazard"), (-1.5, 1.5, "hatch"), (1.5, 5.3, "hazard"),
-                (5.3, fx, "light")], (-5.3, -1.5, 1.5, 5.3)),
+        "-y": ([(-fx, -5.3, "light"), (-5.3, -1.7, "vent"), (-1.7, 1.7, "service"), (1.7, 5.3, "power"),
+                (5.3, fx, "light")], (-5.3, -1.7, 1.7, 5.3)),
         "+y": ([(-fx, -5.3, "light"), (-5.3, dl - 0.4, "hazard"), (dr + 0.4, 2.6, "socket"), (2.6, 5.3, "hazard"),
                 (5.3, fx, "light")], (-5.3, dl - 0.2, dr + 0.2, 2.6, 5.3)),
         "-x": ([(-sy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, sy, "plain")], (-1.2, 1.2)),
@@ -239,7 +314,14 @@ def build(mats, exp, ref):
     boolean(shell, prism("tmp_win", win, "y", *win_depth, M["M_MetalDark"], exp))
     boolean(shell, box("tmp_door", (DOOR_X, by, DOOR_H / 2), (DOOR_W, 1.5, DOOR_H), M["M_MetalDark"], exp))
     # dark stepped reveal around the window opening
-    boolean(shell, prism("tmp_reveal", inset_poly(win, -0.24), "y", fy - 0.5, fy + 0.09, M["M_MetalDark"], exp))
+    boolean(shell, prism("tmp_reveal", inset_poly(win, -0.24), "y", fy - 0.5, fy + 0.17, M["M_MetalDark"], exp))
+    # dark seams in the shell under the gaps between the front band sections
+    gaps = sorted({x for sec in FRONT_SECTIONS for x in sec} | set(VISOR_SEAT))
+    gaps = [(a + b) / 2 for a, b in zip(gaps[:-1], gaps[1:]) if 0.02 < b - a < 0.2]
+    for x in gaps:
+        g = skin("tmp_fs", box("tmp_fsr", (x, -3.3, 6.4), (0.06, 3.4, 2.0), None, exp),
+                 -0.1, ROOF + 0.1, 0.035, ROOF - 0.035, M["M_MetalDark"], exp)
+        boolean(shell, g)
     # panel seams running over front chamfer, roof and back chamfer
     for x in (-3.4, 3.4):
         g = skin("tmp_seam", box("tmp_sr", (x, 0, 6.5), (0.05, D + 2, 1.7), None, exp),
@@ -258,6 +340,10 @@ def build(mats, exp, ref):
     bevel(shell, 0.05)
 
     # ===================================================================== WINDOW (tilted 15°)
+    # heavy stepped frame: deep reveal (0.17) + a protruding dark bezel ring standing in it
+    bez = prism("WINDOW_BEZEL", inset_poly(win, -0.15), "y", fy + 0.0, fy + 0.17, M["M_MetalDark"], exp)
+    boolean(bez, prism("tmp_bz", win, "y", fy - 1, fy + 1, None, exp))
+    bevel(bez, 0.03)
     t = 0.16
     inner_win = inset_poly(win, t)
     frame = prism("WINDOW_FRAMES", win, "y", yb - 0.09, yb + 0.09, M["M_MetalDark"], exp)
@@ -266,19 +352,34 @@ def build(mats, exp, ref):
     parts = []
     for x in (-MULLION_X, MULLION_X):
         parts.append(box(f"WINDOW_FRAMES_mullion_{x:+.0f}", (x, yb, (WIN_Z0 + WIN_TOP) / 2),
-                         (0.16, 0.16, WIN_TOP - WIN_Z0), M["M_MetalDark"], exp))
+                         (0.2, 0.2, WIN_TOP - WIN_Z0), M["M_MetalDark"], exp))
     xb, xt, hgt = WIN_X - 0.3, WIN_X - 1.5, WIN_TOP - WIN_Z0
     ang = math.atan2(xb - xt, hgt)
     for s in (-1, 1):
         parts.append(box(f"WINDOW_FRAMES_mullion_angled_{s:+d}", (s * (xb + xt) / 2, yb, (WIN_Z0 + WIN_TOP) / 2),
-                         (0.16, 0.16, math.hypot(xb - xt, hgt)), M["M_MetalDark"], exp, rot=(0, -s * ang, 0)))
+                         (0.2, 0.2, math.hypot(xb - xt, hgt)), M["M_MetalDark"], exp, rot=(0, -s * ang, 0)))
     parts.append(prism("WINDOW_GLASS", inner_win, "y", yb - 0.015, yb + 0.015, M["M_Glass"], exp))
+    # joint plates where the mullions meet the frame (bolted nodes)
+    zb, zt = WIN_Z0 + t + 0.08, WIN_TOP - t - 0.08
+    nodes = [(x, z) for x in (-MULLION_X, MULLION_X) for z in (zb, zt)]
+    nodes += [(s * xb, zb) for s in (-1, 1)] + [(s * xt, zt) for s in (-1, 1)]
+    for i, (x, z) in enumerate(nodes):
+        parts.append(box(f"WINDOW_FRAMES_node_{i}", (x, yb - 0.12, z), (0.36, 0.06, 0.26), M["M_MetalLight"], exp))
+        for dx in (-0.11, 0.11):
+            parts.append(cylinder(f"WINDOW_FRAMES_node_{i}_bolt_{dx:+.2f}", (x + dx, yb - 0.16, z), 0.03, 0.03,
+                                  M["M_MetalDark"], exp, 8, axis="Y"))
     for p in parts:
         shear_y(p, WIN_Z0, TILT)
     xs = [-5.75, -3.5, -1.15, 1.15, 3.5, 5.75]
     for i in range(len(xs) - 1):  # segmented light-metal sill between the pylons
         bevel(box(f"WINDOW_SILL_{i}", ((xs[i] + xs[i + 1]) / 2, (fy - 0.16 + yb + 0.02) / 2, 2.07),
                   (xs[i + 1] - xs[i] - 0.05, yb + 0.02 - fy + 0.16, 0.18), M["M_MetalLight"], exp), 0.02)
+    # thin mechanical mounts under the lower glass edge: bracket + diagonal strut + pin
+    for i, x in enumerate((-4.7, -3.0, -1.2, 1.2, 3.0, 4.7)):
+        bevel(box(f"WINDOW_MOUNT_{i}", (x, fy + 0.0, 2.25), (0.14, 0.16, 0.14), M["M_MetalDark"], exp), 0.01)
+        box(f"WINDOW_MOUNT_{i}_strut", (x, fy - 0.03, 2.19), (0.05, 0.05, 0.2), M["M_MetalLight"], exp,
+            rot=(math.radians(-35), 0, 0))
+        cylinder(f"WINDOW_MOUNT_{i}_pin", (x, fy - 0.0, 2.25), 0.025, 0.2, M["M_MetalLight"], exp, 8, axis="X")
 
     # ===================================================================== CORNER PYLONS
     for s_x in (-1, 1):
@@ -320,6 +421,18 @@ def build(mats, exp, ref):
 
     # ===================================================================== FRONT VISOR LIGHT (on the 45° chamfer)
     # thin axis must follow the chamfer normal (0, -1, 1)/sqrt(2) -> rotate -45° about X
+    # separate orange sections over the front chamfer and roof edge + dark recessed seat for the visor
+    def band_plate(name, x0, x1, thick, mat):
+        reg = box("tmp_bpr", ((x0 + x1) / 2, -3.3, 6.75), (x1 - x0, 3.4, 2.3), None, exp)
+        p = skin(name, reg, -thick, ROOF + thick, 0.0, ROOF, mat, exp)
+        boolean(p, prism("tmp_bpw", inset_poly(win, -0.24), "y", fy - 1.0, fy + 1.7, None, exp))
+        return bevel(p, 0.025)
+    for i, (x0, x1) in enumerate(FRONT_SECTIONS):
+        band_plate(f"FRONT_BAND_{i}", x0, x1, FRONT_PLATE_T, M["M_PaintOrange"])
+    band_plate("FRONT_BAND_visor_seat", *VISOR_SEAT, 0.045, M["M_MetalDark"])
+    for i, x in enumerate((-2.15, 2.15)):   # light-metal clamps holding the visor housing
+        on_chamfer(f"LIGHTS_visor_clamp_{i}", (x, fy + FRONT_CH / 2, ROOF - FRONT_CH / 2), "y", -1,
+                   (0.12, 0.16, 0.8), 0.1, M["M_MetalLight"], exp)
     # raised orange housing with a dark bezel, as on the concept
     c = (0.0, fy + FRONT_CH / 2, ROOF - FRONT_CH / 2)
     bevel(on_chamfer("LIGHTS_visor_housing", c, "y", -1, (3.9, 0.4, 1.15), 0.08, M["M_PaintOrange"], exp), 0.06)
