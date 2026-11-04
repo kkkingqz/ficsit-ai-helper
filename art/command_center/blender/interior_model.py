@@ -19,7 +19,7 @@ import math
 import bpy  # noqa: F401  (must precede bmesh when running from the bpy wheel)
 import bmesh
 
-from cc_lib import (CEIL, D, FLOOR_Z, FRAME_MINOR, LOUVRE_ANGLE, SHELL_INSET, WALL, W, bevel, boolean, box, cylinder,
+from cc_lib import (CEIL, D, DOOR_X, FLOOR_Z, FRAME_MINOR, LOUVRE_ANGLE, SHELL_INSET, WALL, W, bevel, boolean, box, cylinder,
                     louvre,
                     mesh_object, octagon, prism)
 
@@ -41,6 +41,10 @@ WING_W, WING_ANGLE = 1.8, math.radians(25)
 HOLO_XY = (3.2, 0.0)                     # holo platform centre (under the ceiling projector bay)
 OPERATOR_XY = (CONSOLE_X, -1.85)          # where the standing operator stands (mat, interaction zone)
 BEAMS_X = (-4.8, -1.6, 1.6, 4.8)         # ceiling beams (bays between them carry lights / projector)
+# back wall composition (entry wall), x ranges along the wall
+PORTAL_X = (DOOR_X - 2.3, DOOR_X + 2.3)    # door portal = main node, centred on the door
+POWER_X = (PORTAL_X[1] + 0.03, 2.85)       # power / cable group, on the axis of the exterior cable entry (x 1.05..2.2)
+SERVICE_X = (2.9, 6.55)                   # one service group: service console + three cabinets under one canopy
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -303,8 +307,10 @@ def build_walls(M, exp, door):
     left = [("vent", -2.65, -1.35), ("cable", -1.35, -0.45), ("rack", -0.45, 0.5), ("rack", 0.5, 1.45),
             ("hvac", 1.45, 2.65)]
     right = [("clean", -2.65, 0.37), ("clean", 0.83, 2.65)]          # the cable duct runs in the gap at y 0.6
-    back = [("access", -6.65, -5.3), ("access", -5.3, -3.95), ("terminal", -3.95, door_x0 - 0.35),
-            ("behind", 2.9, 3.55), ("behind", 3.55, 6.35), ("access", 6.35, 6.65)]
+    # back wall = ENTRY composition (see build_back_wall): calm panels + 2 containers | door portal with access
+    # control | power / cable group | one service-cabinet group
+    back = [("clean", -6.65, -4.95), ("clean", -4.95, PORTAL_X[0] - 0.03),
+            ("behind", SERVICE_X[0], 4.75), ("behind", 4.75, 6.65)]
     for wall, zones in (("L", left), ("R", right), ("B", back)):
         for i, (kind, a0, a1) in enumerate(zones):
             zone(wall, kind, a0, a1, i)
@@ -316,15 +322,7 @@ def build_walls(M, exp, door):
         bevel(box(f"WALL_column_{i}", (x, y, (F + WALL_TOP) / 2), (0.32, 0.34, WALL_TOP - F), M["M_PaintOrange"], exp),
               0.03)
         box(f"WALL_column_{i}_stripe", (x, y - math.copysign(0.172, y), F + 0.5), (0.24, 0.004, 0.5), M["M_Hazard"], exp)
-    # FICSIT logo panel on the back wall
-    lx0, lx1 = door_x1 + 0.35, 2.9
-    bevel(box("WALL_logo_panel", ((lx0 + lx1) / 2, YW - 0.04, (uz0 + uz1) / 2), (lx1 - lx0 - 0.06, 0.08, uz1 - uz0),
-              M["M_MetalDark"], exp), 0.03)
-    box("DECALS_logo_inside", ((lx0 + lx1) / 2, YW - 0.083, uz0 + 1.75), (1.6, 0.006, 0.5), M["M_Decal"], exp)
-    for j in range(4):
-        box(f"WALL_logo_panel_stripe_{j}", (lx0 + 0.4 + j * 0.22, YW - 0.083, uz0 + 1.2), (0.12, 0.006, 0.3),
-            M["M_PaintOrange"], exp, rot=(0, math.radians(-25), 0))
-    dado("WALL_logo_panel", "B", lx0, lx1)
+
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -943,7 +941,7 @@ def build_entrance(M, exp, door, pit):
     # ---- layered frame: dark casing -> orange inner frame ------------------------------------------------------------
     for s, (x0, x1) in ((-1, (door_x0 - cw, door_x0)), (1, (door_x1, door_x1 + cw))):
         xc = (x0 + x1) / 2
-        bevel(box(f"DOOR_IN_casing_{s:+d}", (xc, YW - 0.1, (door_h + 0.5) / 2), (cw, 0.2, door_h + 0.5), M["M_MetalDark"],
+        bevel(box(f"DOOR_IN_casing_{s:+d}", (xc, YW - 0.1, (door_h + 0.05) / 2), (cw, 0.2, door_h + 0.05), M["M_MetalDark"],
                   exp), 0.03)
         xi = door_x0 - 0.06 if s < 0 else door_x1 + 0.06
         bevel(box(f"DOOR_IN_frame_{s:+d}", (xi, YW - 0.225, door_h / 2), (0.12, 0.05, door_h), M["M_PaintOrange"], exp),
@@ -962,19 +960,6 @@ def build_entrance(M, exp, door, pit):
         box(f"DOOR_IN_status_led_{k}", (dx + 0.82 + k * 0.13, YW - 0.232, door_h + 0.36), (0.07, 0.006, 0.07),
             M["M_Beacon"] if k == 1 else M["M_ScreenStatic"], exp)
     box("DOOR_IN_sign_label", (dx - 0.8, YW - 0.205, door_h + 0.36), (0.6, 0.006, 0.14), M["M_Decal"], exp)
-    # ---- door control panel on the wall + card reader on the right casing ------------------------------------------
-    dc = door_x0 - cw - 0.33
-    bevel(box("DOOR_IN_control", (dc, YW - 0.05, 1.95), (0.3, 0.1, 0.5), M["M_MetalDark"], exp), 0.012)
-    box("DOOR_IN_control_screen", (dc, YW - 0.103, 2.06), (0.22, 0.004, 0.14), M["M_ScreenStatic"], exp)
-    for r in range(3):
-        for c in range(3):
-            box(f"DOOR_IN_control_key_{r}_{c}", (dc - 0.07 + c * 0.07, YW - 0.108, 1.9 - r * 0.06), (0.05, 0.01, 0.04),
-                M["M_MetalBare"], exp)
-    box("DOOR_IN_control_button", (dc + 0.1, YW - 0.11, 1.78), (0.07, 0.02, 0.07), M["M_Beacon"], exp)
-    rx = door_x1 + cw / 2
-    bevel(box("DOOR_IN_reader", (rx, YW - 0.215, 1.75), (0.16, 0.03, 0.26), M["M_MetalLight"], exp), 0.012)
-    box("DOOR_IN_reader_led", (rx, YW - 0.232, 1.83), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
-    box("DOOR_IN_reader_pad", (rx, YW - 0.232, 1.7), (0.1, 0.004, 0.1), M["M_Rubber"], exp)
     # ---- threshold in the door opening: grated plate, hazard edge, door track ------------------------------------------
     tw = door_x1 - door_x0
     bevel(box("DOOR_threshold", (dx, YW + 0.15, 0.015), (tw, 0.42, 0.03), M["M_MetalLight"], exp), 0.012)
@@ -1019,6 +1004,94 @@ def build_entrance(M, exp, door, pit):
         box(f"PIT_RAIL_{s}_rail_mid", (x, yc, F + 0.6), (0.05, ln, 0.05), M["M_PaintOrange"], exp)
         box(f"PIT_RAIL_{s}_post_0_band", (x, py0 + 0.05, F + 0.85), (0.084, 0.084, 0.12), M["M_Hazard"], exp)
         box(f"LIGHTS_rail_marker_{s}", (x, py0 + 0.05, F + 1.125), (0.06, 0.06, 0.02), M["M_Beacon"], exp)
+
+
+def build_back_wall(M, exp, door):
+    """Entry wall as ONE composition with a clear hierarchy (stage 4, back-wall pass):
+       1. door portal (main node): dark surround around the door casing, heavy orange frame, FICSIT logo in the head;
+       2. access control right beside the door, in the portal: one module (door control + card reader);
+       3. power / cable group: closed vertical cable trunk (floor box -> cornice) + power distribution board,
+          on the axis of the exterior cable entry;
+       4. one service group: service console + three cabinets under a shared canopy with a work light;
+       5. the two service containers stay in the calm left corner (build_services)."""
+    door_x0, door_x1, door_h = door
+    dx = (door_x0 + door_x1) / 2
+    cw = 0.42                                        # door casing width (build_entrance)
+    p0, p1 = PORTAL_X
+    uz1 = WALL_TOP - 0.15
+    head_z0 = door_h + 0.55                          # top of the door header
+    fw = 0.16                                        # portal frame = FRAME_MAJOR-class member
+    # ---- 1. portal: surround panels (around the casing) + orange frame + logo head -------------------------------------
+    for s, (x0, x1) in ((-1, (p0, door_x0 - cw)), (1, (door_x1 + cw, p1))):
+        bevel(box(f"PORTAL_surround_{s:+d}", ((x0 + x1) / 2, YW - 0.04, (F + uz1) / 2), (x1 - x0, 0.08, uz1 - F),
+                  M["M_MetalDark"], exp), 0.012)
+        fx = x0 + fw / 2 if s < 0 else x1 - fw / 2
+        bevel(box(f"PORTAL_frame_{s:+d}", (fx, YW - 0.09, (F + uz1) / 2), (fw, 0.18, uz1 - F), M["M_PaintOrange"], exp),
+              0.03)
+        box(f"PORTAL_frame_{s:+d}_hazard", (fx, YW - 0.182, F + 0.35), (fw - 0.04, 0.006, 0.5), M["M_Hazard"], exp)
+    hx0, hx1 = door_x0 - cw, door_x1 + cw
+    bevel(box("PORTAL_head", (dx, YW - 0.04, (head_z0 + uz1) / 2), (hx1 - hx0, 0.08, uz1 - head_z0), M["M_MetalDark"], exp),
+          0.012)
+    bevel(box("PORTAL_frame_top", (dx, YW - 0.09, uz1 - fw / 2), (p1 - p0, 0.18, fw), M["M_PaintOrange"], exp), 0.03)
+    box("DECALS_logo_inside", (dx, YW - 0.082, (head_z0 + uz1 - fw) / 2), (1.6, 0.006, 0.42), M["M_Decal"], exp)
+    box("LIGHTS_portal_head", (dx, YW - 0.182, uz1 - fw - 0.03), (p1 - p0 - 2 * fw - 0.2, 0.01, 0.04), M["M_LightWarm"],
+        exp)
+    # cornice continues over portal + power group (the zones carry their own pieces)
+    box("PORTAL_cornice", ((p0 + POWER_X[1]) / 2, YW - 0.05, WALL_TOP - 0.08), (POWER_X[1] - p0 + 0.06, 0.1, 0.1),
+        M["M_MetalDark"], exp)
+    # ---- 2. access control module in the left surround: door control above, card reader below --------------------------
+    ax = (p0 + fw + door_x0 - cw) / 2
+    az = F + 1.1
+    bevel(box("ACCESS_backplate", (ax, YW - 0.095, az), (0.4, 0.03, 1.05), M["M_MetalLight"], exp), 0.012)
+    box("ACCESS_trim", (ax, YW - 0.112, az + 0.5), (0.4, 0.006, 0.04), M["M_PaintOrange"], exp)
+    bevel(box("DOOR_IN_control", (ax, YW - 0.15, az + 0.22), (0.3, 0.08, 0.42), M["M_MetalDark"], exp), 0.012)
+    box("DOOR_IN_control_screen", (ax, YW - 0.192, az + 0.33), (0.22, 0.004, 0.14), M["M_ScreenStatic"], exp)
+    for r in range(2):
+        for c in range(3):
+            box(f"DOOR_IN_control_key_{r}_{c}", (ax - 0.07 + c * 0.07, YW - 0.196, az + 0.17 - r * 0.06), (0.05, 0.01, 0.04),
+                M["M_MetalBare"], exp)
+    box("DOOR_IN_control_button", (ax, YW - 0.2, az + 0.05), (0.12, 0.02, 0.05), M["M_Beacon"], exp)
+    bevel(box("DOOR_IN_reader", (ax, YW - 0.13, az - 0.3), (0.18, 0.04, 0.26), M["M_MetalDark"], exp), 0.012)
+    box("DOOR_IN_reader_led", (ax, YW - 0.152, az - 0.22), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
+    box("DOOR_IN_reader_pad", (ax, YW - 0.152, az - 0.33), (0.12, 0.004, 0.12), M["M_Rubber"], exp)
+    box("ACCESS_label", (ax, YW - 0.112, az - 0.47), (0.3, 0.004, 0.06), M["M_Decal"], exp)
+    # ---- 3. power / cable group ------------------------------------------------------------------------------------------
+    q0, q1 = POWER_X
+    bevel(box("POWER_backplate", ((q0 + q1) / 2, YW - 0.03, (F + uz1) / 2), (q1 - q0, 0.06, uz1 - F), M["M_MetalDark"], exp),
+          0.012)
+    tx, tw, td = q0 + 0.3, 0.36, 0.18                # closed cable trunk floor -> cornice
+    bevel(box("POWER_trunk", (tx, YW - 0.06 - td / 2, (F + WALL_TOP) / 2), (tw, td, WALL_TOP - F), M["M_MetalLight"], exp),
+          0.012)
+    box("POWER_trunk_seam", (tx, YW - 0.06 - td - 0.002, (F + WALL_TOP) / 2), (0.02, 0.006, WALL_TOP - F - 0.1),
+        M["M_Rubber"], exp)
+    for k, z in enumerate((F + 0.8, F + 2.0, F + 3.2)):    # rhythm: three clamps, same pitch as the left cable ladder
+        box(f"POWER_trunk_clamp_{k}", (tx, YW - 0.06 - td / 2, z), (tw + 0.06, td + 0.04, 0.08), M["M_PaintOrange"], exp)
+    bevel(box("POWER_trunk_floor_box", (tx, YW - 0.25, F + 0.13), (tw + 0.14, 0.38, 0.26), M["M_MetalDark"], exp), 0.012)
+    box("POWER_trunk_floor_box_hazard", (tx, YW - 0.442, F + 0.13), (tw + 0.04, 0.006, 0.1), M["M_Hazard"], exp)
+    bx, bw, bh, bz = (tx + tw / 2 + q1) / 2, 0.7, 1.1, F + 1.55      # power distribution board
+    bevel(box("POWER_board", (bx, YW - 0.06 - 0.11, bz), (bw, 0.22, bh), M["M_MetalDark"], exp), 0.03)
+    bevel(box("POWER_board_door", (bx, YW - 0.29, bz - 0.05), (bw - 0.1, 0.02, bh - 0.22), M["M_MetalLight"], exp), 0.012)
+    box("POWER_board_handle", (bx + bw / 2 - 0.11, YW - 0.31, bz - 0.05), (0.03, 0.03, 0.22), M["M_MetalBare"], exp)
+    box("POWER_board_hazard", (bx - 0.08, YW - 0.302, bz + 0.2), (0.22, 0.004, 0.22), M["M_Hazard"], exp)
+    box("POWER_board_label", (bx - 0.08, YW - 0.302, bz - 0.12), (0.34, 0.004, 0.08), M["M_Decal"], exp)
+    box("POWER_board_led", (bx, YW - 0.282, bz + bh / 2 - 0.06), (0.08, 0.006, 0.03), M["M_Beacon"], exp)
+    # feeds: trunk -> board (top), board -> service group canopy
+    cylinder("POWER_feed_trunk", ((tx + bx - bw / 2) / 2, YW - 0.14, bz + bh / 2 - 0.14), 0.04,
+             bx - bw / 2 - tx, M["M_Rubber"], exp, 8, axis="X")
+    # ---- 4. service group: one canopy over console + cabinets, work light, one label ---------------------------------
+    s0, s1 = SERVICE_X
+    cz0, cz1, cd = F + 2.3, F + 2.45, 0.62
+    bevel(box("SERVICE_canopy", ((s0 + s1) / 2, YW - cd / 2, (cz0 + cz1) / 2), (s1 - s0, cd, cz1 - cz0), M["M_MetalDark"],
+              exp), 0.012)
+    box("SERVICE_canopy_edge", ((s0 + s1) / 2, YW - cd - 0.01, (cz0 + cz1) / 2), (s1 - s0, 0.02, cz1 - cz0),
+        M["M_PaintOrange"], exp)
+    box("LIGHTS_service_canopy", ((s0 + s1) / 2, YW - cd + 0.08, cz0 - 0.005), (s1 - s0 - 0.4, 0.06, 0.01), M["M_LightWarm"],
+        exp)
+    box("SERVICE_canopy_label", (s0 + 0.9, YW - cd - 0.022, (cz0 + cz1) / 2), (0.6, 0.004, 0.08), M["M_Decal"], exp)
+    cylinder("POWER_feed_service", ((bx + bw / 2 + s0) / 2 + 0.02, YW - 0.14, cz0 - 0.1), 0.04, s0 - bx - bw / 2 + 0.1,
+             M["M_Rubber"], exp, 8, axis="X")
+    cylinder("POWER_feed_service_riser", (bx + bw / 2 - 0.02, YW - 0.14, (bz + bh / 2 + cz0 - 0.1) / 2), 0.04,
+             cz0 - 0.1 - bz - bh / 2 + 0.04, M["M_Rubber"], exp, 8)
 
 
 def build_ref(M, ref, door_x):
@@ -1075,15 +1148,9 @@ def _detail_console(M, exp, segs):
 
 
 def _detail_door_walls(M, exp, door):
-    """Panel-split seams on the upper panels next to the door (rhythm) and kick plates on the casing (function)."""
+    """Kick plates on the door casing (function)."""
     door_x0, door_x1, door_h = door
     uz0, uz1 = F + 0.96, WALL_TOP - 0.15
-    for name, a0, a1 in (("terminal", -3.92, door_x0 - 0.38), ("logo_r", 2.9 - 0.4, 2.87)):
-        box(f"WALL_B_{name}_seam_h", _wp("B", (a0 + a1) / 2, 0.052, uz0 + 1.4), _ws("B", a1 - a0 - 0.06, 0.006, 0.02),
-            M["M_Rubber"], exp)
-    ac = (-3.92 + door_x0 - 0.45) / 2
-    box("WALL_B_terminal_seam_v", _wp("B", ac, 0.052, (uz0 + uz1) / 2), _ws("B", 0.02, 0.006, uz1 - uz0 - 0.06), M["M_Rubber"],
-        exp)
     cw = 0.42
     for s, xc in ((-1, door_x0 - cw / 2), (1, door_x1 + cw / 2)):
         bevel(box(f"DOOR_IN_kick_{s:+d}", (xc, YW - 0.206, 0.18), (cw - 0.06, 0.012, 0.3), M["M_MetalBare"], exp), 0.012)
@@ -1200,6 +1267,7 @@ def build_interior_v2(M, exp, ref, door):
     build_ceiling(M, exp)
     build_services(M, exp)
     build_entrance(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h), pit)
+    build_back_wall(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h))
     build_surface_detail(M, exp, segs, (door_x - door_w / 2, door_x + door_w / 2, door_h))
     build_window_band(M, exp)
     build_ref(M, ref, door_x)
