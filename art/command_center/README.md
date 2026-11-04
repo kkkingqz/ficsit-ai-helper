@@ -126,7 +126,7 @@ blender -b -P build_model.py -- --out ../export --render ../renders/stage3
 | `blender/build_model.py` | **текущая модель**: детализированный корпус (этап 3) + интерьер |
 | `blender/build_blockout.py` | блокаут этапа 1, сохранён для сравнения |
 | `export/` | FBX для UE, GLB для просмотра: `SM_CommandCenter*` и `SM_CommandCenter_Blockout*` |
-| `renders/turnaround/` | облёт: 8 перспективных ракурсов через 45° (`T000_front` … `T315_front_left`), вид сверху, 4 ортогональных вида, сводные листы `00_turnaround_sheet` и `00_ortho_sheet` (64 сэмпла) |
+| `renders/turnaround/` | облёт: 8 перспективных ракурсов через 45° (`T000_front` … `T315_front_left`), вид сверху, 4 ортогональных вида, сводные листы `00_turnaround_sheet` и `00_ortho_sheet` (64 сэмпла). **Снят до прохода 10** (старая дверь и вентблок крыши); после прохода 10 обновлены только `stage3/04_back`, `13_roof`, `06_top`. Полный перерендер — по запросу |
 | `renders/stage3/`, `renders/blockout/` | 3/4 спереди, сзади, слева и справа, вид на крышу, четыре ортогональных вида, крупные планы узла связи и цоколя, сверху, интерьер, сравнения с концептом, крупный план фронта |
 | `reference/` | пакет референсов (JPG ≤ 2400 px, без изменений по содержанию) и `README_modeling.md` |
 
