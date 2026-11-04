@@ -182,6 +182,28 @@ def cylinder(name, center, radius, height, mat, coll, segments=24, axis="Z"):
     return mesh_object(name, bm, mat, coll)
 
 
+# unified form language
+FRAME_MAJOR = 0.24     # window reveal, door frame, service-bay margins, vent grille margins
+FRAME_MINOR = 0.12     # inner steps: window bezel, hatch frames, radiator / vent frames, cap ledge height
+LOUVRE_PITCH, LOUVRE_SLAT_H, LOUVRE_SLAT_T = 0.12, 0.06, 0.03   # vent type A (intakes): one slat series
+LOUVRE_ANGLE = math.radians(30)                 # tips out and down; vent type B = round exhausts / fans
+
+
+def louvre(prefix, side, a_c, length, z0, z1, plane, M, exp):
+    """Vent type A: horizontal bare-metal slats at the standard pitch and angle, filling z0..z1.
+    side: outward face normal ('-y', '+y', '-x', '+x'); plane: world coordinate of the slat centres along it."""
+    n = max(2, int(round((z1 - z0) / LOUVRE_PITCH)))
+    for i in range(n):
+        z = z0 + (i + 0.5) * (z1 - z0) / n
+        if side[1] == "y":
+            ctr, size = (a_c, plane, z), (length, LOUVRE_SLAT_T, LOUVRE_SLAT_H)
+            rot = (-LOUVRE_ANGLE if side == "-y" else LOUVRE_ANGLE, 0, 0)
+        else:
+            ctr, size = (plane, a_c, z), (LOUVRE_SLAT_T, length, LOUVRE_SLAT_H)
+            rot = (0, LOUVRE_ANGLE if side == "-x" else -LOUVRE_ANGLE, 0)
+        box(f"{prefix}_slat_{i}", ctr, size, M["M_MetalBare"], exp, rot=rot)
+
+
 def apply_modifier(target, mtype, **props):
     """Add a modifier, bake the evaluated mesh into the object and drop the modifier (no operator context)."""
     mod = target.modifiers.new("tmp_mod", mtype)
@@ -342,11 +364,15 @@ def render_all(out, only=None, suffix=""):
         "18_detail_back_door": ((1.5, 10.5, 2.6), (-1.0, 4.0, 2.0), None, 40),
         "19_detail_roof": ((-6.5, -4.5, 11.5), (-1.0, 0.4, 7.2), None, 45),
         "20_detail_front_band": ((-4.0, -10.0, 7.6), (-2.5, -3.4, 6.2), None, 45),
+        # interior views (stage 4)
+        "21_interior_main": ((6.3, 2.45, 3.1), (-2.5, -2.6, 2.3), None, 18),
+        "22_interior_alt": ((-6.4, -1.9, 3.1), (2.6, 2.6, 2.4), None, 18),
+        "23_interior_console": ((-3.0, 1.2, 2.9), (-3.0, -3.0, 2.3), None, 24),
     }
     for name, (loc, tgt, ortho, lens) in shots.items():
         if only and name not in only:
             continue
-        if not only and name.startswith(("16_", "17_", "18_", "19_", "20_")):
+        if not only and name.startswith(("16_", "17_", "18_", "19_", "20_", "21_", "22_", "23_")):
             continue          # close-ups only on request
         s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35)
         s.render.filepath = os.path.join(out, name + suffix + ".png")

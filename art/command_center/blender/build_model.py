@@ -11,7 +11,7 @@ Dimensions, axes and pivot are unchanged from the blockout (see ../README.md). W
 - segmented plinth with light niches, hazard bays and a hatch; panelled sides and back;
 - double rear door in a frame, pipes with flanges/clamps, louvred vents, stepped roof box with vents,
   front light visor, beacon with antennas; small bevels on all hard edges.
-The interior (console, displays, holo table) is still the stage-1 version from cc_interior.py.
+The interior is built by interior_model.py (stage 4); cc_interior.py is only used by the blockout.
 """
 import math
 import os
@@ -21,9 +21,10 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import bpy  # noqa: F401  (must precede bmesh when running from the bpy wheel)
 
-from cc_lib import (BASE_H, CEIL, CORNER, D, DOOR_H, DOOR_W, DOOR_X, FLOOR_Z, ROOF, SHELL_INSET, WALL, W,
-                    bevel, boolean, box, chamfer_rect, cylinder, prism, run, shear_y, shell_volume)
-from cc_interior import build_interior
+from cc_lib import (BASE_H, CEIL, CORNER, D, DOOR_H, DOOR_W, DOOR_X, FLOOR_Z, FRAME_MAJOR, FRAME_MINOR,  # noqa: F401
+                    LOUVRE_ANGLE, LOUVRE_PITCH, LOUVRE_SLAT_H, LOUVRE_SLAT_T, ROOF, SHELL_INSET, WALL, W,
+                    bevel, boolean, box, chamfer_rect, cylinder, louvre, prism, run, shear_y, shell_volume)
+from interior_model import build_interior_v2
 
 # personnel door, revised after the turnaround review: 2.0 x 2.8 read as a hatch next to the 6.8 m body.
 # 2.4 x 3.2 gives a clear walk-in entrance with headroom for a pioneer with backpack/jetpack (blockout keeps 2.0 x 2.8)
@@ -42,11 +43,6 @@ PLINTH_SETBACK = 0.12                           # plinth body stands back from t
 PLATFORM_H = 0.15                               # bolted mounting plate on the foundation (full 16 x 8)
 KICK_Z = 0.3                                    # shadow recess between plate and modules
 CORNER_WRAP = 1.7                               # corner supports wrap this much of each face
-# unified form language
-FRAME_MAJOR = 0.24     # window reveal, door frame, service-bay margins, vent grille margins
-FRAME_MINOR = 0.12     # inner steps: window bezel, hatch frames, radiator / vent frames, cap ledge height
-LOUVRE_PITCH, LOUVRE_SLAT_H, LOUVRE_SLAT_T = 0.12, 0.06, 0.03   # vent type A (intakes): one slat series
-LOUVRE_ANGLE = math.radians(30)                 # tips out and down; vent type B = round exhausts / fans
 BACK_SECTIONS = ((-5.75, -3.9), (-3.82, -2.42), (0.42, 2.6), (2.68, 5.75))   # back chamfer band (same family)
 BACK_SEAT = (-2.34, 0.34)                       # dark seat for the rear light bar, on the door axis
 LOUVRE_PYLONS = ((-1, -1), (-1, 1), (1, 1))     # front-right pylon carries the logo instead
@@ -129,21 +125,6 @@ def on_chamfer(name, mid, normal_axis, sign, size, offset, mat, coll):
     n = (sign * k, 0.0, k)
     ctr = (mid[0] + n[0] * offset, mid[1], mid[2] + n[2] * offset)
     return box(name, ctr, (size[1], size[0], size[2]), mat, coll, rot=(0, math.radians(-45 * sign), 0))
-
-
-def louvre(prefix, side, a_c, length, z0, z1, plane, M, exp):
-    """Vent type A: horizontal bare-metal slats at the standard pitch and angle, filling z0..z1.
-    side: outward face normal ('-y', '+y', '-x', '+x'); plane: world coordinate of the slat centres along it."""
-    n = max(2, int(round((z1 - z0) / LOUVRE_PITCH)))
-    for i in range(n):
-        z = z0 + (i + 0.5) * (z1 - z0) / n
-        if side[1] == "y":
-            ctr, size = (a_c, plane, z), (length, LOUVRE_SLAT_T, LOUVRE_SLAT_H)
-            rot = (-LOUVRE_ANGLE if side == "-y" else LOUVRE_ANGLE, 0, 0)
-        else:
-            ctr, size = (plane, a_c, z), (LOUVRE_SLAT_T, length, LOUVRE_SLAT_H)
-            rot = (0, LOUVRE_ANGLE if side == "-x" else -LOUVRE_ANGLE, 0)
-        box(f"{prefix}_slat_{i}", ctr, size, M["M_MetalBare"], exp, rot=rot)
 
 
 BARE_METAL_PARTS = ("PIPE", "CONDUIT", "ANTENNA", "MAST", "WHIP", "POLE", "BOLT", "HINGE", "_PIN", "STRUT", "STEM",
@@ -788,7 +769,7 @@ def build(mats, exp, ref):
     # ===================================================================== FLOOR
     hx, hy = W / 2 - SHELL_INSET - WALL, D / 2 - SHELL_INSET - WALL
     floor = prism("FLOOR", chamfer_rect(hx, hy, CORNER - WALL * 0.4), "z", FLOOR_Z, FLOOR_Z + 0.02,
-                  M["M_MetalLight"], exp)
+                  M["M_MetalDark"], exp)
     boolean(floor, box("tmp_fp", (DOOR_X, (pit_y0 + D / 2) / 2, FLOOR_Z), (DOOR_W + 0.2, D / 2 - pit_y0, 0.2),
                        M["M_MetalLight"], exp))
 
@@ -1102,7 +1083,7 @@ def build(mats, exp, ref):
     box("ROOF_cable_tray_cover", ((tx0 + tx1) / 2, byy, ROOF + 0.125), (tx1 - tx0, 0.36, 0.01), M["M_MetalLight"], exp)
 
     build_final_details(M, exp, sx_out, fy, by)
-    build_interior(M, exp, ref)
+    build_interior_v2(M, exp, ref, (DOOR_X, DOOR_W, DOOR_H))
     apply_material_families(exp, M)
 
 
