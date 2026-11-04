@@ -45,6 +45,9 @@ BACK_COOLING_X = (-5.65, -2.85)     # cooling block with two fans
 BACK_CABLE_X = (0.85, 2.2)          # cable entry zone above the plinth power socket
 BACK_CABINET_X = (2.3, 5.65)        # power cabinet: two doors + breaker column
 BACK_BAND_Z = (4.0, 5.5)            # upper band over the module: hatch | radiator | tech panel
+# left side = external utility cluster (y ranges; front is -y)
+LEFT_TRENCH_Y = (-1.73, -0.05)      # recessed pipe run between pump block and header
+LEFT_TECH_Y = (0.05, 1.73)          # tall vertical tech block
 
 
 def outer_shell(name, inset, z0, top, mat, coll):
@@ -386,6 +389,93 @@ def build_back(M, exp, by):
     box("BACK_COOLING_label", (fx_, by + 0.172, (qz0 + qz1) / 2), (0.8, 0.004, 0.14), M["M_Hazard"], exp)
 
 
+def build_left_utility(M, exp, sx_out):
+    """Left side = the engineering side: pump/power block -> three pipes in a trench -> radiator header,
+    the thin line branches into a tall tech block. Everything stays inside x >= -W/2."""
+    wx = -sx_out                         # wall plane
+    back = wx + 0.26                     # trench back wall
+    edge = -W / 2
+
+    def lbox(name, y0, y1, z0, z1, depth, mat, bev_w=0.04):
+        return bevel(box(name, (wx - depth / 2 + 0.01, (y0 + y1) / 2, (z0 + z1) / 2), (depth + 0.02, y1 - y0, z1 - z0),
+                         mat, exp), bev_w)
+
+    ty0, ty1 = LEFT_TRENCH_Y
+    yc = (ty0 + ty1) / 2
+    # pump / power block on the plinth cap: source of the pipes
+    pump = lbox("LEFT_PUMP", ty0, ty1, 2.0, 2.75, 0.19, M["M_MetalDark"])
+    bevel(box("LEFT_PUMP_hatch", (wx - 0.19, yc + 0.35, 2.37), (0.02, 0.7, 0.45), M["M_MetalLight"], exp), 0.01)
+    box("LEFT_PUMP_label", (wx - 0.192, yc - 0.45, 2.5), (0.006, 0.4, 0.14), M["M_Hazard"], exp)
+    box("LEFT_PUMP_led", (wx - 0.192, yc - 0.45, 2.3), (0.006, 0.12, 0.05), M["M_Beacon"], exp)
+    # radiator header (orange) on top with a louvred face
+    hdr = lbox("LEFT_HEADER", ty0, ty1, 4.5, 5.4, 0.2, M["M_PaintOrange"], 0.06)
+    boolean(hdr, box("tmp_hg", (wx - 0.2, yc, 4.95), (0.12, ty1 - ty0 - 0.3, 0.55), M["M_MetalDark"], exp))
+    for i in range(6):
+        box(f"LEFT_HEADER_slat_{i}", (wx - 0.16, yc, 4.72 + i * 0.09), (0.03, ty1 - ty0 - 0.35, 0.035),
+            M["M_MetalLight"], exp, rot=(0, math.radians(30), 0))   # -x face: tilt about Y
+    box("LEFT_HEADER_label", (wx - 0.201, ty0 + 0.35, 5.3), (0.004, 0.4, 0.06), M["M_MetalLight"], exp)
+
+    # three pipes of different gauge; centres keep the outer surface inside the footprint
+    pipes = [  # name, y, r, segmentation style
+        ("LEFT_PIPE_main", ty0 + 0.38, 0.22, "flanged"),
+        ("LEFT_PIPE_valve", ty0 + 1.0, 0.15, "valve"),
+        ("LEFT_PIPE_branch", ty1 - 0.25, 0.08, "insulated"),
+    ]
+    z0, z1 = 2.75, 4.5
+    for name, y, r, style in pipes:
+        x = edge + 0.01 + r
+        top = z1 if style != "insulated" else 3.9
+        cylinder(name, (x, y, (z0 + top) / 2), r, top - z0, M["M_MetalLight"], exp, 16)
+        for k, z in enumerate((z0 + 0.04, z1 - 0.04) if style != "insulated" else (z0 + 0.04,)):
+            cylinder(f"{name}_flange_{k}", (x, y, z), r + 0.05, 0.08, M["M_MetalDark"], exp, 16)
+        if style == "flanged":   # segment flanges + orange clamps
+            cylinder(f"{name}_flange_mid", (x, y, 3.62), r + 0.05, 0.08, M["M_MetalDark"], exp, 16)
+            clamps = (3.2, 4.05)
+            for k, z in enumerate(clamps):
+                cylinder(f"{name}_clamp_{k}", (x, y, z), r + 0.03, 0.1, M["M_PaintOrange"], exp, 16)
+        elif style == "valve":   # gate valve with hand wheel facing forward
+            cylinder(f"{name}_valve_body", (x, y, 3.55), r + 0.0, 0.32, M["M_MetalDark"], exp, 12)
+            cylinder(f"{name}_valve_stem", (x, y - r - 0.06, 3.55), 0.025, 0.14, M["M_MetalLight"], exp, 8, axis="Y")
+            cylinder(f"{name}_valve_wheel", (x, y - r - 0.14, 3.55), 0.14, 0.03, M["M_PaintOrange"], exp, 16, axis="Y")
+            clamps = (3.05, 4.1)
+            for k, z in enumerate(clamps):
+                cylinder(f"{name}_clamp_{k}", (x, y, z), r + 0.03, 0.08, M["M_MetalDark"], exp, 16)
+        else:                    # insulated branch turning into the tech block
+            for k, z in enumerate((3.1, 3.45)):
+                cylinder(f"{name}_insulation_{k}", (x, y, z), r + 0.025, 0.14, M["M_Rubber"], exp, 12)
+            cylinder(f"{name}_elbow", (x, y, 3.9), r + 0.03, 0.2, M["M_MetalDark"], exp, 12)
+            run = LEFT_TECH_Y[0] - y
+            cylinder(f"{name}_run", (x, y + run / 2, 3.9), r, run, M["M_MetalLight"], exp, 12, axis="Y")
+            clamps = (3.3,)
+        for k, z in enumerate(clamps):   # bracket from the trench back + wall plate
+            blen = (x + r * 0.0) - back
+            box(f"{name}_bracket_{k}", ((x + back) / 2, y, z), (abs(blen), 0.08, 0.06), M["M_MetalDark"], exp)
+            box(f"{name}_bracket_{k}_plate", (back - 0.015, y, z), (0.03, 0.22, 0.18), M["M_MetalLight"], exp)
+
+    # tall vertical tech block
+    vy0, vy1 = LEFT_TECH_Y
+    vc = (vy0 + vy1) / 2
+    face = wx - 0.17
+    tb = lbox("LEFT_TECHBLOCK", vy0, vy1, 2.05, 5.3, 0.17, M["M_MetalDark"], 0.05)
+    boolean(tb, box("tmp_ti", (face, vc, 4.72), (0.16, vy1 - vy0 - 0.3, 0.75), M["M_MetalDark"], exp))  # intake
+    for i in range(7):
+        box(f"LEFT_TECHBLOCK_intake_slat_{i}", (face + 0.05, vc, 4.4 + i * 0.105), (0.03, vy1 - vy0 - 0.36, 0.05),
+            M["M_MetalLight"], exp, rot=(0, math.radians(30), 0))
+    bevel(box("LEFT_TECHBLOCK_gauges", (face - 0.01, vc, 3.8), (0.02, vy1 - vy0 - 0.3, 0.7), M["M_MetalLight"], exp), 0.01)
+    for k, y in enumerate((vc - 0.33, vc + 0.33)):
+        box(f"LEFT_TECHBLOCK_screen_{k}", (face - 0.022, y, 3.9), (0.004, 0.5, 0.28), M["M_ScreenStatic"], exp)
+    cylinder("LEFT_TECHBLOCK_dial", (face - 0.025, vc, 3.58), 0.1, 0.01, M["M_LightWarm"], exp, 16, axis="X")
+    bevel(box("LEFT_TECHBLOCK_hatch", (face - 0.01, vc - 0.15, 2.75), (0.02, 0.95, 0.85), M["M_MetalLight"], exp), 0.01)
+    for k, dz in enumerate((0.25, -0.25)):
+        box(f"LEFT_TECHBLOCK_latch_{k}", (face - 0.025, vc + 0.38, 2.75 + dz), (0.03, 0.1, 0.14), M["M_MetalDark"], exp)
+    box("LEFT_TECHBLOCK_label", (face - 0.003, vc + 0.55, 3.3), (0.004, 0.36, 0.12), M["M_Hazard"], exp)
+    box("LEFT_TECHBLOCK_led", (face - 0.003, vc + 0.55, 3.1), (0.004, 0.12, 0.05), M["M_Beacon"], exp)
+    cylinder("LEFT_TECHBLOCK_inlet", (edge + 0.01 + 0.08, vy0 - 0.02, 3.9), 0.12, 0.06, M["M_MetalDark"], exp, 12,
+             axis="Y")
+    for k, (z0_, z1_) in enumerate(((2.0, 2.12), (5.22, 5.36))):   # orange caps top / bottom
+        lbox(f"LEFT_TECHBLOCK_cap_{k}", vy0 - 0.03, vy1 + 0.03, z0_, z1_, 0.19, M["M_PaintOrange"], 0.02)
+
+
 def build(mats, exp, ref):
     M = mats
     fy = -(D / 2 - SHELL_INSET)          # outer front face of the shell
@@ -483,15 +573,21 @@ def build(mats, exp, ref):
                  -0.1, ROOF + 0.1, 0.035, ROOF - 0.035, M["M_MetalDark"], exp)
         boolean(shell, g)
     # recessed dark louvre bays on both side chamfers (concept: dark vents along the top edges)
+    # left = the technical side (big bay, more slats, hood), right = secondary and cleaner
     k = math.sqrt(0.5)
-    for s in (-1, 1):
+    for s, length, slope, n in ((-1, 3.3, 1.15, 7), (1, 2.0, 0.8, 4)):
         mid = (s * (sx_out - SIDE_CH / 2), 0.0, ROOF - SIDE_CH / 2)
-        reg = on_chamfer("tmp_cr", mid, "x", s, (2.8, 0.5, 1.0), 0.0, None, exp)
+        reg = on_chamfer("tmp_cr", mid, "x", s, (length, 0.5, slope), 0.0, None, exp)
         boolean(shell, skin("tmp_bay", reg, -0.1, ROOF + 0.1, 0.07, ROOF - 0.07, M["M_MetalDark"], exp))
-        for i in range(5):
-            on_chamfer(f"VENTS_chamfer_{'L' if s < 0 else 'R'}_slat_{i}",
-                       (mid[0] - s * k * (i - 2) * 0.17, 0.0, mid[2] + k * (i - 2) * 0.17), "x", s,
-                       (2.7, 0.03, 0.07), -0.04, M["M_MetalLight"], exp)
+        for i in range(n):
+            o = (i - (n - 1) / 2) * (slope - 0.15) / (n - 1)
+            on_chamfer(f"VENTS_chamfer_{'L' if s < 0 else 'R'}_slat_{i}", (mid[0] - s * k * o, 0.0, mid[2] + k * o),
+                       "x", s, (length - 0.1, 0.03, 0.07), -0.04, M["M_MetalLight"], exp)
+    hood_mid = (-(sx_out - SIDE_CH / 2) + k * 0.66, 0.0, ROOF - SIDE_CH / 2 + k * 0.66)
+    bevel(on_chamfer("VENTS_chamfer_L_hood", hood_mid, "x", -1, (3.5, 0.14, 0.16), 0.03, M["M_PaintOrange"], exp), 0.02)
+    # utility trench on the left wall for the pipe run (0.26 deep, wall stays 0.09 thick)
+    boolean(shell, box("tmp_trench", (-sx_out, (LEFT_TRENCH_Y[0] + LEFT_TRENCH_Y[1]) / 2, (2.75 + 4.5) / 2),
+                       (0.52, LEFT_TRENCH_Y[1] - LEFT_TRENCH_Y[0], 1.75), M["M_MetalDark"], exp))
     bevel(shell, 0.05)
 
     # ===================================================================== WINDOW (tilted 15°)
@@ -600,29 +696,13 @@ def build(mats, exp, ref):
 
     # ===================================================================== SIDE / BACK PANELS
     free_y = D / 2 - PYLON - 0.05
-    for s_x, nm in ((-1, "L"), (1, "R")):
+    for s_x, nm in ((1, "R"),):   # the left side is the utility cluster (build_left_utility)
         for j, (z0, z1) in enumerate(((BASE_H + 0.3, 3.75), (3.85, 5.2))):
             bevel(box(f"SIDE_PANEL_{nm}_{j}", (s_x * (sx_out + 0.025), 0.0, (z0 + z1) / 2),
                       (0.05, 2 * free_y, z1 - z0), M["M_MetalDark"], exp), 0.015)
     build_back(M, exp, by)
 
-    # ===================================================================== PIPES (left, embedded in the wall)
-    # orange side module up top; the pipes rise from the plinth into its underside (concept 00)
-    sm = box("SIDE_MODULE_L", (-(sx_out + 0.09), -0.6, 5.0), (0.18, 2.3, 0.95), M["M_PaintOrange"], exp)
-    bevel(sm, 0.06)
-    bevel(box("SIDE_MODULE_L_grille", (-(sx_out + 0.185), -0.6, 5.0), (0.01, 1.7, 0.5), M["M_MetalDark"], exp), 0.0)
-    for i in range(5):
-        box(f"SIDE_MODULE_L_slat_{i}", (-(sx_out + 0.19), -0.6, 4.8 + i * 0.1), (0.008, 1.6, 0.035),
-            M["M_MetalLight"], exp)
-    px = -(sx_out - 0.08)                   # centre; r = 0.25 keeps them inside the 16 m footprint
-    for i, y in enumerate((-1.05, -0.4)):
-        cylinder(f"EXHAUST_PIPES_{i}", (px, y, 3.27), 0.25, 2.55, M["M_MetalLight"], exp, 16)
-        for k, z in enumerate((2.0, 4.5)):
-            cylinder(f"EXHAUST_PIPES_{i}_flange_{k}", (px, y, z), 0.3, 0.12, M["M_MetalDark"], exp, 16)
-        for k, z in enumerate((2.7, 3.6)):
-            cylinder(f"EXHAUST_PIPES_{i}_clamp_{k}", (px, y, z), 0.28, 0.1, M["M_PaintOrange"], exp, 16)
-    bevel(box("EXHAUST_PIPES_bracket", (-(sx_out + 0.06), -0.72, 3.15), (0.12, 1.3, 0.16), M["M_MetalDark"], exp),
-          0.02)
+    build_left_utility(M, exp, sx_out)
 
     # ===================================================================== EQUIPMENT CABINET (right)
     cx0 = sx_out + 0.09
