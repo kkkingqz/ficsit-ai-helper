@@ -711,16 +711,29 @@ def build_holo(M, exp):
                 (0.36 - k * 0.08, 0.004, 0.025), M["M_Holo"], exp, rot_z=a + math.pi / 2)
     # ---- ceiling emitter: bolted frame, hangers, stacked mechanical housing, segmented lens, actuators -------------
     zc = CEIL
-    frame = prism("HOLO_PROJECTOR_frame", octagon(1.42, hx, hy), "z", zc - 0.05, zc, M["M_MetalDark"], exp)
-    boolean(frame, prism("tmp_pf", octagon(1.2, hx, hy), "z", zc - 1, zc + 1, None, exp))
-    for i in range(8):
-        a = math.pi / 8 + i * math.pi / 4
-        cylinder(f"HOLO_PROJECTOR_frame_bolt_{i}", (hx + 1.32 * math.cos(a), hy + 1.32 * math.sin(a), zc - 0.06), 0.025,
-                 0.02, M["M_MetalBare"], exp, 8)
-    for i in range(4):                                           # hangers from the frame to the drum
+    # carrier frame: square ring girder filling the projector cell, bolted to the two transverse and the two
+    # longitudinal ceiling beams -> the emitter visibly HANGS from the ceiling structure
+    ch, gw, gz0, gz1 = 1.45, 0.18, zc - 0.22, zc - 0.02
+    for k, (cx_, cy_, sx_, sy_) in enumerate(((hx - ch + gw / 2, hy, gw, 2 * ch), (hx + ch - gw / 2, hy, gw, 2 * ch),
+                                               (hx, hy - ch + gw / 2, 2 * ch - 2 * gw, gw), (hx, hy + ch - gw / 2, 2 * ch - 2 * gw, gw))):
+        bevel(box(f"HOLO_MOUNT_girder_{k}", (cx_, cy_, (gz0 + gz1) / 2), (sx_, sy_, gz1 - gz0), M["M_MetalLight"], exp), 0.012)
+    for sx in (-1, 1):                                           # corner gussets (stiffen the ring girder)
+        for sy in (-1, 1):
+            box(f"HOLO_MOUNT_gusset_{sx:+d}{sy:+d}", (hx + sx * (ch - 0.3), hy + sy * (ch - 0.3), gz1 - 0.05),
+                (0.55, 0.14, 0.08), M["M_MetalLight"], exp, rot_z=math.radians(-45 * sx * sy))
+    for i in range(4):                                           # 4 suspension nodes: clevis plate, strut, pin, arm
         a = i * math.pi / 2
-        box(f"HOLO_PROJECTOR_hanger_{i}", (hx + 1.18 * math.cos(a), hy + 1.18 * math.sin(a), zc - 0.15), (0.08, 0.16, 0.2),
-            M["M_MetalBare"], exp, rot_z=a)
+        ca, sa = math.cos(a), math.sin(a)
+        rs = ch - gw / 2
+        box(f"HOLO_MOUNT_hanger_{i}_plate", (hx + rs * ca, hy + rs * sa, gz0 - 0.02), (0.3, 0.3, 0.04), M["M_MetalBare"], exp,
+            rot_z=a)
+        bevel(box(f"HOLO_MOUNT_hanger_{i}_strut", (hx + rs * ca, hy + rs * sa, gz0 - 0.13), (0.11, 0.14, 0.2),
+                  M["M_MetalDark"], exp, rot_z=a), 0.012)
+        cylinder(f"HOLO_MOUNT_hanger_{i}_pin", (hx + rs * ca, hy + rs * sa, gz0 - 0.1), 0.035, 0.2, M["M_MetalBare"], exp, 10,
+                 axis="Y" if i % 2 == 0 else "X")
+        r0, r1 = 1.06, rs + 0.05
+        bevel(box(f"HOLO_MOUNT_hanger_{i}_arm", (hx + (r0 + r1) / 2 * ca, hy + (r0 + r1) / 2 * sa, zc - 0.4),
+                  (r1 - r0, 0.14, 0.1), M["M_MetalDark"], exp, rot_z=a), 0.012)
     bevel(cylinder("HOLO_PROJECTOR", (hx, hy, zc - 0.17), 1.05, 0.2, M["M_MetalDark"], exp, 32), 0.03)   # upper drum
     for i in range(8):                                           # radial ribs on the drum
         a = i * math.pi / 4
@@ -747,9 +760,53 @@ def build_holo(M, exp):
               0.012)
         cylinder(f"HOLO_PROJECTOR_actuator_{i}_piston", (axx, ayy, zc - 0.6), 0.03, 0.12, M["M_MetalBare"], exp, 8)
         cylinder(f"HOLO_PROJECTOR_actuator_{i}_lens", (axx, ayy, zc - 0.665), 0.045, 0.01, M["M_Holo"], exp, 10)
-    jx = hx + 1.3                                                # junction box where the ceiling tray arrives
-    bevel(box("HOLO_PROJECTOR_junction", (jx, 0.6, zc - 0.17), (0.3, 0.36, 0.26), M["M_MetalDark"], exp), 0.012)
-    box("HOLO_PROJECTOR_junction_led", (jx - 0.152, 0.6, zc - 0.17), (0.004, 0.06, 0.03), M["M_Beacon"], exp)
+    # ---- three service feeds, one per side of the carrier, each a different kind of object ---------------------------
+    # POWER (+x): the ceiling cable tray ends at the carrier; junction box under the girder, two thick cables into the
+    # lower housing
+    jx0, jx1 = hx + 1.16, hx + ch - 0.01
+    bevel(box("HOLO_FEED_power_junction", ((jx0 + jx1) / 2, 0.6, gz0 - 0.13), (jx1 - jx0, 0.36, 0.26), M["M_MetalDark"], exp),
+          0.012)
+    box("HOLO_FEED_power_hazard", (jx0 - 0.003, 0.6, gz0 - 0.1), (0.004, 0.2, 0.14), M["M_Hazard"], exp)
+    box("HOLO_FEED_power_led", (jx0 - 0.003, 0.6, gz0 - 0.21), (0.004, 0.06, 0.03), M["M_Beacon"], exp)
+    for k, y in enumerate((0.5, 0.7)):
+        cylinder(f"HOLO_FEED_power_cable_{k}", ((hx + 0.85 + jx0) / 2, y, zc - 0.4), 0.04, jx0 - hx - 0.85, M["M_Rubber"],
+                 exp, 10, axis="X")
+    # COOLING (back-left corner): flexible air hose from the end of the HVAC duct to a cooler unit hung in the corner of
+    # the carrier, round fan facing down, two coolant lines into the housing
+    clx, cly, cs = hx - ch + 0.4, hy + ch - 0.3, 0.44
+    cz0, cz1 = zc - 0.56, zc - 0.24
+    bevel(box("HOLO_FEED_cooler", (clx, cly, (cz0 + cz1) / 2), (cs, cs, cz1 - cz0), M["M_MetalLight"], exp), 0.03)
+    ring = cylinder("HOLO_FEED_cooler_fan_ring", (clx, cly, cz0 - 0.01), 0.17, 0.02, M["M_MetalBare"], exp, 20)
+    boolean(ring, cylinder("tmp_cfr", (clx, cly, cz0 - 0.01), 0.14, 0.2, None, exp, 20))
+    cylinder("HOLO_FEED_cooler_fan_well", (clx, cly, cz0 - 0.002), 0.145, 0.004, M["M_Rubber"], exp, 20)
+    for g in (-0.06, 0.06):
+        box(f"HOLO_FEED_cooler_fan_guard_{g:+.2f}", (clx + g, cly, cz0 - 0.02), (0.015, 0.3, 0.01), M["M_MetalDark"], exp)
+    box("HOLO_FEED_cooler_label", (clx, cly - cs / 2 - 0.003, cz1 - 0.08), (0.26, 0.004, 0.07), M["M_Decal"], exp)
+    hz, hr, hy0, hx_end = zc - 0.37, 0.08, 2.1, 1.34              # hose runs under the beams (their bottoms zc-0.2/-0.26)
+    cylinder("HOLO_FEED_cool_hose_x", ((hx_end + clx) / 2, hy0, hz), hr, clx - hx_end, M["M_MetalBare"], exp, 14, axis="X")
+    cylinder("HOLO_FEED_cool_hose_elbow", (clx, hy0, hz), hr, 2 * hr, M["M_MetalBare"], exp, 14)
+    cylinder("HOLO_FEED_cool_hose_y", (clx, (hy0 + cly + cs / 2) / 2, hz), hr, hy0 - cly - cs / 2, M["M_MetalBare"], exp, 14,
+             axis="Y")
+    for k, (px_, py_, ax_) in enumerate(((hx_end + 0.12, hy0, "X"), ((hx_end + clx) / 2, hy0, "X"), (clx, cly + cs / 2 + 0.12, "Y"))):
+        cylinder(f"HOLO_FEED_cool_hose_clamp_{k}", (px_, py_, hz), hr + 0.015, 0.05, M["M_PaintOrange"], exp, 14, axis=ax_)
+    for k, o in enumerate((-0.05, 0.05)):                        # coolant lines: cooler -> lower housing (diagonal)
+        mx, my = clx + 0.31 + o * 0.707, cly - 0.31 + o * 0.707
+        box(f"HOLO_FEED_cool_line_{k}", (mx, my, zc - 0.4), (0.4, 0.05, 0.05), M["M_MetalBare"], exp, rot_z=math.radians(-45))
+    # CONTROL (-x, towards the console): control module under the girder with a status strip, slim data conduit along
+    # the underside of the front longitudinal beam back to the window header above the console
+    kx0, kx1 = hx - ch + 0.03, hx - 1.22
+    bevel(box("HOLO_FEED_control", ((kx0 + kx1) / 2, -0.6, gz0 - 0.12), (kx1 - kx0, 0.5, 0.24), M["M_MetalDark"], exp), 0.012)
+    box("HOLO_FEED_control_screen", (kx0 - 0.003, -0.6, gz0 - 0.1), (0.004, 0.36, 0.1), M["M_ScreenStatic"], exp)
+    for k in range(3):
+        box(f"HOLO_FEED_control_led_{k}", (kx0 - 0.003, -0.74 + k * 0.14, gz0 - 0.2), (0.004, 0.05, 0.025),
+            M["M_Beacon"] if k == 0 else M["M_ScreenStatic"], exp)
+    dz_ = zc - 0.295
+    box("HOLO_FEED_data_drop", ((kx0 + kx1) / 2, (-0.85 + LONG_Y[0]) / 2, dz_), (0.1, -0.85 - LONG_Y[0], 0.05), M["M_MetalDark"], exp)
+    box("HOLO_FEED_data_run", ((CONSOLE_X + (kx0 + kx1) / 2) / 2, LONG_Y[0], dz_), ((kx0 + kx1) / 2 - CONSOLE_X, 0.1, 0.05),
+        M["M_MetalDark"], exp)
+    box("HOLO_FEED_data_to_header", (CONSOLE_X, (LONG_Y[0] - 2.15) / 2, dz_), (0.1, 2.15 + LONG_Y[0], 0.05), M["M_MetalDark"],
+        exp)
+
 
 
 LONG_Y = (-1.6, 1.6)                     # longitudinal ceiling beams
@@ -803,12 +860,8 @@ def build_ceiling(M, exp):
     # ---- middle band: ceiling panels, light panels, diffusers, service hatch -----------------------------------------
     for i, (x0, x1) in enumerate(zip(bays[:-1], bays[1:])):
         xc, bw = (x0 + x1) / 2, x1 - x0
-        if i == 3:     # holo projector cell: dark coffer plate, nothing else in this bay
+        if i == 3:     # holo projector cell: dark coffer plate; the carrier frame is built by build_holo
             bevel(box("CEILING_projector_cell", (xc, 0.0, zc - 0.01), (bw - 0.32, 2.9, 0.02), M["M_MetalDark"], exp), 0.012)
-            for s in (-1, 1):
-                for t in (-1, 1):             # knee braces from the beams to the projector frame
-                    box(f"CEILING_projector_brace_{s:+d}{t:+d}", (xc + s * 1.15, t * 1.25, zc - 0.1), (0.5, 0.08, 0.08),
-                        M["M_MetalDark"], exp, rot_z=math.radians(45 * s * t))
             continue
         bevel(box(f"CEILING_panel_{i}", (xc, 0.0, zc - 0.015), (bw - 0.32, 2.9, 0.03), M["M_MetalLight"], exp), 0.012)
         box(f"CEILING_panel_{i}_seam", (xc, 0.15, zc - 0.032), (bw - 0.4, 0.02, 0.004), M["M_Rubber"], exp)

@@ -387,6 +387,7 @@ def render_all(out, only=None, suffix=""):
         "41_detail_service_console": ((2.4, 1.6, 2.3), (3.5, 3.3, 2.1), None, 28),
         "42_interior_back_wall": ((-1.0, 0.0, 2.5), (0.6, 3.45, 2.3), None, 11),
         "43_back_wall_elevation": ((0.0, -10.0, 2.9), (0.0, 0.0, 2.9), 14.2, 0, 12.0),
+        "44_detail_holo_mount": ((0.4, -2.2, 3.1), (3.0, 0.4, 5.45), None, 17),
         "27_interior_back_left": ((1.5, -0.6, 3.0), (-5.5, 2.6, 1.9), None, 20),
         "28_interior_front_right": ((-2.0, 0.6, 3.3), (6.3, -0.4, 2.4), None, 20),
         # plan cutaway: ortho from above, near clip removes everything above z = 4.5
@@ -395,7 +396,7 @@ def render_all(out, only=None, suffix=""):
     for name, (loc, tgt, ortho, lens, *clip) in shots.items():
         if only and name not in only:
             continue
-        if not only and name[:3] in {f"{n}_" for n in range(16, 44)}:
+        if not only and name[:3] in {f"{n}_" for n in range(16, 45)}:
             continue          # close-ups only on request
         s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35, clip[0] if clip else None)
         s.render.filepath = os.path.join(out, name + suffix + ".png")
