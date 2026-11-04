@@ -58,7 +58,7 @@ def _pt_in_room(x, y):
 
 
 def build_floor(M, exp, pit):
-    """Seams on the 1 x 1 m panel grid, orange perimeter line, dashed walkway, floor grilles."""
+    """Floor system: seams on the 1 x 1 m panel grid, five tile types, one marking code for the functional zones."""
     px0, px1, py0 = pit
     z = F + 0.002
 
@@ -88,39 +88,84 @@ def build_floor(M, exp, pit):
         for a, b in clipped(-XW, y, XW, y):
             _seg(f"FLOOR_seam_{k}", a, b, 0.018, z, 0.004, M["M_Rubber"], exp)
             k += 1
-    # orange perimeter line, 0.5 m in from the walls
-    ix, iy = XW - 0.5, YW - 0.5
-    ring = [(-ix + 0.5, -iy), (ix - 0.5, -iy), (ix, -iy + 0.5), (ix, iy - 0.5), (ix - 0.5, iy), (-ix + 0.5, iy),
-            (-ix, iy - 0.5), (-ix, -iy + 0.5)]
-    k = 0
-    for i in range(len(ring)):
-        for a, b in clipped(*ring[i], *ring[(i + 1) % len(ring)]):
-            _seg(f"FLOOR_marking_perimeter_{k}", a, b, 0.1, z + 0.001, 0.004, M["M_PaintOrange"], exp)
-            k += 1
-    # dashed walkway (white): stair pit -> console, branch to the holo platform
-    path = [((px0 + px1) / 2, py0 - 0.2), ((px0 + px1) / 2, -0.95), (CONSOLE_X + 0.6, -0.95)]
-    branch = [((px0 + px1) / 2, -0.95), (HOLO_XY[0] - 1.95, -0.95)]
-    k = 0
-    for poly in (path, branch):
-        for (a, b) in zip(poly[:-1], poly[1:]):
-            ln = math.dist(a, b)
-            n = int(ln / 0.6)
-            for i in range(n):
-                t0, t1 = i * 0.6 / ln, (i * 0.6 + 0.38) / ln
-                p0 = (a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0)
-                p1 = (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1)
-                _seg(f"FLOOR_marking_walkway_{k}", p0, p1, 0.08, z + 0.001, 0.004, M["M_Decal"], exp)
-                k += 1
-    # floor grilles: recessed dark plate + flat bare-metal bars
-    for g, (x, y) in enumerate(((-5.9, -1.15), (1.5, 2.2))):
-        bevel(box(f"FLOOR_grille_{g}_frame", (x, y, F + 0.004), (1.1, 0.6, 0.012), M["M_MetalDark"], exp), 0.012)
-        for i in range(8):
-            box(f"FLOOR_grille_{g}_bar_{i}", (x - 0.42 + i * 0.12, y, F + 0.012), (0.03, 0.5, 0.008), M["M_MetalBare"], exp)
-    # holo platform floor plate with an orange octagon edge
+    # ---- floor system (stage 4 v2): five tile types and one marking code ----------------------------------------
+    #   orange solid outline  = functional zone (operator / projector / technical)
+    #   yellow-black          = danger or keep-clear (stair, service clearance in front of cabinets, projector edge)
+    #   grey ribbed tiles + white chevrons = main walkway (stair -> operator zone, branch -> projector)
+    zt = z + 0.002
+
+    def outline(name, x0, y0, x1, y1, width, mat):
+        for k, (a, b) in enumerate((((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0)))):
+            _seg(f"{name}_{k}", a, b, width, zt, 0.004, mat, exp)
+
+    def label(name, x, y, w=0.7, rot=0.0):
+        box(f"FLOOR_label_{name}", (x, y, zt), (w, 0.16, 0.004), M["M_Decal"], exp, rot_z=rot)
+
+    def tile_path(cx, cy):                                  # tile type 2: grey anti-slip walkway tile
+        bevel(box(f"FLOOR_path_tile_{cx:+.1f}_{cy:+.1f}", (cx, cy, F + 0.006), (0.96, 0.96, 0.012), M["M_MetalLight"], exp),
+              0.012)
+        for r in range(5):
+            box(f"FLOOR_path_tile_{cx:+.1f}_{cy:+.1f}_rib_{r}", (cx, cy - 0.36 + r * 0.18, F + 0.014), (0.86, 0.03, 0.006),
+                M["M_MetalBare"], exp)
+
+    def tile_hatch(name, cx, cy, size=0.9):                 # tile type 3: technical floor hatch
+        bevel(box(f"FLOOR_hatch_{name}", (cx, cy, F + 0.006), (size, size, 0.012), M["M_MetalLight"], exp), 0.012)
+        box(f"FLOOR_hatch_{name}_seal", (cx, cy, F + 0.003), (size + 0.04, size + 0.04, 0.006), M["M_Rubber"], exp)
+        for s in (-1, 1):
+            box(f"FLOOR_hatch_{name}_hinge_{s:+d}", (cx + s * size * 0.3, cy + size / 2 - 0.04, F + 0.016), (0.14, 0.04, 0.012),
+                M["M_MetalBare"], exp)
+        box(f"FLOOR_hatch_{name}_handle", (cx, cy - size / 2 + 0.1, F + 0.016), (0.28, 0.05, 0.01), M["M_MetalDark"], exp)
+        box(f"FLOOR_hatch_{name}_corner", (cx + size / 2 - 0.12, cy - size / 2 + 0.12, F + 0.0135), (0.16, 0.16, 0.003),
+            M["M_Hazard"], exp)
+
+    def tile_grille(name, cx, cy, w=1.2, d=0.6):            # tile type 4: floor vent grille
+        bevel(box(f"FLOOR_grille_{name}_frame", (cx, cy, F + 0.006), (w, d, 0.012), M["M_MetalDark"], exp), 0.012)
+        n = int((w - 0.15) / 0.1)
+        for i in range(n):
+            box(f"FLOOR_grille_{name}_bar_{i}", (cx - (w - 0.2) / 2 + i * (w - 0.2) / (n - 1), cy, F + 0.014), (0.025, d - 0.1, 0.008),
+                M["M_MetalBare"], exp)
+
+    # main walkway: 2 m wide strip of tiles from the stair landing to the operator zone, branch to the projector
+    walk = [(x, y) for x in (-1.5, -0.5) for y in (1.5, 0.5, -0.5)] + [(0.5, -0.5), (0.5, 0.5)]
+    for cx, cy in walk:
+        tile_path(cx, cy)
+    for k, (cx, cy) in enumerate(((-1.0, 1.0), (-1.0, -0.05))):     # "v" chevrons pointing to the console (-y)
+        for s in (-1, 1):
+            box(f"FLOOR_marking_chevron_{k}_{s:+d}", (cx + s * 0.18, cy, zt + 0.012), (0.42, 0.07, 0.004), M["M_Decal"], exp,
+                rot_z=math.radians(35 * s))
+    for s in (-1, 1):                                                 # ">" chevron on the branch, pointing to the projector
+        box(f"FLOOR_marking_chevron_branch_{s:+d}", (0.5, s * 0.12, zt + 0.012), (0.42, 0.07, 0.004), M["M_Decal"], exp,
+            rot_z=math.radians(-35 * s))
+    # operator zone at the console: orange outline around the standing mat + label
+    ox0, ox1, oy0, oy1 = CONSOLE_X - 1.6, CONSOLE_X + 1.6, -2.25, -1.1
+    outline("FLOOR_marking_operator", ox0, oy0, ox1, oy1, 0.08, M["M_PaintOrange"])
+    label("operator", ox1 - 0.5, oy1 - 0.12)
+    # technical zone along the left wall: outline, two floor hatches, rack exhaust grille, cable channel
+    outline("FLOOR_marking_tech", -6.85, -1.25, -5.75, 2.65, 0.08, M["M_PaintOrange"])
+    label("tech", -6.3, -1.1, w=0.6)
+    tile_hatch("tech_0", -6.35, 0.55, 0.8)
+    tile_hatch("tech_1", -6.35, 1.55, 0.8)
+    tile_grille("tech_rack", -6.35, -0.45, 0.8, 0.6)
+    for k, (a, b) in enumerate((((-6.85, -0.9), (-6.2, -0.9)), ((-6.2, -0.9), (-6.2, -1.45)))):
+        _seg(f"FLOOR_cable_channel_tech_{k}", a, b, 0.26, F + 0.012, 0.024, M["M_MetalLight"], exp)
+    # service zone: keep-clear frame in front of the back cabinets + an underfloor access hatch at the logo wall
+    outline("FLOOR_marking_service", 3.5, 2.15, 6.4, 2.9, 0.1, M["M_Hazard"])
+    label("service", 4.95, 2.02, w=0.8)
+    tile_hatch("service", 1.5, 2.5)
+    # supply-air grilles under the window (right of the console)
+    for k, x in enumerate((1.5, 3.5, 5.5)):
+        tile_grille(f"window_{k}", x, -3.05)
+    # projector zone: dark plate with an orange octagon edge, yellow-black keep-out marks, label
     hx, hy = HOLO_XY
     prism("FLOOR_holo_plate", octagon(1.9, hx, hy), "z", F, F + 0.012, M["M_MetalDark"], exp)
     ring = prism("FLOOR_marking_holo_ring", octagon(1.95, hx, hy), "z", F + 0.012, F + 0.016, M["M_PaintOrange"], exp)
     boolean(ring, prism("tmp_hr", octagon(1.83, hx, hy), "z", F, F + 0.1, None, exp))
+    for i in range(8):
+        a = i * math.pi / 4 + math.pi / 4
+        r = 1.6 * math.cos(math.pi / 8)
+        box(f"FLOOR_marking_holo_keepout_{i}", (hx + r * math.cos(a), hy + r * math.sin(a), F + 0.016), (0.08, 0.5, 0.004),
+            M["M_Hazard"], exp, rot_z=a)
+    label("holo", hx - 1.2, hy - 1.55, w=0.6, rot=math.radians(45))
 
 
 # ---------------------------------------------------------------------------------------------------------
