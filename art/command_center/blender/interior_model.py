@@ -880,15 +880,47 @@ def build_services(M, exp):
             (0.004, 0.06, 0.03) if rz else (0.06, 0.004, 0.03), M["M_Beacon"], exp)
         bevel(box(f"INT_CABINET_{i}_cap", (x, y, F + h + 0.03), (sx + 0.04, sy + 0.04, 0.06), M["M_PaintOrange"], exp),
               0.012)
-    # FICSIT crates in the back-left corner
-    crates = [((-5.85, 2.75, F + 0.32), (0.9, 0.7, 0.64)), ((-4.85, 2.85, F + 0.28), (0.8, 0.6, 0.56)),
-              ((-5.8, 2.75, F + 0.94), (0.7, 0.55, 0.6))]
-    for i, ((x, y, z), (sx, sy, sz)) in enumerate(crates):
-        bevel(box(f"PROP_CRATE_{i}", (x, y, z), (sx, sy, sz), M["M_MetalDark"], exp), 0.03)
+    # two compact FICSIT service containers in the back-left corner (no warehouse stack): spare-parts / tool case
+    # and a smaller power-cell case; both on the floor, side by side
+    _service_container("PROP_CONTAINER_parts", (-5.75, 2.88), (1.0, 0.62, 0.62), M, exp, kind="parts")
+    _service_container("PROP_CONTAINER_cells", (-4.7, 2.95), (0.62, 0.48, 0.48), M, exp, kind="cells")
+
+
+def _service_container(name, xy, size, M, exp, kind):
+    """FICSIT-style service container: ribbed dark body, orange corner protectors, latches, side handles,
+    stacking feet, top grip recesses, markings; the power-cell case adds a charge indicator and a hazard label."""
+    x, y = xy
+    sx, sy, sz = size
+    z0 = F + 0.04                                                    # on stacking feet
+    zc = z0 + sz / 2
+    bevel(box(name, (x, y, zc), (sx, sy, sz), M["M_MetalDark"], exp), 0.03)
+    bevel(box(f"{name}_lid", (x, y, z0 + sz + 0.025), (sx + 0.02, sy + 0.02, 0.05), M["M_MetalLight"], exp), 0.012)
+    for s in (-1, 1):                                                # top grip recesses
+        box(f"{name}_lid_grip_{s:+d}", (x + s * sx * 0.25, y, z0 + sz + 0.052), (sx * 0.22, 0.08, 0.006), M["M_Rubber"], exp)
+    for k in range(int(sx / 0.16)):                                  # vertical ribs on the long faces
+        rx = x - sx / 2 + 0.14 + k * (sx - 0.28) / max(1, int(sx / 0.16) - 1)
         for s in (-1, 1):
-            box(f"PROP_CRATE_{i}_band_{s:+d}", (x + s * (sx / 2 - 0.08), y, z), (0.1, sy + 0.02, sz + 0.02),
-                M["M_PaintOrange"], exp)
-        box(f"PROP_CRATE_{i}_label", (x, y - sy / 2 - 0.004, z + 0.05), (0.3, 0.006, 0.12), M["M_Decal"], exp)
+            box(f"{name}_rib_{k}_{s:+d}", (rx, y + s * (sy / 2 + 0.008), zc - 0.05), (0.03, 0.016, sz - 0.24), M["M_MetalDark"], exp)
+    for a in (-1, 1):                                                # orange corner protectors (8)
+        for b in (-1, 1):
+            for c in (-1, 1):
+                bevel(box(f"{name}_corner_{a:+d}{b:+d}{c:+d}", (x + a * (sx / 2 - 0.05), y + b * (sy / 2 - 0.05),
+                          (z0 + 0.06) if c < 0 else (z0 + sz - 0.03)), (0.12, 0.12, 0.13 if c < 0 else 0.1), M["M_PaintOrange"], exp),
+                      0.012)
+                if c < 0:
+                    box(f"{name}_foot_{a:+d}{b:+d}", (x + a * (sx / 2 - 0.08), y + b * (sy / 2 - 0.08), F + 0.02),
+                        (0.1, 0.1, 0.04), M["M_Rubber"], exp)
+    for s in (-1, 1):                                                # latches on the front face, handles on the ends
+        box(f"{name}_latch_{s:+d}", (x + s * sx * 0.28, y - sy / 2 - 0.015, z0 + sz - 0.08), (0.08, 0.03, 0.1), M["M_MetalBare"], exp)
+        box(f"{name}_handle_{s:+d}", (x + s * (sx / 2 + 0.02), y, zc + 0.06), (0.04, sy * 0.4, 0.05), M["M_MetalBare"], exp)
+    box(f"{name}_label", (x - sx * 0.12, y - sy / 2 - 0.018, zc), (sx * 0.38, 0.004, 0.12), M["M_Decal"], exp)
+    if kind == "cells":
+        box(f"{name}_hazard", (x + sx * 0.22, y - sy / 2 - 0.018, zc), (0.16, 0.004, 0.16), M["M_Hazard"], exp)
+        for k in range(4):                                           # charge indicator
+            box(f"{name}_charge_{k}", (x - sx * 0.12 - 0.09 + k * 0.06, y - sy / 2 - 0.018, zc - 0.12), (0.04, 0.004, 0.03),
+                M["M_Beacon"] if k == 3 else M["M_ScreenStatic"], exp)
+    else:
+        box(f"{name}_stripe", (x, y - sy / 2 - 0.016, z0 + 0.14), (sx - 0.3, 0.004, 0.05), M["M_PaintOrange"], exp)
 
 
 def build_entrance(M, exp, door, pit):
