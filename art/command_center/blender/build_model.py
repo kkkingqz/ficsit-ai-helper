@@ -429,7 +429,7 @@ def build_back(M, exp, by):
     for k, x in enumerate((cx0 + 0.3, (cx0 + cx1) / 2, cx1 - 0.3)):
         cylinder(f"BACK_CABLE_conduit_{k}", (x, by + 0.12, (1.98 + bz0 - 0.55) / 2), 0.065, bz0 - 0.55 - 1.98,
                  M["M_Rubber"], exp, 10)
-        cylinder(f"BACK_CABLE_gland_{k}", (x, by + 0.12, bz0 - 0.58), 0.09, 0.08, M["M_MetalDark"], exp, 10)
+        cylinder(f"BACK_CABLE_gland_{k}", (x, by + 0.105, bz0 - 0.58), 0.09, 0.08, M["M_MetalDark"], exp, 10)
         for j, z in enumerate((2.5, 3.1)):
             box(f"BACK_CABLE_clamp_{k}_{j}", (x, by + 0.12, z), (0.2, 0.15, 0.05), M["M_MetalDark"], exp)
 
@@ -447,14 +447,14 @@ def build_back(M, exp, by):
     louvre("BACK_POWER_CABINET_vent", "+y", (vb[0] + vb[1]) / 2, vb[1] - vb[0] - 0.06, pz1 - 0.43, pz1 - 0.13,
            by + 0.15, M, exp)
     for k, x in enumerate((px0 + 0.95, px0 + 1.25)):
-        box(f"BACK_POWER_CABINET_handle_{k}", (x, by + 0.19, 3.7), (0.05, 0.03, 0.45), M["M_MetalLight"], exp)
+        box(f"BACK_POWER_CABINET_handle_{k}", (x, by + 0.19, 3.7), (0.05, 0.02, 0.45), M["M_MetalLight"], exp)
     box("BACK_POWER_CABINET_label", (px0 + 0.55, by + 0.182, 4.4), (0.5, 0.004, 0.34), M["M_Hazard"], exp)
     box("BACK_POWER_CABINET_plate", (px0 + 1.65, by + 0.182, 4.4), (0.6, 0.004, 0.2), M["M_MetalLight"], exp)
     bc = px0 + 2.75                    # breaker column: rows of status lights
     for r in range(4):
         z = 4.5 - r * 0.45
-        box(f"BACK_POWER_CABINET_breaker_{r}", (bc, by + 0.19, z), (0.75, 0.03, 0.26), M["M_MetalLight"], exp)
-        box(f"BACK_POWER_CABINET_status_{r}", (bc + 0.25, by + 0.197, z), (0.1, 0.006, 0.06),
+        box(f"BACK_POWER_CABINET_breaker_{r}", (bc, by + 0.1875, z), (0.75, 0.015, 0.26), M["M_MetalLight"], exp)
+        box(f"BACK_POWER_CABINET_status_{r}", (bc + 0.25, by + 0.1975, z), (0.1, 0.004, 0.06),
             M["M_Beacon"] if r % 2 else M["M_ScreenStatic"], exp)
     bevel(box("BACK_POWER_CABINET_cap", ((px0 + px1) / 2, by + 0.1, pz1 + 0.05), (px1 - px0 + 0.1, 0.2, 0.1),
               M["M_PaintOrange"], exp), 0.02)
@@ -500,10 +500,10 @@ def build_left_utility(M, exp, sx_out):
     box("LEFT_PUMP_label", (wx - 0.192, yc - 0.45, 2.5), (0.006, 0.4, 0.14), M["M_Hazard"], exp)
     box("LEFT_PUMP_led", (wx - 0.192, yc - 0.45, 2.3), (0.006, 0.12, 0.05), M["M_Beacon"], exp)
     # radiator header (orange) on top with a louvred face
-    hdr = lbox("LEFT_HEADER", ty0, ty1, 4.5, 5.4, 0.2, M["M_PaintOrange"], 0.06)
+    hdr = lbox("LEFT_HEADER", ty0, ty1, 4.5, 5.4, 0.195, M["M_PaintOrange"], 0.06)   # face 5 mm inside the edge
     boolean(hdr, box("tmp_hg", (wx - 0.2, yc, 4.95), (0.12, ty1 - ty0 - 0.3, 0.55), M["M_MetalDark"], exp))
     louvre("LEFT_HEADER", "-x", yc, ty1 - ty0 - 0.35, 4.68, 5.22, wx - 0.16, M, exp)
-    box("LEFT_HEADER_label", (wx - 0.201, ty0 + 0.35, 5.3), (0.004, 0.4, 0.06), M["M_MetalLight"], exp)
+    box("LEFT_HEADER_label", (wx - 0.197, ty0 + 0.35, 5.3), (0.004, 0.4, 0.06), M["M_MetalLight"], exp)
 
     # three pipes of different gauge; centres keep the outer surface inside the footprint
     pipes = [  # name, y, r, segmentation style
@@ -513,7 +513,7 @@ def build_left_utility(M, exp, sx_out):
     ]
     z0, z1 = 2.75, 4.5
     for name, y, r, style in pipes:
-        x = edge + 0.01 + r
+        x = edge + 0.01 + r + 0.05          # flanges are r + 0.05: keep the widest ring inside the footprint
         top = z1 if style != "insulated" else 3.9
         cylinder(name, (x, y, (z0 + top) / 2), r, top - z0, M["M_MetalLight"], exp, 16)
         for k, z in enumerate((z0 + 0.04, z1 - 0.04) if style != "insulated" else (z0 + 0.04,)):
@@ -555,10 +555,10 @@ def build_left_utility(M, exp, sx_out):
     cylinder("LEFT_TECHBLOCK_dial", (face - 0.025, vc, 3.58), 0.1, 0.01, M["M_LightWarm"], exp, 16, axis="X")
     bevel(box("LEFT_TECHBLOCK_hatch", (face - 0.01, vc - 0.15, 2.75), (0.02, 0.95, 0.85), M["M_MetalLight"], exp), 0.01)
     for k, dz in enumerate((0.25, -0.25)):
-        box(f"LEFT_TECHBLOCK_latch_{k}", (face - 0.025, vc + 0.38, 2.75 + dz), (0.03, 0.1, 0.14), M["M_MetalDark"], exp)
+        box(f"LEFT_TECHBLOCK_latch_{k}", (face - 0.014, vc + 0.38, 2.75 + dz), (0.028, 0.1, 0.14), M["M_MetalDark"], exp)
     box("LEFT_TECHBLOCK_label", (face - 0.003, vc + 0.55, 3.3), (0.004, 0.36, 0.12), M["M_Hazard"], exp)
     box("LEFT_TECHBLOCK_led", (face - 0.003, vc + 0.55, 3.1), (0.004, 0.12, 0.05), M["M_Beacon"], exp)
-    cylinder("LEFT_TECHBLOCK_inlet", (edge + 0.01 + 0.08, vy0 - 0.02, 3.9), 0.12, 0.06, M["M_MetalDark"], exp, 12,
+    cylinder("LEFT_TECHBLOCK_inlet", (edge + 0.01 + 0.08 + 0.05, vy0 - 0.02, 3.9), 0.12, 0.06, M["M_MetalDark"], exp, 12,
              axis="Y")
     for k, (z0_, z1_) in enumerate(((2.0, 2.12), (5.22, 5.36))):   # orange caps top / bottom
         lbox(f"LEFT_TECHBLOCK_cap_{k}", vy0 - 0.03, vy1 + 0.03, z0_, z1_, 0.19, M["M_PaintOrange"], 0.02)
@@ -632,6 +632,74 @@ def build_right_service(M, exp, sx_out):
     for j, dy in enumerate((-0.15, 0.0, 0.15)):
         cylinder(f"RIGHT_IFACE_gland_{j}", (wx + 0.07, iyc + dy, 2.16), 0.04, 0.08, M["M_MetalDark"], exp, 8)
         cylinder(f"RIGHT_IFACE_cable_{j}", (wx + 0.07, iyc + dy, 2.06), 0.03, 0.14, M["M_Rubber"], exp, 8)
+
+
+def build_final_details(M, exp, sx_out, fy, by):
+    """Last exterior pass (review table): small fixings and markings on the front, cable links on the right,
+    panel joints at the back, pipe supports on the left, service points on the roof."""
+    k = math.sqrt(0.5)
+    # ---- front: bolts on the orange band sections + markings -------------------------------------
+    mid_y, mid_z = fy + FRONT_CH / 2, ROOF - FRONT_CH / 2
+    # a band plate of thickness t sits 3t/sqrt(2) off the 45° chamfer (both the face and the top grow by t)
+    on_plate = 3 * FRONT_PLATE_T / math.sqrt(2)
+    for i, (x0, x1) in enumerate(FRONT_SECTIONS):
+        for j, (bx_, o) in enumerate(((x0 + 0.16, -0.62), (x1 - 0.16, -0.62), (x0 + 0.16, 0.62), (x1 - 0.16, 0.62))):
+            on_chamfer(f"FRONT_BAND_{i}_bolt_{j}", (bx_, mid_y + k * o, mid_z + k * o), "y", -1, (0.06, 0.025, 0.06),
+                       on_plate + 0.008, M["M_MetalBare"], exp)
+    on_chamfer("FRONT_BAND_unit_id_label", (-4.7, mid_y - k * 0.3, mid_z - k * 0.3), "y", -1, (0.9, 0.006, 0.22),
+               on_plate + 0.003, M["M_Decal"], exp)
+    pf = -D / 2 + PLINTH_SETBACK + 0.05 - 0.002           # plinth bay panel face (front)
+    box("VENTS_plinth_intake_label", (-3.5, pf, 1.12), (0.7, 0.004, 0.08), M["M_Decal"], exp)
+    box("POWER_bay_label", (3.4, pf, 1.12), (0.7, 0.004, 0.08), M["M_Decal"], exp)
+    box("POWER_bay_warning_sign", (4.05, pf, 1.12), (0.1, 0.004, 0.1), M["M_Hazard"], exp, rot=(0, math.radians(45), 0))
+    # ---- right: every cable visibly ends in the riser -------------------------------------------
+    wx = sx_out
+    ny0, ny1 = RIGHT_NICHE_Y
+    for name, y0, y1, z in (("cabinet", RIGHT_CABINET_Y[1], ny0 + 0.05, 2.3), ("iface", ny1 - 0.05, RIGHT_IFACE_Y[0], 3.5)):
+        cylinder(f"RIGHT_LINK_{name}_conduit", (wx + 0.09, (y0 + y1) / 2, z), 0.05, y1 - y0 + 0.04, M["M_MetalBare"], exp,
+                 10, axis="Y")
+        for e_ in (y0, y1):
+            cylinder(f"RIGHT_LINK_{name}_gland_{e_:+.2f}", (wx + 0.09, e_, z), 0.075, 0.05, M["M_MetalDark"], exp, 10,
+                     axis="Y")
+    # ---- back: rubber joint strips between the modules -----------------------------------------
+    for x, z0, z1 in ((BACK_COOLING_X[1] + 0.05, BASE_H + 0.1, 5.5), (BACK_MODULE_X[1] + 0.05, BASE_H + 0.1, 5.5),
+                      (BACK_CABINET_X[0] - 0.05, BASE_H + 0.1, 5.3)):
+        box(f"BACK_JOINT_v_{x:+.2f}", (x, by + 0.05, (z0 + z1) / 2), (0.05, 0.06, z1 - z0), M["M_Rubber"], exp)
+    box("BACK_JOINT_h_band", ((BACK_MODULE_X[0] + BACK_MODULE_X[1]) / 2, by + 0.05, BACK_BAND_Z[0] - 0.05),
+        (BACK_MODULE_X[1] - BACK_MODULE_X[0], 0.06, 0.05), M["M_Rubber"], exp)
+    # ---- left: two support rails across the pipe trench with U-bolts and wall plates ----------------
+    ty0, ty1 = LEFT_TRENCH_Y
+    gauge = ((ty0 + 0.38, 0.22), (ty0 + 1.0, 0.15), (ty1 - 0.25, 0.08))
+    for r_i, z in enumerate((3.0, 4.25)):
+        bevel(box(f"LEFT_PIPE_support_rail_{r_i}", (-W / 2 + 0.4, (ty0 + ty1) / 2, z), (0.08, ty1 - ty0, 0.1),
+                  M["M_MetalLight"], exp), 0.012)   # painted grey so it reads against the dark trench
+        for e_, sgn in ((ty0, 1), (ty1, -1)):
+            box(f"LEFT_PIPE_support_plate_{r_i}_{sgn:+d}", (-W / 2 + 0.36, e_ + sgn * 0.015, z), (0.22, 0.03, 0.24),
+                M["M_MetalLight"], exp)
+            cylinder(f"LEFT_PIPE_support_bolt_{r_i}_{sgn:+d}", (-W / 2 + 0.3, e_ + sgn * 0.035, z), 0.025, 0.02,
+                     M["M_MetalBare"], exp, 8, axis="Y")
+        for p_i, (y, r) in enumerate(gauge):
+            if p_i == 2 and z > 3.9:      # the branch already turned into the tech block
+                continue
+            x = -W / 2 + 0.01 + r + 0.05     # same centre line as the pipes
+            cylinder(f"LEFT_PIPE_ubolt_{r_i}_{p_i}", (x, y, z), r + 0.025, 0.05, M["M_MetalBare"], exp, 16)
+            for sgn in (-1, 1):
+                box(f"LEFT_PIPE_ubolt_{r_i}_{p_i}_nut_{sgn:+d}", (-W / 2 + 0.36, y + sgn * (r + 0.03), z),
+                    (0.05, 0.05, 0.05), M["M_MetalBare"], exp)
+    # ---- roof: lifting lugs on the module corners + access plates on the fan housings ---------------
+    ry = 0.15
+    for i, (sx_, sy_) in enumerate(((-1, -1), (-1, 1), (1, -1), (1, 1))):
+        lug = box(f"ROOF_lifting_lug_{i}", (sx_ * 3.7, ry + sy_ * 1.2, ROOF + 0.43), (0.2, 0.05, 0.16), M["M_MetalBare"],
+                  exp, rot_z=math.radians(45 * sx_ * sy_))
+        boolean(lug, cylinder("tmp_lh", (sx_ * 3.7, ry + sy_ * 1.2, ROOF + 0.45), 0.045, 0.3, None, exp, 10, axis="Y"))
+        box(f"ROOF_lifting_lug_{i}_base", (sx_ * 3.7, ry + sy_ * 1.2, ROOF + 0.36), (0.26, 0.14, 0.02), M["M_MetalDark"],
+            exp, rot_z=math.radians(45 * sx_ * sy_))
+    for f, x in enumerate((-1.3, 1.3)):
+        zt = ROOF + 0.75
+        box(f"ROOF_fan_{f}_access_plate", (x, ry + 0.05 - 0.505, zt + 0.11), (0.32, 0.02, 0.13), M["M_MetalLight"], exp)
+        for dx in (-0.12, 0.12):
+            cylinder(f"ROOF_fan_{f}_access_bolt_{dx:+.2f}", (x + dx, ry + 0.05 - 0.517, zt + 0.11), 0.015, 0.01,
+                     M["M_MetalBare"], exp, 6, axis="Y")
 
 
 def build(mats, exp, ref):
@@ -1033,6 +1101,7 @@ def build(mats, exp, ref):
               exp), 0.015)
     box("ROOF_cable_tray_cover", ((tx0 + tx1) / 2, byy, ROOF + 0.125), (tx1 - tx0, 0.36, 0.01), M["M_MetalLight"], exp)
 
+    build_final_details(M, exp, sx_out, fy, by)
     build_interior(M, exp, ref)
     apply_material_families(exp, M)
 

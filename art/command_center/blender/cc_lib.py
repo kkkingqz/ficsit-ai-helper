@@ -336,10 +336,18 @@ def render_all(out, only=None, suffix=""):
         "10_left_three_quarter": ((-19.0, -6.0, 5.0), (-6.0, -0.3, 3.4), None, 35),
         "11_right_three_quarter": ((19.0, -6.0, 6.5), (6.0, 0.3, 3.8), None, 35),
         "13_roof": ((-9.0, 12.0, 16.0), (0.0, 0.6, 6.8), None, 35),
+        # close-ups for checking small parts (render them explicitly with --shots)
+        "16_detail_left_pipes": ((-11.0, -2.6, 4.0), (-8.0, -0.9, 3.6), None, 50),
+        "17_detail_right_links": ((11.0, -0.6, 3.6), (8.0, 0.6, 3.0), None, 50),
+        "18_detail_back_door": ((1.5, 10.5, 2.6), (-1.0, 4.0, 2.0), None, 40),
+        "19_detail_roof": ((-6.5, -4.5, 11.5), (-1.0, 0.4, 7.2), None, 45),
+        "20_detail_front_band": ((-4.0, -10.0, 7.6), (-2.5, -3.4, 6.2), None, 45),
     }
     for name, (loc, tgt, ortho, lens) in shots.items():
         if only and name not in only:
             continue
+        if not only and name.startswith(("16_", "17_", "18_", "19_", "20_")):
+            continue          # close-ups only on request
         s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35)
         s.render.filepath = os.path.join(out, name + suffix + ".png")
         bpy.ops.render.render(write_still=True)
