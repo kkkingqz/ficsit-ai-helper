@@ -15,6 +15,7 @@
 | [docs/README.md](docs/README.md) | Состав пакета документа, сборка схем и PDF/DOCX |
 | [docs/assets/*.dot](docs/assets) | Исходники схем Graphviz |
 | [docs/contracts/*.json](docs/contracts) | Примеры предлагаемых контрактов (не runtime API) |
+| [art/command_center/](art/command_center) | 3D: флагманский AI Terminal «Центр управления» — блокаут, референсы, план |
 
 ## Главное из архитектуры
 
