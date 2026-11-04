@@ -326,8 +326,10 @@ def setup_render(res=(1600, 900), samples=48):
     s.collection.objects.link(so)
 
 
-def camera(name, loc, target, ortho=None, lens=35):
+def camera(name, loc, target, ortho=None, lens=35, clip_start=None):
     cam = bpy.data.cameras.new(name)
+    if clip_start:
+        cam.clip_start = clip_start      # used for cutaway views: everything nearer than this is not rendered
     if ortho:
         cam.type = "ORTHO"
         cam.ortho_scale = ortho
@@ -369,13 +371,19 @@ def render_all(out, only=None, suffix=""):
         "22_interior_alt": ((-6.4, -1.9, 3.1), (2.6, 2.6, 2.4), None, 18),
         "23_interior_console": ((-3.0, 1.2, 2.9), (-3.0, -3.0, 2.3), None, 24),
         "24_interior_console_side": ((-0.2, 0.2, 2.15), (-3.3, -2.6, 2.05), None, 28),
+        "25_interior_entrance": ((-1.0, 2.0, 2.7), (-1.5, -3.4, 2.4), None, 20),
+        "26_interior_holo": ((0.4, 2.2, 2.6), (3.2, 0.0, 2.6), None, 26),
+        "27_interior_back_left": ((2.5, -1.2, 3.2), (-5.5, 2.6, 1.9), None, 20),
+        "28_interior_front_right": ((-2.0, 0.6, 3.3), (6.3, -0.4, 2.4), None, 20),
+        # plan cutaway: ortho from above, near clip removes everything above z = 4.5
+        "29_interior_plan": ((0.0, -0.001, 40.0), (0.0, 0.0, 0.0), 16.5, 0, 35.5),
     }
-    for name, (loc, tgt, ortho, lens) in shots.items():
+    for name, (loc, tgt, ortho, lens, *clip) in shots.items():
         if only and name not in only:
             continue
-        if not only and name.startswith(("16_", "17_", "18_", "19_", "20_", "21_", "22_", "23_", "24_")):
+        if not only and name[:3] in {f"{n}_" for n in range(16, 30)}:
             continue          # close-ups only on request
-        s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35)
+        s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35, clip[0] if clip else None)
         s.render.filepath = os.path.join(out, name + suffix + ".png")
         bpy.ops.render.render(write_still=True)
 
