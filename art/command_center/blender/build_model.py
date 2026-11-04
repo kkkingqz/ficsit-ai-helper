@@ -778,29 +778,64 @@ def build(mats, exp, ref):
 
     build_right_service(M, exp, sx_out)
 
-    # ===================================================================== ROOF BOX (stepped) + vents
-    ry = 0.3
-    r0 = prism("ROOF", chamfer_rect(4.2, 1.9, 0.6), "z", ROOF - 0.05, ROOF + 0.35, M["M_MetalDark"], exp)
-    r1 = prism("ROOF_top", chamfer_rect(3.4, 1.45, 0.7), "z", ROOF + 0.35, ROOF + 0.8, M["M_MetalLight"], exp)
-    for r in (r0, r1):
-        for v in r.data.vertices:
-            v.co.y += ry
-        bevel(r, 0.06)
-    for k, x in enumerate((-1.6, 1.6)):     # grilles on the front face of the lower roof tier
-        bevel(box(f"ROOF_grille_{k}", (x, ry - 1.9 - 0.01, ROOF + 0.15), (1.5, 0.03, 0.26), M["M_MetalDark"], exp),
-              0.0)
+    # ===================================================================== ROOF: four zones, five elements
+    # front zone (over the glass) stays clean: orange band sections + visor only.
+    # 1) central tech module: low plinth -> middle tier -> two round fan modules (highest point)
+    ry = 0.15
+    r0 = prism("ROOF", [(x, y + ry) for x, y in chamfer_rect(4.0, 1.5, 0.5)], "z", ROOF - 0.05, ROOF + 0.35,
+               M["M_MetalDark"], exp)
+    r1 = prism("ROOF_top", [(x, y + ry + 0.05) for x, y in chamfer_rect(2.6, 1.15, 0.6)], "z", ROOF + 0.35,
+               ROOF + 0.75, M["M_MetalLight"], exp)
+    bevel(r0, 0.06)
+    bevel(r1, 0.06)
+    for k, x in enumerate((-1.6, 1.6)):     # intake grilles on the front face of the plinth
+        bevel(box(f"ROOF_grille_{k}", (x, ry - 1.5 - 0.01, ROOF + 0.15), (1.5, 0.03, 0.26), M["M_MetalDark"], exp), 0.0)
         for i in range(3):
-            box(f"ROOF_grille_{k}_slat_{i}", (x, ry - 1.93, ROOF + 0.07 + i * 0.08), (1.4, 0.02, 0.03),
+            box(f"ROOF_grille_{k}_slat_{i}", (x, ry - 1.53, ROOF + 0.07 + i * 0.08), (1.4, 0.02, 0.03),
                 M["M_MetalLight"], exp)
-    bevel(box("ROOF_hatch", (0.0, ry, ROOF + 0.84), (1.0, 0.8, 0.08), M["M_MetalDark"], exp), 0.02)
-    box("ROOF_hatch_handle", (0.0, ry - 0.25, ROOF + 0.9), (0.4, 0.05, 0.05), M["M_MetalLight"], exp)
-    cylinder("ROOF_conduit", ((4.2 + COMMS_XY[0] - 0.65) / 2, COMMS_XY[1], ROOF + 0.12), 0.07,
-             COMMS_XY[0] - 0.65 - 4.2 + 0.1, M["M_MetalLight"], exp, 10, axis="X")
-    for k, x in enumerate((-2.0, 2.0)):
-        bevel(box(f"ROOF_vent_{k}", (x, ry, ROOF + 0.92), (1.2, 0.9, 0.25), M["M_MetalDark"], exp), 0.03)
-        for i in range(5):
-            box(f"ROOF_vent_{k}_slat_{i}", (x, ry - 0.32 + i * 0.16, ROOF + 1.05), (1.05, 0.06, 0.03),
-                M["M_MetalLight"], exp)
+    for k, x in enumerate((-3.3, 3.3)):     # flush access overlays on the plinth shoulders
+        bevel(box(f"ROOF_overlay_{k}", (x, ry, ROOF + 0.36), (0.9, 1.7, 0.02), M["M_MetalLight"], exp), 0.005)
+        box(f"ROOF_overlay_{k}_seam", (x, ry, ROOF + 0.372), (0.02, 1.5, 0.006), M["M_MetalDark"], exp)
+    for f, x in enumerate((-1.3, 1.3)):
+        zt = ROOF + 0.75
+        bevel(cylinder(f"ROOF_fan_{f}_housing", (x, ry + 0.05, zt + 0.11), 0.5, 0.22, M["M_MetalDark"], exp, 24), 0.02)
+        ring = cylinder(f"ROOF_fan_{f}_ring", (x, ry + 0.05, zt + 0.235), 0.5, 0.03, M["M_MetalLight"], exp, 24)
+        boolean(ring, cylinder("tmp_rfr", (x, ry + 0.05, zt + 0.235), 0.42, 0.2, None, exp, 24))
+        cylinder(f"ROOF_fan_{f}_well", (x, ry + 0.05, zt + 0.222), 0.43, 0.004, M["M_Rubber"], exp, 24)
+        cylinder(f"ROOF_fan_{f}_hub", (x, ry + 0.05, zt + 0.235), 0.1, 0.03, M["M_MetalLight"], exp, 12)
+        for b in range(5):
+            a = math.radians(b * 72 + (20 if f else 50))
+            box(f"ROOF_fan_{f}_blade_{b}", (x + 0.26 * math.cos(a), ry + 0.05 + 0.26 * math.sin(a), zt + 0.228),
+                (0.3, 0.11, 0.012), M["M_MetalDark"], exp, rot=(math.radians(12), 0, a))
+        for g in (-0.22, 0.22):
+            box(f"ROOF_fan_{f}_guard_{g:+.2f}", (x, ry + 0.05 + g, zt + 0.25), (0.98, 0.025, 0.012), M["M_MetalDark"], exp)
+    # 2) back service zone: maintenance hatch on the door axis
+    hy_ = 2.2
+    bevel(box("ROOF_hatch_frame", (DOOR_X, hy_, ROOF + 0.03), (1.3, 0.75, 0.06), M["M_MetalDark"], exp), 0.015)
+    bevel(box("ROOF_hatch", (DOOR_X, hy_, ROOF + 0.08), (1.1, 0.56, 0.05), M["M_MetalLight"], exp), 0.01)
+    box("ROOF_hatch_handle", (DOOR_X, hy_ - 0.18, ROOF + 0.12), (0.4, 0.05, 0.04), M["M_MetalDark"], exp)
+    for k, dx in enumerate((-0.35, 0.35)):
+        cylinder(f"ROOF_hatch_hinge_{k}", (DOOR_X + dx, hy_ + 0.3, ROOF + 0.09), 0.03, 0.16, M["M_MetalDark"], exp, 8,
+                 axis="X")
+    for k, dy in enumerate((-0.35, 0.35)):
+        box(f"DECALS_hazard_roof_hatch_{k}", (DOOR_X, hy_ + dy, ROOF + 0.062), (1.25, 0.05, 0.004), M["M_Hazard"], exp)
+    # 3) back service zone: low cooling unit right above the cooling block on the back wall
+    cx_ = (BACK_COOLING_X[0] + BACK_COOLING_X[1]) / 2
+    bevel(box("ROOF_cooler", (cx_, 2.2, ROOF + 0.21), (1.9, 0.7, 0.42), M["M_MetalDark"], exp), 0.03)
+    bevel(box("ROOF_cooler_lid", (cx_, 2.2, ROOF + 0.445), (1.96, 0.76, 0.05), M["M_MetalLight"], exp), 0.015)
+    for i in range(7):
+        box(f"ROOF_cooler_fin_{i}", (cx_ - 0.75 + i * 0.25, 2.555, ROOF + 0.21), (0.04, 0.02, 0.32),
+            M["M_MetalLight"], exp)
+    box("ROOF_cooler_led", (cx_ + 0.8, 1.845, ROOF + 0.32), (0.1, 0.01, 0.04), M["M_Beacon"], exp)
+    # 4) thin cable channel along the back of the module: cooler -> comms node
+    c0, c1 = cx_ + 0.95, COMMS_XY[0] - 0.45
+    bevel(box("ROOF_cable_channel", ((c0 + c1) / 2, ry + 1.58, ROOF + 0.04), (c1 - c0, 0.14, 0.08), M["M_MetalDark"],
+              exp), 0.01)
+    box("ROOF_cable_channel_cover", ((c0 + c1) / 2, ry + 1.58, ROOF + 0.083), (c1 - c0 - 0.1, 0.09, 0.006),
+        M["M_MetalLight"], exp)
+    # 5) antenna node (below) is fed from the module by a conduit
+    cylinder("ROOF_conduit", ((4.0 + COMMS_XY[0] - 0.65) / 2, COMMS_XY[1], ROOF + 0.12), 0.07,
+             COMMS_XY[0] - 0.65 - 4.0 + 0.1, M["M_MetalLight"], exp, 10, axis="X")
 
     # ===================================================================== BEACON / COMMS NODE
     bx, byy = COMMS_XY
