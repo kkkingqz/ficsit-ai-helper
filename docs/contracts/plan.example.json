@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 2,
+  "id": "plan_computers",
+  "saveKey": "MyGame_Autosave",
+  "catalogRevision": 17,
+  "version": 3,
+  "target": { "item": "Desc_Computer_C", "ratePerMin": 10 },
+  "groups": [
+    {
+      "id": "g_computer",
+      "machineClass": "Build_ManufacturerMk1_C",
+      "recipeClass": "Recipe_Computer_C",
+      "count": 4,
+      "clockPercent": 100,
+      "plannedRatePerMin": 10
+    },
+    {
+      "id": "g_circuit",
+      "machineClass": "Build_AssemblerMk1_C",
+      "recipeClass": "Recipe_CircuitBoard_C",
+      "count": 10,
+      "clockPercent": 100,
+      "plannedRatePerMin": 100
+    }
+  ],
+  "connections": [
+    {
+      "item": "Desc_CircuitBoard_C",
+      "from": "g_circuit",
+      "to": "g_computer",
+      "ratePerMin": 100,
+      "unit": "items/min"
+    }
+  ],
+  "rawInputs": [{ "item": "Desc_OreCopper_C", "ratePerMin": 300, "unit": "items/min" }],
+  "selectedAlternates": ["Recipe_Alternate_CircuitBoard_1_C"],
+  "totals": { "powerMW": 940, "machineCount": 14 },
+  "warnings": [
+    {
+      "code": "RECIPE_LOOP_NEEDS_PIN",
+      "message": "Обнаружен цикл рецептов; закрепите одну из ставок для разрешения системы.",
+      "scope": "groups"
+    }
+  ]
+}

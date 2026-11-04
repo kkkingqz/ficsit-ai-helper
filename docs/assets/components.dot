@@ -1,0 +1,63 @@
+// FICSIT AI v2.0-draft — компонентная схема.
+// Два рантайма вместо пяти в 1.0-draft. Рендер: dot -Tpng -Gdpi=150 components.dot -o components.png
+digraph G {
+  graph [rankdir=TB, compound=true, nodesep=.30, ranksep=.45, pad=.16, bgcolor="white",
+         fontname="DejaVu Sans", splines=ortho];
+  node  [shape=box, style="rounded,filled", fontname="DejaVu Sans", fontsize=10,
+         color="#A8B3BD", fillcolor="#F6F8FA", fontcolor="#24303A", margin=".12,.08"];
+  edge  [color="#718291", penwidth=1.2, arrowsize=.6];
+
+  subgraph cluster_game {
+    label="Игровой процесс: Satisfactory 1.2 + SML + FicsitAI (одиночная игра)";
+    fontsize=12; fontname="DejaVu Sans"; fontcolor="#263B47"; color="#CDD5DB"; style="rounded";
+
+    subgraph cluster_present {
+      label="Презентационный слой"; fontsize=10; fontcolor="#54646F"; color="#DFE5EA"; style="rounded,dashed";
+      terminal  [label="AI Terminal\nстроительный объект · E · экран в мире", fillcolor="#F9E6CA", color="#D69A53"];
+      equipment [label="AI Assistant\nручной слот · ЛКМ · клавиши", fillcolor="#F9E6CA", color="#D69A53"];
+      ui        [label="Единый UI Controller\nUMG · layout-пресеты"];
+      graphview [label="Послойный граф + таблица\nread-only, своя раскладка"];
+      hud       [label="HUD widgets\nпри активном устройстве"];
+      rt        [label="Render target → меш терминала\nобновление по renderRevision"];
+    }
+
+    subgraph cluster_auth {
+      label="Authority-слой — единственный путь к мутации мира"; fontsize=10;
+      fontcolor="#54646F"; color="#D8BFA0"; style="rounded,dashed";
+      validator [label="Validator + очередь подтверждений", fillcolor="#FBEEDC", color="#C98F4C"];
+      planner   [label="Planner\nмашины · потоки · энергия"];
+      catalog   [label="CatalogProvider\nAFGRecipeManager · SML classes"];
+      telemetry [label="TelemetrySampler\nснапшоты вне GameThread"];
+      bpcore    [label="Factory Spawner core (адаптация)\nv1.1", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+      validator -> bpcore [style=dashed];
+    }
+
+    mcp   [label="Локальный MCP-эндпойнт\n127.0.0.1 + токен", fillcolor="#E6F1F3", color="#7FA7B0"];
+    store [label="Локальное состояние по сохранению\nплан · экраны · заметки · кэш", shape=cylinder];
+
+    terminal -> ui; equipment -> ui; equipment -> hud;
+    ui -> graphview; terminal -> rt;
+    ui -> validator; hud -> telemetry;
+    catalog -> planner; telemetry -> planner [style=dotted];
+    planner -> validator;
+    ui -> store [dir=both]; graphview -> store [style=dotted];
+    mcp -> validator [label="tool calls", fontsize=9];
+    mcp -> catalog [style=dotted]; mcp -> planner [style=dotted];
+  }
+
+  subgraph cluster_side {
+    label="Локальный сайдкар (один установщик, loopback)";
+    fontsize=12; fontname="DejaVu Sans"; fontcolor="#263B47"; color="#CDD5DB"; style="rounded";
+    foreman [label="FICSIT Foreman — vanilla\nchat SSE · MCP client · Work Orders", fillcolor="#E6F1F3", color="#7FA7B0"];
+    fdb     [label="Foreman DB\nаккаунт · переписка · Work Orders", shape=cylinder];
+    voice   [label="STT + TTS\nv1.3", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+    foreman -> fdb [dir=both];
+    foreman -> voice [dir=both, style=dashed];
+  }
+
+  llm [label="LLM-провайдер\nключ хранится у сайдкара", shape=note, fillcolor="#F2F4F6", color="#B9C2CA"];
+
+  ui      -> foreman [dir=both, label="chat HTTP/SSE · loopback", fontsize=9];
+  foreman -> mcp     [label="MCP · loopback", fontsize=9];
+  foreman -> llm     [dir=both, style=dashed];
+}

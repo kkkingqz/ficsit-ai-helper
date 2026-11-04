@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 2,
+  "id": "screen_computers",
+  "scope": "terminal",
+  "title": "Computer Factory",
+  "layout": "slots-3",
+  "theme": "dark",
+  "widgets": [
+    {
+      "id": "graph",
+      "type": "production_graph",
+      "slot": "main",
+      "source": { "kind": "plan", "id": "plan_computers" }
+    },
+    {
+      "id": "power",
+      "type": "timeseries",
+      "slot": "side",
+      "source": { "kind": "metric", "id": "power.consumption" },
+      "options": { "windowMin": 15 },
+      "refreshSec": 5
+    },
+    {
+      "id": "orders",
+      "type": "work_orders",
+      "slot": "foot",
+      "source": { "kind": "work_orders", "id": "active" }
+    }
+  ]
+}

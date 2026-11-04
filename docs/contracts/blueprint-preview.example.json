@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 2,
+  "requestId": "b7f2c1e4-0a9d-4c3b-9f10-5d2e8a6c4b11",
+  "valid": true,
+  "errors": [],
+  "warnings": [
+    {
+      "code": "MANIFOLD_RAMP_UP",
+      "message": "Манифолд из 4 машин: последняя выходит на режим с задержкой; буфер входа заполняется неравномерно.",
+      "scope": "connections.belts"
+    },
+    {
+      "code": "CLOCK_NOT_APPLIED",
+      "message": "clockPercent=100 учтён в расчёте плановой скорости, но такт в чертеже не выставляется.",
+      "scope": "clockPercent"
+    }
+  ],
+  "estimates": {
+    "inputs": [{ "item": "Desc_LiquidOil_C", "ratePerMin": 120, "unit": "m3/min" }],
+    "outputs": [
+      { "item": "Desc_Plastic_C", "ratePerMin": 80, "unit": "items/min" },
+      { "item": "Desc_HeavyOilResidue_C", "ratePerMin": 40, "unit": "m3/min", "byproduct": true }
+    ],
+    "powerMW": 120,
+    "footprint": { "x": 4, "y": 1, "z": 1, "unit": "foundations" }
+  },
+  "moduleSplit": null
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 2,
+  "requestId": "b7f2c1e4-0a9d-4c3b-9f10-5d2e8a6c4b11",
+  "machineClass": "Build_OilRefinery_C",
+  "recipeClass": "Recipe_Plastic_C",
+  "count": 4,
+  "clockPercent": 100,
+  "clockApplied": false,
+  "layout": "single_row",
+  "connections": { "belts": "manifold", "pipes": "manifold", "power": true },
+  "outputName": "AI_Plastic_4x"
+}

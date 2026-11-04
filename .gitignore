@@ -1,0 +1,5 @@
+# Сгенерированные схемы и документы (исходники — docs/assets/*.dot)
+docs/assets/*.png
+docs/assets/*.svg
+*.docx
+*.pdf
