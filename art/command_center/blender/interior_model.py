@@ -19,7 +19,8 @@ import math
 import bpy  # noqa: F401  (must precede bmesh when running from the bpy wheel)
 import bmesh
 
-from cc_lib import (CEIL, D, FLOOR_Z, FRAME_MINOR, SHELL_INSET, WALL, W, bevel, boolean, box, cylinder, louvre,
+from cc_lib import (CEIL, D, FLOOR_Z, FRAME_MINOR, LOUVRE_ANGLE, SHELL_INSET, WALL, W, bevel, boolean, box, cylinder,
+                    louvre,
                     mesh_object, octagon, prism)
 
 XW = W / 2 - SHELL_INSET - WALL          # inner face of the side walls (7.45)
@@ -29,7 +30,7 @@ CORNER_IN = 0.76                         # inner 45° corner chamfer
 WALL_TOP = 4.75                          # where the inner ceiling chamfers start (lowest of the three)
 
 CONSOLE_X = -3.0                         # console centre (front-left)
-CONSOLE_Y = -2.85                        # centre line of the centre segment
+CONSOLE_Y = -2.75                        # centre line of the centre segment (clear of the tilted glass)
 CONSOLE_W, CONSOLE_DEPTH = 3.2, 0.8
 # standing operator (pioneer ~1.8 m, eyes ~1.65 m): standing desk height, panel tilted towards a standing user
 DESK_H = 1.05
@@ -197,81 +198,240 @@ def build_walls(M, exp, door):
 
 
 # ---------------------------------------------------------------------------------------------------------
-def _console_segment(name, cx, cy, w, rot, M, exp):
-    """Desk body + top + orange edge + inclined control panel with buttons + monitor riser + front details."""
+# ---------------------------------------------------------------------------------------------------------
+# Operator console v2 — the most detailed element of the interior.
+# Segment profile (heights above the floor, local depth ly: + towards the operator):
+#   body 0..0.94 with kick recess | rubber arm pad + orange trim 0.90..1.02 at the front
+#   inclined control deck 1.0 -> 1.18 (PANEL_TILT) | back shelf 1.19 | screen rail 1.20..1.26 | screens from 1.28
+BODY_H, DECK_FRONT_LY, DECK_LEN = 0.94, 0.34, 0.48
+
+
+def _frame(cx, cy, rot):
     ca, sa = math.cos(rot), math.sin(rot)
+    return lambda lx, ly: (cx + lx * ca - ly * sa, cy + lx * sa + ly * ca)
 
-    def P(lx, ly):           # local (along, depth: +towards operator) -> world xy
-        return (cx + lx * ca - ly * sa, cy + lx * sa + ly * ca)
 
+def _deck(P, rot):
+    """Point on the control deck: u along the segment, v up the slope from the front edge, hoff off the surface."""
+    t = PANEL_TILT
+
+    def pt(u, v, hoff=0.0):
+        ly = DECK_FRONT_LY - v * math.cos(t) + hoff * math.sin(t)
+        h = 1.025 + v * math.sin(t) + hoff * math.cos(t)
+        return (*P(u, ly), F + h)
+    return pt, (-t, 0.0, rot)
+
+
+def _deck_controls(name, kind, w, pt, drot, M, exp):
+    """Separate control groups on the deck: keypads / toggles with guards / indicators / knobs / touch screen."""
+    def plate(tag, u, v, gw, gv):
+        bevel(box(f"CONTROL_PANELS_{name}_{tag}", pt(u, v, 0.006), (gw, gv, 0.012), M["M_MetalLight"], exp, rot=drot), 0.012)
+
+    def keys(tag, u0, v0, cols, rows, pitch, mats):
+        for c in range(cols):
+            for r in range(rows):
+                m = mats[(c + r) % len(mats)]
+                box(f"CONTROL_PANELS_{name}_{tag}_key_{c}_{r}", pt(u0 + (c - (cols - 1) / 2) * pitch,
+                    v0 + (r - (rows - 1) / 2) * pitch, 0.022), (pitch * 0.7, pitch * 0.7, 0.02), m, exp, rot=drot)
+
+    def leds(tag, u0, v0, n, pitch):
+        for i in range(n):
+            m = M["M_Beacon"] if i % 3 == 0 else M["M_ScreenStatic"]
+            box(f"CONTROL_PANELS_{name}_{tag}_led_{i}", pt(u0 + (i - (n - 1) / 2) * pitch, v0, 0.014), (0.025, 0.025, 0.006),
+                m, exp, rot=drot)
+
+    if kind == "centre":
+        plate("touch_frame", 0.0, 0.26, 1.0, 0.34)
+        box(f"CONTROL_PANELS_{name}_touch", pt(0.0, 0.26, 0.014), (0.9, 0.28, 0.004), M["M_ScreenStatic"], exp, rot=drot)
+        for s in (-1, 1):
+            plate(f"keypad_{s:+d}", s * 1.0, 0.24, 0.8, 0.36)
+            keys(f"keypad_{s:+d}", s * 1.0, 0.24, 7, 3, 0.1, (M["M_MetalBare"], M["M_MetalBare"], M["M_ScreenStatic"]))
+        plate("leds", 0.0, 0.45, w - 0.3, 0.05)
+        leds("leds", 0.0, 0.45, 22, 0.13)
+    elif kind == "toggles":
+        plate("toggles", 0.0, 0.2, w - 0.35, 0.3)
+        for i in range(8):
+            u = (i - 3.5) * 0.17
+            box(f"CONTROL_PANELS_{name}_toggle_{i}", pt(u, 0.2, 0.05), (0.025, 0.025, 0.07), M["M_MetalBare"], exp,
+                rot=(drot[0] + math.radians(25), 0, drot[2]))
+            for s in (-1, 1):   # guard frame around each toggle
+                box(f"CONTROL_PANELS_{name}_toggle_{i}_guard_{s:+d}", pt(u + s * 0.05, 0.2, 0.03), (0.012, 0.11, 0.05),
+                    M["M_Hazard"], exp, rot=drot)
+        plate("indicators", 0.0, 0.42, w - 0.35, 0.08)
+        leds("indicators", 0.0, 0.42, 8, 0.17)
+    else:  # knobs: rotary knobs, numeric display, two big push buttons
+        plate("knobs", -0.25, 0.22, 1.0, 0.3)
+        for i in range(5):
+            box(f"CONTROL_PANELS_{name}_knob_{i}", pt(-0.65 + i * 0.2, 0.22, 0.035), (0.075, 0.075, 0.05), M["M_Rubber"], exp,
+                rot=(drot[0], 0, drot[2] + math.radians(45)))
+            box(f"CONTROL_PANELS_{name}_knob_{i}_mark", pt(-0.65 + i * 0.2, 0.25, 0.062), (0.012, 0.03, 0.004),
+                M["M_Decal"], exp, rot=drot)
+        plate("display", 0.55, 0.3, 0.45, 0.16)
+        box(f"CONTROL_PANELS_{name}_display", pt(0.55, 0.3, 0.014), (0.4, 0.11, 0.004), M["M_ScreenStatic"], exp, rot=drot)
+        for i, u in enumerate((0.42, 0.68)):
+            box(f"CONTROL_PANELS_{name}_button_{i}", pt(u, 0.1, 0.03), (0.1, 0.1, 0.04),
+                M["M_Beacon"] if i == 0 else M["M_ScreenStatic"], exp, rot=drot)
+
+
+def _lower_modules(name, P, w, rot, mods, M, exp):
+    """Service sections at the operator side of the body, separated by proud pilasters."""
     d = CONSOLE_DEPTH
-    rz = rot
-    body = box(f"CONSOLE_BODY_{name}", (*P(0, 0), F + DESK_H / 2), (w, d, DESK_H), M["M_MetalDark"], exp, rot_z=rz)
-    boolean(body, box("tmp_kick", (*P(0, d / 2), F + 0.05), (w + 0.1, 0.16, 0.1), M["M_Rubber"], exp, rot_z=rz))
+    fy = d / 2
+    total = sum(f for f, _ in mods)
+    x = -w / 2
+    edges = []
+    for i, (frac, kind) in enumerate(mods):
+        mw = w * frac / total
+        u = x + mw / 2
+        x += mw
+        edges.append(x)
+        tag = f"{name}_{i}"
+        if kind == "hatch":            # service hatch: cover, two latches, handle, label
+            bevel(box(f"CONSOLE_hatch_{tag}", (*P(u, fy + 0.01), F + 0.5), (mw - 0.14, 0.02, 0.62), M["M_MetalLight"], exp,
+                      rot_z=rot), 0.012)
+            for s in (-1, 1):
+                box(f"CONSOLE_hatch_{tag}_latch_{s:+d}", (*P(u + s * (mw / 2 - 0.13), fy + 0.025), F + 0.68),
+                    (0.05, 0.02, 0.08), M["M_MetalDark"], exp, rot_z=rot)
+            box(f"CONSOLE_hatch_{tag}_handle", (*P(u, fy + 0.03), F + 0.36), (0.3, 0.02, 0.035), M["M_MetalBare"], exp,
+                rot_z=rot)
+            box(f"CONSOLE_hatch_{tag}_label", (*P(u, fy + 0.022), F + 0.7), (0.24, 0.004, 0.07), M["M_Hazard"], exp,
+                rot_z=rot)
+        elif kind == "server":         # built-in tech block: dark well, louvre, LED rack
+            box(f"CONSOLE_server_{tag}_well", (*P(u - 0.1, fy + 0.004), F + 0.5), (mw - 0.4, 0.01, 0.6), M["M_MetalDark"],
+                exp, rot_z=rot)
+            for k in range(5):
+                box(f"CONSOLE_server_{tag}_slat_{k}", (*P(u - 0.1, fy + 0.02), F + 0.26 + k * 0.12), (mw - 0.5, 0.03, 0.06),
+                    M["M_MetalBare"], exp, rot=(LOUVRE_ANGLE, 0, rot))
+            for k in range(6):
+                box(f"CONSOLE_server_{tag}_led_{k}", (*P(u + mw / 2 - 0.15, fy + 0.008), F + 0.25 + k * 0.09),
+                    (0.04, 0.006, 0.03), M["M_Beacon"] if k % 2 else M["M_ScreenStatic"], exp, rot_z=rot)
+        elif kind == "cable":          # cable / terminal module: dark plate with square sockets
+            bevel(box(f"CONSOLE_cable_{tag}", (*P(u, fy + 0.01), F + 0.5), (mw - 0.14, 0.02, 0.6), M["M_MetalDark"], exp,
+                      rot_z=rot), 0.012)
+            for k in range(4):
+                box(f"CONSOLE_cable_{tag}_port_{k}", (*P(u + (k - 1.5) * 0.12, fy + 0.025), F + 0.62), (0.07, 0.012, 0.07),
+                    M["M_Rubber"], exp, rot_z=rot)
+                box(f"CONSOLE_cable_{tag}_port_{k}_ring", (*P(u + (k - 1.5) * 0.12, fy + 0.022), F + 0.62),
+                    (0.09, 0.006, 0.09), M["M_Beacon"], exp, rot_z=rot)
+            box(f"CONSOLE_cable_{tag}_label", (*P(u, fy + 0.022), F + 0.4), (0.3, 0.004, 0.07), M["M_Decal"], exp,
+                rot_z=rot)
+        else:                          # vent module
+            box(f"CONSOLE_vent_{tag}_well", (*P(u, fy + 0.004), F + 0.5), (mw - 0.14, 0.01, 0.6), M["M_MetalDark"], exp,
+                rot_z=rot)
+            for k in range(5):
+                box(f"CONSOLE_vent_{tag}_slat_{k}", (*P(u, fy + 0.02), F + 0.26 + k * 0.12), (mw - 0.24, 0.03, 0.06),
+                    M["M_MetalBare"], exp, rot=(LOUVRE_ANGLE, 0, rot))
+    for i, e in enumerate(edges[:-1]):   # proud pilasters between the modules
+        bevel(box(f"CONSOLE_pilaster_{name}_{i}", (*P(e, fy + 0.02), F + 0.48), (0.06, 0.04, 0.76), M["M_MetalDark"], exp,
+                  rot_z=rot), 0.012)
+    box(f"CONSOLE_hazard_{name}", (*P(0, fy + 0.006), F + 0.12 + 0.04), (w - 0.2, 0.01, 0.06), M["M_Hazard"], exp,
+        rot_z=rot)
+
+
+def _console_segment(name, cx, cy, w, rot, deck_kind, mods, M, exp):
+    """One console segment with the stepped desk silhouette; returns the local->world frame."""
+    P = _frame(cx, cy, rot)
+    d = CONSOLE_DEPTH
+    body = box(f"CONSOLE_BODY_{name}", (*P(0, 0), F + BODY_H / 2), (w, d, BODY_H), M["M_MetalDark"], exp, rot_z=rot)
+    boolean(body, box("tmp_kick", (*P(0, d / 2), F + 0.05), (w + 0.1, 0.2, 0.1), M["M_Rubber"], exp, rot_z=rot))
     bevel(body, 0.03)
-    bevel(box(f"CONSOLE_TOP_{name}", (*P(0, 0.04), F + DESK_H + 0.03), (w + 0.04, d + 0.1, 0.06), M["M_MetalLight"], exp,
-              rot_z=rz), 0.012)
-    box(f"CONSOLE_EDGE_{name}", (*P(0, d / 2 + 0.08), F + DESK_H + 0.03), (w + 0.04, 0.05, 0.07), M["M_PaintOrange"], exp,
-        rot_z=rz)
-    box(f"LIGHTS_console_{name}", (*P(0, d / 2 + 0.06), F + DESK_H - 0.02), (w - 0.1, 0.02, 0.02), M["M_LightWarm"], exp,
-        rot_z=rz)
-    # inclined control panel on the front half of the desk
-    bevel(box(f"CONTROL_PANELS_{name}", (*P(0, 0.12), F + DESK_H + 0.1), (w - 0.25, 0.4, 0.05), M["M_MetalDark"], exp,
-              rot=(-PANEL_TILT, 0, rz)), 0.012)
-    nb = max(3, int((w - 0.5) / 0.16))
-    for i in range(nb):
-        lx = -(w - 0.5) / 2 + i * (w - 0.5) / (nb - 1)
-        mat = M["M_Beacon"] if i % 4 == 0 else M["M_ScreenStatic"] if i % 3 == 0 else M["M_MetalBare"]
-        box(f"CONTROL_PANELS_{name}_key_{i}", (*P(lx, 0.2), F + DESK_H + 0.135), (0.07, 0.07, 0.02), mat, exp,
-            rot=(-PANEL_TILT, 0, rz))
-    box(f"CONTROL_PANELS_{name}_screen", (*P(0, 0.02), F + DESK_H + 0.16), (min(w - 0.6, 0.9), 0.16, 0.01),
-        M["M_ScreenStatic"], exp, rot=(-PANEL_TILT, 0, rz))
-    # monitor riser at the back of the desk
-    bevel(box(f"CONSOLE_RISER_{name}", (*P(0, -d / 2 + 0.06), F + DESK_H + 0.06 + RISER_H / 2), (w, 0.12, RISER_H),
-              M["M_MetalDark"], exp,
-              rot_z=rz), 0.012)
-    # front of the desk (operator side): hazard strip, louvre, two cabinet doors
-    fy = d / 2 + 0.005
-    box(f"CONSOLE_hazard_{name}", (*P(0, fy), F + 0.24), (w - 0.5, 0.01, 0.12), M["M_Hazard"], exp, rot_z=rz)
-    for j, lx in enumerate((-w / 4, w / 4)):
-        bevel(box(f"CONSOLE_door_{name}_{j}", (*P(lx, fy), F + 0.58), (w / 2 - 0.12, 0.02, 0.42), M["M_MetalLight"], exp,
-                  rot_z=rz), 0.012)
-        box(f"CONSOLE_door_{name}_{j}_handle", (*P(lx + (0.2 if j == 0 else -0.2), fy + 0.02), F + 0.58),
-            (0.04, 0.02, 0.18), M["M_MetalBare"], exp, rot_z=rz)
+    # front: orange trim + rubber arm pad (the soft operator edge)
+    box(f"CONSOLE_EDGE_{name}", (*P(0, d / 2 + 0.02), F + 0.92), (w, 0.06, 0.04), M["M_PaintOrange"], exp, rot_z=rot)
+    bevel(box(f"CONSOLE_armpad_{name}", (*P(0, d / 2 + 0.01), F + 0.98), (w, 0.12, 0.08), M["M_Rubber"], exp, rot_z=rot),
+          0.03)
+    box(f"LIGHTS_console_{name}", (*P(0, d / 2 + 0.055), F + 0.885), (w - 0.1, 0.01, 0.02), M["M_LightWarm"], exp,
+        rot_z=rot)
+    # inclined control deck + its support, back shelf, screen rail
+    t = PANEL_TILT
+    ly_c = DECK_FRONT_LY - DECK_LEN / 2
+    h_c = 1.0 + DECK_LEN / 2 * math.tan(t)
+    bevel(box(f"CONTROL_DECK_{name}", (*P(0, ly_c), F + h_c), (w - 0.04, DECK_LEN / math.cos(t), 0.05), M["M_MetalDark"],
+              exp, rot=(-t, 0, rot)), 0.012)
+    box(f"CONSOLE_deck_support_{name}", (*P(0, (DECK_FRONT_LY - DECK_LEN - 0.4) / 2 + 0.0), F + (BODY_H + 1.16) / 2),
+        (w - 0.02, 0.4 + DECK_LEN - DECK_FRONT_LY + 0.06, 1.16 - BODY_H), M["M_MetalDark"], exp, rot_z=rot)
+    bevel(box(f"CONSOLE_shelf_{name}", (*P(0, -0.3), F + 1.19), (w, 0.22, 0.03), M["M_MetalLight"], exp, rot_z=rot), 0.012)
+    bevel(box(f"CONSOLE_RISER_{name}", (*P(0, -0.37), F + 1.23), (w, 0.08, 0.06), M["M_MetalDark"], exp, rot_z=rot), 0.012)
+    pt, drot = _deck(P, rot)
+    _deck_controls(name, deck_kind, w, pt, drot, M, exp)
+    _lower_modules(name, P, w, rot, mods, M, exp)
     return P
 
 
-def _monitor(name, center_xy, z0, w, h, rot, screen_mat, exp, M, stand=True):
-    """Frame + screen plane facing the operator (+local depth) + stand post."""
-    ca, sa = math.cos(rot), math.sin(rot)
-    off = lambda d: (center_xy[0] - d * sa, center_xy[1] + d * ca)       # noqa: E731
+def _monitor(name, P, lx, ly, z0, w, h, rot, screen_mat, M, exp, tilt=0.0):
+    """Bezel + back housing + screen plane facing the operator; tilt > 0 leans the top towards the operator."""
     zc = z0 + h / 2
-    bevel(box(f"DISPLAY_FRAMES_{name}", (*off(0.0), zc), (w + 0.1, 0.06, h + 0.1), M["M_MetalDark"], exp, rot_z=rot),
-          0.012)
-    box(f"DISPLAY_{name}" if name == "MAIN_RT" else f"DISPLAY_PLANES_{name}", (*off(0.032), zc), (w, 0.01, h),
-        screen_mat, exp, rot_z=rot)
-    if stand:
-        box(f"DISPLAY_FRAMES_{name}_stand", (*off(-0.06), z0 - 0.15), (0.12, 0.06, 0.32), M["M_MetalBare"], exp, rot_z=rot)
+    r = (-tilt, 0.0, rot)
+    bevel(box(f"DISPLAY_FRAMES_{name}", (*P(lx, ly), zc), (w + 0.12, 0.05, h + 0.12), M["M_MetalDark"], exp, rot=r), 0.012)
+    bevel(box(f"DISPLAY_FRAMES_{name}_housing", (*P(lx, ly - 0.05), zc), (w * 0.8, 0.06, h * 0.8), M["M_MetalDark"], exp,
+              rot=r), 0.012)
+    box(f"DISPLAY_{name}" if name == "MAIN_RT" else f"DISPLAY_PLANES_{name}", (*P(lx, ly + 0.027), zc), (w, 0.006, h),
+        screen_mat, exp, rot=r)
+
+
+def _tower(name, P, lx, rot, M, exp):
+    """Built-in tech tower at a wing end: louvre, LED column, status screen, cable glands, orange cap."""
+    d = CONSOLE_DEPTH + 0.1
+    hgt = 1.75
+    bevel(box(f"CONSOLE_TOWER_{name}", (*P(lx, 0.0), F + hgt / 2), (0.6, d, hgt), M["M_MetalDark"], exp, rot_z=rot), 0.03)
+    fy = d / 2
+    box(f"CONSOLE_TOWER_{name}_well", (*P(lx, fy + 0.004), F + 1.2), (0.44, 0.01, 0.6), M["M_MetalDark"], exp, rot_z=rot)
+    for k in range(5):
+        box(f"CONSOLE_TOWER_{name}_slat_{k}", (*P(lx, fy + 0.02), F + 0.96 + k * 0.12), (0.4, 0.03, 0.06), M["M_MetalBare"],
+            exp, rot=(LOUVRE_ANGLE, 0, rot))
+    box(f"CONSOLE_TOWER_{name}_screen", (*P(lx, fy + 0.006), F + 1.6), (0.36, 0.006, 0.16), M["M_ScreenStatic"], exp,
+        rot_z=rot)
+    for k in range(6):
+        box(f"CONSOLE_TOWER_{name}_led_{k}", (*P(lx - 0.22, fy + 0.006), F + 0.3 + k * 0.08), (0.03, 0.006, 0.03),
+            M["M_Beacon"] if k % 2 else M["M_ScreenStatic"], exp, rot_z=rot)
+    bevel(box(f"CONSOLE_TOWER_{name}_hatch", (*P(lx + 0.06, fy + 0.01), F + 0.5), (0.36, 0.02, 0.6), M["M_MetalLight"],
+              exp, rot_z=rot), 0.012)
+    for k in range(3):
+        box(f"CONSOLE_TOWER_{name}_gland_{k}", (*P(lx - 0.15 + k * 0.15, fy + 0.02), F + 0.12), (0.07, 0.04, 0.07),
+            M["M_Rubber"], exp, rot_z=rot)
+    bevel(box(f"CONSOLE_TOWER_{name}_cap", (*P(lx, 0.0), F + hgt + 0.03), (0.64, d + 0.04, 0.06), M["M_PaintOrange"], exp,
+              rot_z=rot), 0.012)
+    box(f"CONSOLE_TOWER_{name}_stripe", (*P(lx, fy + 0.005), F + hgt - 0.08), (0.56, 0.008, 0.06), M["M_Hazard"], exp,
+        rot_z=rot)
 
 
 def build_console(M, exp, ref):
-    """Curved operator console: centre segment + two wings angled towards the operator; five displays."""
-    P0 = _console_segment("centre", CONSOLE_X, CONSOLE_Y, CONSOLE_W, 0.0, M, exp)
+    """Curved operator console: centre + two wings, joint pillars, end towers, 1 large + 4 medium + 2 narrow screens."""
+    P0 = _console_segment("centre", CONSOLE_X, CONSOLE_Y, CONSOLE_W, 0.0, "centre",
+                          [(0.9, "hatch"), (1.4, "server"), (0.9, "hatch")], M, exp)
     wings = []
     for s, nm in ((-1, "left"), (1, "right")):
         inner = (CONSOLE_X + s * CONSOLE_W / 2, CONSOLE_Y)
         cx = inner[0] + s * math.cos(WING_ANGLE) * WING_W / 2
         cy = inner[1] + math.sin(WING_ANGLE) * WING_W / 2
-        wings.append((nm, _console_segment(nm, cx, cy, WING_W, s * WING_ANGLE, M, exp), s))
-    zt = F + SCREEN_Z0 - 0.12                                   # screens start 0.12 above this line
-    # main render-target display (16:9, own slot, UV 0-1 on the plane) + two flanking + one per wing
-    _monitor("MAIN_RT", P0(0, -CONSOLE_DEPTH / 2 + 0.06), zt + 0.12, 2.4, 2.4 * 9 / 16, 0.0, M["M_ScreenRT"], exp, M)
-    for i, lx in enumerate((-1.48, 1.48)):
-        _monitor(f"centre_{i}", P0(lx, -CONSOLE_DEPTH / 2 + 0.06), zt + 0.12, 0.3, 0.9, 0.0, M["M_ScreenStatic"], exp, M,
-                 stand=False)
-    for nm, P, s in wings:
-        _monitor(f"wing_{nm}", P(0, -CONSOLE_DEPTH / 2 + 0.06), zt + 0.12, 1.45, 1.45 * 9 / 16, s * WING_ANGLE,
-                 M["M_ScreenStatic"], exp, M)
+        rot = s * WING_ANGLE
+        mods = [(1.0, "vent"), (1.0, "cable")] if s < 0 else [(1.0, "cable"), (1.0, "vent")]
+        P = _console_segment(nm, cx, cy, WING_W, rot, "toggles" if s < 0 else "knobs", mods, M, exp)
+        wings.append((nm, P, s, rot))
+        # joint pillar at the seam with the centre segment (hides the wedge gap, marks the module split)
+        jp = _frame(*inner, rot / 2)
+        bevel(box(f"CONSOLE_JOINT_{nm}", (*jp(0, 0.0), F + 0.62), (0.16, CONSOLE_DEPTH + 0.14, 1.24), M["M_MetalDark"], exp,
+                  rot_z=rot / 2), 0.03)
+        box(f"CONSOLE_JOINT_{nm}_cap", (*jp(0, 0.0), F + 1.26), (0.17, CONSOLE_DEPTH + 0.15, 0.04), M["M_PaintOrange"], exp,
+            rot_z=rot / 2)
+        box(f"LIGHTS_console_joint_{nm}", (*jp(0, CONSOLE_DEPTH / 2 + 0.071), F + 0.55), (0.03, 0.006, 0.8),
+            M["M_LightWarm"], exp, rot_z=rot / 2)
+        _tower(nm, P, s * (WING_W / 2 + 0.3), rot, M, exp)
+    z0 = F + SCREEN_Z0
+    # 1 large: render-target screen (16:9, own slot); 2 narrow verticals flanking it
+    _monitor("MAIN_RT", P0, 0.0, -0.32, z0, 2.4, 2.4 * 9 / 16, 0.0, M["M_ScreenRT"], M, exp)
+    for i, lx in enumerate((-1.44, 1.44)):
+        _monitor(f"narrow_{i}", P0, lx, -0.32, z0, 0.28, 1.05, 0.0, M["M_ScreenStatic"], M, exp)
+    # support beam + posts behind the centre screens
+    bevel(box("CONSOLE_screen_beam", (*P0(0, -0.42), z0 + 0.72), (3.3, 0.08, 0.14), M["M_MetalDark"], exp), 0.012)
+    for i, lx in enumerate((-0.9, 0.9)):
+        box(f"CONSOLE_screen_post_{i}", (*P0(lx, -0.42), F + 1.2 + (z0 - F - 1.2 + 1.5) / 2), (0.08, 0.06,
+            z0 - F - 1.2 + 1.5), M["M_MetalDark"], exp)
+    # 4 medium: per wing a lower 16:9 screen and an upper one leaning towards the operator
+    for nm, P, s, rot in wings:
+        _monitor(f"wing_{nm}", P, 0.0, -0.32, z0, 1.45, 1.45 * 9 / 16, rot, M["M_ScreenStatic"], M, exp)
+        _monitor(f"wing_{nm}_upper", P, 0.0, -0.3, z0 + 0.94, 1.0, 0.56, rot, M["M_ScreenStatic"], M, exp,
+                 tilt=math.radians(12))
+        box(f"CONSOLE_arm_{nm}", (*P(0, -0.38), z0 + 0.88), (0.1, 0.06, 0.2), M["M_MetalBare"], exp, rot_z=rot)
     # interaction zone for E (reference only, not exported)
     use = box("USE_ZONE_console", (CONSOLE_X, OPERATOR_XY[1], F + 1.1), (6.0, 1.3, 2.2), None, ref)
     use.display_type = "WIRE"
@@ -288,7 +448,7 @@ def build_operator_mat(M, exp):
 
 def build_kiosk(M, exp):
     """Standing terminal at the left wall (concept: kiosk next to the console)."""
-    x, y = -XW + 0.55, -1.3
+    x, y = -XW + 0.55, 0.6                # mid left wall (the console end tower took its old spot)
     bevel(box("KIOSK_base", (x, y, F + 0.04), (0.6, 0.5, 0.08), M["M_MetalDark"], exp), 0.012)
     bevel(box("KIOSK_column", (x, y, F + 0.55), (0.26, 0.22, 0.95), M["M_MetalDark"], exp), 0.03)
     box("KIOSK_column_trim", (x + 0.132, y, F + 0.55), (0.004, 0.18, 0.8), M["M_PaintOrange"], exp)
@@ -429,7 +589,8 @@ def build_ref(M, ref, door_x):
         box(f"REF_foundation_{i}", (x, 0, -0.5), (7.98, 7.98, 1.0), M["REF_Foundation"], ref)
     for nm, pos in (("REF_player_inside", (OPERATOR_XY[0] + 0.5, OPERATOR_XY[1], F)),
                     ("REF_player_outside", (-9.3, -4.6, 0.0))):
-        cylinder(nm, (pos[0], pos[1], pos[2] + 0.9), 0.3, 1.8, M["REF_Foundation"], ref, 12)   # 1.8 m pioneer
+        cap = cylinder(nm, (pos[0], pos[1], pos[2] + 0.9), 0.3, 1.8, M["REF_Foundation"], ref, 12)   # 1.8 m pioneer
+        cap.hide_render = nm.endswith("inside")   # scale check in the viewport; read as a stray column in renders
 
 
 def build_interior_v2(M, exp, ref, door):
