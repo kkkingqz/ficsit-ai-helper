@@ -5,7 +5,8 @@ The room size comes from the approved exterior (14.9 x 6.9 m, 4.8 m clear), not 
 approximate numbers; the sheet drives composition, modules and materials.
 
 Layout (world coordinates, front = -Y = panoramic window):
-    operator console  front-left under the window, curved: centre + two angled wings, 5 displays
+    operator console  front-left under the window, curved: centre + two angled wings, 5 displays;
+                      STANDING operator (no chair): desk 1.05 m, main screen centre ~1.96 m above the floor
     holo platform     centre of the right half, ceiling projector above it, beam between them
     rear wall         door with the stair pit (guard rails), FICSIT logo panel, service cabinets, crates
     right wall        cable duct (continues the exterior riser) -> ceiling tray -> holo projector
@@ -29,10 +30,15 @@ WALL_TOP = 4.75                          # where the inner ceiling chamfers star
 
 CONSOLE_X = -3.0                         # console centre (front-left)
 CONSOLE_Y = -2.85                        # centre line of the centre segment
-CONSOLE_W, CONSOLE_DEPTH, DESK_H = 3.2, 0.8, 0.88
+CONSOLE_W, CONSOLE_DEPTH = 3.2, 0.8
+# standing operator (pioneer ~1.8 m, eyes ~1.65 m): standing desk height, panel tilted towards a standing user
+DESK_H = 1.05
+PANEL_TILT = math.radians(20)
+RISER_H = 0.2
+SCREEN_Z0 = 1.28                         # bottom of the main / wing screens above the floor
 WING_W, WING_ANGLE = 1.8, math.radians(25)
 HOLO_XY = (3.2, 0.0)                     # holo platform centre (under the ceiling projector bay)
-CHAIR_XY = (CONSOLE_X, -1.75)
+OPERATOR_XY = (CONSOLE_X, -1.85)          # where the standing operator stands (mat, interaction zone)
 BEAMS_X = (-4.8, -1.6, 1.6, 4.8)         # ceiling beams (bays between them carry lights / projector)
 
 
@@ -211,17 +217,18 @@ def _console_segment(name, cx, cy, w, rot, M, exp):
         rot_z=rz)
     # inclined control panel on the front half of the desk
     bevel(box(f"CONTROL_PANELS_{name}", (*P(0, 0.12), F + DESK_H + 0.1), (w - 0.25, 0.4, 0.05), M["M_MetalDark"], exp,
-              rot=(math.radians(-14), 0, rz)), 0.012)
+              rot=(-PANEL_TILT, 0, rz)), 0.012)
     nb = max(3, int((w - 0.5) / 0.16))
     for i in range(nb):
         lx = -(w - 0.5) / 2 + i * (w - 0.5) / (nb - 1)
         mat = M["M_Beacon"] if i % 4 == 0 else M["M_ScreenStatic"] if i % 3 == 0 else M["M_MetalBare"]
         box(f"CONTROL_PANELS_{name}_key_{i}", (*P(lx, 0.2), F + DESK_H + 0.135), (0.07, 0.07, 0.02), mat, exp,
-            rot=(math.radians(-14), 0, rz))
+            rot=(-PANEL_TILT, 0, rz))
     box(f"CONTROL_PANELS_{name}_screen", (*P(0, 0.02), F + DESK_H + 0.16), (min(w - 0.6, 0.9), 0.16, 0.01),
-        M["M_ScreenStatic"], exp, rot=(math.radians(-14), 0, rz))
+        M["M_ScreenStatic"], exp, rot=(-PANEL_TILT, 0, rz))
     # monitor riser at the back of the desk
-    bevel(box(f"CONSOLE_RISER_{name}", (*P(0, -d / 2 + 0.06), F + DESK_H + 0.2), (w, 0.12, 0.34), M["M_MetalDark"], exp,
+    bevel(box(f"CONSOLE_RISER_{name}", (*P(0, -d / 2 + 0.06), F + DESK_H + 0.06 + RISER_H / 2), (w, 0.12, RISER_H),
+              M["M_MetalDark"], exp,
               rot_z=rz), 0.012)
     # front of the desk (operator side): hazard strip, louvre, two cabinet doors
     fy = d / 2 + 0.005
@@ -256,7 +263,7 @@ def build_console(M, exp, ref):
         cx = inner[0] + s * math.cos(WING_ANGLE) * WING_W / 2
         cy = inner[1] + math.sin(WING_ANGLE) * WING_W / 2
         wings.append((nm, _console_segment(nm, cx, cy, WING_W, s * WING_ANGLE, M, exp), s))
-    zt = F + DESK_H + 0.37                                      # top of the riser
+    zt = F + SCREEN_Z0 - 0.12                                   # screens start 0.12 above this line
     # main render-target display (16:9, own slot, UV 0-1 on the plane) + two flanking + one per wing
     _monitor("MAIN_RT", P0(0, -CONSOLE_DEPTH / 2 + 0.06), zt + 0.12, 2.4, 2.4 * 9 / 16, 0.0, M["M_ScreenRT"], exp, M)
     for i, lx in enumerate((-1.48, 1.48)):
@@ -266,33 +273,17 @@ def build_console(M, exp, ref):
         _monitor(f"wing_{nm}", P(0, -CONSOLE_DEPTH / 2 + 0.06), zt + 0.12, 1.45, 1.45 * 9 / 16, s * WING_ANGLE,
                  M["M_ScreenStatic"], exp, M)
     # interaction zone for E (reference only, not exported)
-    use = box("USE_ZONE_console", (CONSOLE_X, -1.75, F + 1.1), (6.0, 1.3, 2.2), None, ref)
+    use = box("USE_ZONE_console", (CONSOLE_X, OPERATOR_XY[1], F + 1.1), (6.0, 1.3, 2.2), None, ref)
     use.display_type = "WIRE"
     use.hide_render = True
 
 
-def build_chair(M, exp):
-    """Operator chair facing the console: five-star base, column, seat, backrest, headrest, armrests."""
-    cx, cy = CHAIR_XY
-    for i in range(5):
-        a = math.radians(90 + i * 72)
-        box(f"PROP_CHAIR_leg_{i}", (cx + 0.16 * math.cos(a), cy + 0.16 * math.sin(a), F + 0.07), (0.34, 0.06, 0.04),
-            M["M_MetalDark"], exp, rot_z=a)
-        cylinder(f"PROP_CHAIR_caster_{i}", (cx + 0.32 * math.cos(a), cy + 0.32 * math.sin(a), F + 0.03), 0.03, 0.05,
-                 M["M_Rubber"], exp, 8, axis="X")
-    cylinder("PROP_CHAIR_column", (cx, cy, F + 0.27), 0.035, 0.36, M["M_MetalBare"], exp, 10)
-    bevel(box("PROP_CHAIR_seat", (cx, cy, F + 0.5), (0.52, 0.5, 0.1), M["M_Rubber"], exp), 0.03)
-    box("PROP_CHAIR_seat_trim", (cx, cy, F + 0.44), (0.54, 0.52, 0.03), M["M_PaintOrange"], exp)
-    bevel(box("PROP_CHAIR_back", (cx, cy + 0.27, F + 0.9), (0.48, 0.08, 0.65), M["M_Rubber"], exp,
-              rot=(math.radians(-10), 0, 0)), 0.03)
-    bevel(box("PROP_CHAIR_back_shell", (cx, cy + 0.32, F + 0.9), (0.5, 0.03, 0.62), M["M_PaintOrange"], exp,
-              rot=(math.radians(-10), 0, 0)), 0.012)
-    box("PROP_CHAIR_back_label", (cx, cy + 0.338, F + 1.0), (0.26, 0.004, 0.08), M["M_Decal"], exp,
-        rot=(math.radians(-10), 0, 0))
-    bevel(box("PROP_CHAIR_headrest", (cx, cy + 0.34, F + 1.33), (0.3, 0.08, 0.16), M["M_Rubber"], exp), 0.012)
-    for s in (-1, 1):
-        box(f"PROP_CHAIR_arm_{s:+d}", (cx + s * 0.28, cy + 0.02, F + 0.68), (0.05, 0.36, 0.04), M["M_MetalDark"], exp)
-        box(f"PROP_CHAIR_arm_post_{s:+d}", (cx + s * 0.28, cy + 0.12, F + 0.59), (0.03, 0.03, 0.16), M["M_MetalDark"], exp)
+def build_operator_mat(M, exp):
+    """Anti-fatigue rubber mat where the operator stands (replaces the chair)."""
+    x, y = OPERATOR_XY
+    bevel(box("PROP_MAT_operator", (x, y + 0.15, F + 0.008), (2.6, 0.9, 0.016), M["M_Rubber"], exp), 0.012)
+    for s_ in (-1, 1):
+        box(f"PROP_MAT_operator_edge_{s_:+d}", (x, y + 0.15 + s_ * 0.44, F + 0.012), (2.6, 0.03, 0.01), M["M_Hazard"], exp)
 
 
 def build_kiosk(M, exp):
@@ -436,10 +427,9 @@ def build_ref(M, ref, door_x):
     """Reference objects (not exported): foundations and player capsules."""
     for i, x in enumerate((-4.0, 4.0)):
         box(f"REF_foundation_{i}", (x, 0, -0.5), (7.98, 7.98, 1.0), M["REF_Foundation"], ref)
-    for nm, pos in (("REF_player_inside", (CHAIR_XY[0] + 0.9, CHAIR_XY[1] + 0.6, F)),
+    for nm, pos in (("REF_player_inside", (OPERATOR_XY[0] + 0.5, OPERATOR_XY[1], F)),
                     ("REF_player_outside", (-9.3, -4.6, 0.0))):
-        cap = cylinder(nm, (pos[0], pos[1], pos[2] + 0.9), 0.3, 1.8, M["M_Rubber"], ref, 12)
-        cap.hide_render = nm.endswith("inside")       # scale reference in the viewport, out of interior renders
+        cylinder(nm, (pos[0], pos[1], pos[2] + 0.9), 0.3, 1.8, M["REF_Foundation"], ref, 12)   # 1.8 m pioneer
 
 
 def build_interior_v2(M, exp, ref, door):
@@ -450,7 +440,7 @@ def build_interior_v2(M, exp, ref, door):
     build_floor(M, exp, pit)
     build_walls(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h))
     build_console(M, exp, ref)
-    build_chair(M, exp)
+    build_operator_mat(M, exp)
     build_kiosk(M, exp)
     build_holo(M, exp)
     build_ceiling(M, exp)

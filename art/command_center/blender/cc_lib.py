@@ -368,11 +368,12 @@ def render_all(out, only=None, suffix=""):
         "21_interior_main": ((6.3, 2.45, 3.1), (-2.5, -2.6, 2.3), None, 18),
         "22_interior_alt": ((-6.4, -1.9, 3.1), (2.6, 2.6, 2.4), None, 18),
         "23_interior_console": ((-3.0, 1.2, 2.9), (-3.0, -3.0, 2.3), None, 24),
+        "24_interior_console_side": ((-0.2, 0.2, 2.15), (-3.3, -2.6, 2.05), None, 28),
     }
     for name, (loc, tgt, ortho, lens) in shots.items():
         if only and name not in only:
             continue
-        if not only and name.startswith(("16_", "17_", "18_", "19_", "20_", "21_", "22_", "23_")):
+        if not only and name.startswith(("16_", "17_", "18_", "19_", "20_", "21_", "22_", "23_", "24_")):
             continue          # close-ups only on request
         s.camera = camera("CAM_" + name, loc, tgt, ortho, lens or 35)
         s.render.filepath = os.path.join(out, name + suffix + ".png")
