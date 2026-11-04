@@ -382,6 +382,7 @@ def render_all(out, only=None, suffix=""):
         "36_interior_wall_back": ((-1.6, -1.4, 2.5), (-1.0, 3.4, 2.3), None, 16),
         "37_interior_entrance": ((-1.0, 0.0, 2.7), (-1.0, 3.45, 2.0), None, 20),
         "38_interior_pit_side": ((1.7, 1.3, 2.3), (-1.0, 3.0, 0.7), None, 24),
+        "39_interior_window_band": ((3.45, -1.55, 1.75), (3.45, -3.45, 1.5), None, 14),
         "27_interior_back_left": ((2.5, -1.2, 3.2), (-5.5, 2.6, 1.9), None, 20),
         "28_interior_front_right": ((-2.0, 0.6, 3.3), (6.3, -0.4, 2.4), None, 20),
         # plan cutaway: ortho from above, near clip removes everything above z = 4.5

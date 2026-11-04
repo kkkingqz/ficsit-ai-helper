@@ -153,7 +153,7 @@ def build_floor(M, exp, pit):
     label("service", 4.95, 2.02, w=0.8)
     tile_hatch("service", 1.5, 2.5)
     # supply-air grilles under the window (right of the console)
-    for k, x in enumerate((1.5, 3.5, 5.5)):
+    for k, x in enumerate((2.25, 5.35)):              # right under the louvre sections of the window band
         tile_grille(f"window_{k}", x, -3.05)
     # projector zone: dark plate with an orange octagon edge, yellow-black keep-out marks, label
     hx, hy = HOLO_XY
@@ -311,12 +311,7 @@ def build_walls(M, exp, door):
             zone(wall, kind, a0, a1, i)
     # clean wall: one continuous light line
     box("LIGHTS_wall_R", _wp("R", 0.0, 0.06, F + 2.6), _ws("R", 5.1, 0.02, 0.05), M["M_LightWarm"], exp)   # proud of the 5 cm panels
-    front_spans = [(0.45, 2.45), (2.45, 4.45), (4.45, 6.45)]          # under the window, right of the console
-    for i, (a0, a1) in enumerate(front_spans):
-        ac = (a0 + a1) / 2
-        bevel(box(f"WALL_F_dado_{i}", (ac, -YW + 0.03, (F + 2.1) / 2), (a1 - a0 - 0.06, 0.06, 2.1 - F), M["M_MetalDark"],
-                  exp), 0.012)
-        louvre(f"WALL_F_dado_{i}_vent", "+y", ac, 1.2, F + 0.25, F + 0.61, -YW + 0.075, M, exp)
+    # the lower band under the window is built by build_window_band()
     # orange structural columns: window ends + back corners
     for i, (x, y) in enumerate(((-6.75, -YW + 0.17), (6.75, -YW + 0.17), (-6.75, YW - 0.17), (6.75, YW - 0.17))):
         bevel(box(f"WALL_column_{i}", (x, y, (F + WALL_TOP) / 2), (0.32, 0.34, WALL_TOP - F), M["M_PaintOrange"], exp),
@@ -1156,15 +1151,6 @@ def _detail_ceiling(M, exp):
 def _detail_window_band(M, exp):
     """Interior lower band under the window (right of the console): split onlay panels, kick plate, slots, screws,
     plus an interior window ledge on brackets."""
-    for i, (a0, a1) in enumerate(((0.45, 2.45), (2.45, 4.45), (4.45, 6.45))):
-        ac = (a0 + a1) / 2
-        for j, u in enumerate((ac - 0.5, ac + 0.5)):
-            bevel(box(f"WALL_F_{i}_onlay_{j}", (u, -YW + 0.07, F + 0.74), (0.88, 0.02, 0.36), M["M_MetalDark"], exp), 0.012)
-            _screws(f"WALL_F_{i}_onlay_{j}", [(u + a * 0.4, -YW + 0.082, F + 0.74 + c * 0.14) for a in (-1, 1) for c in (-1, 1)],
-                    M, exp)
-            _slots(f"WALL_F_{i}_onlay_{j}", lambda o, u=u: (u + o, -YW + 0.081, F + 0.74), 6, 0.11, (0.06, 0.006, 0.18), M, exp)
-        box(f"WALL_F_{i}_seam", (ac, -YW + 0.062, (F + 2.1) / 2), (0.02, 0.006, 2.1 - F - 0.1), M["M_Rubber"], exp)
-        box(f"WALL_F_{i}_kick", (ac, -YW + 0.075, F + 0.07), (a1 - a0 - 0.1, 0.03, 0.12), M["M_MetalBare"], exp)
     x0, x1 = 0.45, 6.5
     bevel(box("WALL_F_ledge", ((x0 + x1) / 2, -YW + 0.13, 2.13), (x1 - x0, 0.26, 0.05), M["M_MetalLight"], exp), 0.012)
     box("WALL_F_ledge_trim", ((x0 + x1) / 2, -YW + 0.262, 2.13), (x1 - x0, 0.012, 0.05), M["M_PaintOrange"], exp)
@@ -1182,6 +1168,78 @@ def build_surface_detail(M, exp, segs, door):
     _detail_window_band(M, exp)
 
 
+WINDOW_BAND = ((0.45, 1.55, "service"), (1.55, 2.95, "vent"), (2.95, 3.75, "cable"), (3.75, 4.85, "diag"),
+               (4.85, 5.85, "vent"), (5.85, 6.45, "service"))      # interior lower band under the window, right of the console
+BAND_Z0, BAND_Z1 = F + 0.22, F + 0.82                               # module zone (kick below, raceway above)
+
+
+def build_window_band(M, exp):
+    """Lower band under the panoramic window as a modular sequence: service panels, technical louvres, a cable
+    section, a diagnostic module; pilasters with diagnostic light, a raceway along the band, light under the ledge."""
+    x0, x1 = WINDOW_BAND[0][0], WINDOW_BAND[-1][1]
+    xc, ln = (x0 + x1) / 2, x1 - x0
+    top = 2.08
+    bevel(box("WALL_F_band_back", _wp("F", xc, 0.02, (F + top) / 2), _ws("F", ln, 0.04, top - F), M["M_MetalDark"], exp), 0.012)
+    box("WALL_F_band_shadow_gap", _wp("F", xc, 0.045, F + 0.05), _ws("F", ln, 0.01, 0.1), M["M_Rubber"], exp)
+    bevel(box("WALL_F_band_kick", _wp("F", xc, 0.08, F + 0.15), _ws("F", ln, 0.06, 0.1), M["M_MetalBare"], exp), 0.012)
+    zm = (BAND_Z0 + BAND_Z1) / 2
+    hm = BAND_Z1 - BAND_Z0
+    for i, (a0, a1, kind) in enumerate(WINDOW_BAND):
+        a0, a1 = a0 + 0.06, a1 - 0.06
+        ac, w = (a0 + a1) / 2, a1 - a0
+        n = f"WALL_F_band_{i}_{kind}"
+        if kind == "service":
+            bevel(box(n, _wp("F", ac, 0.07, zm), _ws("F", w, 0.04, hm), M["M_MetalLight"], exp), 0.012)
+            _screws(n, [_wp("F", ac + a * (w / 2 - 0.07), 0.092, zm + c * (hm / 2 - 0.07)) for a in (-1, 1) for c in (-1, 1)],
+                    M, exp)
+            for s in (-1, 1):
+                box(f"{n}_latch_{s:+d}", _wp("F", ac + s * (w / 2 - 0.12), 0.095, zm), _ws("F", 0.05, 0.02, 0.09), M["M_MetalDark"], exp)
+            box(f"{n}_handle", _wp("F", ac, 0.1, zm - 0.15), _ws("F", min(0.3, w - 0.3), 0.02, 0.035), M["M_MetalBare"], exp)
+            box(f"{n}_label", _wp("F", ac, 0.092, zm + 0.16), _ws("F", min(0.36, w - 0.25), 0.004, 0.08), M["M_Hazard"], exp)
+            _slots(n, lambda o, ac=ac: _wp("F", ac + o, 0.091, zm + 0.02), max(2, int((w - 0.3) / 0.1)), 0.1, (0.05, 0.006, 0.12),
+                   M, exp)
+        elif kind == "vent":
+            for s in (-1, 1):
+                box(f"{n}_frame_{s:+d}", _wp("F", ac + s * (w / 2 - 0.03), 0.09, zm), _ws("F", 0.06, 0.06, hm), M["M_MetalDark"], exp)
+            for s in (-1, 1):
+                box(f"{n}_frame_h_{s:+d}", _wp("F", ac, 0.09, zm + s * (hm / 2 - 0.03)), _ws("F", w, 0.06, 0.06), M["M_MetalDark"], exp)
+            box(f"{n}_well", _wp("F", ac, 0.045, zm), _ws("F", w - 0.12, 0.006, hm - 0.12), M["M_Rubber"], exp)
+            louvre(f"{n}_louvre", "+y", ac, w - 0.16, BAND_Z0 + 0.08, BAND_Z1 - 0.08, _plane("F", 0.07), M, exp)
+        elif kind == "cable":
+            box(f"{n}_well", _wp("F", ac, 0.045, (F + 0.18 + BAND_Z1 + 0.12) / 2), _ws("F", w, 0.006, BAND_Z1 + 0.12 - F - 0.18),
+                M["M_Rubber"], exp)
+            for c, o in enumerate((-0.2, -0.07, 0.07, 0.2)):
+                cylinder(f"{n}_cable_{c}", _wp("F", ac + o, 0.09, (F + 0.2 + BAND_Z1 + 0.1) / 2), 0.03, BAND_Z1 + 0.1 - F - 0.2,
+                         M["M_Rubber"], exp, 8)
+            for c, z in enumerate((BAND_Z0 + 0.1, BAND_Z1 - 0.1)):
+                box(f"{n}_clamp_{c}", _wp("F", ac, 0.12, z), _ws("F", w - 0.1, 0.03, 0.05), M["M_PaintOrange"], exp)
+            bevel(box(f"{n}_floor_entry", _wp("F", ac, 0.16, F + 0.1), _ws("F", w, 0.3, 0.2), M["M_MetalDark"], exp), 0.012)
+            box(f"{n}_label", _wp("F", ac, 0.312, F + 0.12), _ws("F", 0.4, 0.004, 0.07), M["M_Decal"], exp)
+        else:  # diagnostic module: proud box with screen, LED matrix, status lights, keypad
+            bevel(box(n, _wp("F", ac, 0.1, zm), _ws("F", w, 0.12, hm), M["M_MetalDark"], exp), 0.03)
+            box(f"{n}_screen", _wp("F", ac - 0.15, 0.162, zm + 0.12), _ws("F", 0.5, 0.004, 0.24), M["M_ScreenStatic"], exp)
+            for r in range(2):
+                for c in range(6):
+                    box(f"{n}_led_{r}_{c}", _wp("F", ac - 0.38 + c * 0.09, 0.162, zm - 0.12 - r * 0.07), _ws("F", 0.04, 0.004, 0.03),
+                        M["M_Beacon"] if (r + c) % 4 == 0 else M["M_ScreenStatic"], exp)
+            for r in range(2):
+                for c in range(3):
+                    box(f"{n}_key_{r}_{c}", _wp("F", ac + 0.25 + c * 0.08, 0.168, zm + 0.12 - r * 0.08), _ws("F", 0.06, 0.016, 0.06),
+                        M["M_MetalBare"], exp)
+            box(f"{n}_label", _wp("F", ac + 0.32, 0.162, zm - 0.18), _ws("F", 0.3, 0.004, 0.07), M["M_Decal"], exp)
+    for k, (a0, _, _) in enumerate(WINDOW_BAND[1:]):                # pilasters with built-in diagnostic light
+        bevel(box(f"WALL_F_band_pilaster_{k}", _wp("F", a0, 0.06, (F + top) / 2), _ws("F", 0.1, 0.12, top - F), M["M_MetalDark"],
+                  exp), 0.012)
+        box(f"LIGHTS_band_pilaster_{k}", _wp("F", a0, 0.122, BAND_Z1 - 0.2), _ws("F", 0.02, 0.004, 0.4), M["M_ScreenStatic"], exp)
+        box(f"LIGHTS_band_pilaster_{k}_status", _wp("F", a0, 0.122, BAND_Z0 + 0.06), _ws("F", 0.04, 0.004, 0.04), M["M_Beacon"], exp)
+    # raceway along the whole band + light under the ledge
+    rz = F + 0.9
+    bevel(box("WALL_F_band_raceway", _wp("F", xc, 0.11, rz), _ws("F", ln, 0.1, 0.08), M["M_MetalDark"], exp), 0.012)
+    box("WALL_F_band_raceway_cover", _wp("F", xc, 0.162, rz), _ws("F", ln - 0.05, 0.006, 0.05), M["M_MetalLight"], exp)
+    box("LIGHTS_band_under_ledge", _wp("F", xc, 0.2, 2.095), _ws("F", ln - 0.1, 0.03, 0.012), M["M_LightWarm"], exp)
+    _preview_light("PREVIEW_band", xc, -YW + 0.35, 2.0, ln, 0.1, 60.0)
+
+
 def build_interior_v2(M, exp, ref, door):
     """door = (DOOR_X, DOOR_W, DOOR_H) of the model."""
     door_x, door_w, door_h = door
@@ -1197,4 +1255,5 @@ def build_interior_v2(M, exp, ref, door):
     build_services(M, exp)
     build_entrance(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h), pit)
     build_surface_detail(M, exp, segs, (door_x - door_w / 2, door_x + door_w / 2, door_h))
+    build_window_band(M, exp)
     build_ref(M, ref, door_x)
