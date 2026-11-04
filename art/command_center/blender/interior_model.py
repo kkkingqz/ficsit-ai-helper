@@ -252,12 +252,6 @@ def build_walls(M, exp, door):
         elif kind == "terminal":                  # zone of the access terminal next to the door
             dado(name, wall, a0, a1)
             upper(name, wall, a0, a1)
-            dc = door_x0 - 0.42
-            bevel(box("WALL_door_control", _wp(wall, dc, 0.04, F + 1.35), _ws(wall, 0.22, 0.08, 0.34), M["M_MetalDark"],
-                      exp), 0.012)
-            box("WALL_door_control_screen", _wp(wall, dc, 0.082, F + 1.42), _ws(wall, 0.15, 0.004, 0.1), M["M_ScreenStatic"],
-                exp)
-            box("WALL_door_control_button", _wp(wall, dc, 0.085, F + 1.27), _ws(wall, 0.08, 0.01, 0.08), M["M_Beacon"], exp)
         # cornice piece over every zone
         box(f"{name}_cornice", _wp(wall, ac, 0.05, WALL_TOP - 0.08), _ws(wall, a1 - a0 + 0.06, 0.1, 0.1), M["M_MetalDark"],
             exp)
@@ -283,13 +277,6 @@ def build_walls(M, exp, door):
         bevel(box(f"WALL_column_{i}", (x, y, (F + WALL_TOP) / 2), (0.32, 0.34, WALL_TOP - F), M["M_PaintOrange"], exp),
               0.03)
         box(f"WALL_column_{i}_stripe", (x, y - math.copysign(0.172, y), F + 0.5), (0.24, 0.004, 0.5), M["M_Hazard"], exp)
-    # interior door frame (orange) over the stair pit
-    for i, x in enumerate((door_x0 - 0.17, door_x1 + 0.17)):
-        bevel(box(f"WALL_door_jamb_{i}", (x, YW - 0.08, door_h / 2), (0.3, 0.16, door_h), M["M_PaintOrange"], exp), 0.03)
-    bevel(box("WALL_door_header", ((door_x0 + door_x1) / 2, YW - 0.08, door_h + 0.15),
-              (door_x1 - door_x0 + 0.64, 0.16, 0.3), M["M_PaintOrange"], exp), 0.03)
-    box("LIGHTS_door_inside", ((door_x0 + door_x1) / 2, YW - 0.165, door_h + 0.15), (1.2, 0.01, 0.08),
-        M["M_LightWarm"], exp)
     # FICSIT logo panel on the back wall
     lx0, lx1 = door_x1 + 0.35, 2.9
     bevel(box("WALL_logo_panel", ((lx0 + lx1) / 2, YW - 0.04, (uz0 + uz1) / 2), (lx1 - lx0 - 0.06, 0.08, uz1 - uz0),
@@ -552,7 +539,7 @@ def build_operator_mat(M, exp):
 
 def build_kiosk(M, exp):
     """Access terminal next to the door on the back wall (entry zone), facing into the room (-y)."""
-    x, y = -3.25, YW - 0.5
+    x, y = -3.6, YW - 0.5                 # clear of the door casing and the door control panel
     bevel(box("KIOSK_base", (x, y, F + 0.04), (0.5, 0.6, 0.08), M["M_MetalDark"], exp), 0.012)
     bevel(box("KIOSK_column", (x, y, F + 0.55), (0.22, 0.26, 0.95), M["M_MetalDark"], exp), 0.03)
     box("KIOSK_column_trim", (x, y - 0.132, F + 0.55), (0.18, 0.004, 0.8), M["M_PaintOrange"], exp)
@@ -863,19 +850,94 @@ def build_services(M, exp):
         box(f"PROP_CRATE_{i}_label", (x, y - sy / 2 - 0.004, z + 0.05), (0.3, 0.006, 0.12), M["M_Decal"], exp)
 
 
-def build_pit_guard(M, exp, pit):
-    """Guard rails along both long sides of the stair pit + hazard nosing on every step."""
+def build_entrance(M, exp, door, pit):
+    """Entrance zone (back wall): layered door frame with light and access status, door control + card reader,
+    warning markings, technical threshold and step treads with riser lights, industrial integrated guard rails."""
+    door_x0, door_x1, door_h = door
     px0, px1, py0 = pit
-    for s, x in (("L", px0 - 0.05), ("R", px1 + 0.05)):
-        for j, y in enumerate((py0, (py0 + YW) / 2, YW - 0.05)):
-            cylinder(f"PIT_RAIL_{s}_post_{j}", (x, y, F + 0.5), 0.03, 1.0, M["M_PaintOrange"], exp, 8)
-        for j, z in enumerate((F + 0.5, F + 1.0)):
-            cylinder(f"PIT_RAIL_{s}_rail_{j}", (x, (py0 + YW) / 2, z), 0.025, YW - py0, M["M_PaintOrange"], exp, 8, axis="Y")
+    dx = (door_x0 + door_x1) / 2
+    cw = 0.42                                                    # casing width
+    # ---- layered frame: dark casing -> orange inner frame ------------------------------------------------------------
+    for s, (x0, x1) in ((-1, (door_x0 - cw, door_x0)), (1, (door_x1, door_x1 + cw))):
+        xc = (x0 + x1) / 2
+        bevel(box(f"DOOR_IN_casing_{s:+d}", (xc, YW - 0.1, (door_h + 0.5) / 2), (cw, 0.2, door_h + 0.5), M["M_MetalDark"],
+                  exp), 0.03)
+        xi = door_x0 - 0.06 if s < 0 else door_x1 + 0.06
+        bevel(box(f"DOOR_IN_frame_{s:+d}", (xi, YW - 0.225, door_h / 2), (0.12, 0.05, door_h), M["M_PaintOrange"], exp),
+              0.012)
+        box(f"LIGHTS_door_jamb_{s:+d}", (xc + s * 0.02, YW - 0.203, door_h / 2 + 0.1), (0.03, 0.01, door_h - 0.6),
+            M["M_LightWarm"], exp)
+        box(f"DECALS_hazard_door_in_{s:+d}", (xc + s * 0.11, YW - 0.203, 0.85), (0.16, 0.008, 1.3), M["M_Hazard"], exp)
+        for k, z in enumerate((0.25, door_h + 0.3)):
+            box(f"DOOR_IN_casing_{s:+d}_bolt_{k}", (xc - s * 0.12, YW - 0.205, z), (0.04, 0.01, 0.04), M["M_MetalBare"], exp)
+    hw = door_x1 - door_x0 + 2 * cw
+    bevel(box("DOOR_IN_header", (dx, YW - 0.1, door_h + 0.3), (hw, 0.2, 0.5), M["M_MetalDark"], exp), 0.03)
+    bevel(box("DOOR_IN_frame_top", (dx, YW - 0.225, door_h + 0.06), (door_x1 - door_x0 + 0.24, 0.05, 0.12),
+              M["M_PaintOrange"], exp), 0.012)
+    box("LIGHTS_door_inside", (dx, YW - 0.205, door_h + 0.2), (1.4, 0.01, 0.06), M["M_LightWarm"], exp)
+    # access status module + exit sign in the header
+    bevel(box("DOOR_IN_status", (dx + 0.95, YW - 0.21, door_h + 0.36), (0.42, 0.04, 0.16), M["M_MetalLight"], exp), 0.012)
+    for k in range(3):
+        box(f"DOOR_IN_status_led_{k}", (dx + 0.82 + k * 0.13, YW - 0.232, door_h + 0.36), (0.07, 0.006, 0.07),
+            M["M_Beacon"] if k == 1 else M["M_ScreenStatic"], exp)
+    box("DOOR_IN_sign_label", (dx - 0.8, YW - 0.205, door_h + 0.36), (0.6, 0.006, 0.14), M["M_Decal"], exp)
+    # ---- door control panel on the wall + card reader on the right casing ------------------------------------------
+    dc = door_x0 - cw - 0.33
+    bevel(box("DOOR_IN_control", (dc, YW - 0.05, 1.95), (0.3, 0.1, 0.5), M["M_MetalDark"], exp), 0.012)
+    box("DOOR_IN_control_screen", (dc, YW - 0.103, 2.06), (0.22, 0.004, 0.14), M["M_ScreenStatic"], exp)
+    for r in range(3):
+        for c in range(3):
+            box(f"DOOR_IN_control_key_{r}_{c}", (dc - 0.07 + c * 0.07, YW - 0.108, 1.9 - r * 0.06), (0.05, 0.01, 0.04),
+                M["M_MetalBare"], exp)
+    box("DOOR_IN_control_button", (dc + 0.1, YW - 0.11, 1.78), (0.07, 0.02, 0.07), M["M_Beacon"], exp)
+    rx = door_x1 + cw / 2
+    bevel(box("DOOR_IN_reader", (rx, YW - 0.215, 1.75), (0.16, 0.03, 0.26), M["M_MetalLight"], exp), 0.012)
+    box("DOOR_IN_reader_led", (rx, YW - 0.232, 1.83), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
+    box("DOOR_IN_reader_pad", (rx, YW - 0.232, 1.7), (0.1, 0.004, 0.1), M["M_Rubber"], exp)
+    # ---- threshold in the door opening: grated plate, hazard edge, door track ------------------------------------------
+    tw = door_x1 - door_x0
+    bevel(box("DOOR_threshold", (dx, YW + 0.15, 0.015), (tw, 0.42, 0.03), M["M_MetalLight"], exp), 0.012)
+    for k in range(9):
+        box(f"DOOR_threshold_slot_{k}", (dx - tw / 2 + 0.2 + k * (tw - 0.4) / 8, YW + 0.2, 0.031), (0.03, 0.26, 0.004),
+            M["M_Rubber"], exp)
+    box("DECALS_hazard_threshold", (dx, YW - 0.03, 0.032), (tw, 0.06, 0.004), M["M_Hazard"], exp)
+    box("DOOR_track", (dx, YW + 0.175, 0.04), (tw + 0.3, 0.04, 0.02), M["M_MetalDark"], exp)
+    # ---- step treads (grated), riser lights, nosings, landing edge -------------------------------------------------------
     for i in range(4):
-        y = YW - 0.3 * i - 0.03
-        box(f"DECALS_hazard_step_{i}", ((px0 + px1) / 2, y, 0.25 * (i + 1) + 0.003), (px1 - px0 - 0.1, 0.06, 0.006),
+        h = 0.25 * (i + 1)
+        y_hi = YW - 0.3 * i                               # +y edge of step i (towards the door)
+        box(f"STEPS_{i}_tread", ((px0 + px1) / 2, y_hi - 0.15, h + 0.006), (px1 - px0 - 0.12, 0.26, 0.012), M["M_MetalBare"],
+            exp)
+        box(f"DECALS_hazard_step_{i}", ((px0 + px1) / 2, y_hi - 0.03, h + 0.014), (px1 - px0 - 0.12, 0.06, 0.006),
             M["M_Hazard"], exp)
-    box("DECALS_hazard_pit_edge", ((px0 + px1) / 2, py0 + 0.04, F + 0.003), (px1 - px0, 0.08, 0.006), M["M_Hazard"], exp)
+        if i:
+            box(f"LIGHTS_step_riser_{i}", ((px0 + px1) / 2, y_hi + 0.004, h - 0.08), (px1 - px0 - 0.4, 0.008, 0.03),
+                M["M_LightWarm"], exp)
+    box("DECALS_hazard_pit_edge", ((px0 + px1) / 2, py0 - 0.05, F + 0.003), (px1 - px0, 0.1, 0.006), M["M_Hazard"], exp)
+    box("LIGHTS_landing_edge", ((px0 + px1) / 2, py0 + 0.004, F - 0.06), (px1 - px0 - 0.2, 0.008, 0.03), M["M_LightWarm"],
+        exp)
+    # one solid warning band in front of the stair (small rotated chevrons read as scattered chips) + a label beside
+    # the walkway, not on it
+    box("DECALS_hazard_landing", ((px0 + px1) / 2, py0 - 0.3, F + 0.004), (px1 - px0 + 0.3, 0.22, 0.004), M["M_Hazard"], exp)
+    box("DECALS_landing_label", (px1 + 0.75, py0 - 0.3, F + 0.004), (0.8, 0.16, 0.004), M["M_Decal"], exp)
+    # ---- industrial guard rails along both pit edges, tied into the door casing -------------------------------------------
+    ln = YW - 0.2 - py0
+    yc = py0 + ln / 2
+    for s, x in (("L", px0 - 0.07), ("R", px1 + 0.07)):
+        bevel(box(f"PIT_RAIL_{s}_curb", (x, yc, F + 0.075), (0.14, ln, 0.15), M["M_MetalDark"], exp), 0.012)
+        box(f"PIT_RAIL_{s}_curb_hazard", (x + (0.072 if s == "L" else -0.072), yc, F + 0.075), (0.006, ln, 0.1),
+            M["M_Hazard"], exp)
+        box(f"PIT_RAIL_{s}_panel", (x, yc, F + 0.34), (0.02, ln - 0.1, 0.38), M["M_MetalDark"], exp)
+        for j, y in enumerate((py0 + 0.05, yc, YW - 0.25)):
+            bevel(box(f"PIT_RAIL_{s}_post_{j}", (x, y, F + 0.55), (0.08, 0.08, 1.1), M["M_MetalDark"], exp), 0.012)
+            box(f"PIT_RAIL_{s}_post_{j}_plate", (x, y, F + 0.158), (0.18, 0.18, 0.016), M["M_MetalBare"], exp)
+            for b in (-1, 1):
+                box(f"PIT_RAIL_{s}_post_{j}_bolt_{b:+d}", (x + b * 0.065, y + b * 0.065, F + 0.172), (0.025, 0.025, 0.012),
+                    M["M_MetalBare"], exp)
+        box(f"PIT_RAIL_{s}_rail_top", (x, yc, F + 1.08), (0.09, ln + 0.06, 0.07), M["M_PaintOrange"], exp)
+        box(f"PIT_RAIL_{s}_rail_mid", (x, yc, F + 0.6), (0.05, ln, 0.05), M["M_PaintOrange"], exp)
+        box(f"PIT_RAIL_{s}_post_0_band", (x, py0 + 0.05, F + 0.85), (0.084, 0.084, 0.12), M["M_Hazard"], exp)
+        box(f"LIGHTS_rail_marker_{s}", (x, py0 + 0.05, F + 1.125), (0.06, 0.06, 0.02), M["M_Beacon"], exp)
 
 
 def build_ref(M, ref, door_x):
@@ -901,5 +963,5 @@ def build_interior_v2(M, exp, ref, door):
     build_holo(M, exp)
     build_ceiling(M, exp)
     build_services(M, exp)
-    build_pit_guard(M, exp, pit)
+    build_entrance(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h), pit)
     build_ref(M, ref, door_x)
