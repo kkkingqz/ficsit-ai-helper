@@ -1052,7 +1052,6 @@ def build_entrance(M, exp, door, pit):
     bevel(box("DOOR_IN_header", (dx, YW - 0.1, door_h + 0.3), (hw, 0.2, 0.5), M["M_MetalDark"], exp), 0.03)
     bevel(box("DOOR_IN_frame_top", (dx, YW - 0.225, door_h + 0.06), (door_x1 - door_x0 + 0.24, 0.05, 0.12),
               M["M_PaintOrange"], exp), 0.012)
-    box("LIGHTS_door_inside", (dx, YW - 0.205, door_h + 0.2), (1.4, 0.01, 0.06), M["M_LightWarm"], exp)
     # access status module + exit sign in the header
     bevel(box("DOOR_IN_status", (dx + 0.95, YW - 0.21, door_h + 0.36), (0.42, 0.04, 0.16), M["M_MetalLight"], exp), 0.012)
     for k in range(3):
@@ -1186,7 +1185,11 @@ def build_back_wall(M, exp, door):
     bevel(box("PORTAL_head", (dx, YW - 0.04, (head_z0 + uz1) / 2), (hx1 - hx0, 0.08, uz1 - head_z0), M["M_MetalDark"], exp),
           0.012)
     bevel(box("PORTAL_frame_top", (dx, YW - 0.09, uz1 - fw / 2), (p1 - p0, 0.18, fw), M["M_PaintOrange"], exp), 0.03)
-    box("DECALS_logo_inside", (dx, YW - 0.082, (head_z0 + uz1 - fw) / 2), (1.6, 0.006, 0.42), M["M_Decal"], exp)
+    # station sign = backlit light box: dark housing, sign plate (decal slot), light strip under the lower edge
+    sz = (head_z0 + uz1 - fw) / 2
+    bevel(box("PORTAL_sign_housing", (dx, YW - 0.105, sz), (1.76, 0.05, 0.56), M["M_MetalDark"], exp), 0.012)
+    box("DECALS_logo_inside", (dx, YW - 0.133, sz), (1.6, 0.006, 0.42), M["M_Decal"], exp)
+    box("LIGHTS_portal_sign", (dx, YW - 0.12, sz - 0.29), (1.5, 0.03, 0.012), M["M_LightWarm"], exp)
     box("LIGHTS_portal_head", (dx, YW - 0.182, uz1 - fw - 0.03), (p1 - p0 - 2 * fw - 0.2, 0.01, 0.04), M["M_LightWarm"],
         exp)
     # cornice continues over portal + power group (the zones carry their own pieces)
