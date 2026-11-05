@@ -115,7 +115,7 @@ UV0 `UVMap` строится в сборке (`blender/uv_stage5.py`, вызыв
 **Проверка** — `blender/uv_check.py` → [`uv_check.md`](uv_check.md): у всех 1 911 мешей есть `UVMap` и `PaintMask`; плотность
 на тайлинговых гранях 0,9998–1,0002 от цели; UV табличек и экранов внутри своих ячеек; `DISPLAY_MAIN_RT` ровно 0–1; маска
 совпадает со слотами; ошибок 0. Отдельно посчитаны **щепки после булевых операций** (грани < 1 см², ~2 000) — их убирает
-очистка сетки на этапе 6. Визуально — рендеры с шахматкой на тайлинговых слотах ([`renders/stage5/00_uvchecker_sheet.jpg`](renders/stage5/00_uvchecker_sheet.jpg)), атласы в превью ([`00_atlas_sheet.jpg`](renders/stage5/00_atlas_sheet.jpg)), текстуры ([`00_textures_sheet.jpg`](renders/stage5/00_textures_sheet.jpg)). В FBX у всех 1 911 мешей есть UV0 и `PaintMask`; в GLB атрибут цвета записан как стандартный `COLOR_0`.
+очистка сетки на этапе 6. Визуально — рендеры с шахматкой на тайлинговых слотах ([`renders/stage5/00_uvchecker_sheet.jpg`](renders/stage5/00_uvchecker_sheet.jpg)), атласы в превью ([`00_atlas_sheet.jpg`](renders/stage5/00_atlas_sheet.jpg)), текстуры ([`00_textures_sheet.jpg`](renders/stage5/00_textures_sheet.jpg), [`00_surface_textures.jpg`](renders/stage5/00_surface_textures.jpg)), полный материал этапа 5 с износом по кромкам ([`00_surface_sheet.jpg`](renders/stage5/00_surface_sheet.jpg)). В FBX у всех 1 911 мешей есть UV0 и `PaintMask`; в GLB атрибут цвета записан как стандартный `COLOR_0`.
 Превью-рендеры (`ui_preview.apply_preview_ui`) теперь берут таблички, экраны и полосы **из этих же атласов через UV0** —
 так же, как будет в UE.
 
