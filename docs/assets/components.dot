@@ -17,10 +17,10 @@ digraph G {
     subgraph cluster_present {
       label="Презентационный слой"; fontsize=10; fontcolor="#54646F"; color="#DFE5EA"; style="rounded,dashed";
       terminal  [label="AI Terminal — хост v1.0\nстроительный объект · питание · E", fillcolor="#F9E6CA", color="#D69A53"];
-      equipment [label="AI Assistant — хост после v1.0\nручной слот · те же модули", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+      equipment [label="AI Assistant — хост v1.4\nручной слот · те же модули", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       ui        [label="Экранные модули (IScreenModule)\nDashboard · Chat · Notes · Work Orders · Screens"];
-      graphview [label="Обёртки Planning и Graph (IPlanView)\nv1.0 — заглушка · UI подключаемый"];
-      hud       [label="HUD\nвместе с AI Assistant", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+      graphview [label="Обёртки Planning и Graph (IPlanView)\nv1.0 — заглушка · UI плана в v1.3"];
+      hud       [label="HUD\nv1.4, вместе с AI Assistant", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       rt        [label="Render target → меш терминала\nобновление по renderRevision"];
     }
 
@@ -29,7 +29,7 @@ digraph G {
       fontcolor="#54646F"; color="#D8BFA0"; style="rounded,dashed";
       validator [label="OperationRegistry + Validator\nодни операции для UI и модели\nсхема · лимиты · живой каталог", fillcolor="#FBEEDC", color="#C98F4C"];
       planner   [label="PlannerGateway (обёртка)\nPlanRequest → ProductionPlan\nv1.0 — заглушка"];
-      provider  [label="Внешний провайдер\nпервый кандидат — ядро SBC", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+      provider  [label="Внешний провайдер — v1.3\nпервый кандидат — ядро SBC", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       provider -> planner [style=dashed];
       catalog   [label="CatalogProvider\nAFGRecipeManager · SML classes"];
       telemetry [label="TelemetrySampler\nснапшоты, агрегация вне GameThread"];
@@ -58,7 +58,7 @@ digraph G {
     foreman [label="FICSIT Foreman ff-server — vanilla\nchat SSE · MCP client · Work Orders", fillcolor="#E6F1F3", color="#7FA7B0"];
     sfmcp   [label="sf-mcp (Foreman)\nсправочные данные · .sav", fillcolor="#F2F4F6", color="#B9C2CA"];
     fdb     [label="Foreman DB (SQLite)\nаккаунт · переписка · Work Orders", shape=cylinder];
-    voice   [label="STT + TTS\nv1.3", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+    voice   [label="STT + TTS\nv1.2", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
     foreman -> adapter [label="MCP_URL", fontsize=9];
     adapter -> foreman [label="chat · Work Orders REST · сессия", fontsize=9];
     adapter -> sfmcp [label="прокси", fontsize=9];

@@ -3,7 +3,7 @@
 Мод к Satisfactory и локальный сервис-компаньон, делающие [FICSIT Foreman](https://github.com/StuartMeeks/ficsit-foreman)
 инженерным помощником прямо в игре: AI Terminal с переиспользуемыми экранами (Dashboard, Chat,
 Notes, Work Orders, Screens), подключаемый планировщик производства и запросы на создание Blueprint.
-Экипируемый AI Assistant и HUD — после v1.0.
+Экипируемый AI Assistant и HUD — v1.4.
 
 **Статус: только архитектура.** Кода пока нет. Репозиторий содержит проект архитектуры
 релизной версии, вынесенный на согласование, — не описание реализованного продукта.
@@ -26,14 +26,14 @@ Notes, Work Orders, Screens), подключаемый планировщик п
   сайдкар: vanilla Foreman плюс тонкий адаптер, через который мод подключается к Foreman
   исходящим соединением. Foreman не форкается и не патчится.
 - **UI:** переиспользуемые экранные модули, которые открываются в любом хосте. В v1.0 хост —
-  AI Terminal (потребляет энергию); после v1.0 те же экраны откроет AI Assistant.
+  AI Terminal (потребляет 10 MW); в v1.4 те же экраны откроет AI Assistant.
 - **Планировщик:** стандартизированная обёртка (`PlanRequest` → `ProductionPlan`, интерфейс
   провайдера и UI плана), в v1.0 — заглушка. Первый кандидат провайдера — ядро
   [Satisfactory Build Calculator](https://github.com/AutoCrafter1223/satisfactory-build-calculator-mod) (MIT).
 - **Объём v1.0:** AI Terminal; экраны Dashboard, Chat, Notes, Work Orders, Screens (редактор
   экранов вместе с инструментами модели); обёртки Planning и Graph; состояние в сохранении.
   Первым идёт вертикальный срез v0.1 (терминал, Chat, Dashboard). Blueprint Builder — v1.1,
-  голос — v1.3; подключение планировщика и AI Assistant с HUD — после v1.0, номера не назначены.
+  голос — v1.2, подключение планировщика и UI плана — v1.3, AI Assistant с HUD — v1.4.
 - **Контракты:** `GameCatalog`, `PlanRequest`, `ProductionPlan`, `ScreenDefinition`, `BlueprintRequest`.
 - **Ручной паритет:** всё, что может модель (экран, график, заметка, Work Order, чертёж, план),
   игрок делает вручную через UI без LLM — UI и модель вызывают одни и те же операции.
