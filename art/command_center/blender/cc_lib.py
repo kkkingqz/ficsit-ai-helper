@@ -369,7 +369,7 @@ def render_all(out, only=None, suffix=""):
         # interior views (stage 4)
         "21_interior_main": ((6.3, 2.45, 3.1), (-2.5, -2.6, 2.3), None, 18),
         "22_interior_alt": ((-5.5, -0.9, 3.1), (2.6, 2.6, 2.4), None, 18),
-        "23_interior_console": ((-3.0, 1.2, 2.9), (-3.0, -3.0, 2.3), None, 24),
+        "23_interior_console": ((-3.0, 1.4, 2.75), (-3.0, -3.0, 2.85), None, 19),
         "24_interior_console_side": ((-0.2, 0.2, 2.15), (-3.3, -2.6, 2.05), None, 28),
         "25_interior_entrance": ((-1.0, 2.0, 2.7), (-1.5, -3.4, 2.4), None, 20),
         "26_interior_holo": ((0.4, 2.2, 2.6), (3.2, 0.0, 2.6), None, 26),
@@ -459,6 +459,9 @@ def triangle_count(coll):
     return sum(sum(len(p.vertices) - 2 for p in o.data.polygons) for o in coll.objects if o.type == "MESH")
 
 
+PREVIEW_HOOKS = []                          # callables run before rendering, never before export
+
+
 def run(build_fn, basename, label):
     """CLI entry shared by the build scripts: build -> export -> optional .blend / renders."""
     argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else sys.argv[1:]
@@ -482,6 +485,8 @@ def run(build_fn, basename, label):
     if a.blend:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(a.out, basename + ".blend"))
     if a.render:
+        for hook in PREVIEW_HOOKS:          # render-only material swaps (after export: exports stay clean)
+            hook()
         setup_render(samples=a.samples)
         render_all(a.render, a.shots.split(",") if a.shots else None)
         if a.turnaround:
