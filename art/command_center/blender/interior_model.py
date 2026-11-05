@@ -118,8 +118,6 @@ def build_floor(M, exp, pit):
             box(f"FLOOR_hatch_{name}_hinge_{s:+d}", (cx + s * size * 0.3, cy + size / 2 - 0.04, F + 0.016), (0.14, 0.04, 0.012),
                 M["M_MetalBare"], exp)
         box(f"FLOOR_hatch_{name}_handle", (cx, cy - size / 2 + 0.1, F + 0.016), (0.28, 0.05, 0.01), M["M_MetalDark"], exp)
-        box(f"FLOOR_hatch_{name}_corner", (cx + size / 2 - 0.12, cy - size / 2 + 0.12, F + 0.0135), (0.16, 0.16, 0.003),
-            M["M_Hazard"], exp)
 
     def tile_grille(name, cx, cy, w=1.2, d=0.6):            # tile type 4: floor vent grille
         bevel(box(f"FLOOR_grille_{name}_frame", (cx, cy, F + 0.006), (w, d, 0.012), M["M_MetalDark"], exp), 0.012)
@@ -128,7 +126,7 @@ def build_floor(M, exp, pit):
             box(f"FLOOR_grille_{name}_bar_{i}", (cx - (w - 0.2) / 2 + i * (w - 0.2) / (n - 1), cy, F + 0.014), (0.025, d - 0.1, 0.008),
                 M["M_MetalBare"], exp)
 
-    def dashed(name, a, b, width=0.06, dash=0.45, gap=0.25):
+    def dashed(name, a, b, width=0.06, dash=0.6, gap=0.4):
         ln = math.dist(a, b)
         n = int((ln + gap) / (dash + gap))
         for q in range(n):
@@ -144,15 +142,14 @@ def build_floor(M, exp, pit):
 
     # ---- 1. main walkway (WHITE): 2 m lane from the stair landing to the console zone, branch to the projector -----
     lx0, lx1 = -2.0, 0.0                                     # lane between the pit rails' axis
-    ly0, ly1 = py0 - 0.5, -1.1                               # from the landing band to the operator zone edge
+    ly0, ly1 = py0 - 0.45, -1.1                              # from the pit-edge band to the operator zone edge
     by0, by1 = -0.5, 0.5                                     # branch towards the projector
     dashed("FLOOR_lane_edge_L", (lx0, ly0), (lx0, ly1))
     dashed("FLOOR_lane_edge_R_0", (lx1, ly0), (lx1, by1))
     dashed("FLOOR_lane_edge_R_1", (lx1, by0), (lx1, ly1))
     for k, y in enumerate((by1, by0)):
         dashed(f"FLOOR_lane_branch_edge_{k}", (lx1, y), (HOLO_XY[0] - 1.95, y))
-    for k, y in enumerate((1.0, -0.6)):
-        chevron(f"FLOOR_lane_chevron_{k}", (lx0 + lx1) / 2, y, -math.pi / 2)
+    chevron("FLOOR_lane_chevron_0", (lx0 + lx1) / 2, 0.75, -math.pi / 2)
     chevron("FLOOR_lane_chevron_branch", 0.65, 0.0, 0.0)
     # ---- 2. console work zone (ORANGE outline) around the standing mat --------------------------------------
     ox0, ox1, oy0, oy1 = CONSOLE_X - 1.6, CONSOLE_X + 1.6, -2.25, -1.1
@@ -703,12 +700,6 @@ def build_holo(M, exp):
     route = [(ex, ey + 0.42), (ex, 2.35), (4.95, 2.35), (4.95, YW - 0.55)]
     for k, (a, b) in enumerate(zip(route[:-1], route[1:])):
         _seg(f"FLOOR_cable_channel_{k}", a, b, 0.34, F + 0.012, 0.024, M["M_MetalLight"], exp)
-        for s in (-1, 1):                                          # hazard edges of the channel cover
-            dx, dy = b[0] - a[0], b[1] - a[1]
-            ln = math.hypot(dx, dy)
-            nx, ny = -dy / ln * 0.18 * s, dx / ln * 0.18 * s
-            _seg(f"FLOOR_cable_channel_{k}_edge_{s:+d}", (a[0] + nx, a[1] + ny), (b[0] + nx, b[1] + ny), 0.03, F + 0.026,
-                 0.004, M["M_Hazard"], exp)
     # ---- emitter: disc, lens rings, four emitter nodes ---------------------------------------------------------------
     cylinder("HOLO_EMITTER", (hx, hy, F + 0.96), 0.9, 0.03, M["M_Holo"], exp, 32)
     for i, (r0, r1) in enumerate(((1.1, 0.98), (0.62, 0.56))):
@@ -1072,16 +1063,16 @@ def build_entrance(M, exp, door, pit):
         y_hi = YW - 0.3 * i                               # +y edge of step i (towards the door)
         box(f"STEPS_{i}_tread", ((px0 + px1) / 2, y_hi - 0.15, h + 0.006), (px1 - px0 - 0.12, 0.26, 0.012), M["M_MetalBare"],
             exp)
-        box(f"DECALS_hazard_step_{i}", ((px0 + px1) / 2, y_hi - 0.03, h + 0.014), (px1 - px0 - 0.12, 0.06, 0.006),
-            M["M_Hazard"], exp)
+        if i == 0:                                    # nosing stripe on the entry step only
+            box(f"DECALS_hazard_step_{i}", ((px0 + px1) / 2, y_hi - 0.03, h + 0.014), (px1 - px0 - 0.12, 0.06, 0.006),
+                M["M_Hazard"], exp)
         if i:
             box(f"LIGHTS_step_riser_{i}", ((px0 + px1) / 2, y_hi + 0.004, h - 0.08), (px1 - px0 - 0.4, 0.008, 0.03),
                 M["M_LightWarm"], exp)
-    box("DECALS_hazard_pit_edge", ((px0 + px1) / 2, py0 - 0.05, F + 0.003), (px1 - px0, 0.1, 0.006), M["M_Hazard"], exp)
+    box("DECALS_hazard_pit_edge", ((px0 + px1) / 2, py0 - 0.11, F + 0.003), (px1 - px0, 0.22, 0.006), M["M_Hazard"], exp)
     box("LIGHTS_landing_edge", ((px0 + px1) / 2, py0 + 0.004, F - 0.06), (px1 - px0 - 0.2, 0.008, 0.03), M["M_LightWarm"],
         exp)
-    # one solid warning band in front of the stair (small rotated chevrons read as scattered chips)
-    box("DECALS_hazard_landing", ((px0 + px1) / 2, py0 - 0.3, F + 0.004), (px1 - px0 + 0.3, 0.22, 0.004), M["M_Hazard"], exp)
+    # door zone = ONE solid warning band along the pit edge (the separate landing band in front of it is gone)
     # ---- industrial guard rails along both pit edges, tied into the door casing -------------------------------------------
     ln = YW - 0.2 - py0
     yc = py0 + ln / 2
