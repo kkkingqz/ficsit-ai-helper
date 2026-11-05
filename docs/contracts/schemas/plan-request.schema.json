@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/plan-request.schema.json",
+  "title": "PlanRequest",
+  "description": "Запрос к обёртке планировщика (ARCHITECTURE.md §5.2, §8.3). Любой провайдер принимает PlanRequest и возвращает ProductionPlan или ошибку: PLANNER_NOT_CONNECTED, PLANNER_CAPABILITY_MISSING, RECIPE_CYCLE_UNSUPPORTED. Обёртка отклоняет запрос, если он требует возможности, которой нет у провайдера.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "saveId", "catalogRevision", "target", "selectedAlternates"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "saveId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "catalogRevision": { "type": "integer", "minimum": 0 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "ratePerMin": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "selectedAlternates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/className" },
+      "description": "Альтернативные рецепты, которые разрешено использовать; каждый сверяется с живым каталогом и статусом разблокировки."
+    },
+    "machineSettings": {
+      "type": "array",
+      "description": "Настройки машин по рецептам. Требует у провайдера возможностей powerShards и somersloops.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["recipeClass"],
+        "properties": {
+          "recipeClass": { "$ref": "#/$defs/className" },
+          "powerShards": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "somersloops": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "rawLimits": {
+      "type": "array",
+      "description": "Необязательные ограничения на сырьё. Требует у провайдера возможности rawLimits, иначе обёртка отвечает PLANNER_CAPABILITY_MISSING.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item", "maxRatePerMin", "unit"],
+        "properties": {
+          "item": { "$ref": "#/$defs/className" },
+          "maxRatePerMin": { "type": "number", "exclusiveMinimum": 0 },
+          "unit": { "enum": ["items/min", "m3/min"] }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "className": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$", "maxLength": 128 }
+  }
+}
