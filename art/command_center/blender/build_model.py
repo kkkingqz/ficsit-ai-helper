@@ -354,9 +354,9 @@ def build_back(M, exp, by):
     rx = DOOR_X + DOOR_W / 2 + FRAME_MAJOR + 0.27
     bevel(box("DOOR_ACCESS_backplate", (rx, by + 0.17, 1.3), (0.36, 0.02, 1.0), M["M_MetalLight"], exp), 0.01)
     box("DOOR_ACCESS_trim", (rx, by + 0.182, 1.78), (0.36, 0.006, 0.04), M["M_PaintOrange"], exp)
-    bevel(box("DOOR_reader", (rx, by + 0.2, 1.5), (0.28, 0.04, 0.34), M["M_MetalDark"], exp), 0.01)
-    box("DOOR_reader_screen", (rx, by + 0.221, 1.58), (0.22, 0.004, 0.124), M["M_ScreenStatic"], exp)
-    box("DOOR_reader_keypad", (rx, by + 0.221, 1.42), (0.18, 0.004, 0.08), M["M_MetalBare"], exp)
+    bevel(box("DOOR_reader", (rx, by + 0.185, 1.5), (0.28, 0.025, 0.34), M["M_MetalDark"], exp), 0.01)   # stays inside y <= 4.0
+    box("DOOR_reader_screen", (rx, by + 0.1985, 1.58), (0.22, 0.002, 0.124), M["M_ScreenStatic"], exp)
+    box("DOOR_reader_keypad", (rx, by + 0.1985, 1.42), (0.18, 0.002, 0.08), M["M_MetalBare"], exp)
     box("DOOR_reader_pad", (rx, by + 0.191, 1.12), (0.14, 0.004, 0.14), M["M_Rubber"], exp)      # card at hand height
     box("DOOR_reader_led", (rx, by + 0.191, 1.24), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
     box("DOOR_ACCESS_label", (rx, by + 0.182, 0.9), (0.28, 0.004, 0.07), M["M_Decal"], exp)
