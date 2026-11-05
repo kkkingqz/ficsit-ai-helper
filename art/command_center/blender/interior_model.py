@@ -1103,6 +1103,62 @@ def build_entrance(M, exp, door, pit):
         box(f"LIGHTS_rail_marker_{s}", (x, py0 + 0.05, F + 1.125), (0.06, 0.06, 0.02), M["M_Beacon"], exp)
 
 
+def build_panel_life(M, exp):
+    """Constructive life for the large orange wall panels, DOSED: 1-3 elements per panel, picked from five kinds only
+    (seam, recessed frame, service hatch, inspection cover, warning marking); some panels stay plain as pauses.
+    Upper orange panels: surface at d = 0.05 from the wall lining."""
+    uz0, uz1 = F + 0.96, WALL_TOP - 0.15
+    ds = 0.052                                                   # just proud of the orange panel surface
+
+    def seam(n, wall, a, z, vertical, a0=None, a1=None, z0=uz0, z1=uz1):
+        if vertical:
+            box(n, _wp(wall, a, ds, (z0 + z1) / 2), _ws(wall, 0.025, 0.006, z1 - z0 - 0.04), M["M_Rubber"], exp)
+        else:
+            box(n, _wp(wall, (a0 + a1) / 2, ds, z), _ws(wall, a1 - a0 - 0.04, 0.006, 0.025), M["M_Rubber"], exp)
+
+    def groove_frame(n, wall, a0, a1, z0, z1):                   # recessed frame = rubber groove rectangle
+        seam(f"{n}_0", wall, None, z0, False, a0, a1)
+        seam(f"{n}_1", wall, None, z1, False, a0, a1)
+        seam(f"{n}_2", wall, a0, None, True, z0=z0, z1=z1)
+        seam(f"{n}_3", wall, a1, None, True, z0=z0, z1=z1)
+
+    def hatch(n, wall, a, zc, w, h):                             # service hatch: seal, plate, 2 hinges, latch, label
+        box(f"{n}_seal", _wp(wall, a, ds, zc), _ws(wall, w + 0.05, 0.006, h + 0.05), M["M_Rubber"], exp)
+        bevel(box(n, _wp(wall, a, 0.065, zc), _ws(wall, w, 0.025, h), M["M_MetalLight"], exp), 0.012)
+        for k in (-1, 1):
+            box(f"{n}_hinge_{k:+d}", _wp(wall, a - w / 2 + 0.02, 0.085, zc + k * h * 0.3), _ws(wall, 0.05, 0.02, 0.14),
+                M["M_MetalBare"], exp)
+        box(f"{n}_latch", _wp(wall, a + w / 2 - 0.08, 0.085, zc), _ws(wall, 0.05, 0.02, 0.12), M["M_MetalDark"], exp)
+        box(f"{n}_label", _wp(wall, a, 0.079, zc + h / 2 - 0.1), _ws(wall, 0.3, 0.004, 0.07), M["M_Hazard"], exp)
+
+    def inspect(n, wall, a, zc):                                 # small inspection cover with a pull tab
+        box(f"{n}_seal", _wp(wall, a, ds, zc), _ws(wall, 0.32, 0.006, 0.32), M["M_Rubber"], exp)
+        bevel(box(n, _wp(wall, a, 0.062, zc), _ws(wall, 0.28, 0.02, 0.28), M["M_MetalLight"], exp), 0.012)
+        box(f"{n}_tab", _wp(wall, a, 0.075, zc - 0.09), _ws(wall, 0.1, 0.012, 0.03), M["M_MetalDark"], exp)
+
+    def warning(n, wall, a, zc, w=0.4):                          # yellow-black warning strip + text plate
+        box(n, _wp(wall, a, ds + 0.002, zc), _ws(wall, w, 0.006, 0.09), M["M_Hazard"], exp)
+        box(f"{n}_text", _wp(wall, a, ds + 0.002, zc - 0.12), _ws(wall, w * 0.8, 0.006, 0.06), M["M_Decal"], exp)
+
+    # far (right) wall behind the projector: the two largest panels
+    seam("WALL_R_0_seam", "R", -1.45, None, True)                                      # 60/40 split
+    hatch("WALL_R_0_hatch", "R", -2.05, F + 1.65, 0.7, 0.8)                            # service hatch (lower field)
+    warning("WALL_R_0_warning", "R", -2.05, F + 2.25)
+    groove_frame("WALL_R_0_frame", "R", -1.3, 0.2, F + 2.85, uz1 - 0.15)              # recessed frame (upper field)
+    seam("WALL_R_1_seam", "R", None, F + 3.0, False, 0.86, 2.62)
+    inspect("WALL_R_1_inspect", "R", 1.75, F + 1.5)
+    # back wall: corner panels behind the containers, panel next to the door portal, panels above the service canopy
+    seam("WALL_B_0_seam", "B", None, F + 2.9, False, -6.62, -4.98)
+    inspect("WALL_B_0_inspect", "B", -5.3, F + 3.35)
+    groove_frame("WALL_B_1_frame", "B", -4.77, -3.51, uz0 + 0.15, uz1 - 0.15)
+    warning("WALL_B_1_warning", "B", -4.14, uz0 + 0.45)
+    inspect("WALL_B_2_inspect", "B", 3.4, F + 3.0)
+    seam("WALL_B_3_seam", "B", 5.55, None, True, z0=F + 2.45)
+    warning("WALL_B_3_warning", "B", 6.05, F + 3.0, w=0.36)
+    # left technical wall: one inspection cover above the first rack (the second rack panel stays plain)
+    inspect("WALL_L_2_inspect", "L", 0.02, F + 3.0)
+
+
 def build_back_wall(M, exp, door):
     """Entry wall as ONE composition with a clear hierarchy (stage 4, back-wall pass):
        1. door portal (main node): dark surround around the door casing, heavy orange frame, FICSIT logo in the head;
@@ -1352,6 +1408,7 @@ def build_interior_v2(M, exp, ref, door):
     pit = (door_x - door_w / 2 - 0.1, door_x + door_w / 2 + 0.1, wall_in - 4 * 0.3)
     build_floor(M, exp, pit)
     build_walls(M, exp, (door_x - door_w / 2, door_x + door_w / 2, door_h))
+    build_panel_life(M, exp)
     segs = build_console(M, exp, ref)
     build_operator_mat(M, exp)
     build_service_console(M, exp)
