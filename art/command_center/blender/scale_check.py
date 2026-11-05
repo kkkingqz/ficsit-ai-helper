@@ -113,6 +113,28 @@ def measure():
     add("Пульт", "главный экран: верх над уровнем глаз (угол)", math.degrees(math.atan((m_hi.z - F - EYE_H) / dist)), None, 40,
         "°", note="при > 30° игрок задирает камеру")
     add("Пульт", "главный экран: центр над полом", (m_lo.z + m_hi.z) / 2 - F, 1.6, 2.2)
+    # ---- exterior (heights above the foundation top z = 0, where the player stands outside) --------------------
+    ds_lo, ds_hi = bbox("DOOR_seal")
+    add("Экстерьер", "дверь снаружи: ширина в свету", ds_hi.x - ds_lo.x, 2 * CAP_R + 1.0, 3.0)
+    add("Экстерьер", "дверь снаружи: высота в свету", ds_hi.z - ds_lo.z, PLAYER_H + 0.8, 4.0)
+    for name, label, lo_, hi_ in (("DOOR_reader_pad", "считыватель у двери: центр", 1.0, 1.35),
+                                  ("DOOR_reader_screen", "экран модуля доступа: центр", 1.3, 1.7),
+                                  ("POWER_SOCKET", "силовой разъём: центр", 0.8, 1.6),
+                                  ("BASE_SERVICE_cover", "сервисная крышка цоколя: центр", 0.6, 1.4)):
+        lo, hi = bbox(name)
+        add("Экстерьер", label, (lo.z + hi.z) / 2, lo_, hi_, note="рука стоящего игрока ≈ 0,9–1,5 м")
+    lo, hi = bbox("BASE_SERVICE_cover")
+    add("Экстерьер", "сервисная крышка цоколя: высота", hi.z - lo.z, 0.6, 1.3)
+    lo, hi = bbox("ROOF_service_hatch")
+    add("Экстерьер", "люк крыши: меньшая сторона", min(hi.x - lo.x, hi.y - lo.y), 2 * CAP_R + 0.2, None, note="проход капсулы 0,6 м")
+    add("Экстерьер", "цоколь: высота", cc_lib.BASE_H, 1.5, 2.2, note="выше плеча игрока: окно читается над головой")
+    for cab, seam_, label in (("RIGHT_CABINET", "RIGHT_CABINET_tier_seam", "шкаф справа"),
+                              ("BACK_POWER_CABINET", "BACK_POWER_CABINET_tier_seam", "силовой шкаф сзади")):
+        c_lo, c_hi = bbox(cab)
+        s_lo, s_hi = bbox(seam_)
+        tier = max(s_lo.z - c_lo.z, c_hi.z - s_hi.z)
+        add("Экстерьер", f"{label}: высота створки", tier, None, 1.6,
+            note="створка ≤ 1,6 м — шкаф не читается как второй вход (дверь 3,2 м); над цоколем, в игре декоративно")
     # ---- screens: aspect --------------------------------------------------------------------------------------------
     scr = []
     for ob in bpy.data.objects:
@@ -139,7 +161,7 @@ def report(rows, path):
              "(`blender/scale_check.py`), высоты — от пола интерьера (+1,02 м над фундаментом), если не сказано иное.", "",
              "| Узел | Параметр | Значение | Цель | Итог | Примечание |", "|---|---|---|---|---|---|"]
     for g, i, v, t, ok, n in rows:
-        lines.append(f"| {g} | {i} | {v} | {t} | {'✅' if ok == 'OK' else '⚠️'} | {n} |")
+        lines.append(f"| {g} | {i} | {v} | {t} | {'✅' if ok == 'OK' else 'ℹ️' if ok == 'INFO' else '⚠️'} | {n} |")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
@@ -153,6 +175,10 @@ CAPSULES = {           # name: (x, y, z_floor)
     "projector": (im.HOLO_XY[0] - 1.9, im.HOLO_XY[1] - 0.6, None),
     "operator": (im.OPERATOR_XY[0] + 0.4, im.OPERATOR_XY[1] + 0.15, None),
     "window_band": (3.45, -2.6, None),
+    "ext_front": (-0.6, -cc_lib.D / 2 - 0.7, 0.0),
+    "ext_back_access": (0.2, cc_lib.D / 2 + 0.7, 0.0),
+    "ext_right": (cc_lib.W / 2 + 0.7, 0.9, 0.0),
+    "ext_left": (-cc_lib.W / 2 - 0.7, -0.6, 0.0),
 }
 
 SCALE_SHOTS = {
@@ -161,6 +187,10 @@ SCALE_SHOTS = {
     "S3_service": ((0.4, 0.6, 2.4), (3.6, 3.4, 1.9), None, 20),
     "S4_projector": ((-0.8, 1.2, 2.3), (2.4, -0.9, 1.7), None, 18),
     "S5_section": ((0.0, -12.0, 2.7), (0.0, 0.0, 2.7), 15.4, 0, 10.6),   # cut at y = -1.4: console out, back half in
+    "S6_ext_back": ((2.5, 11.0, 2.4), (-0.8, 3.9, 2.0), None, 26),
+    "S7_ext_front": ((-3.5, -12.0, 2.3), (-0.3, -4.0, 2.2), None, 24),
+    "S8_ext_right": ((15.0, -2.5, 2.6), (8.0, 0.6, 2.6), None, 26),
+    "S9_ext_elev_back": ((0.0, 40.0, 3.4), (0.0, 0.0, 3.4), 18.0, 0),
 }
 
 

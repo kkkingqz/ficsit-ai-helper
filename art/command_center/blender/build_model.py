@@ -441,8 +441,11 @@ def build_back(M, exp, by):
     bevel(cab, 0.04)
     louvre("BACK_POWER_CABINET_vent", "+y", (vb[0] + vb[1]) / 2, vb[1] - vb[0] - 0.06, pz1 - 0.43, pz1 - 0.13,
            by + 0.15, M, exp)
+    ptz = 3.65                                                   # tier seam: the two doors become 2 x 2 (scale check)
+    box("BACK_POWER_CABINET_tier_seam", (px0 + 1.12, by + 0.182, ptz), (2.14, 0.02, 0.03), M["M_Rubber"], exp)
     for k, x in enumerate((px0 + 0.95, px0 + 1.25)):
-        box(f"BACK_POWER_CABINET_handle_{k}", (x, by + 0.19, 3.7), (0.05, 0.02, 0.45), M["M_MetalLight"], exp)
+        for t, z in enumerate((2.85, 4.15)):
+            box(f"BACK_POWER_CABINET_handle_{k}{t}", (x, by + 0.19, z), (0.05, 0.02, 0.3), M["M_MetalLight"], exp)
     box("BACK_POWER_CABINET_label", (px0 + 0.55, by + 0.182, 4.4), (0.5, 0.004, 0.34), M["M_Hazard"], exp)
     box("BACK_POWER_CABINET_plate", (px0 + 1.65, by + 0.182, 4.4), (0.6, 0.004, 0.2), M["M_MetalLight"], exp)
     bc = px0 + 2.75                    # breaker column: rows of status lights
@@ -577,15 +580,18 @@ def build_right_service(M, exp, sx_out):
               M["M_MetalLight"], exp)
     seam = (cy0 + cy1) / 2
     boolean(cab, box("tmp_rcs", (face, seam, (cz0 + cz1) / 2), (0.04, 0.03, cz1 - cz0 - 0.15), M["M_MetalDark"], exp))
+    tz = 3.47                                                    # tier seam: 2 x 2 doors of ~1.2 m (scale check)
     for j, (a, b) in enumerate(((cy0 + 0.12, seam - 0.1), (seam + 0.1, cy1 - 0.12))):   # recessed door fields
-        boolean(cab, box("tmp_rcf", (face, (a + b) / 2, (cz0 + cz1) / 2 - 0.15), (0.03, b - a, cz1 - cz0 - 0.9),
-                         M["M_MetalLight"], exp))
+        for z0_, z1_ in ((cz0 + 0.2, tz - 0.08), (tz + 0.08, cz1 - 0.2)):
+            boolean(cab, box("tmp_rcf", (face, (a + b) / 2, (z0_ + z1_) / 2), (0.03, b - a, z1_ - z0_), M["M_MetalLight"], exp))
     bevel(cab, 0.03)
-    for j, y in enumerate((cy0 + 0.04, cy1 - 0.04)):                                 # hinges
-        for h, z in enumerate((2.6, 3.5, 4.4)):
-            cylinder(f"RIGHT_CABINET_hinge_{j}_{h}", (face + 0.0, y, z), 0.035, 0.2, M["M_MetalDark"], exp, 8)
-    for j, y in enumerate((seam - 0.12, seam + 0.12)):                               # handles
-        box(f"RIGHT_CABINET_handle_{j}", (face + 0.02, y, 3.55), (0.03, 0.05, 0.42), M["M_MetalDark"], exp)
+    box("RIGHT_CABINET_tier_seam", (face - 0.005, (cy0 + cy1) / 2, tz), (0.02, cy1 - cy0 - 0.1, 0.03), M["M_Rubber"], exp)
+    for j, y in enumerate((cy0 + 0.04, cy1 - 0.04)):                                 # hinges: two per door
+        for h, z in enumerate((2.55, 3.15, 3.8, 4.45)):
+            cylinder(f"RIGHT_CABINET_hinge_{j}_{h}", (face + 0.0, y, z), 0.035, 0.16, M["M_MetalDark"], exp, 8)
+    for j, y in enumerate((seam - 0.12, seam + 0.12)):                               # handles: one per door
+        for t, z in enumerate((2.85, 4.1)):
+            box(f"RIGHT_CABINET_handle_{j}{t}", (face + 0.02, y, z), (0.03, 0.05, 0.26), M["M_MetalDark"], exp)
     box("RIGHT_CABINET_window", (face + 0.004, (cy0 + seam) / 2, 4.3), (0.006, 0.45, 0.3), M["M_ScreenStatic"], exp)
     box("RIGHT_CABINET_window_frame", (face + 0.002, (cy0 + seam) / 2, 4.3), (0.004, 0.55, 0.4), M["M_MetalDark"], exp)
     box("RIGHT_CABINET_hazard", (face + 0.004, (seam + cy1) / 2, 4.3), (0.006, 0.4, 0.4), M["M_Hazard"], exp)
@@ -695,6 +701,54 @@ def build_final_details(M, exp, sx_out, fy, by):
         for dx in (-0.12, 0.12):
             cylinder(f"ROOF_fan_{f}_access_bolt_{dx:+.2f}", (x + dx, ry + 0.05 - 0.517, zt + 0.11), 0.015, 0.01,
                      M["M_MetalBare"], exp, 6, axis="Y")
+
+
+def build_exterior_panel_life(M, exp, sx_out, by):
+    """Constructive life for the large orange pylon faces, DOSED like inside (1-2 elements per face, some faces stay
+    plain): back faces of the rear pylons, the 45-degree corner faces of the rear pylons and of the front-left pylon.
+    Kinds: recessed frame (rubber groove), inspection cover, service hatch, warning marking."""
+    ax, ay = sx_out + ARMOR_T, D / 2 - SHELL_INSET + ARMOR_T     # outer pylon surface
+    ac = CORNER + ARMOR_T * 0.4
+
+    def put(name, base, n, t_off, z, d, size, mat):
+        t = (-n[1], n[0])
+        loc = (base[0] + t[0] * t_off + n[0] * d, base[1] + t[1] * t_off + n[1] * d, z)
+        return box(name, loc, size, mat, exp, rot_z=math.atan2(t[1], t[0]))
+
+    def groove(name, base, n, w, z0, z1):
+        for k, (to, z, sz) in enumerate(((0.0, z0, (w, 0.006, 0.025)), (0.0, z1, (w, 0.006, 0.025)),
+                                         (-w / 2, (z0 + z1) / 2, (0.025, 0.006, z1 - z0)),
+                                         (w / 2, (z0 + z1) / 2, (0.025, 0.006, z1 - z0)))):
+            put(f"{name}_{k}", base, n, to, z, 0.003, sz, M["M_Rubber"])
+
+    def inspect(name, base, n, t_off, z):
+        # thin on purpose: the rear pylon face is only 2 cm inside the footprint edge
+        put(f"{name}_seal", base, n, t_off, z, 0.002, (0.36, 0.004, 0.36), M["M_Rubber"])
+        bevel(put(name, base, n, t_off, z, 0.008, (0.32, 0.012, 0.32), M["M_MetalLight"]), 0.004)
+        put(f"{name}_tab", base, n, t_off, z - 0.1, 0.0135, (0.1, 0.008, 0.03), M["M_MetalDark"])
+
+    def hatch(name, base, n, z, w, h):
+        put(f"{name}_seal", base, n, 0.0, z, 0.003, (w + 0.05, 0.006, h + 0.05), M["M_Rubber"])
+        bevel(put(name, base, n, 0.0, z, 0.014, (w, 0.025, h), M["M_MetalLight"]), 0.012)
+        for k in (-1, 1):
+            put(f"{name}_hinge_{k:+d}", base, n, -w / 2 + 0.02, z + k * h * 0.3, 0.03, (0.05, 0.02, 0.14), M["M_MetalBare"])
+        put(f"{name}_latch", base, n, w / 2 - 0.08, z, 0.03, (0.05, 0.02, 0.12), M["M_MetalDark"])
+        put(f"{name}_label", base, n, 0.0, z + h / 2 - 0.1, 0.028, (0.3, 0.004, 0.07), M["M_Hazard"])
+
+    def warning(name, base, n, t_off, z, w=0.42):
+        put(name, base, n, t_off, z, 0.004, (w, 0.006, 0.1), M["M_Hazard"])
+        put(f"{name}_text", base, n, t_off, z - 0.13, 0.004, (w * 0.85, 0.006, 0.07), M["M_Decal"])
+
+    k = math.sqrt(0.5)
+    # rear pylons, back faces (normal +y): inspection cover by the cooling side, warning by the power side
+    inspect("PYLON_back_L_inspect", (-6.4, ay), (0.0, 1.0), 0.0, 3.1)
+    warning("PYLON_back_R_warning", (6.4, ay), (0.0, 1.0), 0.0, 3.35)
+    # rear pylons, 45-degree faces: recessed frame on both (rhythm), lower field under the 4.35 seam
+    for sx_ in (-1, 1):
+        mid = (sx_ * (ax - ac / 2), ay - ac / 2)
+        groove(f"PYLON_corner_{sx_:+d}+1_frame", mid, (sx_ * k, k), 0.9, 2.35, 4.1)
+    # front-left pylon, 45-degree face: one service hatch
+    hatch("PYLON_corner_-1-1_hatch", (-(ax - ac / 2), -(ay - ac / 2)), (-k, -k), 3.15, 0.7, 0.9)
 
 
 def build(mats, exp, ref):
@@ -962,6 +1016,8 @@ def build(mats, exp, ref):
     build_left_utility(M, exp, sx_out)
 
     build_right_service(M, exp, sx_out)
+
+    build_exterior_panel_life(M, exp, sx_out, by)
 
     # ===================================================================== ROOF: four zones, five elements
     # front zone (over the glass) stays clean: orange band sections + visor only.
