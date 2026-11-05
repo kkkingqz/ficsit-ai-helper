@@ -205,6 +205,19 @@ def make_sign(path):
     im.save(path)
 
 
+def make_entry(path):
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 336), (14, 16, 20))
+    d = ImageDraw.Draw(im)
+    d.rectangle((8, 8, 1272, 328), outline=ORANGE, width=10)
+    for txt, size, y, col in (("COMMAND CENTER", 120, 34, ORANGE), ("ENTRY  //  AUTHORISED PERSONNEL", 50, 226, (220, 225, 230))):
+        while size > 30 and d.textlength(txt, font=_font(size)) > 1280 - 120:
+            size -= 4
+        w = d.textlength(txt, font=_font(size))
+        d.text(((1280 - w) / 2, y), txt, fill=col, font=_font(size))
+    im.save(path)
+
+
 def make_exit(path):
     from PIL import Image, ImageDraw
     im = Image.new("RGB", (640, 150), (14, 60, 36))
@@ -219,7 +232,8 @@ def make_exit(path):
 def ensure_textures(force=False):
     os.makedirs(OUT, exist_ok=True)
     jobs = {"ui_main": lambda p: make_main(p), "ui_wing": lambda p: make_wing(p), "ui_list": lambda p: make_list(p),
-            "ui_cam": lambda p: make_cam(p), "sign_cc": lambda p: make_sign(p), "sign_exit": lambda p: make_exit(p)}
+            "ui_cam": lambda p: make_cam(p), "sign_cc": lambda p: make_sign(p), "sign_exit": lambda p: make_exit(p),
+            "sign_entry": lambda p: make_entry(p)}
     for k in range(3):
         jobs[f"ui_status_{k}"] = (lambda kk: (lambda p: make_status(p, kk)))(k)
     for k, lines in enumerate(LABELS):
@@ -271,13 +285,16 @@ def _planar_uv(ob):
     c = sum(pts, Vector()) / len(pts)
     best = max(me.polygons, key=lambda p: p.area)
     n = (mw.to_3x3() @ best.normal).normalized()
-    if abs(n.z) > 0.7:
+    import cc_lib
+    xw, yw = cc_lib.W / 2 - cc_lib.SHELL_INSET - cc_lib.WALL, cc_lib.D / 2 - cc_lib.SHELL_INSET - cc_lib.WALL
+    outside = abs(c.x) > xw + 0.06 or abs(c.y) > yw + 0.06 or c.z > cc_lib.CEIL + 0.1   # exterior: faces AWAY
+    if abs(n.z) > 0.8:                                   # 45-degree chamfers count as vertical faces
         n = n if n.z > 0 else -n
         up = Vector((0.0, -1.0 if c.y < 0 else 1.0, 0.0))
         up = (up - n * up.dot(n)).normalized()
     else:
         to_c = Vector((-c.x, -c.y, 0.0))
-        if n.dot(to_c) < 0:
+        if (n.dot(to_c) < 0) != outside:
             n = -n
         up = Vector((0.0, 0.0, 1.0))
         up = (up - n * up.dot(n)).normalized()
@@ -313,8 +330,10 @@ def _texture_for(ob):
         return f"ui_status_{_pick(n, 3)}", 1.2
     if mat != "M_Decal" or n.startswith("FLOOR_lane") or dims[0] / dims[1] < 1.5:
         return None, 0
-    if n.startswith("DECALS_logo"):
+    if n.startswith("DECALS_logo") or n == "DECALS_sign_front":
         return "sign_cc", 1.6
+    if n == "DECALS_sign_back":
+        return "sign_entry", 1.6
     if n == "DOOR_IN_sign_label":
         return "sign_exit", 1.4
     if n.startswith("FLOOR_label_"):

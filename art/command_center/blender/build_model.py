@@ -230,8 +230,12 @@ def plinth_face(side, mods, pilasters, M, exp, ref):
 def plinth_bay(side, tag, i, a0, a1, kind, M, exp, ref=None):
     """Front side bays: same hazard strip, different function above it (ventilation vs. power)."""
     ac = (a0 + a1) / 2
-    box(f"DECALS_hazard_{tag}{i}", face_pt(side, ac, CORE + 0.01, 0.62), face_size(side, a1 - a0 - 0.3, 0.04, 0.5),
-        M["M_Hazard"], exp)
+    if kind == "vent":   # marking code: yellow-black only where it means danger (power) -> plain kick panel here
+        face_panels(f"BASE_PANELS_{tag}{i}_low", side, [(a0, a1)], KICK_Z, 1.0, CORE + 0.02, M["M_MetalDark"], exp,
+                    recess=0.05)
+    else:
+        box(f"DECALS_hazard_{tag}{i}", face_pt(side, ac, CORE + 0.01, 0.62), face_size(side, a1 - a0 - 0.3, 0.04, 0.5),
+            M["M_Hazard"], exp)
     top = face_panels(f"BASE_PANELS_{tag}{i}_top", side, [(a0, a1)], 1.05, 1.84, 0.1, M["M_MetalDark"], exp,
                       recess=0.05)[0]
     if kind == "vent":   # wide louvred intake with a frame
@@ -329,7 +333,7 @@ def build_back(M, exp, by):
                      M["M_MetalDark"], exp))
     boolean(mod, box("tmp_ml", (DOOR_X, by + 0.16, DOOR_H + 0.42), (1.7, 0.1, 0.12), M["M_MetalDark"], exp))
     bevel(mod, 0.05)
-    for k, s in enumerate((-1, 1)):          # vertical ribs on the module cheeks
+    for k, s in enumerate((-1,)):            # vertical rib on the left cheek (right cheek = access module)
         cx = DOOR_X + s * (DOOR_W / 2 + FRAME_MAJOR + (mx1 - mx0 - DOOR_W - 2 * FRAME_MAJOR) / 4)
         box(f"BACK_SERVICE_MODULE_rib_{k}", (cx, by + 0.175, 1.9), (0.08, 0.03, 3.0), M["M_MetalLight"], exp)
     # light built into the header: recessed slot + light-metal hood
@@ -339,19 +343,23 @@ def build_back(M, exp, by):
     # heavy door frame
     dfr = box("DOOR_FRAME", (DOOR_X, by + 0.0, (DOOR_H + FRAME_MAJOR) / 2),
               (DOOR_W + 2 * FRAME_MAJOR, 0.34, DOOR_H + FRAME_MAJOR),
-              M["M_MetalLight"], exp)
+              M["M_PaintOrange"], exp)                       # orange portal frame: the main node of the back side
     boolean(dfr, box("tmp_df", (DOOR_X, by, DOOR_H / 2 - 0.01), (DOOR_W, 1.0, DOOR_H), None, exp))
     bevel(dfr, 0.04)
-    for s in (-1, 1):   # hazard strips on the jambs
-        box(f"DECALS_hazard_door_{s:+d}", (DOOR_X + s * (DOOR_W / 2 + FRAME_MAJOR / 2), by + 0.172, 1.1),
-            (FRAME_MAJOR - 0.06, 0.006, 1.6),
+    for s in (-1, 1):   # hazard only at the jamb foot (as inside)
+        box(f"DECALS_hazard_door_{s:+d}", (DOOR_X + s * (DOOR_W / 2 + FRAME_MAJOR / 2), by + 0.172, 0.45),
+            (FRAME_MAJOR - 0.06, 0.006, 0.6),
             M["M_Hazard"], exp)
     # access reader on the right cheek: housing, screen, keypad, status LED
-    rx = DOOR_X + DOOR_W / 2 + FRAME_MAJOR + 0.28
-    bevel(box("DOOR_reader", (rx, by + 0.1775, 1.45), (0.24, 0.035, 0.38), M["M_MetalLight"], exp), 0.01)
-    box("DOOR_reader_screen", (rx, by + 0.197, 1.55), (0.16, 0.004, 0.1), M["M_ScreenStatic"], exp)
-    box("DOOR_reader_keypad", (rx, by + 0.197, 1.4), (0.16, 0.004, 0.1), M["M_MetalDark"], exp)
-    box("DOOR_reader_led", (rx, by + 0.197, 1.3), (0.06, 0.004, 0.03), M["M_Beacon"], exp)
+    rx = DOOR_X + DOOR_W / 2 + FRAME_MAJOR + 0.27
+    bevel(box("DOOR_ACCESS_backplate", (rx, by + 0.17, 1.3), (0.36, 0.02, 1.0), M["M_MetalLight"], exp), 0.01)
+    box("DOOR_ACCESS_trim", (rx, by + 0.182, 1.78), (0.36, 0.006, 0.04), M["M_PaintOrange"], exp)
+    bevel(box("DOOR_reader", (rx, by + 0.2, 1.5), (0.28, 0.04, 0.34), M["M_MetalDark"], exp), 0.01)
+    box("DOOR_reader_screen", (rx, by + 0.221, 1.58), (0.22, 0.004, 0.124), M["M_ScreenStatic"], exp)
+    box("DOOR_reader_keypad", (rx, by + 0.221, 1.42), (0.18, 0.004, 0.08), M["M_MetalBare"], exp)
+    box("DOOR_reader_pad", (rx, by + 0.191, 1.12), (0.14, 0.004, 0.14), M["M_Rubber"], exp)      # card at hand height
+    box("DOOR_reader_led", (rx, by + 0.191, 1.24), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
+    box("DOOR_ACCESS_label", (rx, by + 0.182, 0.9), (0.28, 0.004, 0.07), M["M_Decal"], exp)
     # door leaves deep in the wall: louvres + handles
     for k, s in enumerate((-1, 1)):
         lx_ = DOOR_X + s * DOOR_W / 4
@@ -372,17 +380,23 @@ def build_back(M, exp, by):
     bz0, bz1 = BACK_BAND_Z
     zc = (bz0 + bz1) / 2
     # serviceable compartment: hatch on hinges
-    hx0, hx1 = mx0, -1.3
+    sx0_, sx1_ = DOOR_X - 0.9, DOOR_X + 0.9            # sign box centred on the door
+    hx0, hx1 = mx0, sx0_ - 0.08
     back_box("BACK_BAND_hatch_bay", hx0, hx1, bz0, bz1, 0.1, M["M_MetalDark"], exp, by)
     hc = (hx0 + hx1) / 2
     hw, hh = (hx1 - hx0) / 2 - FRAME_MINOR, (bz1 - bz0) / 2 - FRAME_MINOR
     back_box("BACK_BAND_hatch", hc - hw, hc + hw, zc - hh, zc + hh, 0.13, M["M_MetalLight"], exp, by, 0.02)
     for k, dz in enumerate((-0.35, 0.35)):
-        cylinder(f"BACK_BAND_hatch_hinge_{k}", (hc + 0.6, by + 0.13, zc + dz), 0.04, 0.2, M["M_MetalDark"], exp, 8)
-    box("BACK_BAND_hatch_handle", (hc - 0.4, by + 0.145, zc), (0.05, 0.03, 0.3), M["M_MetalDark"], exp)
+        cylinder(f"BACK_BAND_hatch_hinge_{k}", (hc + hw - 0.08, by + 0.13, zc + dz), 0.04, 0.2, M["M_MetalDark"], exp, 8)
+    box("BACK_BAND_hatch_handle", (hc - hw + 0.12, by + 0.145, zc), (0.05, 0.03, 0.3), M["M_MetalDark"], exp)
     box("BACK_BAND_hatch_label", (hc, by + 0.132, zc + 0.38), (0.4, 0.004, 0.12), M["M_Hazard"], exp)
+    # entry sign light box over the door: dark housing, sign plate (decal slot), light strip on the lower edge
+    back_box("BACK_SIGN_housing", sx0_, sx1_, zc - 0.4, zc + 0.4, 0.14, M["M_MetalDark"], exp, by, 0.02)
+    box("BACK_SIGN_frame", (DOOR_X, by + 0.142, zc + 0.395), (sx1_ - sx0_, 0.012, 0.03), M["M_PaintOrange"], exp)
+    box("DECALS_sign_back", (DOOR_X, by + 0.143, zc + 0.08), (1.6, 0.004, 0.44), M["M_Decal"], exp)
+    box("LIGHTS_back_sign", (DOOR_X, by + 0.145, zc - 0.3), (1.5, 0.01, 0.04), M["M_LightWarm"], exp)
     # radiator: deepest section, framed vertical fins
-    rx0, rx1 = -1.22, BACK_MODULE_X[1] + 0.02
+    rx0, rx1 = sx1_ + 0.08, BACK_MODULE_X[1] + 0.02
     rad = box("BACK_BAND_radiator", ((rx0 + rx1) / 2, by + 0.08, zc), (rx1 - rx0, 0.16, bz1 - bz0), M["M_MetalDark"], exp)
     boolean(rad, box("tmp_rr", ((rx0 + rx1) / 2, by + 0.16, zc), (rx1 - rx0 - 2 * FRAME_MINOR, 0.2,
                                                                      bz1 - bz0 - 2 * FRAME_MINOR), M["M_MetalDark"], exp))
@@ -722,8 +736,8 @@ def build(mats, exp, ref):
         "-y": ([(-cfx, -1.7, "vent"), (-1.7, 1.7, "service"), (1.7, cfx, "power")], (-1.7, 1.7)),
         # back: the rear service module around the door is the central element
         "+y": ([(-cfx, mx0 - 0.4, "vent"), (mx1 + 0.4, cfx, "power_socket")], (mx0 - 0.2, mx1 + 0.2)),
-        "-x": ([(-cfy, -1.2, "vent"), (-1.2, 1.2, "hazard"), (1.2, cfy, "vent")], (-1.2, 1.2)),     # technical side
-        "+x": ([(-cfy, -1.2, "plain"), (-1.2, 1.2, "hazard"), (1.2, cfy, "plain")], (-1.2, 1.2)),   # cleaner side
+        "-x": ([(-cfy, -1.2, "vent"), (-1.2, 1.2, "plain"), (1.2, cfy, "vent")], (-1.2, 1.2)),      # technical side
+        "+x": ([(-cfy, -1.2, "plain"), (-1.2, 1.2, "plain"), (1.2, cfy, "plain")], (-1.2, 1.2)),    # cleaner side
     }
     for side, (mods, pilasters) in layout.items():
         plinth_face(side, mods, pilasters, M, exp, ref)
@@ -930,11 +944,18 @@ def build(mats, exp, ref):
     c = (0.0, fy + FRONT_CH / 2, ROOF - FRONT_CH / 2)
     bevel(on_chamfer("LIGHTS_visor_housing", c, "y", -1, (3.9, 0.4, 1.15), 0.08, M["M_PaintOrange"], exp), 0.06)
     bevel(on_chamfer("LIGHTS_visor_bezel", c, "y", -1, (3.3, 0.08, 0.7), 0.26, M["M_MetalDark"], exp), 0.02)
-    on_chamfer("LIGHTS_visor", c, "y", -1, (3.0, 0.04, 0.46), 0.29, M["M_LightWarm"], exp)
+    # the bezel holds a SIGN (decal slot) instead of a flat white plate; light = a strip along the lower bezel edge
+    k45 = math.sqrt(0.5)
+    on_chamfer("DECALS_sign_front", (c[0], c[1] + 0.03 * k45, c[2] + 0.03 * k45), "y", -1, (3.0, 0.02, 0.42), 0.29,
+               M["M_Decal"], exp)
+    on_chamfer("LIGHTS_visor", (c[0], c[1] - 0.3 * k45, c[2] - 0.3 * k45), "y", -1, (3.0, 0.04, 0.05), 0.3,
+               M["M_LightWarm"], exp)
     # rear light bar on the back chamfer
     cb = (DOOR_X, by - BACK_CH / 2, ROOF - BACK_CH / 2)
     bevel(on_chamfer("LIGHTS_back_housing", cb, "y", 1, (2.6, 0.14, 0.62), 0.04, M["M_MetalDark"], exp), 0.02)
-    on_chamfer("LIGHTS_back", cb, "y", 1, (2.2, 0.04, 0.36), 0.12, M["M_LightWarm"], exp)
+    # flood light for the entry: a strip along the lower housing edge (was a flat white plate)
+    on_chamfer("LIGHTS_back", (cb[0], cb[1] + 0.24 * math.sqrt(0.5), cb[2] - 0.24 * math.sqrt(0.5)), "y", 1,
+               (2.2, 0.04, 0.06), 0.12, M["M_LightWarm"], exp)
 
     build_back(M, exp, by)
 
