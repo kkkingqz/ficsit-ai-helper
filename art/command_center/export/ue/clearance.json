@@ -1,0 +1,20 @@
+{
+  "mesh": "SM_CommandCenter",
+  "units": "m, pivot = footprint centre on the foundation top (z = 0)",
+  "boxes": [
+    {
+      "name": "main",
+      "min": [
+        -8.0,
+        -4.0,
+        0.0
+      ],
+      "max": [
+        8.0,
+        4.0,
+        7.6
+      ]
+    }
+  ],
+  "note": "antenna/beacon above the roof box are excluded (thin, no snapping conflicts); 2 x 1 foundations, see check_fit.py"
+}
