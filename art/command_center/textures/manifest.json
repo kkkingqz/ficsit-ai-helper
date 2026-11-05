@@ -1,0 +1,203 @@
+{
+  "mesh": "SM_CommandCenter",
+  "vertex_color": {
+    "PaintMask": "R primary paint, G secondary paint, B chamfer edges"
+  },
+  "uv0": {
+    "tiling_m_per_uv": 2.0,
+    "hazard_m_per_uv": 0.5,
+    "atlas_px": 2048
+  },
+  "textures": {
+    "T_CC_MetalDetail_M": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Grayscale / Masks",
+      "use": "detail multiplier"
+    },
+    "T_CC_MetalDetail_N": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Normalmap (DXT5/BC5)",
+      "use": "tangent-space normal, DirectX (green = -Y), no flip on import"
+    },
+    "T_CC_MetalDetail_ARW": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Masks (no sRGB)",
+      "use": "R ambient occlusion, G roughness (absolute), B wear mask"
+    },
+    "T_CC_Macro_M": {
+      "size": 512,
+      "srgb": false,
+      "compression": "Grayscale / Masks",
+      "use": "large-scale variation, sample at UV0 / 8 (16 m per tile)"
+    },
+    "T_CC_Hazard_D": {
+      "size": 512,
+      "srgb": true,
+      "compression": "Default (DXT1/BC1)",
+      "use": "hazard stripes"
+    },
+    "T_CC_DecalAtlas_D": {
+      "size": 2048,
+      "srgb": true,
+      "compression": "Default (DXT1/BC1)",
+      "use": "decal atlas"
+    },
+    "T_CC_ScreenAtlas_E": {
+      "size": 2048,
+      "srgb": true,
+      "compression": "Default (DXT1/BC1)",
+      "use": "screen atlas, emissive"
+    }
+  },
+  "slots": {
+    "M_PaintOrange": {
+      "uv": "UV0",
+      "tile_m": 2.0,
+      "detail": "T_CC_MetalDetail_M",
+      "normal": "T_CC_MetalDetail_N",
+      "arw": "T_CC_MetalDetail_ARW",
+      "macro": "T_CC_Macro_M",
+      "macro_uv_scale": 0.125,
+      "base_color_linear": [
+        0.93,
+        0.33,
+        0.016
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "paint": "primary",
+      "paint_mask": "PaintMask.R",
+      "edge_wear": "wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)"
+    },
+    "M_PaintGray": {
+      "uv": "UV0",
+      "tile_m": 2.0,
+      "detail": "T_CC_MetalDetail_M",
+      "normal": "T_CC_MetalDetail_N",
+      "arw": "T_CC_MetalDetail_ARW",
+      "macro": "T_CC_Macro_M",
+      "macro_uv_scale": 0.125,
+      "base_color_linear": [
+        0.105,
+        0.122,
+        0.147
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "paint": "secondary",
+      "paint_mask": "PaintMask.G",
+      "edge_wear": "wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)"
+    },
+    "M_MetalDark": {
+      "uv": "UV0",
+      "tile_m": 2.0,
+      "detail": "T_CC_MetalDetail_M",
+      "normal": "T_CC_MetalDetail_N",
+      "arw": "T_CC_MetalDetail_ARW",
+      "macro": "T_CC_Macro_M",
+      "macro_uv_scale": 0.125,
+      "base_color_linear": [
+        0.027,
+        0.031,
+        0.039
+      ],
+      "metallic": 0.6,
+      "roughness": 0.55
+    },
+    "M_MetalBare": {
+      "uv": "UV0",
+      "tile_m": 2.0,
+      "detail": "T_CC_MetalDetail_M",
+      "normal": "T_CC_MetalDetail_N",
+      "arw": "T_CC_MetalDetail_ARW",
+      "macro": "T_CC_Macro_M",
+      "macro_uv_scale": 0.125,
+      "base_color_linear": [
+        0.33,
+        0.35,
+        0.38
+      ],
+      "metallic": 1.0,
+      "roughness": 0.3
+    },
+    "M_Rubber": {
+      "uv": "UV0",
+      "tile_m": 2.0,
+      "detail": "T_CC_MetalDetail_M",
+      "normal": "T_CC_MetalDetail_N",
+      "arw": "T_CC_MetalDetail_ARW",
+      "macro": "T_CC_Macro_M",
+      "macro_uv_scale": 0.125,
+      "base_color_linear": [
+        0.011,
+        0.013,
+        0.015
+      ],
+      "metallic": 0.0,
+      "roughness": 0.85
+    },
+    "M_Glass": {
+      "uv": "UV0",
+      "translucent": true,
+      "base_color_linear": [
+        0.55,
+        0.7,
+        0.8
+      ],
+      "opacity": 0.08,
+      "roughness": 0.05
+    },
+    "M_Hazard": {
+      "uv": "UV0",
+      "tile_m": 0.5,
+      "base_color": "T_CC_Hazard_D",
+      "roughness": 0.6
+    },
+    "M_Decal": {
+      "uv": "UV0 (atlas cells, stage5_layout.DECAL_CELLS)",
+      "base_color": "T_CC_DecalAtlas_D",
+      "roughness": 0.6
+    },
+    "M_ScreenStatic": {
+      "uv": "UV0 (atlas cells, stage5_layout.SCREEN_CELLS)",
+      "emissive": "T_CC_ScreenAtlas_E",
+      "emissive_strength": 1.2
+    },
+    "M_ScreenRT": {
+      "uv": "UV0 0..1",
+      "emissive": "render target (FR-01 AI Terminal UMG)"
+    },
+    "M_LightWarm": {
+      "uv": "UV0 0..1",
+      "emissive_color_linear": [
+        1.0,
+        0.91,
+        0.7
+      ],
+      "emissive_strength": 8.0
+    },
+    "M_Beacon": {
+      "uv": "UV0 0..1",
+      "emissive_color_linear": [
+        1.0,
+        0.45,
+        0.05
+      ],
+      "emissive_strength": 15.0
+    },
+    "M_Holo": {
+      "uv": "UV0 0..1",
+      "emissive_color_linear": [
+        0.1,
+        0.55,
+        1.0
+      ],
+      "emissive_strength": 4.0,
+      "translucent": "additive",
+      "fresnel_edges": true
+    }
+  }
+}

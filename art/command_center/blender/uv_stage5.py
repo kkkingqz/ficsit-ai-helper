@@ -5,8 +5,16 @@ UV0 ("UVMap") per FACE by the face's material slot (rules and atlas cells: stage
   M_Hazard      -> planar on the plate, HAZARD_M m per UV unit;
   M_Decal       -> one decal-atlas cell per object;  M_ScreenStatic -> one screen-atlas cell per screen (LEDs -> strip);
   M_ScreenRT    -> 0..1;  light / beacon / holo -> 0..1.
-Paint mask: face-corner colour attribute "PaintMask" (R = primary M_PaintOrange, G = secondary M_PaintGray).
+Tiling UVs get a per-object random offset (stable hash of the name) so neighbouring parts do not repeat the same
+2 m tile in phase; the material adds T_CC_Macro_M at UV / 8 for large-scale variation.
+Paint mask: face-corner colour attribute "PaintMask" (R = primary M_PaintOrange, G = secondary M_PaintGray,
+B = edge mask: the 45-degree chamfer faces made by bevel(), for paint wear / edge highlights in the master material).
 """
+import json
+import math
+import os
+
+import bmesh
 import bpy  # noqa: F401
 from mathutils import Vector
 
@@ -66,6 +74,8 @@ def apply_uvs(coll):
         uvl.active_render = True
         frame = None
         dims = sorted(ob.dimensions, reverse=True)
+        h = L.pick(ob.name, 1 << 20)
+        off = ((h & 1023) / 1024.0, (h >> 10) / 1024.0)          # per-object tiling offset in [0, 1)
         mats = [m.name if m else "" for m in me.materials]
         for poly in me.polygons:
             slot = mats[poly.material_index] if poly.material_index < len(mats) else ""
@@ -75,7 +85,7 @@ def apply_uvs(coll):
                 up, right = _face_frame(n)
                 for li in poly.loop_indices:
                     p = mw @ me.vertices[me.loops[li].vertex_index].co
-                    uvl.data[li].uv = (p.dot(right) / L.TILE_M, p.dot(up) / L.TILE_M)
+                    uvl.data[li].uv = (p.dot(right) / L.TILE_M + off[0], p.dot(up) / L.TILE_M + off[1])
                 continue
             if frame is None:
                 frame = object_frame(ob)
@@ -96,19 +106,104 @@ def apply_uvs(coll):
     return stats
 
 
+EDGE_MAX_W = 0.09                     # widest chamfer face: tier 0.06 x sqrt(2) ~ 0.085
+EDGE_ANGLE = (math.radians(25), math.radians(65))   # one-segment 45-degree chamfer against both neighbours
+
+
+def chamfer_faces(me):
+    """Indices of the narrow 45-degree faces created by bevel(): long thin faces whose neighbours across both long
+    edges meet them at ~45 degrees (slats, cables and thin plates meet at 90 degrees and are not marked)."""
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    out = set()
+    for f in bm.faces:
+        if len(f.edges) < 4:
+            continue
+        es = sorted(f.edges, key=lambda e: e.calc_length(), reverse=True)
+        ln = es[0].calc_length()
+        if ln < 1e-6:
+            continue
+        w = f.calc_area() / ln
+        if w > EDGE_MAX_W or ln < 1.5 * w:
+            continue
+        if f.normal.length < 1e-6:
+            continue
+        angs = [f.normal.angle(o.normal) for e in es[:2] for o in e.link_faces if o is not f and o.normal.length > 1e-6]
+        if len(angs) >= 2 and all(EDGE_ANGLE[0] <= a <= EDGE_ANGLE[1] for a in angs):
+            out.add(f.index)
+    bm.free()
+    return out
+
+
 def apply_paint_mask(coll):
-    """R = primary paint (FICSIT orange slot), G = secondary paint (panel grey slot); everything else black."""
+    """R = primary paint (FICSIT orange slot), G = secondary paint (panel grey slot), B = chamfer (edge) faces."""
+    edge_faces = 0
     for ob in coll.objects:
         if ob.type != "MESH" or not ob.data.polygons:
             continue
         me = ob.data
         attr = me.color_attributes.get("PaintMask") or me.color_attributes.new("PaintMask", "BYTE_COLOR", "CORNER")
         mats = [m.name if m else "" for m in me.materials]
+        edges = chamfer_faces(me)
+        edge_faces += len(edges)
         for poly in me.polygons:
             slot = mats[poly.material_index] if poly.material_index < len(mats) else ""
-            col = (1.0, 0.0, 0.0, 1.0) if slot == "M_PaintOrange" else (0.0, 1.0, 0.0, 1.0) if slot == "M_PaintGray" \
-                else (0.0, 0.0, 0.0, 1.0)
+            b = 1.0 if poly.index in edges else 0.0
+            col = (1.0, 0.0, b, 1.0) if slot == "M_PaintOrange" else (0.0, 1.0, b, 1.0) if slot == "M_PaintGray" \
+                else (0.0, 0.0, b, 1.0)
             for li in poly.loop_indices:
                 attr.data[li].color = col
         me.color_attributes.active_color = attr
         me.color_attributes.render_color_index = me.color_attributes.find("PaintMask")
+    return edge_faces
+
+
+# ---- material / texture manifest for the UE import (stage 7) -------------------------------------------------------
+TEXTURES = {
+    "T_CC_MetalDetail_M": {"size": 1024, "srgb": False, "compression": "Grayscale / Masks", "use": "detail multiplier"},
+    "T_CC_MetalDetail_N": {"size": 1024, "srgb": False, "compression": "Normalmap (DXT5/BC5)",
+                           "use": "tangent-space normal, DirectX (green = -Y), no flip on import"},
+    "T_CC_MetalDetail_ARW": {"size": 1024, "srgb": False, "compression": "Masks (no sRGB)",
+                             "use": "R ambient occlusion, G roughness (absolute), B wear mask"},
+    "T_CC_Macro_M": {"size": 512, "srgb": False, "compression": "Grayscale / Masks",
+                     "use": "large-scale variation, sample at UV0 / 8 (16 m per tile)"},
+    "T_CC_Hazard_D": {"size": 512, "srgb": True, "compression": "Default (DXT1/BC1)", "use": "hazard stripes"},
+    "T_CC_DecalAtlas_D": {"size": 2048, "srgb": True, "compression": "Default (DXT1/BC1)", "use": "decal atlas"},
+    "T_CC_ScreenAtlas_E": {"size": 2048, "srgb": True, "compression": "Default (DXT1/BC1)", "use": "screen atlas, emissive"},
+}
+
+
+def write_manifest(path):
+    """textures/manifest.json: which texture goes into which slot, colour-space flags and material parameters."""
+    tiling = {"uv": "UV0", "tile_m": L.TILE_M, "detail": "T_CC_MetalDetail_M", "normal": "T_CC_MetalDetail_N",
+              "arw": "T_CC_MetalDetail_ARW", "macro": "T_CC_Macro_M", "macro_uv_scale": 1 / 8}
+    slots = {}
+    for name in L.TILING:
+        col = cc_lib.COLORS.get(name, (0.5, 0.5, 0.5, 1.0))
+        slot = dict(tiling, base_color_linear=[round(c, 4) for c in col[:3]],
+                    metallic=cc_lib.METALLIC.get(name, 0.0), roughness=cc_lib.ROUGHNESS.get(name, 0.55))
+        if name == "M_PaintOrange":
+            slot.update(paint="primary", paint_mask="PaintMask.R", edge_wear="wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)")
+        elif name == "M_PaintGray":
+            slot.update(paint="secondary", paint_mask="PaintMask.G", edge_wear="wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)")
+        elif name == "M_Glass":
+            slot = {"uv": "UV0", "translucent": True, "base_color_linear": [round(c, 4) for c in (0.55, 0.7, 0.8)],
+                    "opacity": 0.08, "roughness": 0.05}
+        slots[name] = slot
+    slots["M_Hazard"] = {"uv": "UV0", "tile_m": L.HAZARD_M, "base_color": "T_CC_Hazard_D", "roughness": 0.6}
+    slots["M_Decal"] = {"uv": "UV0 (atlas cells, stage5_layout.DECAL_CELLS)", "base_color": "T_CC_DecalAtlas_D",
+                        "roughness": 0.6}
+    slots["M_ScreenStatic"] = {"uv": "UV0 (atlas cells, stage5_layout.SCREEN_CELLS)", "emissive": "T_CC_ScreenAtlas_E",
+                               "emissive_strength": 1.2}
+    slots["M_ScreenRT"] = {"uv": "UV0 0..1", "emissive": "render target (FR-01 AI Terminal UMG)"}
+    for name in ("M_LightWarm", "M_Beacon", "M_Holo"):
+        col, strength = cc_lib.EMISSIVE[name]
+        slots[name] = {"uv": "UV0 0..1", "emissive_color_linear": [round(c, 4) for c in col[:3]],
+                       "emissive_strength": strength}
+    slots["M_Holo"].update(translucent="additive", fresnel_edges=True)
+    data = {"mesh": "SM_CommandCenter", "vertex_color": {"PaintMask": "R primary paint, G secondary paint, B chamfer edges"},
+            "uv0": {"tiling_m_per_uv": L.TILE_M, "hazard_m_per_uv": L.HAZARD_M, "atlas_px": L.ATLAS_PX},
+            "textures": TEXTURES, "slots": slots}
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)

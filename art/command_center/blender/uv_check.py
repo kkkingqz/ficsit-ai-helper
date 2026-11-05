@@ -24,6 +24,7 @@ import build_model
 import cc_lib
 import stage5_layout as L
 import ui_preview
+import uv_stage5
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SHOTS = ("01_three_quarter", "09_rear_three_quarter", "21_interior_main", "23_interior_console", "42_interior_back_wall",
@@ -93,6 +94,20 @@ def check(coll):
     return errors, stats
 
 
+def _edge_faces(coll):
+    n = 0
+    for ob in coll.objects:
+        if ob.type != "MESH":
+            continue
+        pm = ob.data.color_attributes.get("PaintMask")
+        if pm is None:
+            continue
+        for poly in ob.data.polygons:
+            if pm.data[poly.loop_indices[0]].color[2] > 0.5:
+                n += 1
+    return n
+
+
 def report(errors, stats, path):
     lo, hi = stats["density"]
     lines = ["# Проверка UV и маски покраски — SM_CommandCenter (этап 5)", "",
@@ -102,6 +117,7 @@ def report(errors, stats, path):
              f"| Мешей с UV0 `UVMap` и маской `PaintMask` | {stats['meshes']} |",
              f"| Граней всего / тайлинг / атласы | {stats['faces']} / {stats['tiling']} / {stats['atlas']} |",
              f"| Плотность на тайлинговых гранях (отн. цели) | {lo:.4f} … {hi:.4f} |",
+             f"| Грани фасок в маске кромок `PaintMask.B` | {stats.get('edge', 0)} |",
              f"| Щепки после булевых операций (< 1 см², не проверяются; очистка сетки — этап 6) | {stats['slivers']} |",
              f"| Ошибок | {len(errors)} {'✅' if not errors else '⚠️'} |", ""]
     if errors:
@@ -115,6 +131,7 @@ def main():
     ap.add_argument("--render", default=None)
     ap.add_argument("--samples", type=int, default=16)
     ap.add_argument("--shots", default=None)
+    ap.add_argument("--surface", action="store_true", help="render the stage-5 surface look instead of the checker")
     ap.add_argument("--report", default=os.path.join(HERE, "..", "uv_check.md"))
     a = ap.parse_args(sys.argv[1:])
     cc_lib.reset_scene()
@@ -123,6 +140,8 @@ def main():
     ref = cc_lib.collection("REF_NOT_EXPORTED")
     build_model.build(mats, exp, ref)
     errors, stats = check(exp)
+    stats["edge"] = _edge_faces(exp)
+    uv_stage5.write_manifest(os.path.join(HERE, "..", "textures", "manifest.json"))
     report(errors, stats, a.report)
     print(f"[uv] meshes {stats['meshes']}  faces {stats['faces']}  tiling {stats['tiling']}  atlas {stats['atlas']}  "
           f"density {stats['density'][0]:.4f}..{stats['density'][1]:.4f}  slivers {stats['slivers']}  errors {len(errors)}")
@@ -131,7 +150,10 @@ def main():
     if a.render:
         for hook in cc_lib.PREVIEW_HOOKS:
             hook()
-        ui_preview.apply_uv_checker()
+        if a.surface:
+            ui_preview.apply_preview_surface()
+        else:
+            ui_preview.apply_uv_checker()
         cc_lib.setup_render(samples=a.samples)
         cc_lib.render_all(a.render, a.shots.split(",") if a.shots else list(SHOTS))
     sys.exit(1 if errors else 0)

@@ -8,7 +8,11 @@ Textures (v1, procedural placeholders with the final layout, so the UVs can be c
   T_CC_Hazard_D           512^2  yellow-black 45-degree stripes, tiles in U and V (HAZARD_M metres per tile)
   T_CC_MetalDetail_M     1024^2  grey detail / AO multiplier for all tiling metal slots (paint colour comes from the
                                  material parameter = paint-gun colour), tiles (TILE_M metres per tile)
-  T_CC_MetalDetail_N     1024^2  matching tangent-space normal map (OpenGL, +Y up)
+  T_CC_MetalDetail_N     1024^2  matching tangent-space normal map, DirectX convention (green = -Y), as UE expects
+  T_CC_MetalDetail_ARW   1024^2  packed, linear: R = ambient occlusion, G = roughness (absolute, painted metal),
+                                 B = wear mask (scratches where paint is worn to bare metal)
+  T_CC_Macro_M            512^2  very low-frequency variation, linear; sampled at UV / 8 (= 16 m per tile) to break
+                                 the 2 m repetition on large panels
   T_CC_UVChecker         1024^2  checker for the UV / texel-density check renders
 """
 import os
@@ -89,9 +93,22 @@ def metal_detail(n=1024, seed=7):
     dx = (np.roll(height, -1, 1) - np.roll(height, 1, 1)) * 2.0
     dy = (np.roll(height, -1, 0) - np.roll(height, 1, 0)) * 2.0
     nz = np.ones_like(height)
-    nrm = np.stack((-dx, dy, nz), -1)                             # OpenGL convention (+Y up)
+    nrm = np.stack((-dx, -dy, nz), -1)                            # DirectX convention (green flipped vs OpenGL): UE
     nrm /= np.linalg.norm(nrm, axis=-1, keepdims=True)
     Image.fromarray(((nrm * 0.5 + 0.5) * 255).astype(np.uint8), "RGB").save(os.path.join(OUT, "T_CC_MetalDetail_N.png"))
+    # packed ARW: AO from the low-frequency height, roughness variation (smudges), wear = the scratch mask
+    low = _periodic_noise(n, 2.2, rng)
+    ao = 0.78 + 0.22 * low
+    rough = np.clip(0.5 + 0.18 * (_periodic_noise(n, 1.2, rng) - 0.5) * 2 - 0.12 * s, 0.25, 0.8)
+    wear = np.clip(s * 1.6, 0, 1)
+    arw = np.stack((ao, rough, wear), -1)
+    Image.fromarray((arw * 255).astype(np.uint8), "RGB").save(os.path.join(OUT, "T_CC_MetalDetail_ARW.png"))
+
+
+def macro(n=512, seed=11):
+    rng = np.random.default_rng(seed)
+    m = 0.86 + 0.14 * _periodic_noise(n, 2.6, rng)
+    Image.fromarray((m * 255).astype(np.uint8), "L").save(os.path.join(OUT, "T_CC_Macro_M.png"))
 
 
 def checker(n=1024, cells=8):
@@ -113,5 +130,6 @@ if __name__ == "__main__":
     screen_atlas()
     hazard()
     metal_detail()
+    macro()
     checker()
     print("written", sorted(f for f in os.listdir(OUT) if f.startswith("T_CC_")))

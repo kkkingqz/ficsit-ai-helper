@@ -282,6 +282,109 @@ def apply_preview_ui():
         _image_slot(m, _png("ui_main"), 1.4)
 
 
+def apply_preview_surface():
+    """Stage-5 surface look for check renders: slot colour x detail x macro, DirectX normal (green flipped back for
+    Blender), roughness from ARW.G, paint wear on chamfers (PaintMask.B) and scratches (ARW.B) on the paint slots."""
+    import bpy
+    import cc_lib
+
+    def img(name):
+        im = bpy.data.images.load(os.path.join(TEX, name + ".png"), check_existing=True)
+        im.colorspace_settings.name = "Non-Color" if not name.endswith("_D") else "sRGB"
+        return im
+
+    for name in ("M_PaintOrange", "M_PaintGray", "M_MetalDark", "M_MetalBare", "M_Rubber"):
+        m = bpy.data.materials.get(name)
+        if not m:
+            continue
+        nt = m.node_tree
+        nt.nodes.clear()
+        out = nt.nodes.new("ShaderNodeOutputMaterial")
+        b = nt.nodes.new("ShaderNodeBsdfPrincipled")
+        uv = nt.nodes.new("ShaderNodeUVMap")
+        uv.uv_map = "UVMap"
+        tex = {}
+        for t in ("T_CC_MetalDetail_M", "T_CC_MetalDetail_N", "T_CC_MetalDetail_ARW", "T_CC_Macro_M"):
+            n_ = nt.nodes.new("ShaderNodeTexImage")
+            n_.image = img(t)
+            tex[t] = n_
+        sc = nt.nodes.new("ShaderNodeVectorMath")
+        sc.operation = "SCALE"
+        sc.inputs["Scale"].default_value = 1 / 8
+        nt.links.new(uv.outputs["UV"], sc.inputs[0])
+        for t, n_ in tex.items():
+            nt.links.new(sc.outputs[0] if t == "T_CC_Macro_M" else uv.outputs["UV"], n_.inputs["Vector"])
+        base = nt.nodes.new("ShaderNodeRGB")
+        base.outputs[0].default_value = cc_lib.COLORS[name]
+        m1 = nt.nodes.new("ShaderNodeMix")
+        m1.data_type, m1.blend_type = "RGBA", "MULTIPLY"
+        m1.inputs["Factor"].default_value = 1.0
+        nt.links.new(base.outputs[0], m1.inputs["A"])
+        nt.links.new(tex["T_CC_MetalDetail_M"].outputs["Color"], m1.inputs["B"])
+        m2 = nt.nodes.new("ShaderNodeMix")
+        m2.data_type, m2.blend_type = "RGBA", "MULTIPLY"
+        m2.inputs["Factor"].default_value = 1.0
+        nt.links.new(m1.outputs["Result"], m2.inputs["A"])
+        nt.links.new(tex["T_CC_Macro_M"].outputs["Color"], m2.inputs["B"])
+        col = m2.outputs["Result"]
+        metal = nt.nodes.new("ShaderNodeValue")
+        metal.outputs[0].default_value = cc_lib.METALLIC.get(name, 0.0)
+        met = metal.outputs[0]
+        if name in ("M_PaintOrange", "M_PaintGray"):        # paint wear: chamfers + scratches -> bare metal
+            attr = nt.nodes.new("ShaderNodeVertexColor")
+            attr.layer_name = "PaintMask"
+            sep = nt.nodes.new("ShaderNodeSeparateColor")
+            nt.links.new(attr.outputs["Color"], sep.inputs["Color"])
+            sarw = nt.nodes.new("ShaderNodeSeparateColor")
+            nt.links.new(tex["T_CC_MetalDetail_ARW"].outputs["Color"], sarw.inputs["Color"])
+            e = nt.nodes.new("ShaderNodeMath")
+            e.operation = "MULTIPLY"
+            e.inputs[1].default_value = 0.55
+            nt.links.new(sep.outputs["Blue"], e.inputs[0])
+            w = nt.nodes.new("ShaderNodeMath")
+            w.operation = "MULTIPLY"
+            w.inputs[1].default_value = 0.6
+            nt.links.new(sarw.outputs["Blue"], w.inputs[0])
+            wear = nt.nodes.new("ShaderNodeMath")
+            wear.operation = "MAXIMUM"
+            wear.use_clamp = True
+            nt.links.new(e.outputs[0], wear.inputs[0])
+            nt.links.new(w.outputs[0], wear.inputs[1])
+            bare = nt.nodes.new("ShaderNodeRGB")
+            bare.outputs[0].default_value = (0.45, 0.46, 0.48, 1.0)
+            mw = nt.nodes.new("ShaderNodeMix")
+            mw.data_type = "RGBA"
+            nt.links.new(wear.outputs[0], mw.inputs["Factor"])
+            nt.links.new(col, mw.inputs["A"])
+            nt.links.new(bare.outputs[0], mw.inputs["B"])
+            col = mw.outputs["Result"]
+            mm = nt.nodes.new("ShaderNodeMapRange")
+            nt.links.new(wear.outputs[0], mm.inputs["Value"])
+            met = mm.outputs["Result"]
+            nt.links.new(sarw.outputs["Green"], b.inputs["Roughness"])
+        else:
+            b.inputs["Roughness"].default_value = cc_lib.ROUGHNESS.get(name, 0.55)
+        nt.links.new(col, b.inputs["Base Color"])
+        nt.links.new(met, b.inputs["Metallic"])
+        # DirectX normal -> Blender (OpenGL): invert green
+        sn = nt.nodes.new("ShaderNodeSeparateColor")
+        nt.links.new(tex["T_CC_MetalDetail_N"].outputs["Color"], sn.inputs["Color"])
+        inv = nt.nodes.new("ShaderNodeMath")
+        inv.operation = "SUBTRACT"
+        inv.inputs[0].default_value = 1.0
+        nt.links.new(sn.outputs["Green"], inv.inputs[1])
+        cn = nt.nodes.new("ShaderNodeCombineColor")
+        nt.links.new(sn.outputs["Red"], cn.inputs["Red"])
+        nt.links.new(inv.outputs[0], cn.inputs["Green"])
+        nt.links.new(sn.outputs["Blue"], cn.inputs["Blue"])
+        nm = nt.nodes.new("ShaderNodeNormalMap")
+        nm.uv_map = "UVMap"
+        nm.inputs["Strength"].default_value = 0.6
+        nt.links.new(cn.outputs["Color"], nm.inputs["Color"])
+        nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
+        nt.links.new(b.outputs[0], out.inputs["Surface"])
+
+
 def apply_uv_checker():
     """UV check renders: every tiling slot shows the checker (TILE_M metres per tile) in its own tint."""
     import bpy
