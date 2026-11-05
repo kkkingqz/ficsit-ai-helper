@@ -26,7 +26,7 @@ digraph G {
     subgraph cluster_auth {
       label="Authority-слой — каждый внешний вызов проходит Validator"; fontsize=10;
       fontcolor="#54646F"; color="#D8BFA0"; style="rounded,dashed";
-      validator [label="Validator\nсхема · лимиты · живой каталог", fillcolor="#FBEEDC", color="#C98F4C"];
+      validator [label="OperationRegistry + Validator\nодни операции для UI и модели\nсхема · лимиты · живой каталог", fillcolor="#FBEEDC", color="#C98F4C"];
       planner   [label="Planner\nядро Satisfactory Build Calculator"];
       catalog   [label="CatalogProvider\nAFGRecipeManager · SML classes"];
       telemetry [label="TelemetrySampler\nснапшоты, агрегация вне GameThread"];
@@ -40,24 +40,24 @@ digraph G {
 
     terminal -> ui; equipment -> ui; equipment -> hud;
     ui -> graphview; terminal -> rt;
-    ui -> validator; hud -> telemetry;
+    ui -> validator [label="ручные операции", fontsize=9]; hud -> telemetry;
     catalog -> planner; telemetry -> planner [style=dotted];
     planner -> validator;
     ui -> save [dir=both]; telemetry -> files; rt -> files [style=dotted];
-    link -> validator [label="tool calls", fontsize=9];
+    link -> validator [label="те же операции от модели", fontsize=9];
     ui -> link [label="чат", fontsize=9];
   }
 
   subgraph cluster_side {
     label="Локальный сайдкар (один установщик · запускается модом · loopback)";
     fontsize=12; fontname="DejaVu Sans"; fontcolor="#263B47"; color="#CDD5DB"; style="rounded";
-    adapter [label="Адаптер\nMCP-сервер для Foreman · фильтр инструментов\nавторизация · стабильный API для мода", fillcolor="#E6F1F3", color="#7FA7B0"];
+    adapter [label="Адаптер\nMCP-сервер для Foreman · белый список инструментов\nавторизация · стабильный API для мода", fillcolor="#E6F1F3", color="#7FA7B0"];
     foreman [label="FICSIT Foreman ff-server — vanilla\nchat SSE · MCP client · Work Orders", fillcolor="#E6F1F3", color="#7FA7B0"];
     sfmcp   [label="sf-mcp (Foreman)\nсправочные данные · .sav", fillcolor="#F2F4F6", color="#B9C2CA"];
     fdb     [label="Foreman DB (SQLite)\nаккаунт · переписка · Work Orders", shape=cylinder];
     voice   [label="STT + TTS\nv1.3", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
     foreman -> adapter [label="MCP_URL", fontsize=9];
-    adapter -> foreman [label="chat · сессия", fontsize=9];
+    adapter -> foreman [label="chat · Work Orders REST · сессия", fontsize=9];
     adapter -> sfmcp [label="прокси", fontsize=9];
     foreman -> fdb [dir=both];
     foreman -> voice [dir=both, style=dashed];

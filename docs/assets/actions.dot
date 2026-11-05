@@ -1,5 +1,6 @@
 // FICSIT AI v2.1-draft — путь создания чертежа (v1.1).
 // Подтверждения игрока нет: чертёж только попадает в библиотеку, в мир его ставит игрок.
+// Паритет (ADR-018): ручной путь и инструмент модели вызывают одну и ту же операцию.
 // Граница доверия — граница кода: каждый вызов проходит валидацию.
 // Рендер: dot -Tpng -Gdpi=150 actions.dot -o actions.png
 digraph G {
@@ -28,7 +29,7 @@ digraph G {
   result [label="Чертёж в библиотеке\nв мир ставит игрок через Build Gun"];
   reject [label="Отклонено с причиной\nсохранённое состояние не изменено", fillcolor="#F4F0F0", color="#C0A8A8"];
 
-  player -> intent [label="форма: кнопка «Создать»", fontsize=9];
+  player -> intent [label="вручную: форма или строка плана\n(без LLM)", fontsize=9];
   player -> llm [style=dashed, label="текст / голос", fontsize=9];
   llm -> intent [style=dashed, label="request_blueprint_creation", fontsize=9];
   intent -> schema -> live -> preview -> exec -> result;
