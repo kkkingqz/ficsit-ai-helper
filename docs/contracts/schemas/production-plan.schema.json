@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/production-plan.schema.json",
+  "title": "ProductionPlan",
+  "description": "Вычисляемая модель производства (ARCHITECTURE.md §5.2). Считается ядром планировщика в моде (§8.3). Цикл рецептов — ошибка расчёта RECIPE_CYCLE_UNSUPPORTED, план при этом не строится.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "saveId", "catalogRevision", "version", "target",
+    "groups", "connections", "rawInputs", "selectedAlternates", "totals", "warnings"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 3 },
+    "id": { "$ref": "#/$defs/localId" },
+    "saveId": { "$ref": "#/$defs/uuid", "description": "GUID сохранения-владельца (§10)." },
+    "catalogRevision": { "type": "integer", "minimum": 0 },
+    "version": { "type": "integer", "minimum": 1 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "ratePerMin": { "$ref": "#/$defs/positiveRate" }
+      }
+    },
+    "groups": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "machineClass", "recipeClass", "count", "clockPercent", "plannedRatePerMin"],
+        "properties": {
+          "id": { "$ref": "#/$defs/localId" },
+          "machineClass": { "$ref": "#/$defs/className" },
+          "recipeClass": { "$ref": "#/$defs/className" },
+          "count": { "type": "integer", "minimum": 1 },
+          "clockPercent": { "type": "number", "exclusiveMinimum": 0, "maximum": 250 },
+          "powerShards": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "somersloops": { "type": "integer", "minimum": 0 },
+          "plannedRatePerMin": { "$ref": "#/$defs/positiveRate", "description": "Плановая скорость основного продукта группы." },
+          "byproducts": { "type": "array", "items": { "$ref": "#/$defs/flow" } }
+        }
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["item", "from", "to", "ratePerMin", "unit"],
+        "properties": {
+          "item": { "$ref": "#/$defs/className" },
+          "from": { "$ref": "#/$defs/localId" },
+          "to": { "$ref": "#/$defs/localId" },
+          "ratePerMin": { "$ref": "#/$defs/positiveRate" },
+          "unit": { "$ref": "#/$defs/unit" }
+        }
+      }
+    },
+    "rawInputs": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+    "selectedAlternates": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/className" }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["powerMW", "machineCount"],
+      "properties": {
+        "powerMW": { "type": "number", "minimum": 0 },
+        "machineCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "message"],
+        "properties": {
+          "code": { "enum": ["BYPRODUCT_NOT_BALANCED", "RECIPE_LOCKED", "CATALOG_STALE"] },
+          "message": { "type": "string", "maxLength": 500 },
+          "scope": { "type": "string", "maxLength": 100 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "localId": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+    "className": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$",
+      "maxLength": 128,
+      "description": "Игровое className; сверяется с живым каталогом (§7.3)."
+    },
+    "positiveRate": { "type": "number", "exclusiveMinimum": 0 },
+    "unit": { "enum": ["items/min", "m3/min"], "description": "§5.6" },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin", "unit"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "ratePerMin": { "$ref": "#/$defs/positiveRate" },
+        "unit": { "$ref": "#/$defs/unit" }
+      }
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/screen-definition.schema.json",
+  "title": "ScreenDefinition",
+  "description": "Декларативная белая схема экрана (ARCHITECTURE.md §5.3, ADR-005). Незнакомые поля и типы отвергаются. Проверки, которые схема не выражает, выполняет Validator в моде: допустимость слота для пресета layout, существование source.id в живом каталоге метрик и планах, зажим refreshSec в допустимый диапазон.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "scope", "title", "layout", "widgets"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "id": { "$ref": "#/$defs/localId" },
+    "scope": { "enum": ["personal", "terminal"] },
+    "title": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "layout": { "enum": ["slots-1", "slots-2", "slots-3", "hud-compact"] },
+    "theme": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$", "description": "Имя предопределённой темы." },
+    "widgets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "description": "Предлагаемый лимит числа виджетов (§7.4).",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "slot", "source"],
+        "properties": {
+          "id": { "$ref": "#/$defs/localId" },
+          "type": { "enum": ["text", "metric", "table", "timeseries", "production_graph", "notes", "work_orders"] },
+          "slot": { "enum": ["main", "side", "foot"] },
+          "source": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id"],
+            "properties": {
+              "kind": { "enum": ["plan", "metric", "work_orders", "notes", "static"] },
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{0,63}$" }
+            }
+          },
+          "options": {
+            "type": "object",
+            "maxProperties": 8,
+            "additionalProperties": {
+              "anyOf": [{ "type": "string", "maxLength": 100 }, { "type": "number" }, { "type": "boolean" }]
+            }
+          },
+          "refreshSec": { "type": "number", "exclusiveMinimum": 0 }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "localId": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" }
+  }
+}
