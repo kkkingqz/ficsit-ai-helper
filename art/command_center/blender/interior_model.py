@@ -1418,3 +1418,5 @@ def build_interior_v2(M, exp, ref, door):
 
 if ui_preview.apply_preview_ui not in cc_lib.PREVIEW_HOOKS:
     cc_lib.PREVIEW_HOOKS.append(ui_preview.apply_preview_ui)
+if ui_preview.apply_preview_holo not in cc_lib.PREVIEW_HOOKS:
+    cc_lib.PREVIEW_HOOKS.append(ui_preview.apply_preview_holo)

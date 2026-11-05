@@ -338,6 +338,88 @@ def apply_preview_ui():
             ob.data.materials[i] = m
 
 
+# ---- hologram look (render-time only; UE: translucent additive material with fresnel edges) -------------------------
+HOLO_CYAN = (0.02, 0.5, 1.0, 1.0)              # saturated: bright cyan emission turns milky under AgX
+
+
+def _holo_material(name, fill, strength, edge=0.0, wire=0.0):
+    """Mix(Transparent, Emission): fill = base opacity; edge = fresnel (silhouette) glow; wire = glowing mesh edges."""
+    import bpy
+    m = bpy.data.materials.get(name)
+    if m:
+        return m
+    m = bpy.data.materials.new(name)
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    mix = nt.nodes.new("ShaderNodeMixShader")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = HOLO_CYAN
+    em.inputs["Strength"].default_value = strength
+    fac = nt.nodes.new("ShaderNodeValue")
+    fac.outputs[0].default_value = fill
+    cur = fac.outputs[0]
+    if edge:
+        lw = nt.nodes.new("ShaderNodeLayerWeight")
+        lw.inputs["Blend"].default_value = 0.35
+        mul = nt.nodes.new("ShaderNodeMath")
+        mul.operation = "MULTIPLY"
+        mul.inputs[1].default_value = edge
+        nt.links.new(lw.outputs["Facing"], mul.inputs[0])
+        mx = nt.nodes.new("ShaderNodeMath")
+        mx.operation = "MAXIMUM"
+        nt.links.new(cur, mx.inputs[0])
+        nt.links.new(mul.outputs[0], mx.inputs[1])
+        cur = mx.outputs[0]
+    if wire:
+        wf = nt.nodes.new("ShaderNodeWireframe")
+        wf.use_pixel_size = False
+        wf.inputs["Size"].default_value = wire
+        mx2 = nt.nodes.new("ShaderNodeMath")
+        mx2.operation = "MAXIMUM"
+        nt.links.new(cur, mx2.inputs[0])
+        nt.links.new(wf.outputs[0], mx2.inputs[1])
+        cur = mx2.outputs[0]
+    nt.links.new(cur, mix.inputs["Fac"])
+    nt.links.new(tr.outputs[0], mix.inputs[1])
+    nt.links.new(em.outputs[0], mix.inputs[2])
+    nt.links.new(mix.outputs[0], out.inputs["Surface"])
+    return m
+
+
+def _holo_role(name):
+    if name == "HOLO_PROJECTION":
+        return "body"
+    if name.startswith(("HOLO_PROJECTION_ring", "HOLO_PROJECTION_scale", "HOLO_PROJECTION_tick", "HOLO_BEAM")):
+        return "line"
+    if name.startswith("HOLO_UI_card"):
+        return "card_bar" if "_bar_" in name else "card"
+    if name == "HOLO_EMITTER":
+        return "disc"
+    return None
+
+
+HOLO_LOOKS = {"body": (0.02, 1.6, 0.45, 0.014), "line": (0.9, 1.1, 0.0, 0.0), "card": (0.14, 1.0, 0.35, 0.0),
+              "card_bar": (0.85, 1.3, 0.0, 0.0), "disc": (0.35, 1.0, 0.5, 0.0)}   # (fill, strength, fresnel, wire)
+
+
+def apply_preview_holo():
+    """Render-time only: lighter, more transparent hologram (glowing edges instead of a milky solid)."""
+    import bpy
+    for ob in list(bpy.data.objects):
+        if ob.type != "MESH" or not ob.data.materials or not ob.data.materials[0] \
+                or ob.data.materials[0].name != "M_Holo":
+            continue
+        role = _holo_role(ob.name)
+        if not role:
+            continue
+        m = _holo_material(f"PREVIEW_holo_{role}", *HOLO_LOOKS[role])
+        for i in range(len(ob.data.materials)):
+            ob.data.materials[i] = m
+
+
 if __name__ == "__main__":
     ensure_textures(force=True)
     print("written", sorted(os.listdir(OUT)))
