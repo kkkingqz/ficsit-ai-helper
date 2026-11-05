@@ -520,7 +520,7 @@ def _tower(name, P, lx, rot, M, exp):
     for k in range(5):
         box(f"CONSOLE_TOWER_{name}_slat_{k}", (*P(lx, fy + 0.02), F + 0.96 + k * 0.12), (0.4, 0.03, 0.06), M["M_MetalBare"],
             exp, rot=(LOUVRE_ANGLE, 0, rot))
-    box(f"CONSOLE_TOWER_{name}_screen", (*P(lx, fy + 0.006), F + 1.6), (0.36, 0.006, 0.16), M["M_ScreenStatic"], exp,
+    box(f"CONSOLE_TOWER_{name}_screen", (*P(lx, fy + 0.006), F + 1.57), (0.32, 0.006, 0.18), M["M_ScreenStatic"], exp,
         rot_z=rot)
     for k in range(6):
         box(f"CONSOLE_TOWER_{name}_led_{k}", (*P(lx - 0.22, fy + 0.006), F + 0.3 + k * 0.08), (0.03, 0.006, 0.03),
@@ -532,7 +532,7 @@ def _tower(name, P, lx, rot, M, exp):
             M["M_Rubber"], exp, rot_z=rot)
     bevel(box(f"CONSOLE_TOWER_{name}_cap", (*P(lx, 0.0), F + hgt + 0.03), (0.64, d + 0.04, 0.06), M["M_PaintOrange"], exp,
               rot_z=rot), 0.012)
-    box(f"CONSOLE_TOWER_{name}_stripe", (*P(lx, fy + 0.005), F + hgt - 0.08), (0.56, 0.008, 0.06), M["M_Hazard"], exp,
+    box(f"CONSOLE_TOWER_{name}_stripe", (*P(lx, fy + 0.005), F + hgt - 0.05), (0.56, 0.008, 0.06), M["M_Hazard"], exp,
         rot_z=rot)
 
 
@@ -588,18 +588,18 @@ def build_console(M, exp, ref):
     z0 = F + SCREEN_Z0
     # screen composition: one common bottom line z0; the MAIN screen is clearly dominant (3.0 m, 16:9) and sets the
     # top line; the wing upper screens hang on masts from their own console segments, just under that top line
-    mw_, mh_ = 3.0, 3.0 * 9 / 16
+    mw_, mh_ = 2.6, 2.6 * 9 / 16                     # scale check: top <= 40 deg above the eye at 1.34 m
     top = z0 + mh_
     _monitor("MAIN_RT", P0, 0.0, -0.32, z0, mw_, mh_, 0.0, M["M_ScreenRT"], M, exp)
     bevel(box("CONSOLE_screen_beam", (*P0(0, -0.42), z0 + mh_ / 2), (mw_ * 0.85, 0.08, 0.14), M["M_MetalDark"], exp), 0.012)
     for i, lx in enumerate((-1.0, 1.0)):
         box(f"CONSOLE_screen_post_{i}", (*P0(lx, -0.42), (F + 1.2 + z0 + mh_ * 0.75) / 2), (0.08, 0.06, z0 + mh_ * 0.75 - F - 1.2),
             M["M_MetalDark"], exp)
-    uh, uw = 0.56, 1.0                               # upper wing screens: top 12 cm under the main top line
+    uh, uw = 0.9 * 9 / 16, 0.9                       # upper wing screens: top 5 cm under the main top line
     for nm, P, s, rot in wings:
-        lw, lh = 1.45, 1.45 * 9 / 16
+        lw, lh = 1.3, 1.3 * 9 / 16
         _monitor(f"wing_{nm}", P, 0.0, -0.32, z0, lw, lh, rot, M["M_ScreenStatic"], M, exp)
-        uz0 = top - 0.12 - uh
+        uz0 = top - 0.05 - uh
         _monitor(f"wing_{nm}_upper", P, 0.0, -0.3, uz0, uw, uh, rot, M["M_ScreenStatic"], M, exp, tilt=math.radians(12))
         # monitor mast: clamped to the back of the segment body, VESA bracket behind the upper screen
         mz0, mz1 = F + 0.55, uz0 + uh / 2 + 0.1
@@ -628,7 +628,7 @@ def build_service_console(M, exp):
     bevel(box("SERVICE_CONSOLE_backplate", (x, yw - 0.015, F + 1.3), (0.56, 0.03, 1.3), M["M_MetalDark"], exp), 0.012)
     bevel(box("SERVICE_CONSOLE_housing", (x, yw - 0.12, F + 1.5), (0.5, 0.2, 0.42), M["M_MetalDark"], exp,
               rot=(math.radians(-20), 0, 0)), 0.03)
-    box("SERVICE_CONSOLE_screen", (x, yw - 0.222, F + 1.52), (0.42, 0.01, 0.3), M["M_ScreenStatic"], exp,
+    box("SERVICE_CONSOLE_screen", (x, yw - 0.222, F + 1.52), (0.4, 0.01, 0.3), M["M_ScreenStatic"], exp,
         rot=(math.radians(-20), 0, 0))
     box("SERVICE_CONSOLE_trim", (x, yw - 0.2, F + 1.27), (0.5, 0.02, 0.03), M["M_PaintOrange"], exp)
     bevel(box("SERVICE_CONSOLE_shelf", (x, yw - 0.15, F + 1.18), (0.5, 0.24, 0.04), M["M_MetalLight"], exp,
@@ -759,7 +759,7 @@ def build_holo(M, exp):
     zc = CEIL
     # carrier frame: square ring girder filling the projector cell, bolted to the two transverse and the two
     # longitudinal ceiling beams -> the emitter visibly HANGS from the ceiling structure
-    ch, gw, gz0, gz1 = 1.45, 0.18, zc - 0.22, zc - 0.02
+    ch, gw, gz0, gz1 = 1.45, 0.24, zc - 0.22, zc - 0.02      # FRAME_MAJOR section (scale check)
     for k, (cx_, cy_, sx_, sy_) in enumerate(((hx - ch + gw / 2, hy, gw, 2 * ch), (hx + ch - gw / 2, hy, gw, 2 * ch),
                                                (hx, hy - ch + gw / 2, 2 * ch - 2 * gw, gw), (hx, hy + ch - gw / 2, 2 * ch - 2 * gw, gw))):
         bevel(box(f"HOLO_MOUNT_girder_{k}", (cx_, cy_, (gz0 + gz1) / 2), (sx_, sy_, gz1 - gz0), M["M_MetalLight"], exp), 0.012)
@@ -842,9 +842,9 @@ def build_holo(M, exp):
     # the underside of the front longitudinal beam back to the window header above the console
     kx0, kx1 = hx - ch + 0.03, hx - 1.22
     bevel(box("HOLO_FEED_control", ((kx0 + kx1) / 2, -0.6, gz0 - 0.12), (kx1 - kx0, 0.5, 0.24), M["M_MetalDark"], exp), 0.012)
-    box("HOLO_FEED_control_screen", (kx0 - 0.003, -0.6, gz0 - 0.1), (0.004, 0.36, 0.1), M["M_ScreenStatic"], exp)
+    box("HOLO_FEED_control_screen", (kx0 - 0.003, -0.6, gz0 - 0.1), (0.004, 0.32, 0.18), M["M_ScreenStatic"], exp)
     for k in range(3):
-        box(f"HOLO_FEED_control_led_{k}", (kx0 - 0.003, -0.74 + k * 0.14, gz0 - 0.2), (0.004, 0.05, 0.025),
+        box(f"HOLO_FEED_control_led_{k}", (kx0 - 0.003, -0.74 + k * 0.14, gz0 - 0.218), (0.004, 0.05, 0.025),
             M["M_Beacon"] if k == 0 else M["M_ScreenStatic"], exp)
     dz_ = zc - 0.295
     box("HOLO_FEED_data_drop", ((kx0 + kx1) / 2, (-0.85 + LONG_Y[0]) / 2, dz_), (0.1, -0.85 - LONG_Y[0], 0.05), M["M_MetalDark"], exp)
@@ -1194,20 +1194,20 @@ def build_back_wall(M, exp, door):
         M["M_MetalDark"], exp)
     # ---- 2. access control module in the left surround: door control above, card reader below --------------------------
     ax = (p0 + fw + door_x0 - cw) / 2
-    az = F + 1.1
+    az = F + 1.25                                    # control screen ~1.58, card reader ~1.03 above the floor
     bevel(box("ACCESS_backplate", (ax, YW - 0.095, az), (0.4, 0.03, 1.05), M["M_MetalLight"], exp), 0.012)
     box("ACCESS_trim", (ax, YW - 0.112, az + 0.5), (0.4, 0.006, 0.04), M["M_PaintOrange"], exp)
     bevel(box("DOOR_IN_control", (ax, YW - 0.15, az + 0.22), (0.3, 0.08, 0.42), M["M_MetalDark"], exp), 0.012)
-    box("DOOR_IN_control_screen", (ax, YW - 0.192, az + 0.33), (0.22, 0.004, 0.14), M["M_ScreenStatic"], exp)
+    box("DOOR_IN_control_screen", (ax, YW - 0.192, az + 0.33), (0.22, 0.004, 0.124), M["M_ScreenStatic"], exp)
     for r in range(2):
         for c in range(3):
             box(f"DOOR_IN_control_key_{r}_{c}", (ax - 0.07 + c * 0.07, YW - 0.196, az + 0.17 - r * 0.06), (0.05, 0.01, 0.04),
                 M["M_MetalBare"], exp)
     box("DOOR_IN_control_button", (ax, YW - 0.2, az + 0.05), (0.12, 0.02, 0.05), M["M_Beacon"], exp)
-    bevel(box("DOOR_IN_reader", (ax, YW - 0.13, az - 0.3), (0.18, 0.04, 0.26), M["M_MetalDark"], exp), 0.012)
-    box("DOOR_IN_reader_led", (ax, YW - 0.152, az - 0.22), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
-    box("DOOR_IN_reader_pad", (ax, YW - 0.152, az - 0.33), (0.12, 0.004, 0.12), M["M_Rubber"], exp)
-    box("ACCESS_label", (ax, YW - 0.112, az - 0.47), (0.3, 0.004, 0.06), M["M_Decal"], exp)
+    bevel(box("DOOR_IN_reader", (ax, YW - 0.13, az - 0.2), (0.18, 0.04, 0.26), M["M_MetalDark"], exp), 0.012)
+    box("DOOR_IN_reader_led", (ax, YW - 0.152, az - 0.11), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
+    box("DOOR_IN_reader_pad", (ax, YW - 0.152, az - 0.22), (0.12, 0.004, 0.12), M["M_Rubber"], exp)
+    box("ACCESS_label", (ax, YW - 0.112, az - 0.43), (0.3, 0.004, 0.06), M["M_Decal"], exp)
     # ---- 3. power / cable group ------------------------------------------------------------------------------------------
     q0, q1 = POWER_X
     bevel(box("POWER_backplate", ((q0 + q1) / 2, YW - 0.03, (F + uz1) / 2), (q1 - q0, 0.06, uz1 - F), M["M_MetalDark"], exp),
@@ -1381,7 +1381,7 @@ def build_window_band(M, exp):
             box(f"{n}_label", _wp("F", ac, 0.097, zm + 0.12), _ws("F", 0.3, 0.004, 0.08), M["M_Hazard"], exp)
         else:                                                        # control: proud module with a diagnostic panel
             bevel(box(n, _wp("F", ac, 0.1, zm), _ws("F", iw, 0.12, ih), M["M_MetalDark"], exp), 0.03)
-            box(f"{n}_screen", _wp("F", ac - 0.1, 0.162, zm + 0.06), _ws("F", 0.48, 0.004, 0.24), M["M_ScreenStatic"], exp)
+            box(f"{n}_screen", _wp("F", ac - 0.1, 0.162, zm + 0.06), _ws("F", 0.48, 0.004, 0.27), M["M_ScreenStatic"], exp)
             box(f"LIGHTS_{n}_status_bar", _wp("F", ac - 0.1, 0.162, zm - 0.14), _ws("F", 0.48, 0.004, 0.025), M["M_ScreenStatic"],
                 exp)
             for r in range(2):
