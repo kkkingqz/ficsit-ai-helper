@@ -25,6 +25,7 @@ from cc_lib import (BASE_H, CEIL, CORNER, D, DOOR_H, DOOR_W, DOOR_X, FLOOR_Z, FR
                     LOUVRE_ANGLE, LOUVRE_PITCH, LOUVRE_SLAT_H, LOUVRE_SLAT_T, ROOF, SHELL_INSET, WALL, W,
                     bevel, boolean, box, chamfer_rect, cylinder, louvre, prism, run, shear_y, shell_volume)
 from interior_model import build_interior_v2
+import uv_stage5
 
 # personnel door, revised after the turnaround review: 2.0 x 2.8 read as a hatch next to the 6.8 m body.
 # 2.4 x 3.2 gives a clear walk-in entrance with headroom for a pioneer with backpack/jetpack (blockout keeps 2.0 x 2.8)
@@ -1162,6 +1163,9 @@ def build(mats, exp, ref):
     build_final_details(M, exp, sx_out, fy, by)
     build_interior_v2(M, exp, ref, (DOOR_X, DOOR_W, DOOR_H))
     apply_material_families(exp, M)
+    # stage 5: UV0 by material slot (tiling / trim atlases / screens) + paint mask colour attribute
+    uv_stage5.apply_uvs(exp)
+    uv_stage5.apply_paint_mask(exp)
 
 
 if __name__ == "__main__":

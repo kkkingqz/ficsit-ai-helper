@@ -22,9 +22,7 @@ BG, PANEL, LINE = (9, 22, 40), (18, 40, 66), (40, 80, 120)
 ORANGE, CYAN, AMBER, GREEN, WHITE = (242, 155, 56), (90, 200, 255), (255, 190, 60), (110, 220, 140), (225, 235, 245)
 PLATE, PLATE_EDGE, INK = (38, 42, 50), (70, 76, 86), (215, 220, 226)
 
-LABELS = (("SERVICE ACCESS", "AUTHORISED ONLY"), ("FICSIT INC.", "UNIT CC-01"), ("POWER 480 V", "ISOLATE FIRST"),
-          ("COOLANT LOOP", "B-02  MAX 6 BAR"), ("DATA NODE", "NET 04 / OP-01"), ("INSPECT", "EVERY 200 H"),
-          ("CAUTION", "MOVING PARTS"), ("SPARE PARTS", "RACK 3"))
+from stage5_layout import LABELS  # noqa: E402  (one label list for the preview images and the decal atlas)
 FLOOR = {"operator": "OPERATOR", "service": "SERVICE", "holo": "HOLO", "tech": "TECH"}
 
 
@@ -245,116 +243,52 @@ def ensure_textures(force=False):
             fn(_png(name))
 
 
-# ---- render-time application -------------------------------------------------------------------------------------
-def _material(tex_name, strength):
-    """Emissive image material for screens (strength > 0) or a plain painted label material (strength == 0)."""
+# ---- render-time application (stage 5: the real UV0 + atlases, one material per slot as in UE) --------------------
+TEX = os.path.join(HERE, "..", "textures")
+
+
+def _image_slot(mat, png, emission=0.0, roughness=0.6):
+    """Rebuild a slot material as image texture on UVMap: emissive (screens) or painted (decals, hazard)."""
     import bpy
-    name = f"PREVIEW_{tex_name}"
-    m = bpy.data.materials.get(name)
-    if m:
-        return m
-    m = bpy.data.materials.new(name)
-    m.use_nodes = True
-    nt = m.node_tree
+    nt = mat.node_tree
     nt.nodes.clear()
     out = nt.nodes.new("ShaderNodeOutputMaterial")
     tex = nt.nodes.new("ShaderNodeTexImage")
-    tex.image = bpy.data.images.load(_png(tex_name), check_existing=True)
+    tex.image = bpy.data.images.load(png, check_existing=True)
     uv = nt.nodes.new("ShaderNodeUVMap")
-    uv.uv_map = "UV_PREVIEW"
+    uv.uv_map = "UVMap"
     nt.links.new(uv.outputs["UV"], tex.inputs["Vector"])
-    if strength > 0:
+    if emission > 0:
         sh = nt.nodes.new("ShaderNodeEmission")
-        sh.inputs["Strength"].default_value = strength
+        sh.inputs["Strength"].default_value = emission
         nt.links.new(tex.outputs["Color"], sh.inputs["Color"])
     else:
         sh = nt.nodes.new("ShaderNodeBsdfPrincipled")
-        sh.inputs["Roughness"].default_value = 0.6
+        sh.inputs["Roughness"].default_value = roughness
         nt.links.new(tex.outputs["Color"], sh.inputs["Base Color"])
     nt.links.new(sh.outputs[0], out.inputs["Surface"])
-    return m
-
-
-def _planar_uv(ob):
-    """UV 0..1 over the object's visible face: normal = thinnest axis, pointing towards the room centre (or up);
-    'up' = world Z on vertical faces, away from the viewer on near-horizontal ones; 'right' = up x normal."""
-    from mathutils import Vector
-    me = ob.data
-    mw = ob.matrix_world
-    pts = [mw @ v.co for v in me.vertices]
-    c = sum(pts, Vector()) / len(pts)
-    best = max(me.polygons, key=lambda p: p.area)
-    n = (mw.to_3x3() @ best.normal).normalized()
-    import cc_lib
-    xw, yw = cc_lib.W / 2 - cc_lib.SHELL_INSET - cc_lib.WALL, cc_lib.D / 2 - cc_lib.SHELL_INSET - cc_lib.WALL
-    outside = abs(c.x) > xw + 0.06 or abs(c.y) > yw + 0.06 or c.z > cc_lib.CEIL + 0.1   # exterior: faces AWAY
-    if abs(n.z) > 0.8:                                   # 45-degree chamfers count as vertical faces
-        n = n if n.z > 0 else -n
-        up = Vector((0.0, -1.0 if c.y < 0 else 1.0, 0.0))
-        up = (up - n * up.dot(n)).normalized()
-    else:
-        to_c = Vector((-c.x, -c.y, 0.0))
-        if (n.dot(to_c) < 0) != outside:
-            n = -n
-        up = Vector((0.0, 0.0, 1.0))
-        up = (up - n * up.dot(n)).normalized()
-    right = up.cross(n).normalized()
-    us = [(p - c).dot(right) for p in pts]
-    vs = [(p - c).dot(up) for p in pts]
-    u0, u1, v0, v1 = min(us), max(us), min(vs), max(vs)
-    uvl = me.uv_layers.get("UV_PREVIEW") or me.uv_layers.new(name="UV_PREVIEW")
-    for poly in me.polygons:
-        for li in poly.loop_indices:
-            p = pts[me.loops[li].vertex_index]
-            uvl.data[li].uv = (((p - c).dot(right) - u0) / max(u1 - u0, 1e-6), ((p - c).dot(up) - v0) / max(v1 - v0, 1e-6))
-
-
-def _pick(name, n):
-    return int(hashlib.md5(name.encode()).hexdigest(), 16) % n
-
-
-SCREENS = {"DISPLAY_MAIN_RT": "ui_main", "DISPLAY_PLANES_wing_left": "ui_wing", "DISPLAY_PLANES_wing_right": "ui_list",
-           "DISPLAY_PLANES_wing_left_upper": "ui_cam", "DISPLAY_PLANES_wing_right_upper": "ui_wing"}
-
-
-def _texture_for(ob):
-    mat = ob.data.materials[0].name if ob.data.materials and ob.data.materials[0] else ""
-    dims = sorted(ob.dimensions, reverse=True)
-    if dims[1] < 0.05:
-        return None, 0
-    n = ob.name
-    if n in SCREENS:
-        return SCREENS[n], 1.4
-    if mat == "M_ScreenStatic" and any(k in n for k in ("screen", "touch", "gauge", "_status", "IFACE")) \
-            and "led" not in n:
-        return f"ui_status_{_pick(n, 3)}", 1.2
-    if mat != "M_Decal" or n.startswith("FLOOR_lane") or dims[0] / dims[1] < 1.5:
-        return None, 0
-    if n.startswith("DECALS_logo") or n == "DECALS_sign_front":
-        return "sign_cc", 1.6
-    if n == "DECALS_sign_back":
-        return "sign_entry", 1.6
-    if n == "DOOR_IN_sign_label":
-        return "sign_exit", 1.4
-    if n.startswith("FLOOR_label_"):
-        return f"floor_{n[len('FLOOR_label_'):]}", 0
-    return f"label_{_pick(n, len(LABELS))}", 0
 
 
 def apply_preview_ui():
-    """Render-time only: put preview textures on screens, labels and signs (exports are already written)."""
+    """Render-time only: the slot materials read the stage-5 atlases through UV0 (exports are already written)."""
     import bpy
-    ensure_textures()
-    for ob in list(bpy.data.objects):
-        if ob.type != "MESH" or not ob.data.materials:
-            continue
-        tex, strength = _texture_for(ob)
-        if not tex:
-            continue
-        _planar_uv(ob)
-        m = _material(tex, strength)
-        for i in range(len(ob.data.materials)):
-            ob.data.materials[i] = m
+    for name, png, em in (("M_Decal", "T_CC_DecalAtlas_D.png", 0.0), ("M_ScreenStatic", "T_CC_ScreenAtlas_E.png", 1.2),
+                          ("M_Hazard", "T_CC_Hazard_D.png", 0.0)):
+        m = bpy.data.materials.get(name)
+        if m:
+            _image_slot(m, os.path.join(TEX, png), em)
+    m = bpy.data.materials.get("M_ScreenRT")
+    if m:                                                     # preview content for the render target
+        _image_slot(m, _png("ui_main"), 1.4)
+
+
+def apply_uv_checker():
+    """UV check renders: every tiling slot shows the checker (TILE_M metres per tile) in its own tint."""
+    import bpy
+    for name in ("M_PaintOrange", "M_PaintGray", "M_MetalDark", "M_MetalBare", "M_Rubber"):
+        m = bpy.data.materials.get(name)
+        if m:
+            _image_slot(m, os.path.join(TEX, "T_CC_UVChecker.png"), 0.0, 0.8)
 
 
 # ---- hologram look (render-time only; UE: translucent additive material with fresnel edges) -------------------------
