@@ -92,25 +92,21 @@ def build_floor(M, exp, pit):
         for a, b in clipped(-XW, y, XW, y):
             _seg(f"FLOOR_seam_{k}", a, b, 0.018, z, 0.004, M["M_Rubber"], exp)
             k += 1
-    # ---- floor system (stage 4 v2): five tile types and one marking code ----------------------------------------
-    #   orange solid outline  = functional zone (operator / projector / technical)
-    #   yellow-black          = danger or keep-clear (stair, service clearance in front of cabinets, projector edge)
-    #   grey ribbed tiles + white chevrons = main walkway (stair -> operator zone, branch -> projector)
+    # ---- floor system (stage 4 v3): ONE marking language, four codes, four zones ---------------------------------
+    #   WHITE              = movement / direction: dashed lane edges + chevrons (main walkway from the door)
+    #   YELLOW-BLACK       = danger or service-access clearance: stair, projector base ring, technical zones
+    #   ORANGE outline     = fixed work zone: operator zone at the console, projector zone
+    #   METAL inserts      = service areas: floor hatches, grilles, cable channels, service plates, projector plate
+    #   zones: main walkway (door -> console, branch -> projector) | console work zone | projector service zone |
+    #          technical zones at the left wall and at the back-wall cabinets
     zt = z + 0.002
 
     def outline(name, x0, y0, x1, y1, width, mat):
         for k, (a, b) in enumerate((((x0, y0), (x1, y0)), ((x1, y0), (x1, y1)), ((x1, y1), (x0, y1)), ((x0, y1), (x0, y0)))):
             _seg(f"{name}_{k}", a, b, width, zt, 0.004, mat, exp)
 
-    def label(name, x, y, w=0.7, rot=0.0):
-        box(f"FLOOR_label_{name}", (x, y, zt), (w, 0.16, 0.004), M["M_Decal"], exp, rot_z=rot)
-
-    def tile_path(cx, cy):                                  # tile type 2: grey anti-slip walkway tile
-        bevel(box(f"FLOOR_path_tile_{cx:+.1f}_{cy:+.1f}", (cx, cy, F + 0.006), (0.96, 0.96, 0.012), M["M_MetalLight"], exp),
-              0.012)
-        for r in range(5):
-            box(f"FLOOR_path_tile_{cx:+.1f}_{cy:+.1f}_rib_{r}", (cx, cy - 0.36 + r * 0.18, F + 0.014), (0.86, 0.03, 0.006),
-                M["M_MetalBare"], exp)
+    def label(name, x, y, w=0.7, rot=0.0, z_=None):           # zone label: always INSIDE its zone
+        box(f"FLOOR_label_{name}", (x, y, zt if z_ is None else z_), (w, 0.16, 0.004), M["M_Decal"], exp, rot_z=rot)
 
     def tile_hatch(name, cx, cy, size=0.9):                 # tile type 3: technical floor hatch
         bevel(box(f"FLOOR_hatch_{name}", (cx, cy, F + 0.006), (size, size, 0.012), M["M_MetalLight"], exp), 0.012)
@@ -129,48 +125,64 @@ def build_floor(M, exp, pit):
             box(f"FLOOR_grille_{name}_bar_{i}", (cx - (w - 0.2) / 2 + i * (w - 0.2) / (n - 1), cy, F + 0.014), (0.025, d - 0.1, 0.008),
                 M["M_MetalBare"], exp)
 
-    # main walkway: 2 m wide strip of tiles from the stair landing to the operator zone, branch to the projector
-    walk = [(x, y) for x in (-1.5, -0.5) for y in (1.5, 0.5, -0.5)] + [(0.5, -0.5), (0.5, 0.5)]
-    for cx, cy in walk:
-        tile_path(cx, cy)
-    for k, (cx, cy) in enumerate(((-1.0, 1.0), (-1.0, -0.05))):     # "v" chevrons pointing to the console (-y)
-        for s in (-1, 1):
-            box(f"FLOOR_marking_chevron_{k}_{s:+d}", (cx + s * 0.18, cy, zt + 0.012), (0.42, 0.07, 0.004), M["M_Decal"], exp,
-                rot_z=math.radians(35 * s))
-    for s in (-1, 1):                                                 # ">" chevron on the branch, pointing to the projector
-        box(f"FLOOR_marking_chevron_branch_{s:+d}", (0.5, s * 0.12, zt + 0.012), (0.42, 0.07, 0.004), M["M_Decal"], exp,
-            rot_z=math.radians(-35 * s))
-    # operator zone at the console: orange outline around the standing mat + label
+    def dashed(name, a, b, width=0.06, dash=0.45, gap=0.25):
+        ln = math.dist(a, b)
+        n = int((ln + gap) / (dash + gap))
+        for q in range(n):
+            t0, t1 = q * (dash + gap) / ln, min(1.0, (q * (dash + gap) + dash) / ln)
+            _seg(f"{name}_{q}", (a[0] + (b[0] - a[0]) * t0, a[1] + (b[1] - a[1]) * t0),
+                 (a[0] + (b[0] - a[0]) * t1, a[1] + (b[1] - a[1]) * t1), width, zt, 0.004, M["M_Decal"], exp)
+
+    def chevron(name, cx, cy, ang):                          # ang = direction the chevron points to
+        for s_ in (-1, 1):
+            a_ = ang + math.pi + s_ * math.radians(35)
+            box(f"{name}_{s_:+d}", (cx + 0.2 * math.cos(a_), cy + 0.2 * math.sin(a_), zt), (0.42, 0.08, 0.004), M["M_Decal"],
+                exp, rot_z=a_)
+
+    # ---- 1. main walkway (WHITE): 2 m lane from the stair landing to the console zone, branch to the projector -----
+    lx0, lx1 = -2.0, 0.0                                     # lane between the pit rails' axis
+    ly0, ly1 = py0 - 0.5, -1.1                               # from the landing band to the operator zone edge
+    by0, by1 = -0.5, 0.5                                     # branch towards the projector
+    dashed("FLOOR_lane_edge_L", (lx0, ly0), (lx0, ly1))
+    dashed("FLOOR_lane_edge_R_0", (lx1, ly0), (lx1, by1))
+    dashed("FLOOR_lane_edge_R_1", (lx1, by0), (lx1, ly1))
+    for k, y in enumerate((by1, by0)):
+        dashed(f"FLOOR_lane_branch_edge_{k}", (lx1, y), (HOLO_XY[0] - 1.95, y))
+    for k, y in enumerate((1.0, -0.6)):
+        chevron(f"FLOOR_lane_chevron_{k}", (lx0 + lx1) / 2, y, -math.pi / 2)
+    chevron("FLOOR_lane_chevron_branch", 0.65, 0.0, 0.0)
+    # ---- 2. console work zone (ORANGE outline) around the standing mat --------------------------------------
     ox0, ox1, oy0, oy1 = CONSOLE_X - 1.6, CONSOLE_X + 1.6, -2.25, -1.1
     outline("FLOOR_marking_operator", ox0, oy0, ox1, oy1, 0.08, M["M_PaintOrange"])
     label("operator", ox1 - 0.5, oy1 - 0.12)
-    # technical zone along the left wall: outline, two floor hatches, rack exhaust grille, cable channel
-    outline("FLOOR_marking_tech", -6.85, -1.25, -5.75, 2.65, 0.08, M["M_PaintOrange"])
+    # ---- 4a. technical zone along the left wall (YELLOW-BLACK clearance, METAL hatches / grille / channel) ----
+    outline("FLOOR_marking_tech", -6.85, -1.25, -5.75, 2.65, 0.1, M["M_Hazard"])     # service clearance
     label("tech", -6.3, -1.1, w=0.6)
     tile_hatch("tech_0", -6.35, 0.55, 0.8)
     tile_hatch("tech_1", -6.35, 1.55, 0.8)
     tile_grille("tech_rack", -6.35, -0.45, 0.8, 0.6)
     for k, (a, b) in enumerate((((-6.85, -0.9), (-6.2, -0.9)), ((-6.2, -0.9), (-6.2, -1.45)))):
         _seg(f"FLOOR_cable_channel_tech_{k}", a, b, 0.26, F + 0.012, 0.024, M["M_MetalLight"], exp)
-    # service zone: keep-clear frame in front of the back cabinets + an underfloor access hatch at the logo wall
-    outline("FLOOR_marking_service", 3.5, 2.15, 6.4, 2.9, 0.1, M["M_Hazard"])
-    label("service", 4.95, 2.02, w=0.8)
-    tile_hatch("service", 1.5, 2.5)
-    # supply-air grilles under the window (right of the console)
+    # ---- 4b. technical zone at the back wall: power group + service group (YELLOW-BLACK clearance, METAL plates) ----
+    sx0, sx1, sy0, sy1 = 0.95, 6.45, 2.1, 2.95
+    outline("FLOOR_marking_service", sx0, sy0, sx1, sy1, 0.1, M["M_Hazard"])
+    tile_hatch("service", 1.5, 2.52)                         # underfloor access in front of the power group
+    bevel(box("FLOOR_service_plate", ((2.05 + sx1 - 0.1) / 2, (sy0 + sy1) / 2, F + 0.005), (sx1 - 0.1 - 2.05, sy1 - sy0 - 0.2, 0.01),
+              M["M_MetalLight"], exp), 0.012)                # service insert in front of the console + cabinets
+    label("service", 2.6, sy0 + 0.22, w=0.8, z_=F + 0.012)
+    # supply-air grilles under the window (METAL, service)
     vents = [(a0 + a1) / 2 for a0, a1, kind in WINDOW_BAND if kind == "vent"]
     for k, x in enumerate(vents):                     # right under the louvre sections of the window band
         tile_grille(f"window_{k}", x, -3.05, w=BAND_PITCH - 0.1)
-    # projector zone: dark plate with an orange octagon edge, yellow-black keep-out marks, label
+    # ---- 3. projector service zone: METAL plate, ORANGE outline, continuous YELLOW-BLACK ring at the base --------
     hx, hy = HOLO_XY
-    prism("FLOOR_holo_plate", octagon(1.9, hx, hy), "z", F, F + 0.012, M["M_MetalDark"], exp)
+    prism("FLOOR_holo_plate", octagon(1.9, hx, hy), "z", F, F + 0.012, M["M_MetalLight"], exp)
     ring = prism("FLOOR_marking_holo_ring", octagon(1.95, hx, hy), "z", F + 0.012, F + 0.016, M["M_PaintOrange"], exp)
     boolean(ring, prism("tmp_hr", octagon(1.83, hx, hy), "z", F, F + 0.1, None, exp))
-    for i in range(8):
-        a = i * math.pi / 4 + math.pi / 4
-        r = 1.6 * math.cos(math.pi / 8)
-        box(f"FLOOR_marking_holo_keepout_{i}", (hx + r * math.cos(a), hy + r * math.sin(a), F + 0.016), (0.08, 0.5, 0.004),
-            M["M_Hazard"], exp, rot_z=a)
-    label("holo", hx - 1.2, hy - 1.55, w=0.6, rot=math.radians(45))
+    kring = prism("FLOOR_marking_holo_keepout", octagon(1.52, hx, hy), "z", F + 0.012, F + 0.016, M["M_Hazard"], exp)
+    boolean(kring, prism("tmp_hk", octagon(1.4, hx, hy), "z", F, F + 0.1, None, exp))
+    label("holo", hx + 1.67 * math.cos(math.radians(202.5)), hy + 1.67 * math.sin(math.radians(202.5)), w=0.6,
+          rot=math.radians(112.5), z_=F + 0.014)
 
 
 # ---------------------------------------------------------------------------------------------------------
@@ -572,8 +584,7 @@ def build_operator_mat(M, exp):
     """Anti-fatigue rubber mat where the operator stands (replaces the chair)."""
     x, y = OPERATOR_XY
     bevel(box("PROP_MAT_operator", (x, y + 0.15, F + 0.008), (2.6, 0.9, 0.016), M["M_Rubber"], exp), 0.012)
-    for s_ in (-1, 1):
-        box(f"PROP_MAT_operator_edge_{s_:+d}", (x, y + 0.15 + s_ * 0.44, F + 0.012), (2.6, 0.03, 0.01), M["M_Hazard"], exp)
+
 
 
 def build_service_console(M, exp):
@@ -1036,10 +1047,8 @@ def build_entrance(M, exp, door, pit):
     box("DECALS_hazard_pit_edge", ((px0 + px1) / 2, py0 - 0.05, F + 0.003), (px1 - px0, 0.1, 0.006), M["M_Hazard"], exp)
     box("LIGHTS_landing_edge", ((px0 + px1) / 2, py0 + 0.004, F - 0.06), (px1 - px0 - 0.2, 0.008, 0.03), M["M_LightWarm"],
         exp)
-    # one solid warning band in front of the stair (small rotated chevrons read as scattered chips) + a label beside
-    # the walkway, not on it
+    # one solid warning band in front of the stair (small rotated chevrons read as scattered chips)
     box("DECALS_hazard_landing", ((px0 + px1) / 2, py0 - 0.3, F + 0.004), (px1 - px0 + 0.3, 0.22, 0.004), M["M_Hazard"], exp)
-    box("DECALS_landing_label", (px1 + 0.75, py0 - 0.3, F + 0.004), (0.8, 0.16, 0.004), M["M_Decal"], exp)
     # ---- industrial guard rails along both pit edges, tied into the door casing -------------------------------------------
     ln = YW - 0.2 - py0
     yc = py0 + ln / 2
