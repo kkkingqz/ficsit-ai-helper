@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/note.schema.json",
+  "title": "Note",
+  "description": "Заметка (ARCHITECTURE.md §5.8). Контракт заложен под богатые заметки; v1.0 использует только format=plain, title и body. Зарезервированные поля схема допускает, но Validator v1.0 отклоняет их с кодом NOTE_FIELD_NOT_SUPPORTED.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "saveId", "title", "format", "body", "createdAt", "updatedAt"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+    "saveId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "format": { "enum": ["plain", "markdown"], "description": "v1.0 — только plain." },
+    "body": { "type": "string", "maxLength": 20000 },
+    "createdAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "updatedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}Z$" },
+    "tags": { "type": "array", "maxItems": 20, "items": { "type": "string", "maxLength": 40 }, "description": "Зарезервировано." },
+    "category": { "type": "string", "maxLength": 40, "description": "Зарезервировано." },
+    "priority": { "enum": ["low", "medium", "high"], "description": "Зарезервировано." },
+    "pinned": { "type": "boolean", "description": "Зарезервировано." },
+    "archived": { "type": "boolean", "description": "Зарезервировано." },
+    "links": {
+      "type": "array",
+      "description": "Зарезервировано: связи с линиями и планами.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "id"],
+        "properties": { "kind": { "enum": ["line", "plan"] }, "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" } }
+      }
+    },
+    "reminders": {
+      "type": "array",
+      "description": "Зарезервировано: напоминания; тип времени (игровое или реальное) решается вместе с ними.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "at"],
+        "properties": { "text": { "type": "string", "maxLength": 200 }, "at": { "type": "string", "maxLength": 40 }, "done": { "type": "boolean" } }
+      }
+    }
+  }
+}

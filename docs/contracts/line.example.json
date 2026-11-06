@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "id": "line_power_alpha",
+  "saveId": "5f0c9a52-3d1e-4b8a-9c47-2e6d8f1a7b30",
+  "name": "Энергоузел Альфа",
+  "source": "manual",
+  "members": [
+    { "buildingId": "Persistent_Level:PersistentLevel.Build_GeneratorCoal_C_2147290811", "className": "Build_GeneratorCoal_C" },
+    { "buildingId": "Persistent_Level:PersistentLevel.Build_GeneratorCoal_C_2147290740", "className": "Build_GeneratorCoal_C" }
+  ]
+}
