@@ -35,7 +35,7 @@ def load_spec():
 
 def plate_radius(tier):
     p = next(m for m in tier["modules"] if m["type"] == "plate")
-    return G.poly_radius(G.cross(p["core"], p.get("arm", 0), p.get("reach", 0), p["chamfer"]))
+    return G.poly_radius(G.plate_poly(p))
 
 
 def scales(spec):

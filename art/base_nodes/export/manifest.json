@@ -134,6 +134,129 @@
       "mode": "multi",
       "fbx": "export/SM_Holo_CentralHub_T3_Mini.fbx",
       "rim_m": 0.564
+    },
+    "SM_Holo_FluidPlant_T1": {
+      "tris": 4170,
+      "verts": 2320,
+      "bbox_min": [
+        -14.6,
+        -10.6,
+        -0.02
+      ],
+      "bbox_max": [
+        13.26,
+        10.6,
+        15.86
+      ],
+      "radius_xy": 15.26,
+      "node": "fluid_plant",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_FluidPlant_T1.fbx",
+      "rim_m": 0.096,
+      "scale_single": 0.0625
+    },
+    "SM_Holo_FluidPlant_T1_Mini": {
+      "tris": 3498,
+      "verts": 1872,
+      "bbox_min": [
+        -14.6,
+        -10.6,
+        -0.02
+      ],
+      "bbox_max": [
+        13.26,
+        10.6,
+        15.86
+      ],
+      "radius_xy": 15.26,
+      "node": "fluid_plant",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_FluidPlant_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_FluidPlant_T2": {
+      "tris": 8972,
+      "verts": 4900,
+      "bbox_min": [
+        -18.2,
+        -14.2,
+        -0.18
+      ],
+      "bbox_max": [
+        18.2,
+        14.0,
+        23.71
+      ],
+      "radius_xy": 20.64,
+      "node": "fluid_plant",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_FluidPlant_T2.fbx",
+      "rim_m": 0.144,
+      "scale_single": 0.04167
+    },
+    "SM_Holo_FluidPlant_T2_Mini": {
+      "tris": 7172,
+      "verts": 3828,
+      "bbox_min": [
+        -18.2,
+        -14.2,
+        -0.35
+      ],
+      "bbox_max": [
+        18.2,
+        14.0,
+        23.71
+      ],
+      "radius_xy": 20.79,
+      "node": "fluid_plant",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_FluidPlant_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_FluidPlant_T3": {
+      "tris": 14004,
+      "verts": 7808,
+      "bbox_min": [
+        -23.0,
+        -18.6,
+        -0.18
+      ],
+      "bbox_max": [
+        23.0,
+        18.2,
+        29.96
+      ],
+      "radius_xy": 25.11,
+      "node": "fluid_plant",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_FluidPlant_T3.fbx",
+      "rim_m": 0.183,
+      "scale_single": 0.03279
+    },
+    "SM_Holo_FluidPlant_T3_Mini": {
+      "tris": 11052,
+      "verts": 6024,
+      "bbox_min": [
+        -23.0,
+        -18.6,
+        -0.35
+      ],
+      "bbox_max": [
+        23.0,
+        18.2,
+        29.96
+      ],
+      "radius_xy": 25.11,
+      "node": "fluid_plant",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_FluidPlant_T3_Mini.fbx",
+      "rim_m": 0.564
     }
   }
 }

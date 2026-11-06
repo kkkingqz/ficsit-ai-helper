@@ -344,13 +344,23 @@ def _mock(spec):
     return inst
 
 
+def multi_mix(spec, built):
+    """Five (node, tier, mini) keys for the multi-node mock: the first node (hub) T3 in the centre slot, then the
+    other nodes' tiers round the ring; with a single node its own tiers repeat as placeholders."""
+    keys = list(spec["nodes"])
+    first = keys[0]
+    ring = [(k, tk) for k in keys[1:] for tk in spec["nodes"][k]["tiers"]] or \
+           [(first, tk) for tk in spec["nodes"][first]["tiers"]]
+    ring += [(first, "1"), (first, "2")]
+    out = [(first, "3", True)] + [(k, tk, True) for k, tk in ring[:4]]
+    return [k for k in out if k in built]
+
+
 def _projector(spec, built, single, multi, out):
     """Simple projector mock (emitter disc + scale ring) with the hologram at its display scale, seen by a player."""
     s = bpy.context.scene
     disp = spec["display"]
     inst = _mock(spec)
-    key = next(iter(spec["nodes"]))
-    asset = spec["nodes"][key]["asset"]
     for o in s.objects:
         if o.type == "MESH" and not o.get("mock"):
             o.hide_render = True
@@ -359,27 +369,25 @@ def _projector(spec, built, single, multi, out):
     cam.rotation_euler = (Vector((0, 0, 1.45)) - cam.location).to_track_quat("-Z", "Y").to_euler()
     s.camera = cam
     shots = []
-    for tk in ("1", "3"):
-        src = built.get((key, tk, False))
-        if src is None:
-            continue
-        o = inst(src, single[(key, tk)], (0, 0), f"I_single_T{tk}")
-        p = os.path.join(out, f"review_projector_single_T{tk}.png")
-        render(p, (1280, 800))
-        shots.append(p)
-        bpy.data.objects.remove(o)
-    # multi: 5 slots; only the hub exists so far -> the other slots repeat its tiers as placeholders
+    for key in spec["nodes"]:
+        for tk in ("1", "3"):
+            src = built.get((key, tk, False))
+            if src is None:
+                continue
+            o = inst(src, single[(key, tk)], (0, 0), f"I_single_{key}_T{tk}")
+            p = os.path.join(out, f"review_projector_single_{key}_T{tk}.png")
+            render(p, (1280, 800))
+            shots.append(p)
+            bpy.data.objects.remove(o)
     lay = disp["multi"]["layouts"]["5"]
-    order = ["3", "1", "2", "1", "2"]
     tmp = []
-    for i, (xy, tk) in enumerate(zip(lay["slots"], order)):
-        src = built.get((key, tk, True))
-        if src is not None:
-            tmp.append(inst(src, multi["5"], xy, f"I_multi_{i}"))
+    for i, (xy, k) in enumerate(zip(lay["slots"], multi_mix(spec, built))):
+        tmp.append(inst(built[k], multi["5"], xy, f"I_multi_{i}"))
     p = os.path.join(out, "review_projector_multi5.png")
     render(p, (1280, 800))
     for o in tmp:
         bpy.data.objects.remove(o)
+    asset = ", ".join(n["asset"] for n in spec["nodes"].values())
     print("[render] projector", shots, p, asset)
 
 
@@ -469,9 +477,9 @@ def _projector_angles(spec, built, single, multi, out, tile):
     s.camera = cam
     W, H = tile
     rows = []
-    sets = {"single_T2": [((key, "2", False), single.get((key, "2"), 1.0), (0, 0))]}
+    sets = {f"single_{k}_T2": [((k, "2", False), single.get((k, "2"), 1.0), (0, 0))] for k in spec["nodes"]}
     lay = disp["multi"]["layouts"]["5"]
-    sets["multi5"] = [((key, tk, True), multi["5"], xy) for xy, tk in zip(lay["slots"], ["3", "1", "2", "1", "2"])]
+    sets["multi5"] = [(k, multi["5"], xy) for xy, k in zip(lay["slots"], multi_mix(spec, built))]
     for label, items in sets.items():
         tmp = [inst(built[k], sc, xy, f"I_{label}_{i}") for i, (k, sc, xy) in enumerate(items) if k in built]
         row = []
@@ -486,7 +494,7 @@ def _projector_angles(spec, built, single, multi, out, tile):
             bpy.data.objects.remove(o)
     sheet = Image.new("RGB", (len(eyes) * W, len(rows) * (H + 24) + 40), (6, 12, 20))
     dr = ImageDraw.Draw(sheet)
-    dr.text((12, 12), "projector mock, player eye 1.65 m (close_low 1.25 m); multi5: other slots repeat the hub tiers",
+    dr.text((12, 12), "projector mock, player eye 1.65 m (close_low 1.25 m); multi5: hub T3 in the centre + other nodes",
             fill=(150, 210, 255))
     for j, row in enumerate(rows):
         for i, (name, p) in enumerate(row):

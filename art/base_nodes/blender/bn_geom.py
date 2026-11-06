@@ -197,6 +197,49 @@ def cross(core, arm, reach, chamfer):
     return _dedupe(out)
 
 
+def plate_outline(hx, hy, k, arms=None):
+    """Rectangular core (half sizes hx, hy, corner chamfer k) with optional centred arms per side:
+    arms = {"front": [half_width, reach], "right": [...], "back": [...], "left": [...]} (reach from the centre)."""
+    arms = arms or {}
+    pts = [(-hx + k, -hy)]
+    if "front" in arms:
+        a, L = arms["front"]
+        pts += [(-a, -hy), (-a, -L), (a, -L), (a, -hy)]
+    pts += [(hx - k, -hy), (hx, -hy + k)]
+    if "right" in arms:
+        a, L = arms["right"]
+        pts += [(hx, -a), (L, -a), (L, a), (hx, a)]
+    pts += [(hx, hy - k), (hx - k, hy)]
+    if "back" in arms:
+        a, L = arms["back"]
+        pts += [(a, hy), (a, L), (-a, L), (-a, hy)]
+    pts += [(-hx + k, hy), (-hx, hy - k)]
+    if "left" in arms:
+        a, L = arms["left"]
+        pts += [(-hx, a), (-L, a), (-L, -a), (-hx, -a)]
+    pts += [(-hx, -hy + k)]
+    return _dedupe(pts)
+
+
+def plate_poly(m):
+    """Outline of a `plate` module: square cross (core, arm, reach) or rectangle + per-side arms (core [hx, hy])."""
+    if isinstance(m["core"], list):
+        return plate_outline(m["core"][0], m["core"][1], m["chamfer"], m.get("arms"))
+    return cross(m["core"], m.get("arm", 0), m.get("reach", 0), m["chamfer"])
+
+
+def drop(h):
+    """Liquid drop glyph, height h, tip up, centred on its round part (2D)."""
+    r = h * 0.36
+    cy = -h * 0.5 + r
+    pts = [(0.0, h * 0.5)]
+    a0 = math.radians(40)                                  # tangent point of the tip lines on the circle
+    for i in range(15):
+        a = a0 - (math.pi + 2 * a0) * i / 14               # from the right tangent clockwise round the bottom
+        pts.append((r * math.cos(a), cy + r * math.sin(a)))
+    return pts
+
+
 def _dedupe(pts):
     res = []
     for p in pts:

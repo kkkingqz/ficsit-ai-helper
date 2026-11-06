@@ -40,5 +40,47 @@
     "PlateRadius": 2881.4,
     "Height": 2600,
     "ScaleSingle": 0.03471
+  },
+  {
+    "Name": "fluid_plant_T1",
+    "NodeId": "fluid_plant",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"fluid_plant.name\", \"Fluid Processing Plant\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"fluid_plant.type\", \"Processing / Chemical Processes\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_FluidPlant_T1.SM_Holo_FluidPlant_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_FluidPlant_T1_Mini.SM_Holo_FluidPlant_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_FluidPlant_T1_Screen.T_Node_FluidPlant_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_FluidPlant_T1_Icon_256.T_Node_FluidPlant_T1_Icon_256",
+    "PlateRadius": 1526.4,
+    "Height": 1600,
+    "ScaleSingle": 0.0625
+  },
+  {
+    "Name": "fluid_plant_T2",
+    "NodeId": "fluid_plant",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"fluid_plant.name\", \"Fluid Processing Plant\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"fluid_plant.type\", \"Processing / Chemical Processes\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_FluidPlant_T2.SM_Holo_FluidPlant_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_FluidPlant_T2_Mini.SM_Holo_FluidPlant_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_FluidPlant_T2_Screen.T_Node_FluidPlant_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_FluidPlant_T2_Icon_256.T_Node_FluidPlant_T2_Icon_256",
+    "PlateRadius": 1983.1,
+    "Height": 2400,
+    "ScaleSingle": 0.04167
+  },
+  {
+    "Name": "fluid_plant_T3",
+    "NodeId": "fluid_plant",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"fluid_plant.name\", \"Fluid Processing Plant\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"fluid_plant.type\", \"Processing / Chemical Processes\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_FluidPlant_T3.SM_Holo_FluidPlant_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_FluidPlant_T3_Mini.SM_Holo_FluidPlant_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_FluidPlant_T3_Screen.T_Node_FluidPlant_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_FluidPlant_T3_Icon_256.T_Node_FluidPlant_T3_Icon_256",
+    "PlateRadius": 2511.0,
+    "Height": 3050.0,
+    "ScaleSingle": 0.03279
   }
 ]
