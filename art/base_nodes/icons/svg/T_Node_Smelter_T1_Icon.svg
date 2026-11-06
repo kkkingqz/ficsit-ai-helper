@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B2F0FF"/><stop offset="1" stop-color="#60CEFA"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="-3" y="-3" width="106" height="106">
+    <rect x="58" y="10" width="16" height="5" rx="1.2" fill="white"/>
+    <rect x="60" y="15" width="12" height="19" rx="0.0" fill="white"/>
+    <rect x="58" y="34" width="16" height="3" rx="0.0" fill="white"/>
+    <path d="M14,84 L14,56 L28,40 L72,40 L86,56 L86,84 Z" fill="white"/>
+    <polyline points="24,84 24,60 34,49 66,49 76,60 76,84" fill="none" stroke="black" stroke-width="2.6" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="32" y="60" width="36" height="20" rx="2" fill="black"/>
+    <path d="M41.1,64 q1.8,1.5 0,3.0 t0,3.0 t0,3.0 t0,3.0" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M49.1,64 q1.8,1.5 0,3.0 t0,3.0 t0,3.0 t0,3.0" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M57.1,64 q1.8,1.5 0,3.0 t0,3.0 t0,3.0 t0,3.0" fill="none" stroke="white" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M6,88 L10,82 L90,82 L94,88 L94,91 L6,91 Z" fill="white"/>
+    </mask>
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.6"/></filter>
+  </defs>
+  <g filter="url(#glow)" opacity="0.45"><rect x="-3" y="-3" width="106" height="106" fill="#60CEFA" mask="url(#m)"/></g>
+  <rect x="-3" y="-3" width="106" height="106" fill="url(#g)" mask="url(#m)"/>
+</svg>

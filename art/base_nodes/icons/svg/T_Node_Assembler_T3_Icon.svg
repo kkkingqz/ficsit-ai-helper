@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B2F0FF"/><stop offset="1" stop-color="#60CEFA"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="-3" y="-3" width="106" height="106">
+    <polyline points="14,84 14,40 22,31 78,31 86,40 86,84" fill="none" stroke="white" stroke-width="8" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polygon points="24,27 27,19 73,19 76,27" fill="white"/>
+    <rect x="36" y="21.5" width="8" height="3.0" rx="0.0" fill="black"/>
+    <rect x="47" y="21.5" width="8" height="3.0" rx="0.0" fill="black"/>
+    <rect x="58" y="21.5" width="8" height="3.0" rx="0.0" fill="black"/>
+    <rect x="85" y="8" width="4" height="22" rx="1" fill="white"/>
+    <rect x="93" y="12" width="4" height="18" rx="1" fill="white"/>
+    <polyline points="86,40 92,34 92,84" fill="none" stroke="white" stroke-width="3" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="4" y="74" width="92" height="14" rx="1" fill="white"/>
+    <rect x="8" y="78" width="4" height="6" rx="0.0" fill="black"/>
+    <rect x="15" y="79" width="9" height="3" rx="0.0" fill="black"/>
+    <rect x="74" y="78" width="4" height="6" rx="0.0" fill="black"/>
+    <rect x="81" y="79" width="9" height="3" rx="0.0" fill="black"/>
+    <polygon points="14.350000000000001,76.0 16.9,69.2 27.1,69.2 29.65,76.0" fill="white"/>
+    <polyline points="22.0,65.8 30.5,53.900000000000006" fill="none" stroke="white" stroke-width="5.1" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="30.5,53.900000000000006 40.7,59.0" fill="none" stroke="white" stroke-width="3.9099999999999997" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <circle cx="22.0" cy="65.8" r="4.42" fill="white"/>
+    <circle cx="22.0" cy="65.8" r="1.8563999999999998" fill="black"/>
+    <circle cx="30.5" cy="53.900000000000006" r="3.57" fill="white"/>
+    <circle cx="30.5" cy="53.900000000000006" r="1.4993999999999998" fill="black"/>
+    <circle cx="40.7" cy="59.0" r="2.8899999999999997" fill="white"/>
+    <circle cx="40.7" cy="59.0" r="1.2137999999999998" fill="black"/>
+    <polyline points="40.7,61.125 40.7,63.24999999999999" fill="none" stroke="white" stroke-width="2.21" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <path d="M40.7,64.1 q-3.4,0 -2.975,4.25 q0.51,1.7 1.7,1.87" fill="none" stroke="white" stroke-width="2.04" stroke-linecap="butt" stroke-linejoin="miter"/>
+    <path d="M40.7,64.1 q3.4,0 2.975,4.25 q-0.51,1.7 -1.7,1.87" fill="none" stroke="white" stroke-width="2.04" stroke-linecap="butt" stroke-linejoin="miter"/>
+    <polygon points="85.65,76.0 83.1,69.2 72.9,69.2 70.35,76.0" fill="white"/>
+    <polyline points="78.0,65.8 69.5,53.900000000000006" fill="none" stroke="white" stroke-width="5.1" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="69.5,53.900000000000006 59.3,59.0" fill="none" stroke="white" stroke-width="3.9099999999999997" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <circle cx="78.0" cy="65.8" r="4.42" fill="white"/>
+    <circle cx="78.0" cy="65.8" r="1.8563999999999998" fill="black"/>
+    <circle cx="69.5" cy="53.900000000000006" r="3.57" fill="white"/>
+    <circle cx="69.5" cy="53.900000000000006" r="1.4993999999999998" fill="black"/>
+    <circle cx="59.3" cy="59.0" r="2.8899999999999997" fill="white"/>
+    <circle cx="59.3" cy="59.0" r="1.2137999999999998" fill="black"/>
+    <polyline points="59.3,61.125 59.3,63.24999999999999" fill="none" stroke="white" stroke-width="2.21" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <path d="M59.3,64.1 q-3.4,0 -2.975,4.25 q0.51,1.7 1.7,1.87" fill="none" stroke="white" stroke-width="2.04" stroke-linecap="butt" stroke-linejoin="miter"/>
+    <path d="M59.3,64.1 q3.4,0 2.975,4.25 q-0.51,1.7 -1.7,1.87" fill="none" stroke="white" stroke-width="2.04" stroke-linecap="butt" stroke-linejoin="miter"/>
+    </mask>
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.6"/></filter>
+  </defs>
+  <g filter="url(#glow)" opacity="0.45"><rect x="-3" y="-3" width="106" height="106" fill="#60CEFA" mask="url(#m)"/></g>
+  <rect x="-3" y="-3" width="106" height="106" fill="url(#g)" mask="url(#m)"/>
+</svg>

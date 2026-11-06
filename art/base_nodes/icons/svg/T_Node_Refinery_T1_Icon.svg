@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B2F0FF"/><stop offset="1" stop-color="#60CEFA"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="-3" y="-3" width="106" height="106">
+    <rect x="75" y="9" width="10" height="41" rx="2" fill="white"/>
+    <rect x="73" y="44" width="14" height="14" rx="0.0" fill="white"/>
+    <path d="M4,90 L4,66 L12,57 L24,52 L28,48 L66,48 L70,52 L70,90 Z" fill="white"/>
+    <polygon points="22,58 30,58 28,62 20,62" fill="black"/>
+    <polygon points="34,58 42,58 40,62 32,62" fill="black"/>
+    <polygon points="46,58 54,58 52,62 44,62" fill="black"/>
+    <polygon points="14,91 14,70 18,66 56,66 60,70 60,91" fill="black"/>
+    <rect x="21" y="73" width="32" height="4" rx="0.0" fill="white"/>
+    <rect x="21" y="81" width="32" height="4" rx="0.0" fill="white"/>
+    <path d="M72,90 L72,67.4 Q72,62 78.0,62 L90.0,62 Q96,62 96,67.4 L96,90 Z" fill="white"/>
+    <rect x="72" y="89" width="24" height="3" rx="0.0" fill="white"/>
+    </mask>
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.6"/></filter>
+  </defs>
+  <g filter="url(#glow)" opacity="0.45"><rect x="-3" y="-3" width="106" height="106" fill="#60CEFA" mask="url(#m)"/></g>
+  <rect x="-3" y="-3" width="106" height="106" fill="url(#g)" mask="url(#m)"/>
+</svg>

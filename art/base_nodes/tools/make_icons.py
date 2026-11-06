@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Node icons from the concept sheets ("2D иконка (UI / карта)" panel): the cyan pictogram is cut out of the orange
+"""LEGACY (replaced by icons_svg.py, the vector redraw): cuts the pictogram out of a concept sheet. Still used by
+icons_svg.py --compare (frame_inner) to put the concept next to the new icon.
+
+Node icons from the concept sheets ("2D иконка (UI / карта)" panel): the cyan pictogram is cut out of the orange
 selection frame, cleaned (threshold on an upscaled copy -> smooth anti-aliased edges), recoloured flat and written as
 transparent PNGs. The orange frame and the tier bars are UI state, not part of the icon: the widget draws them.
 

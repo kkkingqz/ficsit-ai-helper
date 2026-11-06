@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B2F0FF"/><stop offset="1" stop-color="#60CEFA"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="-3" y="-3" width="106" height="106">
+    <rect x="8" y="53" width="60" height="4" rx="0.0" fill="white"/>
+    <polyline points="8,90 8,64 13,59 63,59 68,64 68,90" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="16,90 16,70 20,66 56,66 60,70 60,90" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="30.0,76.5 33.5,80 30.0,83.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="35.5,76.5 39.0,80 35.5,83.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="41.0,76.5 44.5,80 41.0,83.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="4" y="89" width="92" height="3" rx="0.0" fill="white"/>
+    <path d="M37,48 L37,19.25 Q37,14 44.5,14 Q52,14 52,19.25 L52,48 Z" fill="white"/>
+    <rect x="36.5" y="20.75" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="47.875" y="20.75" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="36.5" y="29.083333333333336" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="47.875" y="29.083333333333336" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="36.5" y="37.41666666666667" width="4.625" height="1.7999999999999972" rx="0.0" fill="black"/>
+    <rect x="47.875" y="37.41666666666667" width="4.625" height="1.7999999999999972" rx="0.0" fill="black"/>
+    <path d="M57,48 L57,19.25 Q57,14 64.5,14 Q72,14 72,19.25 L72,48 Z" fill="white"/>
+    <rect x="56.5" y="20.75" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="67.875" y="20.75" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="56.5" y="29.083333333333336" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="67.875" y="29.083333333333336" width="4.625" height="1.8000000000000007" rx="0.0" fill="black"/>
+    <rect x="56.5" y="37.41666666666667" width="4.625" height="1.7999999999999972" rx="0.0" fill="black"/>
+    <rect x="67.875" y="37.41666666666667" width="4.625" height="1.7999999999999972" rx="0.0" fill="black"/>
+    <polyline points="44.5,14 44.5,4 64.5,4 64.5,14" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="37,32 30,32 30,52" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="36" y="49" width="37" height="4" rx="0.0" fill="white"/>
+    <path d="M72,89 L72,61.4 Q72,56 78.0,56 L90.0,56 Q96,56 96,61.4 L96,89 Z" fill="white"/>
+    <path d="M84.0,68.45 C85.6416,72.09800000000001 88.3092,74.15 88.104,75.74600000000001 A4.103999999999999,4.103999999999999 0 1 1 79.896,75.74600000000001 C79.6908,74.15 82.3584,72.09800000000001 84.0,68.45 Z" fill="black"/>
+    </mask>
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.6"/></filter>
+  </defs>
+  <g filter="url(#glow)" opacity="0.45"><rect x="-3" y="-3" width="106" height="106" fill="#60CEFA" mask="url(#m)"/></g>
+  <rect x="-3" y="-3" width="106" height="106" fill="url(#g)" mask="url(#m)"/>
+</svg>

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-3 -3 106 106" width="512" height="512">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="100" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#B2F0FF"/><stop offset="1" stop-color="#60CEFA"/>
+    </linearGradient>
+    <mask id="m" maskUnits="userSpaceOnUse" x="-3" y="-3" width="106" height="106">
+    <polyline points="12,82 12,50 20,42 78,42 86,50 86,82" fill="none" stroke="white" stroke-width="6" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="22,82 22,57 28,51 70,51 76,57 76,82" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="29,90 29,62.5 33.5,58 64.5,58 69,62.5 69,90" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="7" y="76" width="16" height="4" rx="0.0" fill="white"/>
+    <rect x="4" y="81" width="22" height="9" rx="0.0" fill="white"/>
+    <rect x="8" y="84" width="14" height="2.5" rx="0.0" fill="black"/>
+    <rect x="77" y="76" width="16" height="4" rx="0.0" fill="white"/>
+    <rect x="74" y="81" width="22" height="9" rx="0.0" fill="white"/>
+    <rect x="78" y="84" width="14" height="2.5" rx="0.0" fill="black"/>
+    <polyline points="40.0,70.5 43.5,74 40.0,77.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="45.5,70.5 49.0,74 45.5,77.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="51.0,70.5 54.5,74 51.0,77.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="41,41 41,34 59,34 59,41" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="45" y="37" width="10" height="2.5" rx="0.0" fill="white"/>
+    <polyline points="80,42 80,5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="77.3" y="24" width="5.400000000000006" height="2.3999999999999986" rx="0.0" fill="white"/>
+    <polyline points="80,34 74,40" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <ellipse cx="71" cy="20" rx="5.5" ry="9" transform="rotate(25 71 20)" fill="white"/>
+    <polyline points="68.71786138660022,24.89406204999791 78,27" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    </mask>
+    <filter id="glow" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="1.6"/></filter>
+  </defs>
+  <g filter="url(#glow)" opacity="0.45"><rect x="-3" y="-3" width="106" height="106" fill="#60CEFA" mask="url(#m)"/></g>
+  <rect x="-3" y="-3" width="106" height="106" fill="url(#g)" mask="url(#m)"/>
+</svg>
