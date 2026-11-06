@@ -42,12 +42,14 @@ digraph G {
     files [label="Локальные файлы по saveId\nтелеметрия · кэш рендера", shape=cylinder];
 
     terminal -> ui; equipment -> ui [style=dashed]; equipment -> hud [style=dashed];
-    terminal -> graphview; graphview -> planner; terminal -> rt;
-    ui -> validator [label="ручные операции", fontsize=9]; hud -> telemetry;
+    terminal -> graphview; api -> planner [style=dotted]; terminal -> rt;
+    api [label="Публичный API мода (FicsitAIApi)\nзапросы · операции · события · внешние метрики", fillcolor="#E6F1F3", color="#7FA7B0"];
+    ui -> api [label="экраны — клиенты API", fontsize=9]; graphview -> api; hud -> api [style=dashed];
+    api -> validator; api -> telemetry [style=dotted]; api -> catalog [style=dotted];
     planner -> validator;
     ui -> save [dir=both]; telemetry -> files; rt -> files [style=dotted];
     catalog -> provider [style=dotted];
-    link -> validator [label="те же операции от модели", fontsize=9];
+    link -> api [label="модель — клиент API", fontsize=9];
     ui -> link [label="чат", fontsize=9];
   }
 
@@ -65,6 +67,11 @@ digraph G {
     foreman -> fdb [dir=both];
     foreman -> voice [dir=both, style=dashed];
   }
+
+  fin  [label="FicsIt-Networks (Lua) — v1.1\nFINConnector · netFunc_ · netSig_\nбез зависимости", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+  mods [label="Другие моды (C++/Blueprint) — v1.1\nworld subsystem", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+  fin -> api [dir=both, style=dashed];
+  mods -> api [dir=both, style=dashed];
 
   llm [label="LLM-провайдер\nключ хранится у сайдкара", shape=note, fillcolor="#F2F4F6", color="#B9C2CA"];
 

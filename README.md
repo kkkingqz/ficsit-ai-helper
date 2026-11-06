@@ -35,6 +35,8 @@ Notes, Work Orders, Screens), подключаемый планировщик п
   Записки (только текст), Линии, Screens, Настройки; карточки в чате; обёртки Planning и Graph; состояние в сохранении.
   Первым идёт вертикальный срез v0.1 (терминал, Chat, Dashboard). Blueprint Builder — v1.1,
   голос — v1.2, подключение планировщика и UI плана — v1.3, AI Assistant с HUD — v1.4.
+- **Публичный API:** все экраны работают через публичный API мода; в v1.1 тот же API открывается
+  FicsIt-Networks (Lua, без зависимости от FIN) и другим модам (C++/Blueprint).
 - **Контракты:** `GameCatalog`, `PlanRequest`, `ProductionPlan`, `ScreenDefinition`, `BlueprintRequest`.
 - **Ручной паритет:** всё, что может модель (экран, график, заметка, Work Order, чертёж, план),
   игрок делает вручную через UI без LLM — UI и модель вызывают одни и те же операции.
