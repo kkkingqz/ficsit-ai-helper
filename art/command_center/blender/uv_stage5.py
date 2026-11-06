@@ -100,7 +100,7 @@ def apply_uvs(coll):
                 if slot == "M_Decal":
                     uvl.data[li].uv = _in_rect(uv01, L.decal_rect(L.decal_cell_for(ob.name, dims)))
                 elif slot == "M_ScreenStatic":
-                    uvl.data[li].uv = _in_rect(uv01, L.screen_rect(L.screen_cell_for(ob.name, dims)))
+                    uvl.data[li].uv = _in_rect(uv01, L.screen_rect(L.screen_cell_for(ob.name, dims, (u1 - u0, v1 - v0))))
                 else:                                            # RT screen, lights, beacon, holo: 0..1
                     uvl.data[li].uv = uv01
     return stats

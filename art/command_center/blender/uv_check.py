@@ -81,12 +81,30 @@ def check(coll):
                 dens_lo, dens_hi = min(dens_lo, d), max(dens_hi, d)
             elif slot in ("M_Decal", "M_ScreenStatic"):
                 stats["atlas"] += 1
+                wh = None
+                if slot == "M_ScreenStatic":
+                    _, _, _, _, (u0, u1, v0, v1) = uv_stage5.object_frame(ob)
+                    wh = (u1 - u0, v1 - v0)
                 rect = L.decal_rect(L.decal_cell_for(ob.name, dims)) if slot == "M_Decal" else \
-                    L.screen_rect(L.screen_cell_for(ob.name, dims))
+                    L.screen_rect(L.screen_cell_for(ob.name, dims, wh))
                 for u, v in uvs:
                     if not (rect[0] - 1e-4 <= u <= rect[2] + 1e-4 and rect[1] - 1e-4 <= v <= rect[3] + 1e-4):
                         errors.append(f"{ob.name}: UV ({u:.3f}, {v:.3f}) outside its {slot} atlas cell")
                         break
+        # every UI screen (RT, static screens with a UI cell, hologram UI cards) must be exactly 16:9
+        ui = None
+        if ob.name == "DISPLAY_MAIN_RT" or (ob.name.startswith("HOLO_UI_card") and "_bar_" not in ob.name):
+            ui = "RT" if ob.name == "DISPLAY_MAIN_RT" else "holo card"
+        elif any(m == "M_ScreenStatic" for m in mats):
+            _, _, _, _, (u0, u1, v0, v1) = uv_stage5.object_frame(ob)
+            if L.screen_cell_for(ob.name, dims, (u1 - u0, v1 - v0)) != "led":
+                ui = L.screen_cell_for(ob.name, dims, (u1 - u0, v1 - v0))
+        if ui:
+            _, _, _, _, (u0, u1, v0, v1) = uv_stage5.object_frame(ob)
+            w, h = u1 - u0, v1 - v0
+            stats.setdefault("screens", []).append((ob.name, w, h, ui))
+            if not L.is_screen_aspect(w, h):
+                errors.append(f"{ob.name}: screen {w:.3f} x {h:.3f} ({w / h:.2f}:1) is not 16:9")
         if ob.name == "DISPLAY_MAIN_RT":
             if (uv_min - Vector((0, 0))).length > 1e-4 or (uv_max - Vector((1, 1))).length > 1e-4:
                 errors.append(f"DISPLAY_MAIN_RT: UV spans {tuple(uv_min)}..{tuple(uv_max)}, expected 0..1")
@@ -119,7 +137,15 @@ def report(errors, stats, path):
              f"| Плотность на тайлинговых гранях (отн. цели) | {lo:.4f} … {hi:.4f} |",
              f"| Грани фасок в маске кромок `PaintMask.B` | {stats.get('edge', 0)} |",
              f"| Щепки после булевых операций (< 1 см², не проверяются; очистка сетки — этап 6) | {stats['slivers']} |",
-             f"| Ошибок | {len(errors)} {'✅' if not errors else '⚠️'} |", ""]
+             f"| Ошибок | {len(errors)} {'✅' if not errors else '⚠️'} |", "",
+             "## Экраны: все UI-плоскости 16:9 (одна текстура подходит на любой экран)", "",
+             "| Экран | Размер, м | Соотношение | Ячейка атласа |", "|---|---|---|---|"]
+    for name, w, h, cell in sorted(stats.get("screens", [])):
+        lines.append(f"| `{name}` | {w:.3f} × {h:.3f} | {w / h:.3f} : 1 | {cell} |")
+    lines.append("")
+    lines.append("Индикаторы не 16:9 (светящиеся клавиши, дисплеи-полоски у ручек, окно маяка, мелкие лампы) берут "
+                 "светящуюся полосу атласа, а не UI-картинку.")
+    lines.append("")
     if errors:
         lines += ["## Ошибки", ""] + [f"- {e}" for e in errors[:200]]
     with open(path, "w", encoding="utf-8") as f:

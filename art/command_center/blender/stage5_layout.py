@@ -138,8 +138,20 @@ def decal_cell_for(name, dims):
     return f"label_{pick(n, len(LABELS))}"
 
 
-def screen_cell_for(name, dims):
+SCREEN_ASPECT = 16 / 9                 # every UI screen plane is 16:9, so any UI texture fits any screen
+SCREEN_ASPECT_TOL = 0.02
+
+
+def is_screen_aspect(w, h):
+    return h > 0 and abs((w / h) / SCREEN_ASPECT - 1) <= SCREEN_ASPECT_TOL
+
+
+def screen_cell_for(name, dims, wh=None):
+    """wh = (width, height) of the screen plane; indicators that are not 16:9 (lit keys, display strips, beacon
+    windows, tiny status lamps) use the LED glow strip instead of a squeezed UI picture."""
     if dims[1] < 0.05 or "led" in name.lower():
+        return "led"
+    if wh is not None and not is_screen_aspect(*wh):
         return "led"
     if name in SCREEN_BY_NAME:
         return SCREEN_BY_NAME[name]

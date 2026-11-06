@@ -368,7 +368,7 @@ def build_back(M, exp, by):
     bevel(box("DOOR_ACCESS_backplate", (rx, by + 0.17, 1.3), (0.36, 0.02, 1.0), M["M_MetalLight"], exp), 0.01)
     box("DOOR_ACCESS_trim", (rx, by + 0.182, 1.78), (0.36, 0.006, 0.04), M["M_PaintOrange"], exp)
     bevel(box("DOOR_reader", (rx, by + 0.185, 1.5), (0.28, 0.025, 0.34), M["M_MetalDark"], exp), 0.01)   # stays inside y <= 4.0
-    box("DOOR_reader_screen", (rx, by + 0.1985, 1.58), (0.22, 0.002, 0.124), M["M_ScreenStatic"], exp)
+    box("DOOR_reader_screen", (rx, by + 0.1985, 1.58), (0.22, 0.002, 0.22 * 9 / 16), M["M_ScreenStatic"], exp)
     box("DOOR_reader_keypad", (rx, by + 0.1985, 1.42), (0.18, 0.002, 0.08), M["M_MetalBare"], exp)
     box("DOOR_reader_pad", (rx, by + 0.191, 1.12), (0.14, 0.004, 0.14), M["M_Rubber"], exp)      # card at hand height
     box("DOOR_reader_led", (rx, by + 0.191, 1.24), (0.08, 0.004, 0.03), M["M_Beacon"], exp)
@@ -421,7 +421,7 @@ def build_back(M, exp, by):
     back_box("BACK_BAND_techpanel", tx0, tx1, bz0, bz1, 0.06, M["M_MetalDark"], exp, by)
     tc = (tx0 + tx1) / 2
     for k, x in enumerate((tc - 0.3, tc + 0.3)):
-        box(f"BACK_BAND_gauge_{k}", (x, by + 0.063, zc + 0.35), (0.48, 0.006, 0.28), M["M_ScreenStatic"], exp)
+        box(f"BACK_BAND_gauge_{k}", (x, by + 0.063, zc + 0.35), (0.48, 0.006, 0.27), M["M_ScreenStatic"], exp)   # 16:9
     for k in range(5):
         box(f"BACK_BAND_toggle_{k}", (tc - 0.48 + k * 0.24, by + 0.075, zc - 0.15), (0.08, 0.03, 0.12),
             M["M_MetalLight"], exp)
@@ -562,7 +562,7 @@ def build_left_utility(M, exp, sx_out):
     louvre("LEFT_TECHBLOCK_intake", "-x", vc, vy1 - vy0 - 0.36, 4.36, 5.08, face + 0.05, M, exp)
     bevel(box("LEFT_TECHBLOCK_gauges", (face - 0.01, vc, 3.8), (0.02, vy1 - vy0 - 0.3, 0.7), M["M_MetalLight"], exp), 0.01)
     for k, y in enumerate((vc - 0.33, vc + 0.33)):
-        box(f"LEFT_TECHBLOCK_screen_{k}", (face - 0.022, y, 3.9), (0.004, 0.5, 0.28), M["M_ScreenStatic"], exp)
+        box(f"LEFT_TECHBLOCK_screen_{k}", (face - 0.022, y, 3.9), (0.004, 0.5, 0.5 * 9 / 16), M["M_ScreenStatic"], exp)
     cylinder("LEFT_TECHBLOCK_dial", (face - 0.025, vc, 3.58), 0.1, 0.01, M["M_LightWarm"], exp, 16, axis="X")
     bevel(box("LEFT_TECHBLOCK_hatch", (face - 0.01, vc - 0.15, 2.75), (0.02, 0.95, 0.85), M["M_MetalLight"], exp), 0.01)
     for k, dz in enumerate((0.25, -0.25)):
@@ -605,8 +605,8 @@ def build_right_service(M, exp, sx_out):
     for j, y in enumerate((seam - 0.12, seam + 0.12)):                               # handles: one per door
         for t, z in enumerate((2.85, 4.1)):
             box(f"RIGHT_CABINET_handle_{j}{t}", (face + 0.02, y, z), (0.03, 0.05, 0.26), M["M_MetalDark"], exp)
-    box("RIGHT_CABINET_window", (face + 0.004, (cy0 + seam) / 2, 4.3), (0.006, 0.45, 0.3), M["M_ScreenStatic"], exp)
-    box("RIGHT_CABINET_window_frame", (face + 0.002, (cy0 + seam) / 2, 4.3), (0.004, 0.55, 0.4), M["M_MetalDark"], exp)
+    box("RIGHT_CABINET_window", (face + 0.004, (cy0 + seam) / 2, 4.3), (0.006, 0.45, 0.45 * 9 / 16), M["M_ScreenStatic"], exp)
+    box("RIGHT_CABINET_window_frame", (face + 0.002, (cy0 + seam) / 2, 4.3), (0.004, 0.55, 0.35), M["M_MetalDark"], exp)
     box("RIGHT_CABINET_hazard", (face + 0.004, (seam + cy1) / 2, 4.3), (0.006, 0.4, 0.4), M["M_Hazard"], exp)
     box("RIGHT_CABINET_plate", (face + 0.004, (seam + cy1) / 2, 2.6), (0.006, 0.5, 0.14), M["M_MetalDark"], exp)
     # ---- round exhaust vents above the cabinet (different shape from the left louvres) --------
@@ -638,7 +638,7 @@ def build_right_service(M, exp, sx_out):
     iy0, iy1 = RIGHT_IFACE_Y
     iyc = (iy0 + iy1) / 2
     rbox("RIGHT_IFACE", iy0, iy1, 3.05, 3.95, 0.14, M["M_MetalDark"], 0.03)
-    box("RIGHT_IFACE_screen", (wx + 0.133, iyc, 3.68), (0.006, 0.45, 0.3), M["M_ScreenStatic"], exp)
+    box("RIGHT_IFACE_screen", (wx + 0.133, iyc, 3.68), (0.006, 0.45, 0.45 * 9 / 16), M["M_ScreenStatic"], exp)
     box("RIGHT_IFACE_keypad", (wx + 0.135, iyc, 3.3), (0.01, 0.3, 0.18), M["M_MetalLight"], exp)
     box("RIGHT_IFACE_led", (wx + 0.133, iy1 - 0.08, 3.3), (0.006, 0.05, 0.05), M["M_Beacon"], exp)
     rbox("RIGHT_IFACE_hood", iy0 - 0.03, iy1 + 0.03, 3.97, 4.03, 0.19, M["M_PaintOrange"], 0.01)

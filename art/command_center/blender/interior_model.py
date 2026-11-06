@@ -403,8 +403,10 @@ def _deck_controls(name, kind, w, pt, drot, M, exp):
                     M["M_Decal"], exp, rot=drot)
 
     if kind == "centre":
-        plate("touch_frame", 0.0, V0 + 0.02, 1.0, 0.34)
-        box(f"CONTROL_PANELS_{name}_touch", pt(0.0, V0 + 0.02, 0.014), (0.9, 0.28, 0.004), M["M_ScreenStatic"], exp, rot=drot)
+        # touch panel = 16:9 like every screen (one texture set fits all screens)
+        plate("touch_frame", 0.0, V0 + 0.02, 0.6, 0.34)
+        box(f"CONTROL_PANELS_{name}_touch", pt(0.0, V0 + 0.02, 0.014), (0.5, 0.5 * 9 / 16, 0.004), M["M_ScreenStatic"], exp,
+            rot=drot)
         for k, u0 in enumerate((-1.29, -0.78, 0.78, 1.29)):
             module(f"key_{k}", u0)
     else:
@@ -625,7 +627,7 @@ def build_service_console(M, exp):
     bevel(box("SERVICE_CONSOLE_backplate", (x, yw - 0.015, F + 1.3), (0.56, 0.03, 1.3), M["M_MetalDark"], exp), 0.012)
     bevel(box("SERVICE_CONSOLE_housing", (x, yw - 0.12, F + 1.5), (0.5, 0.2, 0.42), M["M_MetalDark"], exp,
               rot=(math.radians(-20), 0, 0)), 0.03)
-    box("SERVICE_CONSOLE_screen", (x, yw - 0.222, F + 1.52), (0.4, 0.01, 0.3), M["M_ScreenStatic"], exp,
+    box("SERVICE_CONSOLE_screen", (x, yw - 0.222, F + 1.52), (0.42, 0.01, 0.42 * 9 / 16), M["M_ScreenStatic"], exp,
         rot=(math.radians(-20), 0, 0))
     box("SERVICE_CONSOLE_trim", (x, yw - 0.2, F + 1.27), (0.5, 0.02, 0.03), M["M_PaintOrange"], exp)
     bevel(box("SERVICE_CONSOLE_shelf", (x, yw - 0.15, F + 1.18), (0.5, 0.24, 0.04), M["M_MetalLight"], exp,
@@ -742,7 +744,7 @@ def build_holo(M, exp):
             (0.006, 0.03, 1.9), M["M_Holo"], exp, rot_z=a)
     for i, a in enumerate((math.radians(200), math.radians(270), math.radians(340))):   # UI cards facing outwards
         cx_, cy_ = hx + 1.55 * math.cos(a), hy + 1.55 * math.sin(a)
-        box(f"HOLO_UI_card_{i}", (cx_, cy_, F + 2.1), (0.5, 0.006, 0.32), M["M_Holo"], exp, rot_z=a + math.pi / 2)
+        box(f"HOLO_UI_card_{i}", (cx_, cy_, F + 2.1), (0.512, 0.006, 0.288), M["M_Holo"], exp, rot_z=a + math.pi / 2)  # 16:9
         for k in range(3):
             box(f"HOLO_UI_card_{i}_bar_{k}", (cx_ + 0.01 * math.cos(a), cy_ + 0.01 * math.sin(a), F + 2.18 - k * 0.07),
                 (0.36 - k * 0.08, 0.004, 0.025), M["M_Holo"], exp, rot_z=a + math.pi / 2)
@@ -1192,7 +1194,7 @@ def build_back_wall(M, exp, door):
     bevel(box("ACCESS_backplate", (ax, YW - 0.095, az), (0.4, 0.03, 1.05), M["M_MetalLight"], exp), 0.012)
     box("ACCESS_trim", (ax, YW - 0.112, az + 0.5), (0.4, 0.006, 0.04), M["M_PaintOrange"], exp)
     bevel(box("DOOR_IN_control", (ax, YW - 0.15, az + 0.22), (0.3, 0.08, 0.42), M["M_MetalDark"], exp), 0.012)
-    box("DOOR_IN_control_screen", (ax, YW - 0.192, az + 0.33), (0.22, 0.004, 0.124), M["M_ScreenStatic"], exp)
+    box("DOOR_IN_control_screen", (ax, YW - 0.192, az + 0.33), (0.22, 0.004, 0.22 * 9 / 16), M["M_ScreenStatic"], exp)
     for r in range(2):
         for c in range(3):
             box(f"DOOR_IN_control_key_{r}_{c}", (ax - 0.07 + c * 0.07, YW - 0.196, az + 0.17 - r * 0.06), (0.05, 0.01, 0.04),
