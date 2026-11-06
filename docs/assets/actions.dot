@@ -1,4 +1,4 @@
-// FICSIT AI v2.0-draft — путь действия с игровыми последствиями (пример: Blueprint, v1.1).
+// FICSIT AI v3.0-draft — путь действия с игровыми последствиями (пример: Blueprint, v1.1).
 // Сетевой границы больше нет; граница доверия осталась границей кода.
 // Рендер: dot -Tpng -Gdpi=150 actions.dot -o actions.png
 digraph G {
@@ -13,7 +13,7 @@ digraph G {
 
   subgraph cluster_untrusted {
     label="Недоверенный источник"; fontsize=10; fontcolor="#54646F"; color="#DFE5EA"; style="rounded,dashed";
-    llm [label="Foreman / LLM\nтолько предлагает", fillcolor="#E6F1F3", color="#7FA7B0"];
+    llm [label="Foreman / LLM в компаньоне\nтолько предлагает", fillcolor="#E6F1F3", color="#7FA7B0"];
   }
 
   subgraph cluster_trusted {

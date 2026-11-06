@@ -8,11 +8,6 @@
       "code": "MANIFOLD_RAMP_UP",
       "message": "Манифолд из 4 машин: последняя выходит на режим с задержкой; буфер входа заполняется неравномерно.",
       "scope": "connections.belts"
-    },
-    {
-      "code": "CLOCK_NOT_APPLIED",
-      "message": "clockPercent=100 учтён в расчёте плановой скорости, но такт в чертеже не выставляется.",
-      "scope": "clockPercent"
     }
   ],
   "estimates": {

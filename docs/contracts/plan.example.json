@@ -35,11 +35,5 @@
   "rawInputs": [{ "item": "Desc_OreCopper_C", "ratePerMin": 300, "unit": "items/min" }],
   "selectedAlternates": ["Recipe_Alternate_CircuitBoard_1_C"],
   "totals": { "powerMW": 940, "machineCount": 14 },
-  "warnings": [
-    {
-      "code": "RECIPE_LOOP_NEEDS_PIN",
-      "message": "Обнаружен цикл рецептов; закрепите одну из ставок для разрешения системы.",
-      "scope": "groups"
-    }
-  ]
+  "warnings": []
 }

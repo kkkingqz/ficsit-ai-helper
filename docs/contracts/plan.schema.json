@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ficsit-ai-helper/contracts/plan.schema.json",
+  "title": "ProductionPlan",
+  "description": "Вычисляемая модель производства — единый объект для таблицы, графа, AI и Blueprint-контура. Норматив по ADR-022; проза — ARCHITECTURE.md §5.2, §8.3. Структура groups[] + connections[] — DAG, а не дерево (ADR-016). Код предупреждения RECIPE_LOOP_NEEDS_PIN отозван в 3.0-draft: циклы решаются линейной системой без вмешательства игрока (ADR-019).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "saveKey", "catalogRevision", "version", "target", "groups", "connections", "rawInputs", "totals", "warnings"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 2 },
+    "id": { "$ref": "#/$defs/localId" },
+    "saveKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Владелец плана — сохранение, а не игрок (§10)."
+    },
+    "catalogRevision": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Версия каталога, при которой план посчитан. При расхождении с текущей UI помечает план как требующий пересчёта, а не молча показывает устаревшие числа (§5.1, §5.2)."
+    },
+    "version": { "type": "integer", "minimum": 1 },
+    "target": { "$ref": "#/$defs/flowTarget" },
+    "groups": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/group" } },
+    "connections": { "type": "array", "items": { "$ref": "#/$defs/connection" } },
+    "rawInputs": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+    "selectedAlternates": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/className" },
+      "description": "Альтернативные рецепты выбирает игрок. Именно это делает задачу линейной: при фиксированном наборе рецептов автоподбор (LP/MILP) не нужен (§8.3, ADR-019)."
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["powerMW", "machineCount"],
+      "properties": {
+        "powerMW": { "type": "number", "minimum": 0 },
+        "machineCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } }
+  },
+  "$defs": {
+    "localId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$" },
+    "className": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$" },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "machineClass", "recipeClass", "count", "plannedRatePerMin"],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "machineClass": { "$ref": "#/$defs/className" },
+        "recipeClass": { "$ref": "#/$defs/className" },
+        "count": { "type": "number", "exclusiveMinimum": 0 },
+        "clockPercent": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 250,
+          "default": 100,
+          "description": "Такт — понятие планировщика: участвует в расчёте plannedRate. В BlueprintRequest его нет (§5.4)."
+        },
+        "powerShards": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "somersloops": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "plannedRatePerMin": {
+          "type": "number",
+          "minimum": 0,
+          "description": "plannedRate = рецепт × число машин × такт. Не смешивать с actualRate без подписи (§8.4)."
+        },
+        "builtCount": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Прогресс трекера строительства (FR-11, §6.7). Растёт при постройке подходящей машины, уменьшается при демонтаже."
+        }
+      }
+    },
+    "connection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "from", "to", "ratePerMin", "unit"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "from": { "$ref": "#/$defs/localId" },
+        "to": { "$ref": "#/$defs/localId" },
+        "ratePerMin": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["items/min", "m3/min"] }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin", "unit"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "ratePerMin": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["items/min", "m3/min"] },
+        "byproduct": { "type": "boolean", "default": false }
+      }
+    },
+    "flowTarget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "ratePerMin": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "SYSTEM_INFEASIBLE — система неразрешима при заданных ограничениях (отрицательные интенсивности, §8.3). CATALOG_STALE — план посчитан при другом catalogRevision."
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "scope": { "type": "string", "maxLength": 128 }
+      }
+    }
+  }
+}

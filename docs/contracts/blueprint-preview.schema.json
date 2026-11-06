@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ficsit-ai-helper/contracts/blueprint-preview.schema.json",
+  "title": "PreviewResult",
+  "description": "Результат dry-run проверки BlueprintRequest. Норматив по ADR-022; проза — ARCHITECTURE.md §5.4. Код CLOCK_NOT_APPLIED отозван в 3.0-draft вместе с полями такта.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "valid", "errors", "warnings"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 2 },
+    "requestId": { "type": "string", "format": "uuid" },
+    "valid": { "type": "boolean" },
+    "errors": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/diagnostic" } },
+    "estimates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+        "powerMW": { "type": "number", "minimum": 0 },
+        "footprint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "z", "unit"],
+          "properties": {
+            "x": { "type": "number", "exclusiveMinimum": 0 },
+            "y": { "type": "number", "exclusiveMinimum": 0 },
+            "z": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "const": "foundations" }
+          }
+        }
+      }
+    },
+    "moduleSplit": {
+      "description": "Предложение разбиения на модули. null — разбиение не требуется. Правила разбиения ряда — открытый вопрос v1.1 (§15.3).",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["modules", "reason"],
+          "properties": {
+            "modules": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["count"],
+                "properties": {
+                  "count": { "type": "integer", "minimum": 1 },
+                  "outputName": { "type": "string", "maxLength": 48 }
+                }
+              }
+            },
+            "reason": { "enum": ["DIMENSION_LIMIT", "OBJECT_LIMIT"] }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "Машиночитаемый код. MANIFOLD_RAMP_UP обязателен для манифолда: эффект разгона и голодающей последней машины известен, и preview обязан о нём сообщать (§5.4)."
+        },
+        "message": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "scope": {
+          "type": "string",
+          "maxLength": 128,
+          "description": "JSON-указатель в терминах полей BlueprintRequest, например connections.belts."
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin", "unit"],
+      "properties": {
+        "item": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$" },
+        "ratePerMin": { "type": "number", "minimum": 0 },
+        "unit": { "enum": ["items/min", "m3/min", "MW"] },
+        "byproduct": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

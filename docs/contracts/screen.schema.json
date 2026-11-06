@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ficsit-ai-helper/contracts/screen.schema.json",
+  "title": "ScreenDefinition",
+  "description": "Декларативное определение экрана. Норматив по ADR-022; проза — ARCHITECTURE.md §5.3. Схема заморожена в v1.0, рантайм генерического рендерера — v1.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "scope", "layout", "widgets"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 2 },
+    "id": { "$ref": "#/$defs/localId" },
+    "scope": {
+      "description": "Значение shared удалено вместе с мультиплеером (§5.3, ADR-005).",
+      "enum": ["personal", "terminal"]
+    },
+    "title": { "type": "string", "maxLength": 64 },
+    "layout": {
+      "description": "Перечисление пресетов, а не свободная сетка: сокращает число невалидных состояний, которые может породить LLM.",
+      "enum": ["slots-1", "slots-2", "slots-3", "hud-compact"]
+    },
+    "theme": { "enum": ["dark", "light", "ficsit"] },
+    "widgets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "items": { "$ref": "#/$defs/widget" }
+    }
+  },
+  "$defs": {
+    "localId": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_.-]{0,63}$",
+      "description": "Без HTML, JS, Unreal class paths и сетевых URL (§5.3)."
+    },
+    "widget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "slot", "source"],
+      "properties": {
+        "id": { "$ref": "#/$defs/localId" },
+        "type": {
+          "description": "Белый список v1.0. Тип image удалён — пайплайна изображений нет до v1.2.",
+          "enum": ["text", "metric", "table", "timeseries", "production_graph", "notes", "work_orders"]
+        },
+        "slot": { "enum": ["main", "side", "foot"] },
+        "source": { "$ref": "#/$defs/source" },
+        "options": {
+          "type": "object",
+          "description": "Параметры отображения конкретного типа виджета. Незнакомые ключи отвергаются клиентом при разборе.",
+          "properties": {
+            "windowMin": { "type": "integer", "minimum": 1, "maximum": 1440 },
+            "columns": { "type": "array", "items": { "type": "string" }, "maxItems": 12 },
+            "text": { "type": "string", "maxLength": 2048 }
+          }
+        },
+        "refreshSec": {
+          "type": "number",
+          "minimum": 1,
+          "maximum": 3600,
+          "description": "Клиент ЗАЖИМАЕТ значение в допустимый диапазон, а не отклоняет определение; у тяжёлых источников есть нижний порог (§8.2)."
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "id"],
+      "description": "id дополнительно сверяется с живым каталогом метрик и существующими планами; синтаксической валидации недостаточно (§5.3).",
+      "properties": {
+        "kind": { "enum": ["plan", "metric", "work_orders", "notes", "static"] },
+        "id": { "$ref": "#/$defs/localId" }
+      }
+    }
+  }
+}

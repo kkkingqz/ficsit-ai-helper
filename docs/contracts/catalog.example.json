@@ -1,0 +1,87 @@
+{
+  "schemaVersion": 2,
+  "catalogRevision": 17,
+  "saveKey": "MyGame_Autosave",
+  "items": [
+    { "className": "Desc_OreCopper_C", "displayName": "Copper Ore", "form": "solid", "stackSize": 100, "isResource": true },
+    { "className": "Desc_CircuitBoard_C", "displayName": "Circuit Board", "form": "solid", "stackSize": 200 },
+    { "className": "Desc_LiquidOil_C", "displayName": "Crude Oil", "form": "liquid" }
+  ],
+  "recipes": [
+    {
+      "className": "Recipe_CircuitBoard_C",
+      "displayName": "Circuit Board",
+      "durationSec": 8,
+      "ingredients": [
+        { "item": "Desc_CopperSheet_C", "amount": 2, "amountPerMin": 15 },
+        { "item": "Desc_Plastic_C", "amount": 4, "amountPerMin": 30 }
+      ],
+      "products": [{ "item": "Desc_CircuitBoard_C", "amount": 1, "amountPerMin": 7.5 }],
+      "producedIn": ["Build_AssemblerMk1_C"],
+      "isAlternate": false,
+      "unlocked": true,
+      "isVanilla": true
+    },
+    {
+      "className": "Recipe_Alternate_CircuitBoard_1_C",
+      "displayName": "Alternate: Silicon Circuit Board",
+      "durationSec": 24,
+      "ingredients": [
+        { "item": "Desc_CopperSheet_C", "amount": 11, "amountPerMin": 27.5 },
+        { "item": "Desc_Silica_C", "amount": 11, "amountPerMin": 27.5 }
+      ],
+      "products": [{ "item": "Desc_CircuitBoard_C", "amount": 5, "amountPerMin": 12.5 }],
+      "producedIn": ["Build_AssemblerMk1_C"],
+      "isAlternate": true,
+      "unlocked": true,
+      "isVanilla": true
+    },
+    {
+      "className": "Recipe_Alternate_Computer_1_C",
+      "displayName": "Alternate: Caterium Computer",
+      "durationSec": 16,
+      "ingredients": [
+        { "item": "Desc_CircuitBoard_C", "amount": 4, "amountPerMin": 15 },
+        { "item": "Desc_HighSpeedWire_C", "amount": 14, "amountPerMin": 52.5 },
+        { "item": "Desc_Rubber_C", "amount": 6, "amountPerMin": 22.5 }
+      ],
+      "products": [{ "item": "Desc_Computer_C", "amount": 1, "amountPerMin": 3.75 }],
+      "producedIn": ["Build_ManufacturerMk1_C"],
+      "isAlternate": true,
+      "unlocked": false,
+      "isVanilla": true
+    }
+  ],
+  "machines": [
+    {
+      "className": "Build_AssemblerMk1_C",
+      "displayName": "Assembler",
+      "family": "assembler",
+      "powerMW": 15,
+      "buildable": true,
+      "ports": { "beltIn": 2, "beltOut": 1, "pipeIn": 0, "pipeOut": 0 },
+      "maxPowerShards": 3,
+      "maxSomersloops": 2,
+      "footprint": { "x": 10, "y": 15, "z": 11, "unit": "foundations" }
+    },
+    {
+      "className": "Build_ManufacturerMk1_C",
+      "displayName": "Manufacturer",
+      "family": "manufacturer",
+      "powerMW": 55,
+      "buildable": true,
+      "ports": { "beltIn": 4, "beltOut": 1, "pipeIn": 0, "pipeOut": 0 },
+      "maxPowerShards": 3,
+      "maxSomersloops": 4
+    }
+  ],
+  "schematics": [
+    {
+      "className": "Schematic_Alternate_CircuitBoard_1_C",
+      "displayName": "Hard Drive: Silicon Circuit Board",
+      "tier": 0,
+      "purchased": true,
+      "unlocksRecipes": ["Recipe_Alternate_CircuitBoard_1_C"]
+    }
+  ]
+}

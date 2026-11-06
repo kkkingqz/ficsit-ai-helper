@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/ficsit-ai-helper/contracts/blueprint.schema.json",
+  "title": "BlueprintRequest",
+  "description": "Запрос на создание чертежа. Норматив по ADR-022; проза — ARCHITECTURE.md §5.4. Реализация — v1.1. Поля clockPercent и clockApplied удалены в 3.0-draft: такт — понятие планировщика и живёт в ProductionPlan.groups[].clockPercent. Поле targetPlayer удалено вместе с мультиплеером.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "machineClass", "recipeClass", "count", "layout", "connections"],
+  "properties": {
+    "schemaVersion": { "type": "integer", "const": 2 },
+    "requestId": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Обеспечивает идемпотентность повторного подтверждения (§5.4)."
+    },
+    "machineClass": { "$ref": "#/$defs/className" },
+    "recipeClass": { "$ref": "#/$defs/className" },
+    "count": { "type": "integer", "minimum": 1, "maximum": 64 },
+    "layout": { "enum": ["single_row", "double_row", "compact_block"] },
+    "connections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["belts", "pipes", "power"],
+      "properties": {
+        "belts": { "enum": ["none", "manifold", "load_balanced"] },
+        "pipes": { "enum": ["none", "manifold", "load_balanced"] },
+        "power": { "type": "boolean" }
+      }
+    },
+    "outputName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 48,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9 _.-]*$",
+      "description": "Генератор обеспечивает уникальность и не перезаписывает чертежи FactorySpawner (§9.2)."
+    }
+  },
+  "$defs": {
+    "className": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$",
+      "description": "Устойчивое игровое className. Сверяется с живым каталогом, включая статус разблокировки, а не берётся из текста (§7.1)."
+    }
+  }
+}

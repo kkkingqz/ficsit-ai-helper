@@ -1,5 +1,9 @@
-// FICSIT AI v2.0-draft — компонентная схема.
-// Два рантайма вместо пяти в 1.0-draft. Рендер: dot -Tpng -Gdpi=150 components.dot -o components.png
+// FICSIT AI v3.0-draft — компонентная схема.
+// Отличия от 2.0-draft: MCP-сервер переехал в компаньон (ADR-017), у мода один
+// исходящий канал и ни одного слушателя; граф интерактивный и приходит с форком
+// Satisfactory Build Calculator (ADR-016); сайдкар переименован в компаньон, потому
+// что это наш компонент v1.0 (ADR-020); выделены core/ и GameFacade/ (ADR-021).
+// Рендер: dot -Tpng -Gdpi=150 components.dot -o components.png
 digraph G {
   graph [rankdir=TB, compound=true, nodesep=.30, ranksep=.45, pad=.16, bgcolor="white",
          fontname="DejaVu Sans", splines=ortho];
@@ -8,16 +12,16 @@ digraph G {
   edge  [color="#718291", penwidth=1.2, arrowsize=.6];
 
   subgraph cluster_game {
-    label="Игровой процесс: Satisfactory 1.2 + SML + FicsitAI (одиночная игра)";
+    label="Игровой процесс: Satisfactory 1.2 + SML 3.12 + FicsitAI (форк SBC, одиночная игра)";
     fontsize=12; fontname="DejaVu Sans"; fontcolor="#263B47"; color="#CDD5DB"; style="rounded";
 
     subgraph cluster_present {
       label="Презентационный слой"; fontsize=10; fontcolor="#54646F"; color="#DFE5EA"; style="rounded,dashed";
       terminal  [label="AI Terminal\nстроительный объект · E · экран в мире", fillcolor="#F9E6CA", color="#D69A53"];
-      equipment [label="AI Assistant\nручной слот · ЛКМ · клавиши", fillcolor="#F9E6CA", color="#D69A53"];
+      equipment [label="AI Assistant\nручной слот · ЛКМ · клавиши\nv1.1", fillcolor="#F6EADA", color="#D0A878", style="rounded,filled,dashed"];
       ui        [label="Единый UI Controller\nUMG · layout-пресеты"];
-      graphview [label="Послойный граф + таблица\nread-only, своя раскладка"];
-      hud       [label="HUD widgets\nпри активном устройстве"];
+      graphview [label="Интерактивный граф + таблица\nприходит с форком · проекция DAG"];
+      hud       [label="HUD widgets\nv1.1", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       rt        [label="Render target → меш терминала\nобновление по renderRevision"];
     }
 
@@ -25,39 +29,55 @@ digraph G {
       label="Authority-слой — единственный путь к мутации мира"; fontsize=10;
       fontcolor="#54646F"; color="#D8BFA0"; style="rounded,dashed";
       validator [label="Validator + очередь подтверждений", fillcolor="#FBEEDC", color="#C98F4C"];
-      planner   [label="Planner\nмашины · потоки · энергия"];
-      catalog   [label="CatalogProvider\nAFGRecipeManager · SML classes"];
-      telemetry [label="TelemetrySampler\nснапшоты вне GameThread"];
       bpcore    [label="Factory Spawner core (адаптация)\nv1.1", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       validator -> bpcore [style=dashed];
     }
 
-    mcp   [label="Локальный MCP-эндпойнт\n127.0.0.1 + токен", fillcolor="#E6F1F3", color="#7FA7B0"];
-    store [label="Локальное состояние по сохранению\nплан · экраны · заметки · кэш", shape=cylinder];
+    subgraph cluster_core {
+      label="core/ — без Unreal, тесты на хосте"; fontsize=10;
+      fontcolor="#54646F"; color="#C3D2CB"; style="rounded,dashed";
+      planner [label="Planner\nлинейная система A·x = d, x ≥ 0", fillcolor="#EAF2EC", color="#8FAE9B"];
+      tracker [label="Трекер строительства\nсопоставление с узлами плана", fillcolor="#EAF2EC", color="#8FAE9B"];
+    }
 
-    terminal -> ui; equipment -> ui; equipment -> hud;
+    subgraph cluster_facade {
+      label="GameFacade/ — единственное место типов AFG*/UFG*"; fontsize=10;
+      fontcolor="#54646F"; color="#C8CBD9"; style="rounded,dashed";
+      catalog   [label="CatalogProvider\nUModContentRegistry · AFGRecipeManager", fillcolor="#ECEEF6", color="#9B9FBE"];
+      telemetry [label="TelemetrySampler\nснапшоты вне GameThread", fillcolor="#ECEEF6", color="#9B9FBE"];
+      buildwatch[label="Хуки постройки и демонтажа", fillcolor="#ECEEF6", color="#9B9FBE"];
+    }
+
+    link  [label="Исходящий канал к компаньону\nвходящего порта нет", fillcolor="#E6F1F3", color="#7FA7B0"];
+    store [label="Состояние: AModSubsystem (save)\n+ локальные файлы по ключу сохранения", shape=cylinder];
+
+    terminal -> ui; equipment -> ui [style=dashed]; equipment -> hud [style=dashed];
     ui -> graphview; terminal -> rt;
-    ui -> validator; hud -> telemetry;
+    ui -> validator; hud -> telemetry [style=dashed];
     catalog -> planner; telemetry -> planner [style=dotted];
-    planner -> validator;
-    ui -> store [dir=both]; graphview -> store [style=dotted];
-    mcp -> validator [label="tool calls", fontsize=9];
-    mcp -> catalog [style=dotted]; mcp -> planner [style=dotted];
+    buildwatch -> tracker; planner -> tracker [style=dotted];
+    planner -> validator; graphview -> tracker [style=dotted];
+    ui -> store [dir=both]; tracker -> store [dir=both];
+    link -> validator [label="tool calls", fontsize=9];
+    link -> catalog [style=dotted]; link -> planner [style=dotted];
   }
 
   subgraph cluster_side {
-    label="Локальный сайдкар (один установщик, loopback)";
+    label="Компаньон — наш компонент v1.0 (один установщик, loopback)";
     fontsize=12; fontname="DejaVu Sans"; fontcolor="#263B47"; color="#CDD5DB"; style="rounded";
+    mcp     [label="MCP-сервер\nTypeScript SDK · инструменты мода", fillcolor="#E6F1F3", color="#7FA7B0"];
     foreman [label="FICSIT Foreman — vanilla\nchat SSE · MCP client · Work Orders", fillcolor="#E6F1F3", color="#7FA7B0"];
     fdb     [label="Foreman DB\nаккаунт · переписка · Work Orders", shape=cylinder];
-    voice   [label="STT + TTS\nv1.3", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+    voice   [label="Сайдкар STT + TTS\nsherpa-onnx · v1.3", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+    sup     [label="Супервизор и упаковка\nNode SEA · один исполняемый файл"];
     foreman -> fdb [dir=both];
+    foreman -> mcp [label="MCP", fontsize=9];
     foreman -> voice [dir=both, style=dashed];
+    sup -> foreman [style=dotted]; sup -> mcp [style=dotted];
   }
 
-  llm [label="LLM-провайдер\nключ хранится у сайдкара", shape=note, fillcolor="#F2F4F6", color="#B9C2CA"];
+  llm [label="LLM-провайдер\nключ хранится у компаньона", shape=note, fillcolor="#F2F4F6", color="#B9C2CA"];
 
-  ui      -> foreman [dir=both, label="chat HTTP/SSE · loopback", fontsize=9];
-  foreman -> mcp     [label="MCP · loopback", fontsize=9];
+  link    -> mcp     [dir=both, label="одно исходящее соединение\nchat и tool calls · loopback", fontsize=9];
   foreman -> llm     [dir=both, style=dashed];
 }
