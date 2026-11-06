@@ -380,6 +380,129 @@
       "mode": "multi",
       "fbx": "export/SM_Holo_LogisticsHub_T3_Mini.fbx",
       "rim_m": 0.564
+    },
+    "SM_Holo_Smelter_T1": {
+      "tris": 3246,
+      "verts": 1828,
+      "bbox_min": [
+        -7.27,
+        -4.0,
+        -0.02
+      ],
+      "bbox_max": [
+        7.27,
+        4.0,
+        7.95
+      ],
+      "radius_xy": 7.31,
+      "node": "smelter",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Smelter_T1.fbx",
+      "rim_m": 0.048,
+      "scale_single": 0.125
+    },
+    "SM_Holo_Smelter_T1_Mini": {
+      "tris": 3174,
+      "verts": 1780,
+      "bbox_min": [
+        -7.25,
+        -4.0,
+        -0.02
+      ],
+      "bbox_max": [
+        7.25,
+        4.0,
+        7.95
+      ],
+      "radius_xy": 7.29,
+      "node": "smelter",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Smelter_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_Smelter_T2": {
+      "tris": 6532,
+      "verts": 3612,
+      "bbox_min": [
+        -10.66,
+        -6.0,
+        -0.03
+      ],
+      "bbox_max": [
+        10.66,
+        6.0,
+        11.85
+      ],
+      "radius_xy": 10.7,
+      "node": "smelter",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Smelter_T2.fbx",
+      "rim_m": 0.072,
+      "scale_single": 0.08333
+    },
+    "SM_Holo_Smelter_T2_Mini": {
+      "tris": 6328,
+      "verts": 3476,
+      "bbox_min": [
+        -10.65,
+        -6.0,
+        -0.03
+      ],
+      "bbox_max": [
+        10.65,
+        6.0,
+        11.85
+      ],
+      "radius_xy": 10.69,
+      "node": "smelter",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Smelter_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_Smelter_T3": {
+      "tris": 9956,
+      "verts": 5480,
+      "bbox_min": [
+        -14.65,
+        -9.4,
+        -0.02
+      ],
+      "bbox_max": [
+        14.65,
+        8.0,
+        17.05
+      ],
+      "radius_xy": 14.69,
+      "node": "smelter",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Smelter_T3.fbx",
+      "rim_m": 0.103,
+      "scale_single": 0.05848
+    },
+    "SM_Holo_Smelter_T3_Mini": {
+      "tris": 9392,
+      "verts": 5104,
+      "bbox_min": [
+        -14.65,
+        -9.4,
+        -0.02
+      ],
+      "bbox_max": [
+        14.65,
+        8.0,
+        17.05
+      ],
+      "radius_xy": 14.69,
+      "node": "smelter",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Smelter_T3_Mini.fbx",
+      "rim_m": 0.564
     }
   }
 }

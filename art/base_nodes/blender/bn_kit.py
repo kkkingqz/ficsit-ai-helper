@@ -28,6 +28,9 @@ Module types
     pipes.runs  polylines with rounded corners (loops over columns, racks along the walls)
     profile     hall body: (x, z) outline extruded along Y (cut roof corners), glow strips on its faces
     conveyor    belt on legs with rails, rollers and chevrons pointing out of the building
+    stacks      smelter chimneys: base, body, glowing band, wide collar
+    roof_fans   fan box lying on a roof, fans facing up
+    gate.chevrons.kind = "heat"   wavy heat lines instead of >>> (furnace door)
 A module with "detail": true is left out of the small multi-mode mesh (_Mini).
 """
 import math
@@ -156,6 +159,9 @@ def gate(n, m):
     ch = m.get("chevrons")
     for k in range(ch["n"] if ch else 0):
         u = (k - (ch["n"] - 1) / 2) * ch["pitch"]
+        if ch.get("kind") == "heat":                         # furnace: wavy heat lines rising (smelter)
+            _heat_line(n, f, u, pd + 0.2, ch["z"], ch["h"], ch["h"] * 0.09)
+            continue
         org = f.p(u, 0, ch["z"])
         poly = G.chevron(ch["h"], ch["h"] * 0.45, ch["h"] * 0.22)
         n.part(n.extrude2d(poly, pd + 0.15, pd + 0.28, org, f.U, (0, 0, 1), f.N), glow=1.0, rim=False)
@@ -170,6 +176,14 @@ def gate(n, m):
             n.part(n.box(f.p(0, d0 + st["len"] / k / 2 + 0.1, hz / 2), (st["w"], st["len"] / k + 0.2, hz), yaw=f.yaw),
                    rim=True)
             n.part(n.box(f.p(0, d0 + 0.12, hz + 0.02), (st["w"] * 0.9, 0.12, 0.05), yaw=f.yaw), glow=0.7, rim=False)
+
+
+def _heat_line(n, f, u, d, z0, h, t, k=10):
+    """One wavy vertical stroke (1.5 periods) on a face: chain of short beams along a sine."""
+    amp = h * 0.13
+    pts = [f.p(u + amp * math.sin(2 * math.pi * 1.5 * i / k), d, z0 + h * i / k) for i in range(k + 1)]
+    for a, b in zip(pts[:-1], pts[1:]):
+        n.part(n.beam(a, b, t, 0.12), glow=1.0, rim=False)
 
 
 def arm(n, m):
@@ -542,6 +556,32 @@ def conveyor(n, m):
             n.part(n.extrude2d(poly, 0.0, 0.08, org, A * sgn_i, S * sgn_i, (0, 0, 1)), glow=1.0, rim=False)
 
 
+def stacks(n, m):
+    """Smelter chimneys: base block, body, glowing band, wide top collar (open look: dark inner disc)."""
+    r, z0, h = m["r"], m["z0"], m["h"]
+    for x, y in m["at"]:
+        n.part(n.box((x, y, z0 + 0.3), (r * 2.6, r * 2.6, 0.6)), rim=True)
+        n.part(n.cylinder((x, y, z0 + h / 2), r, h, 16), rim=True)
+        n.part(n.annulus((x, y, z0 + h * 0.62), r + 0.08, r - 0.05, 0.3, 16), glow=0.8, rim=False)
+        n.part(n.annulus((x, y, z0 + h + 0.2), r * 1.3, r * 0.72, 0.5, 16), rim=True)
+        n.part(n.cylinder((x, y, z0 + h + 0.05), r * 0.74, 0.1, 16), glow=0.0, rim=False)
+
+
+def roof_fans(n, m):
+    """Fan box lying on a roof: fans face up (rings glow), n fans along X."""
+    x, y, z0 = m["at"]
+    w, d, h = m["size"]
+    k, r = m["n"], m["r"]
+    n.part(n.box((x, y, z0 + h / 2), (w, d, h)), rim=True)
+    for i in range(k):
+        c = Vector((x + (i - (k - 1) / 2) * (w / k), y, z0 + h + 0.06))
+        n.part(n.annulus(c, r, r * 0.8, 0.14, 20), glow=0.8, rim=False)
+        n.part(n.cylinder(c - Vector((0, 0, 0.04)), r * 0.8, 0.05, 20), rim=False)
+        for sg in (-1, 1):
+            n.part(n.box(c, (r * 1.6, 0.08 + 0.0, 0.08), yaw=sg * math.pi / 4), glow=0.35, rim=False)
+        n.part(n.cylinder(c + Vector((0, 0, 0.05)), r * 0.18, 0.1, 10), glow=0.8, rim=False)
+
+
 def crates(n, m):
     for x, y, z0, w, d, h, yaw in m["boxes"]:
         n.part(n.box((x, y, z0 + h / 2), (w, d, h), yaw=math.radians(yaw)), rim=True)
@@ -558,7 +598,7 @@ BUILDERS = {"plate": plate, "mass": mass, "pylons": pylons, "buttresses": buttre
             "shutter": shutter, "fans": fans, "tanks": tanks, "tower": tower, "railing": railing, "dish": dish,
             "antennas": antennas, "banner": banner, "pipes": pipes, "crates": crates, "box": generic_box,
             "columns": columns, "lattice": lattice, "stairs": stairs, "lamps": lamps, "units": units,
-            "profile": profile, "conveyor": conveyor}
+            "profile": profile, "conveyor": conveyor, "stacks": stacks, "roof_fans": roof_fans}
 
 
 def build(n, module):

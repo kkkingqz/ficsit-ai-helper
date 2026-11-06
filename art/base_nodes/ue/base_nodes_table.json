@@ -124,5 +124,47 @@
     "PlateRadius": 1860.1,
     "Height": 1780.0,
     "ScaleSingle": 0.05376
+  },
+  {
+    "Name": "smelter_T1",
+    "NodeId": "smelter",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"smelter.name\", \"Smelting Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"smelter.type\", \"Processing / Smelting\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Smelter_T1.SM_Holo_Smelter_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Smelter_T1_Mini.SM_Holo_Smelter_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Smelter_T1_Screen.T_Node_Smelter_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Smelter_T1_Icon_256.T_Node_Smelter_T1_Icon_256",
+    "PlateRadius": 710.2,
+    "Height": 800.0,
+    "ScaleSingle": 0.125
+  },
+  {
+    "Name": "smelter_T2",
+    "NodeId": "smelter",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"smelter.name\", \"Smelting Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"smelter.type\", \"Processing / Smelting\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Smelter_T2.SM_Holo_Smelter_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Smelter_T2_Mini.SM_Holo_Smelter_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Smelter_T2_Screen.T_Node_Smelter_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Smelter_T2_Icon_256.T_Node_Smelter_T2_Icon_256",
+    "PlateRadius": 1052.2,
+    "Height": 1200.0,
+    "ScaleSingle": 0.08333
+  },
+  {
+    "Name": "smelter_T3",
+    "NodeId": "smelter",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"smelter.name\", \"Smelting Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"smelter.type\", \"Processing / Smelting\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Smelter_T3.SM_Holo_Smelter_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Smelter_T3_Mini.SM_Holo_Smelter_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Smelter_T3_Screen.T_Node_Smelter_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Smelter_T3_Icon_256.T_Node_Smelter_T3_Icon_256",
+    "PlateRadius": 1453.8,
+    "Height": 1710.0,
+    "ScaleSingle": 0.05848
   }
 ]
