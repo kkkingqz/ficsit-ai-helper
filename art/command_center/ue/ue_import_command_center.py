@@ -328,10 +328,8 @@ def do_content():
         o = cdo(build)
         if not set_prop(o, ["m_power_consumption", "mPowerConsumption"], b["power_consumption_mw"]):
             manual(f"{b['blueprint']}: Power Consumption = {b['power_consumption_mw']} MW")
-        meshes = {k: unreal.load_asset(FOLDER["meshes"] + "/" + m["asset"]) for k, m in SPEC["meshes"].items()}
-        for k, prop in (("exterior", "exterior_mesh"), ("interior", "interior_mesh"), ("holo", "holo_mesh")):
-            if not set_prop(o, [prop], meshes.get(k)):
-                manual(f"{b['blueprint']}: assign {SPEC['meshes'][k]['asset']} to the {k} mesh component")
+        for k, m in SPEC["meshes"].items():                   # components are set up in the BP editor (SCS)
+            manual(f"{b['blueprint']}: {m['asset']} -> {m.get('component', k)}")
         eal.save_loaded_asset(build)
     desc = make_blueprint(d["blueprint"], d["parent_class"], folder)
     if desc:
