@@ -1,5 +1,5 @@
 {
-  "_comment": "Command Center (AI Terminal flagship, FR-01) — content spec for stage 7. Single source for ue_import_command_center.py and README_UE.md. Values marked VERIFY are game asset paths / class names that must be checked in the SML 3.12 editor before use.",
+  "_comment": "Command Center (AI Terminal flagship, FR-01) — content spec for stage 7. Single source for ue_import_command_center.py and README_UE.md. C++ class / property names are checked against the SML v3.12.0 headers; values still marked VERIFY are /Game/FactoryGame asset paths (game content, not in the headers) and must be checked in the editor (Content Browser -> Copy Reference).",
   "mod_reference": "FicsitAIHelper",
   "content_root": "/FicsitAIHelper/Buildings/CommandCenter",
   "folders": {
@@ -30,7 +30,7 @@
         "SOCKET_holo",
         "SOCKET_door"
       ],
-      "component": "FGColoredInstanceMeshProxy in Build_CommandCenter (paintable, instanced) — VERIFY component class in SML 3.12"
+      "component": "UFGColoredInstanceMeshProxy (FGColoredInstanceMeshProxy.h, a UStaticMeshComponent) in Build_CommandCenter, tag Exterior (paintable, instanced)"
     },
     "interior": {
       "asset": "SM_CommandCenter_Interior",
@@ -45,7 +45,7 @@
       "collision": "none (the exterior UCX covers the room contents)",
       "component_max_draw_distance_cm": 6000,
       "note": "the main screen (DISPLAY_MAIN_RT) is not in the interior mesh: see screen_rt",
-      "component": "FGColoredInstanceMeshProxy in Build_CommandCenter, Max Draw Distance 6000 cm"
+      "component": "UFGColoredInstanceMeshProxy in Build_CommandCenter, tag Interior, Max Draw Distance 6000 cm"
     },
     "holo": {
       "asset": "SM_CommandCenter_Holo",
@@ -96,7 +96,7 @@
     "orientation_note": "Blender front (window) = -Y. Check in the editor which UE axis the window faces and fix with import rotation if the build gun expects the front on another axis (U-2)."
   },
   "building": {
-    "class_cpp": "AFAIHCommandCenter (GameFacade/Buildings, parent AFGBuildableFactory — VERIFY)",
+    "class_cpp": "AFAIHCommandCenter (GameFacade/Buildings) : AFGBuildableFactory (checked, SML v3.12.0)",
     "blueprint": "Build_CommandCenter",
     "display_name": "Command Center",
     "description": "FICSIT AI Terminal, flagship model. Opens the AI assistant console: production plans, catalog, factory overview and recommended tasks.",
@@ -126,14 +126,16 @@
       ],
       "aspect": "16:9"
     },
-    "no_power_behaviour": "screens dark (static atlas emissive 0), hologram hidden, UI does not open (shows 'No power' look-at text)"
+    "no_power_behaviour": "screens dark (static atlas emissive 0), hologram hidden, UI does not open (shows 'No power' look-at text)",
+    "power_note": "AFGBuildableFactory::mPowerConsumption is private: C++ overrides GetProducingPowerConsumptionBase() -> PowerConsumptionMW; the BP default Power Consumption is set to the same value by --content",
+    "clearance_property": "AFGBuildable::mClearanceData (TArray<FFGClearanceData>: Type, ClearanceBox, RelativeTransform)"
   },
   "descriptor": {
     "blueprint": "Desc_CommandCenter",
     "parent_class": "/Script/FactoryGame.FGBuildingDescriptor",
     "small_icon": "IconDesc_CommandCenter_256",
     "big_icon": "IconDesc_CommandCenter_512",
-    "build_category": "VERIFY: special / organisation category of the build menu in SML 3.12",
+    "build_category": "VERIFY: mCategory / mSubCategories (UFGItemDescriptor, checked) — pick the organisation category asset of the build menu in the editor",
     "build_menu_priority": 10
   },
   "recipe": {
@@ -179,6 +181,7 @@
     "unlocks": [
       "Recipe_CommandCenter"
     ],
+    "unlock_recipe_class": "VERIFY: /Game/FactoryGame/Unlocks/BP_UnlockRecipe.BP_UnlockRecipe_C",
     "cost_proposal": [
       {
         "item": "Reinforced Iron Plate",
@@ -193,7 +196,7 @@
         "amount": 200
       }
     ],
-    "registration": "SML GameWorldModule of the mod (mSchematics array) — VERIFY module name in the fork"
+    "registration": "UGameWorldModule::mSchematics of the mod's GameWorldModule blueprint (SML Module/GameWorldModule.h, checked)"
   },
   "materials": {
     "map_file": "ue_material_map.json",
@@ -215,5 +218,45 @@
       "M_Decal"
     ],
     "manifest": "../textures/manifest.json"
+  },
+  "localization": {
+    "_how_to": "Texts are gathered by the Localization Dashboard (target FicsitAIHelper); tools/apply_localization.py fills the RU .po from this table by source string. See README_UE.md, Localization.",
+    "target": "FicsitAIHelper",
+    "native_culture": "en",
+    "cultures": [
+      "en",
+      "ru"
+    ],
+    "entries": [
+      {
+        "where": "Desc_CommandCenter.mDisplayName",
+        "en": "Command Center",
+        "ru": "Командный центр"
+      },
+      {
+        "where": "Desc_CommandCenter.mDescription",
+        "en": "FICSIT AI Terminal, flagship model. Opens the AI assistant console: production plans, catalog, factory overview and recommended tasks.",
+        "ru": "Терминал ИИ FICSIT, флагманская модель. Открывает консоль ИИ-ассистента: производственные планы, каталог, обзор фабрики и рекомендуемые задачи."
+      },
+      {
+        "where": "C++ LOCTEXT FAIHCommandCenter/UsePowered",
+        "namespace": "FAIHCommandCenter",
+        "key": "UsePowered",
+        "en": "Command Center — press E to open the AI terminal",
+        "ru": "Командный центр — нажмите E, чтобы открыть терминал ИИ"
+      },
+      {
+        "where": "C++ LOCTEXT FAIHCommandCenter/UseNoPower",
+        "namespace": "FAIHCommandCenter",
+        "key": "UseNoPower",
+        "en": "Command Center — no power ({0} MW)",
+        "ru": "Командный центр — нет питания ({0} МВт)"
+      },
+      {
+        "where": "Schem_CommandCenter.mDisplayName",
+        "en": "FICSIT AI Operations",
+        "ru": "Операции ИИ FICSIT"
+      }
+    ]
   }
 }

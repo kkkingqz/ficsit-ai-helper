@@ -6,7 +6,8 @@
     "   for every value that the master has (leave '' to skip). Values come from textures/manifest.json.",
     "3. Run: py ue_import_command_center.py --import  -> creates MI_CC_<slot> and assigns them to the mesh sections.",
     "Paint: the game master usually takes the paint-gun colours itself; then leave base_color '' on the paint slots and",
-    "check U-11 (which mask the master reads: texture, vertex colour PaintMask R/G, or the slot itself)."
+    "check U-11 (which mask the master reads: texture, vertex colour PaintMask R/G, or the slot itself).",
+    "Fallback: a slot with an empty 'parent' and a 'fallback' key gets MI_CC_<slot> parented to the mod's own master (MM_CC_ScreenRT / MM_CC_Holo, built by the script); then 'fallback_param' names are used instead of 'game_param'."
   ],
   "slots": {
     "M_PaintOrange": {
@@ -355,14 +356,17 @@
         "emissive_strength": {
           "type": "scalar",
           "game_param": "",
-          "value": 1.2
+          "value": 1.2,
+          "fallback_param": "Emissive"
         },
         "emissive_texture": {
           "type": "texture",
           "game_param": "",
-          "value": "T_CC_ScreenAtlas_E"
+          "value": "T_CC_ScreenAtlas_E",
+          "fallback_param": "ScreenRT"
         }
-      }
+      },
+      "fallback": "MM_CC_ScreenRT"
     },
     "M_ScreenRT": {
       "parent": "",
@@ -371,9 +375,24 @@
         "screen_rt": {
           "type": "texture",
           "game_param": "",
-          "value": "RUNTIME: render target set by AFAIHCommandCenter"
+          "value": "RUNTIME: render target set by AFAIHCommandCenter",
+          "fallback_param": "ScreenRT"
+        },
+        "emissive_strength": {
+          "type": "scalar",
+          "game_param": "",
+          "fallback_param": "Emissive",
+          "value": 3.0
+        },
+        "power": {
+          "type": "scalar",
+          "game_param": "",
+          "fallback_param": "Power",
+          "value": 1.0,
+          "note": "driven 1/0 at runtime by AFAIHCommandCenter::ScreenPowerParameter"
         }
-      }
+      },
+      "fallback": "MM_CC_ScreenRT"
     },
     "M_LightWarm": {
       "parent": "",
@@ -429,14 +448,17 @@
             0.55,
             1.0,
             1.0
-          ]
+          ],
+          "fallback_param": "HoloColor"
         },
         "emissive_strength": {
           "type": "scalar",
           "game_param": "",
-          "value": 4.0
+          "value": 4.0,
+          "fallback_param": "Intensity"
         }
-      }
+      },
+      "fallback": "MM_CC_Holo"
     }
   }
 }

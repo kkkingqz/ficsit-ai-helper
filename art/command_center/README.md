@@ -209,12 +209,20 @@ UE-специалиста — [`ue/README_UE.md`](ue/README_UE.md):
 - `content_spec.json` — данные: питание **10 МВт**, рецепт **Tier 2** (Reinforced Iron Plate × 15, Modular Frame × 5,
   Rotor × 10, Cable × 50, Concrete × 80), веха «FICSIT AI Operations» (Tier 2), иконки, компоненты, clearance;
 - `ue_material_map.json` — карта слотов на **мастер-материалы игры** (решение), заполняется по `--discover`;
+  для `M_ScreenRT` / `M_ScreenStatic` / `M_Holo` есть свои fallback-мастера `MM_CC_ScreenRT` / `MM_CC_Holo`, которые
+  скрипт строит сам, если игрового мастера не нашлось;
 - `Source/FicsitAIHelper/.../GameFacade/Buildings/` — черновик C++: `AFAIHCommandCenter` (наследник
   `AFGBuildableFactory`: 10 МВт, E → событие для UI, render target главного экрана, вращение голограммы на
   `SOCKET_holo`, отсечение интерьера) и `UFAIHTerminalEvents` (только типы движка — граница ADR-021);
-- `icons/IconDesc_CommandCenter_512.png` / `_256.png` — иконки меню строительства (`blender/render_icon.py`).
+- `icons/IconDesc_CommandCenter_512.png` / `_256.png` — иконки меню строительства (`blender/render_icon.py`);
+- RU-локализация: таблица в `content_spec.json` → `localization`, `tools/apply_localization.py` заполняет `.po`
+  из Localization Dashboard.
 
-Скрипт и C++ ни разу не запускались: всё, что зависит от версии UE/FactoryGame, помечено `VERIFY`.
+Проверки без редактора (`ue/README_UE.md` §9): C++ и имена свойств FactoryGame сверены с заголовками **SML v3.12.0**
+(`mPowerConsumption` оказался private — питание через override `GetProducingPowerConsumptionBase()` + BP-default);
+скрипт прогнан во всех режимах на стабе **UE 5.6.0 Python API** (`tools/ue_stub_dryrun.py`) — 0 расхождений,
+найдено и исправлено 2 ошибки API; ADR-021 проверяется скриптом `tools/ci/check_adr021.py` — 0 нарушений.
+`VERIFY` остался только у путей ассетов `/Game/FactoryGame/...`. В настоящем редакторе пакет ещё не запускался.
 
 ## Слоты материалов
 

@@ -16,8 +16,12 @@ Steps (see README_UE.md for the full procedure):
               FactoryGame property names are set defensively; anything that fails is printed as a manual step)
   --verify    print what exists: meshes, LOD count, screen sizes, collision count, sockets, sections and materials
 
-THIS SCRIPT HAS NOT BEEN RUN IN AN EDITOR YET (written without UE access). Every call that depends on the engine or
-FactoryGame version is wrapped; on failure the script prints what to do by hand instead of stopping.
+NOT RUN IN A REAL EDITOR YET. Checked so far (README_UE.md, "Checks"):
+  * every unreal.* class / function / enum value and every editor property name is validated against the generated
+    UE 5.6.0 stub (PyPI unreal-stub 0.3) by tools/ue_stub_dryrun.py, which also runs all four modes end to end;
+  * FactoryGame property names (m_display_name, m_ingredients, ...) match the SML v3.12.0 headers.
+Every call that depends on the engine or FactoryGame version is still wrapped; on failure the script prints what to do
+by hand instead of stopping.
 """
 import json
 import os
@@ -53,6 +57,22 @@ def subsystem(cls_name):
         return unreal.get_editor_subsystem(cls) if cls else None
     except Exception:
         return None
+
+
+def save(asset):
+    """Save even if the package is not flagged dirty (CDO edits through set_editor_property may not flag it)."""
+    try:
+        return eal.save_loaded_asset(asset, False)
+    except Exception as e:
+        manual(f"save {asset.get_name() if asset else '?'} by hand: {e}")
+        return False
+
+
+def generated_class(bp):
+    try:
+        return unreal.BlueprintEditorLibrary.generated_class(bp)
+    except Exception:
+        return eal.load_blueprint_class(bp.get_path_name().split(".")[0])
 
 
 def set_prop(obj, names, value):
@@ -145,7 +165,7 @@ def import_textures():
             tex.set_editor_property("srgb", bool(t.get("srgb", False)))
             if comp == "TC_NORMALMAP":
                 tex.set_editor_property("flip_green_channel", False)     # already DirectX
-            eal.save_loaded_asset(tex)
+            save(tex)
         except Exception as e:
             manual(f"set compression/sRGB on {name} by hand ({comp}, sRGB={t.get('srgb')}): {e}")
         done[name] = tex
@@ -157,9 +177,9 @@ def import_textures():
                 try:
                     tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
                     tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
-                    eal.save_loaded_asset(tex)
+                    save(tex)
                 except Exception:
-                    pass
+                    manual(f"IconDesc_CommandCenter_{size}: Texture Group = UI, Compression = UserInterface2D")
                 done[f"IconDesc_CommandCenter_{size}"] = tex
     log(f"textures: {len(done)} imported")
     return done
@@ -178,7 +198,7 @@ def fbx_options():
     for prop, val in (("combine_meshes", imp["combine_meshes"]), ("generate_lightmap_u_vs", imp["generate_lightmap_uvs"]),
                       ("auto_generate_collision", imp["auto_generate_collision"]), ("convert_scene", imp["convert_scene"]),
                       ("force_front_x_axis", imp["force_front_x_axis"]), ("remove_degenerates", True),
-                      ("one_convex_hull_per_ucx", True), ("build_nanite", imp["nanite"]), ("import_mesh_lo_ds", False)):
+                      ("one_convex_hull_per_ucx", True), ("build_nanite", imp["nanite"]), ("import_mesh_lods", False)):
         if not set_prop(sm, [prop], val):
             manual(f"FBX option '{prop}' = {val} could not be set by script; set it in the import dialog")
     try:
@@ -188,9 +208,36 @@ def fbx_options():
     return ui
 
 
+LEGACY_FBX_CVAR = "Interchange.FeatureFlags.Import.FBX"
+
+
+def legacy_fbx(enable_legacy):
+    """UE 5.5+ may route .fbx through Interchange, which ignores FbxImportUI. Switch to the legacy importer for the
+    mesh imports and restore the previous value afterwards. Returns the previous value (None if unknown)."""
+    try:
+        prev = unreal.SystemLibrary.get_console_variable_bool_value(LEGACY_FBX_CVAR)
+        unreal.SystemLibrary.execute_console_command(None, f"{LEGACY_FBX_CVAR} {0 if enable_legacy else 1}")
+        return prev
+    except Exception:
+        manual(f"could not switch {LEGACY_FBX_CVAR}; if the FBX options were ignored, run '{LEGACY_FBX_CVAR} 0' "
+               f"in the console and re-run --import")
+        return None
+
+
 def import_meshes():
     sms = subsystem("StaticMeshEditorSubsystem")
     meshes = {}
+    prev = legacy_fbx(True)
+    try:
+        _import_meshes(sms, meshes)
+    finally:
+        if prev is not None:
+            unreal.SystemLibrary.execute_console_command(None, f"{LEGACY_FBX_CVAR} {1 if prev else 0}")
+    log(f"meshes: {len(meshes)} imported")
+    return meshes
+
+
+def _import_meshes(sms, meshes):
     for key, m in SPEC["meshes"].items():
         src = os.path.join(ART, "export", "ue", m["lod0"])
         mesh = import_file(src, FOLDER["meshes"], m["asset"], fbx_options())
@@ -209,33 +256,118 @@ def import_meshes():
         try:
             ns = mesh.get_editor_property("nanite_settings")
             ns.set_editor_property("enabled", False)
-            mesh.set_editor_property("nanite_settings", ns)
+            if sms:
+                sms.set_nanite_settings(mesh, ns, True)
+            else:
+                mesh.set_editor_property("nanite_settings", ns)
         except Exception:
             manual(f"{m['asset']}: Nanite off (Details -> Nanite Settings -> Enabled = false)")
         screen = m["screen_sizes"]
         done = False
-        if sms and hasattr(sms, "set_lod_screen_sizes"):
+        if sms and len(screen) > 1:
             try:
-                sms.set_lod_screen_sizes(mesh, screen)
-                done = True
+                done = bool(sms.set_lod_screen_sizes(mesh, screen))
             except Exception:
                 done = False
+        elif len(screen) <= 1:
+            done = True
         if not done:
             manual(f"{m['asset']}: LOD Settings -> Auto Compute LOD Distances = off, screen sizes {screen}")
-        eal.save_loaded_asset(mesh)
+        save(mesh)
         meshes[key] = mesh
-    log(f"meshes: {len(meshes)} imported")
-    return meshes
+
+
+# Fallback masters: used when ue_material_map.json has no game master for a slot ("fallback" key). Built node by node
+# with MaterialEditingLibrary, parameter names are the "fallback_param" values of the map.
+def _expr(mat, cls, x, y, **props):
+    e = mel.create_material_expression(mat, cls, x, y)
+    for k, v in props.items():
+        e.set_editor_property(k, v)
+    return e
+
+
+def _scalar(mat, name, value, x, y):
+    return _expr(mat, unreal.MaterialExpressionScalarParameter, x, y, parameter_name=name, default_value=value)
+
+
+def _mul(mat, a, a_out, b, b_out, x, y):
+    m = _expr(mat, unreal.MaterialExpressionMultiply, x, y)
+    mel.connect_material_expressions(a, a_out, m, "A")
+    mel.connect_material_expressions(b, b_out, m, "B")
+    return m
+
+
+def _build_mm_screen(mat):
+    """Lit, black glossy base; Emissive = ScreenRT.rgb * Emissive * Power. ScreenRT is the render target at runtime
+    (AFAIHCommandCenter MID) or the static screen atlas in MI_CC_ScreenStatic."""
+    tex = _expr(mat, unreal.MaterialExpressionTextureSampleParameter2D, -900, 0, parameter_name="ScreenRT",
+                sampler_type=unreal.MaterialSamplerType.SAMPLERTYPE_COLOR)
+    default = unreal.load_asset("/Engine/EngineResources/DefaultTexture.DefaultTexture")
+    if default:
+        tex.set_editor_property("texture", default)
+    m1 = _mul(mat, tex, "RGB", _scalar(mat, "Emissive", 3.0, -900, 300), "", -500, 100)
+    m2 = _mul(mat, m1, "", _scalar(mat, "Power", 1.0, -500, 350), "", -250, 150)
+    mel.connect_material_property(m2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.connect_material_property(_scalar(mat, "Roughness", 0.15, -500, 500), "", unreal.MaterialProperty.MP_ROUGHNESS)
+    mel.connect_material_property(_expr(mat, unreal.MaterialExpressionConstant3Vector, -500, -200,
+                                        constant=unreal.LinearColor(0.0, 0.0, 0.0, 1.0)), "",
+                                  unreal.MaterialProperty.MP_BASE_COLOR)
+
+
+def _build_mm_holo(mat):
+    """Unlit additive two-sided: Emissive = HoloColor * Intensity * (Fresnel(Exponent) + Core)."""
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("two_sided", True)
+    col = _expr(mat, unreal.MaterialExpressionVectorParameter, -1000, 0, parameter_name="HoloColor",
+                default_value=unreal.LinearColor(0.1, 0.55, 1.0, 1.0))
+    fres = _expr(mat, unreal.MaterialExpressionFresnel, -1000, 250, exponent=2.5, base_reflect_fraction=0.0)
+    mel.connect_material_expressions(_scalar(mat, "FresnelExponent", 2.5, -1300, 250), "", fres, "ExponentIn")
+    add = _expr(mat, unreal.MaterialExpressionAdd, -700, 300)
+    mel.connect_material_expressions(fres, "", add, "A")
+    mel.connect_material_expressions(_scalar(mat, "Core", 0.25, -1000, 450), "", add, "B")
+    m1 = _mul(mat, col, "", add, "", -450, 100)
+    m2 = _mul(mat, m1, "", _scalar(mat, "Intensity", 4.0, -450, 350), "", -200, 150)
+    mel.connect_material_property(m2, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+
+
+FALLBACK_BUILDERS = {"MM_CC_ScreenRT": _build_mm_screen, "MM_CC_Holo": _build_mm_holo}
+_fallbacks = {}
+
+
+def fallback_master(name):
+    if name in _fallbacks:
+        return _fallbacks[name]
+    path = FOLDER["materials"] + "/" + name
+    mat = unreal.load_asset(path) if eal.does_asset_exist(path) else None
+    if mat is None:
+        try:
+            mat = tools.create_asset(name, FOLDER["materials"], unreal.Material, unreal.MaterialFactoryNew())
+            FALLBACK_BUILDERS[name](mat)
+            mel.recompile_material(mat)
+            save(mat)
+            log(f"fallback master {name} created")
+        except Exception as e:
+            manual(f"fallback master {name} could not be built by script ({e}); build it by hand (README_UE.md)")
+            mat = None
+    _fallbacks[name] = mat
+    return mat
 
 
 def build_material_instances(textures):
     mp = json.load(open(os.path.join(HERE, SPEC["materials"]["map_file"]), encoding="utf-8"))
     out = {}
     for slot, cfg in mp["slots"].items():
-        if not cfg.get("parent"):
+        use_fallback = not cfg.get("parent") and cfg.get("fallback")
+        if use_fallback:
+            parent = fallback_master(cfg["fallback"])
+            if parent is None:
+                continue
+        elif not cfg.get("parent"):
             manual(f"{slot}: no parent in ue_material_map.json (run --discover, pick a game master material)")
             continue
-        parent = unreal.load_asset(cfg["parent"])
+        else:
+            parent = unreal.load_asset(cfg["parent"])
         if parent is None:
             manual(f"{slot}: parent '{cfg['parent']}' not found")
             continue
@@ -246,7 +378,7 @@ def build_material_instances(textures):
                                unreal.MaterialInstanceConstantFactoryNew())
         mel.set_material_instance_parent(mi, parent)
         for key, p in cfg["params"].items():
-            gp = p.get("game_param")
+            gp = p.get("fallback_param") if use_fallback else p.get("game_param")
             if not gp:
                 continue
             try:
@@ -259,7 +391,7 @@ def build_material_instances(textures):
             except Exception as e:
                 manual(f"{name}: parameter {gp} ({key}) failed: {e}")
         mel.update_material_instance(mi)
-        eal.save_loaded_asset(mi)
+        save(mi)
         out[slot] = mi
     log(f"material instances: {len(out)} of {len(mp['slots'])}")
     return out
@@ -274,7 +406,7 @@ def assign_materials(meshes, mis):
                 mesh.set_material(i, mis[slot])
             else:
                 manual(f"{mesh.get_name()}: section {i} '{slot}' has no MI")
-        eal.save_loaded_asset(mesh)
+        save(mesh)
 
 
 def do_import():
@@ -303,15 +435,24 @@ def make_blueprint(name, parent_path, folder):
 
 
 def cdo(bp):
-    return unreal.get_default_object(bp.generated_class())
+    return unreal.get_default_object(generated_class(bp))
 
 
-def item_amount(cls_path, amount):
-    cls = unreal.load_class(None, cls_path.replace("VERIFY: ", ""))
+def game_class(path):
+    """Load a game / mod class by path. Spec values may carry a 'VERIFY: ' prefix (asset paths of the game content,
+    which cannot be checked from the C++ headers)."""
+    return unreal.load_class(None, path.replace("VERIFY: ", "").strip())
+
+
+ITEM_CLASS = {i["item"]: i["class"] for i in SPEC["recipe"]["ingredients_tier2_proposal"]}
+
+
+def item_amount(cls_or_path, amount):
+    cls = game_class(cls_or_path) if isinstance(cls_or_path, str) else cls_or_path
     if cls is None:
         return None
     try:
-        return unreal.ItemAmount(item_class=cls, amount=amount)
+        return unreal.ItemAmount(item_class=cls, amount=amount)          # FItemAmount: ItemClass, Amount (checked)
     except Exception:
         return None
 
@@ -326,47 +467,77 @@ def do_content():
     build = make_blueprint(b["blueprint"], build_parent, folder)
     if build:
         o = cdo(build)
-        if not set_prop(o, ["m_power_consumption", "mPowerConsumption"], b["power_consumption_mw"]):
-            manual(f"{b['blueprint']}: Power Consumption = {b['power_consumption_mw']} MW")
+        mw = b["power_consumption_mw"]
+        # mPowerConsumption is private in C++ but EditDefaultsOnly, so it is reachable through reflection
+        if not set_prop(o, ["m_power_consumption"], mw):
+            manual(f"{b['blueprint']}: Class Defaults -> Power -> Power Consumption = {mw}")
+        set_prop(o, ["power_consumption_mw"], mw)                       # AFAIHCommandCenter::PowerConsumptionMW
+        if not set_prop(o, ["m_can_change_potential"], False):
+            manual(f"{b['blueprint']}: Productivity -> Can Change Potential = false")
+        box = b["clearance_box_cm"]
+        manual(f"{b['blueprint']}: Clearance Data (mClearanceData) -> one entry, Type Default, box min {box['min']} "
+               f"max {box['max']} cm")
         for k, m in SPEC["meshes"].items():                   # components are set up in the BP editor (SCS)
             manual(f"{b['blueprint']}: {m['asset']} -> {m.get('component', k)}")
-        eal.save_loaded_asset(build)
+        save(build)
     desc = make_blueprint(d["blueprint"], d["parent_class"], folder)
     if desc:
         o = cdo(desc)
-        ok = set_prop(o, ["m_display_name", "mDisplayName"], unreal.Text(b["display_name"]))
-        ok &= set_prop(o, ["m_description", "mDescription"], unreal.Text(b["description"]))
+        ok = set_prop(o, ["m_display_name"], unreal.Text(b["display_name"]))
+        ok &= set_prop(o, ["m_description"], unreal.Text(b["description"]))
+        ok &= set_prop(o, ["m_menu_priority"], float(d["build_menu_priority"]))
         if build:
-            ok &= set_prop(o, ["m_buildable_class", "mBuildableClass"], build.generated_class())
-        for prop, icon in ((["m_small_icon", "mSmallIcon"], d["small_icon"]), (["m_persistent_big_icon", "mPersistentBigIcon"], d["big_icon"])):
+            ok &= set_prop(o, ["m_buildable_class"], generated_class(build))
+        for prop, icon in (("m_small_icon", d["small_icon"]), ("m_persistent_big_icon", d["big_icon"])):
             tex = unreal.load_asset(FOLDER["icons"] + "/" + icon)
-            ok &= bool(tex) and set_prop(o, prop, tex)
+            ok &= bool(tex) and set_prop(o, [prop], tex)
         if not ok:
-            manual(f"{d['blueprint']}: set Display Name, Description, Buildable Class, Small/Big Icon by hand")
-        manual(f"{d['blueprint']}: Build Category / Sub Categories ({d['build_category']})")
-        eal.save_loaded_asset(desc)
+            manual(f"{d['blueprint']}: set Display Name, Description, Menu Priority, Buildable Class, Small/Big Icon by hand")
+        manual(f"{d['blueprint']}: Organization -> Category / Sub Categories ({d['build_category']})")
+        save(desc)
     rec = make_blueprint(r["blueprint"], r["parent_class"], folder)
     if rec:
         o = cdo(rec)
         ings = [item_amount(i["class"], i["amount"]) for i in r["ingredients_tier2_proposal"]]
-        ok = all(ings) and set_prop(o, ["m_ingredients", "mIngredients"], ings)
+        ok = all(ings) and set_prop(o, ["m_ingredients"], ings)
         if desc:
-            prod = item_amount(desc.generated_class().get_path_name(), 1)
-            ok &= bool(prod) and set_prop(o, ["m_product", "mProduct"], [prod])
+            prod = item_amount(generated_class(desc), 1)
+            ok &= bool(prod) and set_prop(o, ["m_product"], [prod])
         if not ok:
             manual(f"{r['blueprint']}: Ingredients " + ", ".join(f"{i['item']} x{i['amount']}" for i in r["ingredients_tier2_proposal"])
                    + f"; Product {d['blueprint']} x1")
-        manual(f"{r['blueprint']}: Produced In = Build Gun ({r['produced_in']})")
-        eal.save_loaded_asset(rec)
+        gun = game_class(r["produced_in"])
+        # mProducedIn is TArray<TSoftClassPtr<UObject>>: try the class, then a soft class path
+        if not (gun and (set_prop(o, ["m_produced_in"], [gun]) or
+                         set_prop(o, ["m_produced_in"], [unreal.SoftClassPath(gun.get_path_name())]))):
+            manual(f"{r['blueprint']}: Produced In = Build Gun ({r['produced_in']})")
+        save(rec)
     sch = make_blueprint(s["blueprint"], s["parent_class"], folder)
     if sch:
         o = cdo(sch)
-        set_prop(o, ["m_display_name", "mDisplayName"], unreal.Text(s["display_name"]))
-        set_prop(o, ["m_tech_tier", "mTechTier"], s["tech_tier"])
-        manual(f"{s['blueprint']}: Type = Milestone, Tech Tier = {s['tech_tier']}, Cost = "
-               + ", ".join(f"{c['item']} x{c['amount']}" for c in s["cost_proposal"])
-               + f", Unlocks -> Unlock Recipe {r['blueprint']}; register in the mod's GameWorldModule (mSchematics)")
-        eal.save_loaded_asset(sch)
+        ok = set_prop(o, ["m_display_name"], unreal.Text(s["display_name"]))
+        ok &= set_prop(o, ["m_tech_tier"], s["tech_tier"])
+        try:
+            ok &= set_prop(o, ["m_type"], getattr(unreal.SchematicType, "EST_" + s["type"].upper()))
+        except Exception:
+            ok = False
+        cost = [item_amount(ITEM_CLASS.get(c["item"], ""), c["amount"]) for c in s["cost_proposal"]]
+        ok &= all(cost) and set_prop(o, ["m_cost"], cost)
+        unlocked = False
+        unlock_cls = game_class(s["unlock_recipe_class"])
+        if rec and unlock_cls:
+            try:
+                u = unreal.new_object(unlock_cls, outer=o)
+                unlocked = set_prop(u, ["m_recipes"], [generated_class(rec)]) and set_prop(o, ["m_unlocks"], [u])
+            except Exception:
+                unlocked = False
+        if not ok:
+            manual(f"{s['blueprint']}: Type = {s['type']}, Tech Tier = {s['tech_tier']}, Display Name, Cost = "
+                   + ", ".join(f"{c['item']} x{c['amount']}" for c in s["cost_proposal"]))
+        if not unlocked:
+            manual(f"{s['blueprint']}: Unlocks -> + {s['unlock_recipe_class'].split('.')[-1]} -> Recipes = {r['blueprint']}")
+        manual(f"{s['blueprint']}: register in the mod's GameWorldModule blueprint (UGameWorldModule::mSchematics)")
+        save(sch)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -381,7 +552,10 @@ def do_verify():
             continue
         lods = sms.get_lod_count(mesh) if sms else "?"
         coll = sms.get_convex_collision_count(mesh) if sms and hasattr(sms, "get_convex_collision_count") else "?"
-        socks = [str(x.get_editor_property("socket_name")) for x in mesh.get_editor_property("sockets")]
+        # StaticMesh.sockets is not exposed to Python in 5.6: look the expected sockets up one by one
+        want = m.get("sockets", [])
+        found = [n for n in want if mesh.find_socket(n)]
+        socks = f"{len(found)}/{len(want)}" + (f" missing {sorted(set(want) - set(found))}" if len(found) < len(want) else "")
         mats = [(str(x.get_editor_property("material_slot_name")),
                  x.get_editor_property("material_interface").get_name() if x.get_editor_property("material_interface") else None)
                 for x in mesh.get_editor_property("static_materials")]

@@ -1,7 +1,6 @@
 // FICSIT AI Helper — Command Center, the flagship AI Terminal building (FR-01).
-// DRAFT, not compiled yet (written without the SML 3.12 headers): signatures of AFGBuildableFactory /
-// IFGUseableInterface follow FactoryGame 1.0 conventions and MUST be checked against the headers of the target
-// build (Satisfactory 1.2 / SML 3.12 / UE 5.6) before the first compile. See art/command_center/ue/README_UE.md.
+// DRAFT, not compiled yet (no UE project in this repo). Signatures CHECKED against the SML v3.12.0 FactoryGame headers
+// (Buildables/FGBuildableFactory.h, Buildables/FGBuildable.h, FGUseableInterface.h): see README_UE.md, "Header check".
 //
 // GameFacade/ is the only place where AFG*/UFG* types are allowed (ADR-021). Everything that leaves this class goes
 // through UFAIHTerminalEvents (engine types only).
@@ -27,13 +26,17 @@ public:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
 
-	// IFGUseableInterface (VERIFY exact signatures; note FactoryGame's own spelling "GetLookAtDecription")
+	// IFGUseableInterface, as overridden by AFGBuildable (checked; note FactoryGame's own spelling "GetLookAtDecription")
 	virtual bool IsUseable_Implementation() const override;
 	virtual void OnUse_Implementation(class AFGCharacterPlayer* ByCharacter, const FUseState& State) override;
 	virtual FText GetLookAtDecription_Implementation(class AFGCharacterPlayer* ByCharacter, const FUseState& State) const override;
 
 	// AFGBuildableFactory: "producing" = powered, so the 10 MW are drawn whenever the grid can supply them
 	virtual bool CanProduce_Implementation() const override;
+
+	/** mPowerConsumption is private in AFGBuildableFactory, so the C++ side enforces the draw through this virtual;
+	 *  the BP default "Power Consumption" must still be 10 (build menu reads it), --content sets it. */
+	virtual float GetProducingPowerConsumptionBase() const override { return PowerConsumptionMW; }
 
 	UFUNCTION(BlueprintPure, Category = "FAIH|Terminal")
 	UTextureRenderTarget2D* GetScreenRenderTarget() const { return ScreenRT; }
@@ -59,9 +62,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "FAIH|Terminal")
 	FName ScreenRTParameter = TEXT("ScreenRT");
 
-	/** Scalar parameter of the screen material driven 1/0 by power (leave None if the material has none). */
+	/** Scalar parameter of the screen material driven 1/0 by power. */
 	UPROPERTY(EditDefaultsOnly, Category = "FAIH|Terminal")
-	FName ScreenPowerParameter = NAME_None;
+	FName ScreenPowerParameter = TEXT("Power");    // MM_CC_ScreenRT has it; a missing parameter is a no-op
+
+	/** Draw while powered (content_spec.json building.power_consumption_mw). Keep equal to BP "Power Consumption". */
+	UPROPERTY(EditDefaultsOnly, Category = "FAIH|Terminal", meta = (ClampMin = "0.0"))
+	float PowerConsumptionMW = 10.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "FAIH|Terminal")
 	FIntPoint ScreenRTSize = FIntPoint(1920, 1080);

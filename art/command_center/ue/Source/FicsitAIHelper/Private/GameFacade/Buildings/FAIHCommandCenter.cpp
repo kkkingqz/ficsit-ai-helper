@@ -1,10 +1,10 @@
-// FICSIT AI Helper — Command Center (FR-01). DRAFT, not compiled yet — see the header.
+// FICSIT AI Helper — Command Center (FR-01). DRAFT, not compiled yet; API checked against SML v3.12.0 — see the header.
 #include "GameFacade/Buildings/FAIHCommandCenter.h"
 
 #include "Components/StaticMeshComponent.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Engine/World.h"
-#include "FGCharacterPlayer.h"                     // VERIFY include path in SML 3.12
+#include "FGCharacterPlayer.h"                     // FactoryGame/Public/FGCharacterPlayer.h (checked)
 #include "GameFacade/Buildings/FAIHTerminalEvents.h"
 #include "Kismet/KismetRenderingLibrary.h"
 #include "Materials/MaterialInstanceDynamic.h"
@@ -13,9 +13,10 @@
 
 AFAIHCommandCenter::AFAIHCommandCenter()
 {
-	// 10 MW, no overclocking: the terminal is a consumer, not a production machine (content_spec.json)
-	mPowerConsumption = 10.f;                      // VERIFY member name in AFGBuildableFactory
-	mCanChangePotential = false;                   // VERIFY
+	// 10 MW, no overclocking: the terminal is a consumer, not a production machine (content_spec.json).
+	// mPowerConsumption is PRIVATE in AFGBuildableFactory (SML 3.12): not assigned here. The draw comes from
+	// GetProducingPowerConsumptionBase() (header) and the BP default "Power Consumption" = 10 (set by --content).
+	mCanChangePotential = false;                   // protected in AFGBuildableFactory (checked)
 
 	PrimaryActorTick.bCanEverTick = true;          // hologram spin + power watch (cheap)
 	PrimaryActorTick.TickInterval = 0.f;
@@ -71,7 +72,7 @@ void AFAIHCommandCenter::BeginPlay()
 		                            FAttachmentTransformRules::SnapToTargetNotIncludingScale, TEXT("SOCKET_holo"));
 	}
 
-	ApplyPowerVisuals(HasPower());                 // VERIFY: HasPower() on AFGBuildableFactory
+	ApplyPowerVisuals(HasPower());                 // AFGBuildableFactory::HasPower(), cached in Factory_Tick
 }
 
 void AFAIHCommandCenter::Tick(float DeltaSeconds)
@@ -117,7 +118,8 @@ FText AFAIHCommandCenter::GetLookAtDecription_Implementation(AFGCharacterPlayer*
 {
 	return HasPower()
 		? LOCTEXT("UsePowered", "Command Center — press E to open the AI terminal")
-		: LOCTEXT("UseNoPower", "Command Center — no power (10 MW)");
+		: FText::Format(LOCTEXT("UseNoPower", "Command Center — no power ({0} MW)"),
+		                FText::AsNumber(FMath::RoundToInt(PowerConsumptionMW)));
 }
 
 void AFAIHCommandCenter::ApplyPowerVisuals(bool bPowered)
