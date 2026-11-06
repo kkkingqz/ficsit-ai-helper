@@ -192,6 +192,15 @@ def render(path, res):
     bloom(path)
 
 
+def to_jpg(path, quality=88):
+    """Review images (sheets, mock-ups, turnarounds) are only looked at: JPEG is ~8x smaller than PNG in git."""
+    from PIL import Image
+    jp = os.path.splitext(path)[0] + ".jpg"
+    Image.open(path).convert("RGB").save(jp, quality=quality, optimize=True)
+    os.remove(path)
+    return jp
+
+
 def bloom(path, strength=0.9):
     from PIL import Image, ImageFilter, ImageChops
     im = Image.open(path).convert("RGBA")
@@ -281,7 +290,7 @@ def review(spec, built, single, multi, out):
                 t = Image.open(tiles[(ob.name, vname)]).convert("RGB")
                 sheet.paste(t, (20 + j * W, y0))
         dr.text((20, 12), "views: ISO (A) / FRONT / TOP - common scale across tiers", fill=(200, 200, 200))
-        sheet.save(os.path.join(out, f"review_{key}_tiers.png"))
+        sheet.save(os.path.join(out, f"review_{key}_tiers.jpg"), quality=88, optimize=True)
         for p in tiles.values():
             os.remove(p)
         print("[render] sheet", key)
@@ -377,6 +386,7 @@ def _projector(spec, built, single, multi, out):
             o = inst(src, single[(key, tk)], (0, 0), f"I_single_{key}_T{tk}")
             p = os.path.join(out, f"review_projector_single_{key}_T{tk}.png")
             render(p, (1280, 800))
+            p = to_jpg(p)
             shots.append(p)
             bpy.data.objects.remove(o)
     lay = disp["multi"]["layouts"]["5"]
@@ -385,6 +395,7 @@ def _projector(spec, built, single, multi, out):
         tmp.append(inst(built[k], multi["5"], xy, f"I_multi_{i}"))
     p = os.path.join(out, "review_projector_multi5.png")
     render(p, (1280, 800))
+    p = to_jpg(p)
     for o in tmp:
         bpy.data.objects.remove(o)
     asset = ", ".join(n["asset"] for n in spec["nodes"].values())
@@ -457,7 +468,7 @@ def turnaround(spec, built, single, multi, out, tile=(640, 400)):
             sheet.paste(Image.open(p).convert("RGB"), (x, y))
             dr.text((x + 10, y + H + 4), name, fill=(190, 190, 190))
             os.remove(p)
-        sheet.save(os.path.join(out, f"turnaround_{ob.name}.png"))
+        sheet.save(os.path.join(out, f"turnaround_{ob.name}.jpg"), quality=88, optimize=True)
         print("[render] turnaround", ob.name)
     _projector_angles(spec, built, single, multi, out, tile)
 
@@ -502,5 +513,5 @@ def _projector_angles(spec, built, single, multi, out, tile):
             sheet.paste(Image.open(p).convert("RGB"), (x, y))
             dr.text((x + 10, y + H + 4), name, fill=(190, 190, 190))
             os.remove(p)
-    sheet.save(os.path.join(out, "turnaround_projector.png"))
+    sheet.save(os.path.join(out, "turnaround_projector.jpg"), quality=88, optimize=True)
     print("[render] projector angles")

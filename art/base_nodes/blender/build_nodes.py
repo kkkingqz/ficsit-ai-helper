@@ -180,7 +180,12 @@ def main():
                 manifest["meshes"][ob.name] = st
                 built[(key, tk, mini)] = ob
                 print(f"[nodes] {ob.name}: tris={st['tris']} r={st['radius_xy']} h={st['bbox_max'][2]}")
-    with open(os.path.join(a.out, "manifest.json"), "w", encoding="utf-8") as f:
+    mpath = os.path.join(a.out, "manifest.json")
+    if (a.node or a.tiers) and os.path.exists(mpath):       # partial build: keep the other nodes' entries
+        old = json.load(open(mpath, encoding="utf-8"))
+        old["meshes"].update(manifest["meshes"])
+        manifest["meshes"] = dict(sorted(old["meshes"].items()))
+    with open(mpath, "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2, ensure_ascii=False)
     if not a.node and not a.tiers:
         write_table(spec, single)

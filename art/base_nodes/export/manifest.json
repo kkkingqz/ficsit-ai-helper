@@ -13,8 +13,8 @@
   },
   "meshes": {
     "SM_Holo_CentralHub_T1": {
-      "tris": 3788,
-      "verts": 2176,
+      "tris": 3319,
+      "verts": 2024,
       "bbox_min": [
         -14.0,
         -14.0,
@@ -34,8 +34,8 @@
       "scale_single": 0.05272
     },
     "SM_Holo_CentralHub_T1_Mini": {
-      "tris": 2848,
-      "verts": 1576,
+      "tris": 1869,
+      "verts": 1152,
       "bbox_min": [
         -14.0,
         -14.0,
@@ -54,8 +54,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_CentralHub_T2": {
-      "tris": 5624,
-      "verts": 3196,
+      "tris": 4670,
+      "verts": 2816,
       "bbox_min": [
         -20.5,
         -20.5,
@@ -75,8 +75,8 @@
       "scale_single": 0.04541
     },
     "SM_Holo_CentralHub_T2_Mini": {
-      "tris": 4400,
-      "verts": 2460,
+      "tris": 3214,
+      "verts": 1952,
       "bbox_min": [
         -20.5,
         -20.5,
@@ -95,8 +95,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_CentralHub_T3": {
-      "tris": 7512,
-      "verts": 4260,
+      "tris": 6393,
+      "verts": 3820,
       "bbox_min": [
         -24.5,
         -24.5,
@@ -116,8 +116,8 @@
       "scale_single": 0.03471
     },
     "SM_Holo_CentralHub_T3_Mini": {
-      "tris": 5948,
-      "verts": 3324,
+      "tris": 4677,
+      "verts": 2796,
       "bbox_min": [
         -24.5,
         -24.5,
@@ -136,8 +136,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_FluidPlant_T1": {
-      "tris": 4170,
-      "verts": 2320,
+      "tris": 3440,
+      "verts": 2016,
       "bbox_min": [
         -14.6,
         -10.6,
@@ -146,7 +146,7 @@
       "bbox_max": [
         13.26,
         10.6,
-        15.86
+        15.84
       ],
       "radius_xy": 15.26,
       "node": "fluid_plant",
@@ -157,8 +157,8 @@
       "scale_single": 0.0625
     },
     "SM_Holo_FluidPlant_T1_Mini": {
-      "tris": 3498,
-      "verts": 1872,
+      "tris": 2298,
+      "verts": 1320,
       "bbox_min": [
         -14.6,
         -10.6,
@@ -167,7 +167,7 @@
       "bbox_max": [
         13.26,
         10.6,
-        15.86
+        15.85
       ],
       "radius_xy": 15.26,
       "node": "fluid_plant",
@@ -177,8 +177,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_FluidPlant_T2": {
-      "tris": 8972,
-      "verts": 4900,
+      "tris": 6692,
+      "verts": 3786,
       "bbox_min": [
         -18.2,
         -14.2,
@@ -187,7 +187,7 @@
       "bbox_max": [
         18.2,
         14.0,
-        23.71
+        23.69
       ],
       "radius_xy": 20.64,
       "node": "fluid_plant",
@@ -198,8 +198,8 @@
       "scale_single": 0.04167
     },
     "SM_Holo_FluidPlant_T2_Mini": {
-      "tris": 7172,
-      "verts": 3828,
+      "tris": 4882,
+      "verts": 2720,
       "bbox_min": [
         -18.2,
         -14.2,
@@ -208,7 +208,7 @@
       "bbox_max": [
         18.2,
         14.0,
-        23.71
+        23.7
       ],
       "radius_xy": 20.79,
       "node": "fluid_plant",
@@ -218,8 +218,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_FluidPlant_T3": {
-      "tris": 14004,
-      "verts": 7808,
+      "tris": 10561,
+      "verts": 6016,
       "bbox_min": [
         -23.0,
         -18.6,
@@ -228,7 +228,7 @@
       "bbox_max": [
         23.0,
         18.2,
-        29.96
+        29.94
       ],
       "radius_xy": 25.11,
       "node": "fluid_plant",
@@ -239,8 +239,8 @@
       "scale_single": 0.03279
     },
     "SM_Holo_FluidPlant_T3_Mini": {
-      "tris": 11052,
-      "verts": 6024,
+      "tris": 7410,
+      "verts": 4156,
       "bbox_min": [
         -23.0,
         -18.6,
@@ -249,7 +249,7 @@
       "bbox_max": [
         23.0,
         18.2,
-        29.96
+        29.95
       ],
       "radius_xy": 25.11,
       "node": "fluid_plant",
@@ -259,8 +259,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_LogisticsHub_T1": {
-      "tris": 3076,
-      "verts": 1700,
+      "tris": 2604,
+      "verts": 1532,
       "bbox_min": [
         -9.26,
         -6.0,
@@ -280,15 +280,15 @@
       "scale_single": 0.09524
     },
     "SM_Holo_LogisticsHub_T1_Mini": {
-      "tris": 2956,
-      "verts": 1620,
+      "tris": 1732,
+      "verts": 1076,
       "bbox_min": [
-        -9.25,
+        -9.28,
         -6.0,
         -0.02
       ],
       "bbox_max": [
-        9.25,
+        9.28,
         6.0,
         10.7
       ],
@@ -300,8 +300,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_LogisticsHub_T2": {
-      "tris": 4552,
-      "verts": 2556,
+      "tris": 4082,
+      "verts": 2404,
       "bbox_min": [
         -13.65,
         -9.6,
@@ -321,19 +321,19 @@
       "scale_single": 0.07194
     },
     "SM_Holo_LogisticsHub_T2_Mini": {
-      "tris": 3768,
-      "verts": 2060,
+      "tris": 2554,
+      "verts": 1540,
       "bbox_min": [
-        -13.65,
+        -13.68,
         -9.6,
         -0.02
       ],
       "bbox_max": [
-        13.65,
+        13.68,
         9.6,
         13.9
       ],
-      "radius_xy": 13.72,
+      "radius_xy": 13.73,
       "node": "logistics_hub",
       "tier": 2,
       "mode": "multi",
@@ -341,8 +341,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_LogisticsHub_T3": {
-      "tris": 7712,
-      "verts": 4320,
+      "tris": 6310,
+      "verts": 3712,
       "bbox_min": [
         -17.25,
         -13.6,
@@ -362,15 +362,15 @@
       "scale_single": 0.05376
     },
     "SM_Holo_LogisticsHub_T3_Mini": {
-      "tris": 6636,
-      "verts": 3656,
+      "tris": 4241,
+      "verts": 2556,
       "bbox_min": [
-        -17.25,
+        -17.28,
         -13.6,
         -0.02
       ],
       "bbox_max": [
-        17.25,
+        17.28,
         13.6,
         17.8
       ],
@@ -382,8 +382,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Smelter_T1": {
-      "tris": 3246,
-      "verts": 1828,
+      "tris": 3030,
+      "verts": 1792,
       "bbox_min": [
         -7.27,
         -4.0,
@@ -403,19 +403,19 @@
       "scale_single": 0.125
     },
     "SM_Holo_Smelter_T1_Mini": {
-      "tris": 3174,
-      "verts": 1780,
+      "tris": 2048,
+      "verts": 1280,
       "bbox_min": [
-        -7.25,
+        -7.28,
         -4.0,
         -0.02
       ],
       "bbox_max": [
-        7.25,
+        7.28,
         4.0,
         7.95
       ],
-      "radius_xy": 7.29,
+      "radius_xy": 7.33,
       "node": "smelter",
       "tier": 1,
       "mode": "multi",
@@ -423,8 +423,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Smelter_T2": {
-      "tris": 6532,
-      "verts": 3612,
+      "tris": 5196,
+      "verts": 2980,
       "bbox_min": [
         -10.66,
         -6.0,
@@ -444,19 +444,19 @@
       "scale_single": 0.08333
     },
     "SM_Holo_Smelter_T2_Mini": {
-      "tris": 6328,
-      "verts": 3476,
+      "tris": 3885,
+      "verts": 2268,
       "bbox_min": [
-        -10.65,
+        -10.68,
         -6.0,
         -0.03
       ],
       "bbox_max": [
-        10.65,
+        10.68,
         6.0,
         11.85
       ],
-      "radius_xy": 10.69,
+      "radius_xy": 10.73,
       "node": "smelter",
       "tier": 2,
       "mode": "multi",
@@ -464,8 +464,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Smelter_T3": {
-      "tris": 9956,
-      "verts": 5480,
+      "tris": 7488,
+      "verts": 4308,
       "bbox_min": [
         -14.65,
         -9.4,
@@ -485,19 +485,19 @@
       "scale_single": 0.05848
     },
     "SM_Holo_Smelter_T3_Mini": {
-      "tris": 9392,
-      "verts": 5104,
+      "tris": 5585,
+      "verts": 3232,
       "bbox_min": [
-        -14.65,
+        -14.68,
         -9.4,
         -0.02
       ],
       "bbox_max": [
-        14.65,
+        14.68,
         8.0,
         17.05
       ],
-      "radius_xy": 14.69,
+      "radius_xy": 14.72,
       "node": "smelter",
       "tier": 3,
       "mode": "multi",
@@ -505,7 +505,7 @@
       "rim_m": 0.564
     },
     "SM_Holo_Assembler_T1": {
-      "tris": 2324,
+      "tris": 2198,
       "verts": 1292,
       "bbox_min": [
         -6.47,
@@ -526,19 +526,19 @@
       "scale_single": 0.14519
     },
     "SM_Holo_Assembler_T1_Mini": {
-      "tris": 2252,
-      "verts": 1244,
+      "tris": 1302,
+      "verts": 832,
       "bbox_min": [
-        -6.45,
+        -6.48,
         -4.0,
         -0.03
       ],
       "bbox_max": [
-        6.45,
+        6.48,
         4.0,
         6.55
       ],
-      "radius_xy": 6.89,
+      "radius_xy": 6.95,
       "node": "assembler",
       "tier": 1,
       "mode": "multi",
@@ -546,8 +546,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Assembler_T2": {
-      "tris": 4316,
-      "verts": 2404,
+      "tris": 3473,
+      "verts": 2012,
       "bbox_min": [
         -8.56,
         -5.0,
@@ -567,19 +567,19 @@
       "scale_single": 0.10753
     },
     "SM_Holo_Assembler_T2_Mini": {
-      "tris": 4088,
-      "verts": 2252,
+      "tris": 2487,
+      "verts": 1472,
       "bbox_min": [
-        -8.55,
+        -8.58,
         -5.0,
         -0.03
       ],
       "bbox_max": [
-        8.55,
+        8.58,
         5.0,
         9.24
       ],
-      "radius_xy": 9.17,
+      "radius_xy": 9.22,
       "node": "assembler",
       "tier": 2,
       "mode": "multi",
@@ -587,8 +587,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Assembler_T3": {
-      "tris": 6204,
-      "verts": 3404,
+      "tris": 4728,
+      "verts": 2692,
       "bbox_min": [
         -10.46,
         -6.0,
@@ -597,7 +597,7 @@
       "bbox_max": [
         10.46,
         6.0,
-        10.68
+        10.67
       ],
       "radius_xy": 11.11,
       "node": "assembler",
@@ -608,19 +608,19 @@
       "scale_single": 0.09002
     },
     "SM_Holo_Assembler_T3_Mini": {
-      "tris": 6072,
-      "verts": 3316,
+      "tris": 3549,
+      "verts": 2068,
       "bbox_min": [
-        -10.45,
+        -10.48,
         -6.0,
         -0.03
       ],
       "bbox_max": [
-        10.45,
+        10.48,
         6.0,
         10.68
       ],
-      "radius_xy": 11.11,
+      "radius_xy": 11.15,
       "node": "assembler",
       "tier": 3,
       "mode": "multi",
@@ -628,8 +628,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Refinery_T1": {
-      "tris": 3590,
-      "verts": 1928,
+      "tris": 2958,
+      "verts": 1656,
       "bbox_min": [
         -4.0,
         -7.67,
@@ -649,19 +649,19 @@
       "scale_single": 0.125
     },
     "SM_Holo_Refinery_T1_Mini": {
-      "tris": 3542,
-      "verts": 1896,
+      "tris": 2076,
+      "verts": 1204,
       "bbox_min": [
         -4.0,
-        -7.65,
+        -7.68,
         -0.02
       ],
       "bbox_max": [
         4.0,
-        7.65,
+        7.68,
         8.0
       ],
-      "radius_xy": 7.72,
+      "radius_xy": 7.76,
       "node": "refinery",
       "tier": 1,
       "mode": "multi",
@@ -669,8 +669,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Refinery_T2": {
-      "tris": 5414,
-      "verts": 2876,
+      "tris": 4316,
+      "verts": 2352,
       "bbox_min": [
         -5.0,
         -8.86,
@@ -690,16 +690,16 @@
       "scale_single": 0.11111
     },
     "SM_Holo_Refinery_T2_Mini": {
-      "tris": 5336,
-      "verts": 2828,
+      "tris": 3212,
+      "verts": 1790,
       "bbox_min": [
         -5.0,
-        -8.85,
+        -8.88,
         -0.02
       ],
       "bbox_max": [
         5.0,
-        8.85,
+        8.88,
         9.0
       ],
       "radius_xy": 8.99,
@@ -710,8 +710,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_Refinery_T3": {
-      "tris": 8056,
-      "verts": 4500,
+      "tris": 6592,
+      "verts": 3732,
       "bbox_min": [
         -6.2,
         -10.86,
@@ -731,16 +731,16 @@
       "scale_single": 0.08333
     },
     "SM_Holo_Refinery_T3_Mini": {
-      "tris": 7720,
-      "verts": 4276,
+      "tris": 5135,
+      "verts": 2946,
       "bbox_min": [
         -6.2,
-        -10.85,
+        -10.88,
         -0.35
       ],
       "bbox_max": [
         6.2,
-        10.85,
+        10.88,
         12.0
       ],
       "radius_xy": 11.08,
@@ -751,8 +751,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_OreMine_T1": {
-      "tris": 3940,
-      "verts": 2050,
+      "tris": 2512,
+      "verts": 1398,
       "bbox_min": [
         -8.0,
         -6.0,
@@ -772,8 +772,8 @@
       "scale_single": 0.10301
     },
     "SM_Holo_OreMine_T1_Mini": {
-      "tris": 1948,
-      "verts": 1018,
+      "tris": 1116,
+      "verts": 635,
       "bbox_min": [
         -8.0,
         -6.0,
@@ -792,8 +792,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_OreMine_T2": {
-      "tris": 7158,
-      "verts": 3743,
+      "tris": 4478,
+      "verts": 2509,
       "bbox_min": [
         -9.0,
         -7.0,
@@ -813,8 +813,8 @@
       "scale_single": 0.09055
     },
     "SM_Holo_OreMine_T2_Mini": {
-      "tris": 3726,
-      "verts": 1957,
+      "tris": 2125,
+      "verts": 1218,
       "bbox_min": [
         -9.0,
         -7.0,
@@ -833,8 +833,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_OreMine_T3": {
-      "tris": 11324,
-      "verts": 6009,
+      "tris": 7230,
+      "verts": 4062,
       "bbox_min": [
         -10.0,
         -8.0,
@@ -845,7 +845,7 @@
         8.0,
         11.88
       ],
-      "radius_xy": 12.48,
+      "radius_xy": 12.5,
       "node": "ore_mine",
       "tier": 3,
       "mode": "single",
@@ -854,8 +854,8 @@
       "scale_single": 0.08077
     },
     "SM_Holo_OreMine_T3_Mini": {
-      "tris": 6022,
-      "verts": 3194,
+      "tris": 3534,
+      "verts": 2006,
       "bbox_min": [
         -10.0,
         -8.0,
@@ -866,7 +866,7 @@
         8.0,
         11.85
       ],
-      "radius_xy": 12.38,
+      "radius_xy": 12.4,
       "node": "ore_mine",
       "tier": 3,
       "mode": "multi",

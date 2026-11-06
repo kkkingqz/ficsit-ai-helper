@@ -225,8 +225,8 @@ def fans(n, m):
     for i in range(k):
         uu = u + (i - (k - 1) / 2) * (w / k)
         c = f.p(uu, pl + dd + 0.06, z0 + h / 2)
-        n.part(n.annulus(c, r, r * 0.8, 0.16, 20, Rn), glow=0.8, rim=False)
-        n.part(n.cylinder(f.p(uu, pl + dd, z0 + h / 2), r * 0.8, 0.06, 20, Rn), glow=0.0, rim=False)
+        n.part(n.annulus(c, r, r * 0.8, 0.16, 14, Rn), glow=0.8, rim=False)
+        n.part(n.cylinder(f.p(uu, pl + dd, z0 + h / 2), r * 0.8, 0.06, 14, Rn), glow=0.0, rim=False)
         for s in (-1, 1):
             Rb = f.R @ Matrix.Rotation(s * math.pi / 4, 3, "Y")
             n.part(n.box_r(f.p(uu, pl + dd + 0.06, z0 + h / 2), (r * 1.6, 0.08, r * 0.22), Rb), glow=0.35, rim=False)
@@ -293,11 +293,15 @@ def railing(n, m):
         p0, p1 = Vector((*p0, z)), Vector((*p1, z))
         L = (p1 - p0).length
         k = max(1, int(math.ceil(L / 2.4)))
+        D = (p1 - p0).normalized() * (tp / 2)
         for i in range(k):
             q = p0 + (p1 - p0) * (i / k)
-            n.part(n.box(q + Vector((0, 0, h / 2)), (tp, tp, h)), rim=False)
-        for zz in (h, h * 0.5):
-            n.part(n.beam(p0 + Vector((0, 0, zz)), p1 + Vector((0, 0, zz)), tp, tp), rim=False)
+            # corner post closes the corner (a bit thicker than the rails); the others are thinner and hide in the
+            # rail -> no post side shares a plane with a rail side
+            hh, tw = (h + tp / 2, tp * 1.15) if i == 0 else (h, tp * 0.85)
+            n.part(n.box(q + Vector((0, 0, hh / 2)), (tw, tw, hh)), rim=False)
+        for zz in (h, h * 0.5):                            # rails stop at the corner posts (no overlapping tops)
+            n.part(n.beam(p0 + D + Vector((0, 0, zz)), p1 - D + Vector((0, 0, zz)), tp, tp), rim=False)
 
 
 def dish(n, m):
@@ -311,7 +315,7 @@ def dish(n, m):
     c = Vector((x, y, z0 + mh + 0.2))
     n.part(n.box_r(c, (0.9, 0.9, 0.6), Rd), rim=True)
     prof = []
-    k = 5
+    k = 3
     th = max(0.22, R0 * 0.08)
     for i in range(k + 1):
         r = 0.05 + (R0 - 0.05) * i / k
@@ -319,7 +323,7 @@ def dish(n, m):
     for i in range(k, -1, -1):
         r = 0.05 + (R0 - 0.05) * i / k
         prof.append((r * 0.96, 0.3 + R0 * 0.28 * (r / R0) ** 2 - th))
-    n.part(n.lathe(prof, 18, Rd, c), glow=0.12, rim=True)
+    n.part(n.lathe(prof, 14, Rd, c), glow=0.12, rim=True)
     ax = Rd @ Vector((0, 0, 1))
     n.part(n.beam(c + ax * 0.3, c + ax * (0.3 + R0 * 0.75), 0.12 * n.thin_mul, 0.12 * n.thin_mul), rim=False)
     n.part(n.box_r(c + ax * (0.3 + R0 * 0.75), (0.35, 0.35, 0.35), Rd), glow=1.0, rim=False)
@@ -356,7 +360,10 @@ def banner(n, m):
 
 
 def pipes(n, m):
+    """Pipe runs as continuous tubes (one ring per point, no caps inside): `paths` (polyline or a 3-point quadratic
+    `curve` + optional `tail`) and `runs` (polylines with rounded corners). Flanges / blocks at the ends."""
     r = m["r"]
+    seg = 6 if n.mini else 8
     for path in m["paths"]:
         pts = [Vector(p) for p in path["points"]]
         if path.get("curve") and len(pts) == 3:
@@ -364,26 +371,18 @@ def pipes(n, m):
             pts = [(1 - t) ** 2 * a + 2 * (1 - t) * t * b + t * t * c for t in (i / 6 for i in range(7))]
         if path.get("tail"):
             pts.append(Vector(path["tail"]))
-        for p0, p1 in zip(pts[:-1], pts[1:]):
-            ax = p1 - p0
-            Rr = ax.to_track_quat("Z", "Y").to_matrix()
-            n.part(n.cylinder((p0 + p1) / 2, r, ax.length + r * 0.6, 8, Rr), rim=False)
+        n.part(n.tube(pts, r, seg), rim=False)
         for p in (pts[0], pts[-1]):
             n.part(n.box(p, (r * 3, r * 3, r * 3)), rim=True)
     for path in m.get("runs", []):                          # polylines with rounded corners (pipe racks, loops)
         pts = _rounded([Vector(p) for p in path], m.get("bend", r * 3))
-        for p0, p1 in zip(pts[:-1], pts[1:]):
-            ax = p1 - p0
-            if ax.length < 1e-4:
-                continue
-            Rr = ax.to_track_quat("Z", "Y").to_matrix()
-            n.part(n.cylinder((p0 + p1) / 2, r, ax.length + r * 0.3, 8, Rr), rim=False)
+        n.part(n.tube(pts, r, seg), rim=False)
         for p in (pts[0], pts[-1]):
-            n.part(n.cylinder(p, r * 1.45, r * 1.2, 8, ((pts[1] - pts[0]) if p is pts[0] else (pts[-1] - pts[-2]))
-                              .to_track_quat("Z", "Y").to_matrix()), glow=0.0, rim=True)
+            n.part(n.cylinder(p, r * 1.45, r * 1.2, seg, ((pts[1] - pts[0]) if p is pts[0] else (pts[-1] - pts[-2]))
+                              .to_track_quat("Z", "Y").to_matrix()), glow=0.0, rim=False)
 
 
-def _rounded(pts, bend, k=4):
+def _rounded(pts, bend, k=3):
     """Replace every interior corner of a polyline by a quadratic curve of radius ~bend."""
     out = [pts[0]]
     for a, b, c in zip(pts[:-2], pts[1:-1], pts[2:]):
@@ -434,13 +433,15 @@ def lattice(n, m):
     (x0, y0, z0), (x1, y1, z1) = m["min"], m["max"]
     t = m.get("t", 0.35) * (n.thin_mul if n.mini else 1.0)
     P = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)]
-    for x, y in P:
-        n.part(n.box((x, y, (z0 + z1) / 2), (t, t, z1 - z0)), rim=False)
+    for x, y in P:                                         # posts reach the top of the top beams
+        n.part(n.box((x, y, (z0 + z1 + t / 2) / 2), (t, t, z1 - z0 + t / 2)), rim=False)
     levels = m.get("levels", 1)
     for li in range(levels + 1):
         z = z0 + (z1 - z0) * li / levels
-        for (ax, ay), (bx, by) in zip(P, P[1:] + P[:1]):
-            n.part(n.beam((ax, ay, z), (bx, by, z), t, t), rim=False)
+        for (ax, ay), (bx, by) in zip(P, P[1:] + P[:1]):    # beams stop at the posts (no overlapping faces)
+            a, b = Vector((ax, ay, z)), Vector((bx, by, z))
+            D = (b - a).normalized() * (t / 2)
+            n.part(n.beam(a + D, b - D, t, t), rim=False)
     sides = {"front": (P[0], P[1]), "right": (P[1], P[2]), "back": (P[2], P[3]), "left": (P[3], P[0])}
     for sd in m.get("x", ["front", "right", "back", "left"]):
         (ax, ay), (bx, by) = sides[sd]
@@ -536,8 +537,8 @@ def conveyor(n, m):
     n.part(n.box_r((p0 + p1) / 2 + Vector((0, 0, 0.02)), (w * 0.8, L - 0.4, 0.06), R), glow=0.12, rim=False)
     tr = 0.18 * (n.thin_mul if n.mini else 1.0)
     for sg in (-1, 1):
-        n.part(n.beam(p0 + S * sg * (w / 2 - tr / 2) + Vector((0, 0, 0.12)),
-                      p1 + S * sg * (w / 2 - tr / 2) + Vector((0, 0, 0.12)), tr, 0.3), rim=False)
+        k = w / 2 - tr / 2 + 0.03                          # rails stand 3 cm proud of the bed (no shared plane)
+        n.part(n.beam(p0 + S * sg * k + Vector((0, 0, 0.12)), p1 + S * sg * k + Vector((0, 0, 0.12)), tr, 0.3), rim=False)
     for p in (p0, p1):
         n.part(n.cylinder(p + Vector((0, 0, -bed / 2)), bed * 0.7, w * 1.02, 10,
                           S.to_track_quat("Z", "Y").to_matrix()), glow=0.0, rim=True)
@@ -550,7 +551,7 @@ def conveyor(n, m):
             for sg in (-1, 1):
                 n.part(n.box(q + S * sg * (w / 2 - 0.25) + Vector((0, 0, (z - bed) / 2)), (lt, lt, z - bed)), rim=False)
             n.part(n.beam(q - S * (w / 2 - 0.25) + Vector((0, 0, 0.5)), q + S * (w / 2 - 0.25) + Vector((0, 0, 0.5)),
-                          lt, lt), rim=False)
+                          lt * 0.8, lt * 0.8), rim=False)
             n.part(n.box(q + Vector((0, 0, 0.1)), (w * 0.9, 0.5, 0.2), yaw=math.atan2(A.y, A.x) + math.pi / 2),
                    rim=False)
         d += step
@@ -600,8 +601,8 @@ def roof_fans(n, m):
     n.part(n.box((x, y, z0 + h / 2), (w, d, h)), rim=True)
     for i in range(k):
         c = Vector((x + (i - (k - 1) / 2) * (w / k), y, z0 + h + 0.06))
-        n.part(n.annulus(c, r, r * 0.8, 0.14, 20), glow=0.8, rim=False)
-        n.part(n.cylinder(c - Vector((0, 0, 0.04)), r * 0.8, 0.05, 20), rim=False)
+        n.part(n.annulus(c, r, r * 0.8, 0.14, 14), glow=0.8, rim=False)
+        n.part(n.cylinder(c - Vector((0, 0, 0.04)), r * 0.8, 0.05, 14), rim=False)
         for sg in (-1, 1):
             n.part(n.box(c, (r * 1.6, 0.08 + 0.0, 0.08), yaw=sg * math.pi / 4), glow=0.35, rim=False)
         n.part(n.cylinder(c + Vector((0, 0, 0.05)), r * 0.18, 0.1, 10), glow=0.8, rim=False)
@@ -625,9 +626,9 @@ def robots(n, m):
         n.part(n.box(sh - U * 0.1 * sc, (0.5 * sc, 0.5 * sc, 0.4 * sc), yaw=a), rim=True)
         Rj = Sd.to_track_quat("Z", "Y").to_matrix()             # joint axis across the arm
         for j, r in ((sh, 0.2), (el, 0.17), (wr, 0.13)):
-            n.part(n.cylinder(j, r * sc * k, 0.36 * sc * k, 12, Rj), glow=1.0, rim=False)
-        n.part(n.beam(sh, el, 0.26 * sc * k, 0.26 * sc * k), glow=0.4, rim=False)
-        n.part(n.beam(el, wr, 0.21 * sc * k, 0.21 * sc * k), glow=0.4, rim=False)
+            n.part(n.cylinder(j, r * sc * k, 0.36 * sc * k, 12, Rj), glow=0.65, rim=False)
+        n.part(n.beam(sh, el, 0.26 * sc * k, 0.26 * sc * k), glow=0.1, rim=False)
+        n.part(n.beam(el, wr, 0.21 * sc * k, 0.21 * sc * k), glow=0.1, rim=False)
         g0 = wr - U * 0.12 * sc
         n.part(n.box(g0, (0.36 * sc * k, 0.16 * sc * k, 0.12 * sc * k), yaw=a), rim=False)
         for sg in (-1, 1):
@@ -641,7 +642,8 @@ def _rock(n, x, y, w, d, h, seed, lean=(0.0, 0.0), z0=0.0, veins=0.0, facets=Tru
     import random
     rnd = random.Random(seed)
     pts = []
-    rings = ((0.0, 1.0, 9), (0.3, 0.96, 8), (0.58, 0.78, 7), (0.82, 0.55, 6), (1.0, 0.32, 4))
+    rings = ((0.0, 1.0, 9), (0.3, 0.96, 8), (0.58, 0.78, 7), (0.82, 0.55, 6), (1.0, 0.32, 4)) if facets else \
+            ((0.0, 1.0, 6), (0.5, 0.82, 5), (1.0, 0.4, 3))       # rubble chunks: a few facets are enough
     for k, (fz, fr, cnt) in enumerate(rings):
         a0 = rnd.random() * math.tau
         for i in range(cnt):

@@ -242,12 +242,17 @@ def import_textures():
             continue
         try:
             tex.set_editor_property("lod_group", unreal.TextureGroup.TEXTUREGROUP_UI)
-            tex.set_editor_property("compression_settings", unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+            # screen renders are big (1280 x 800): BC7 keeps alpha and quality at 1/4 of the memory of the
+            # uncompressed UserInterface2D setting; the small icons stay uncompressed (crisp edges)
+            comp = (unreal.TextureCompressionSettings.TC_BC7 if kind == "screens"
+                    else unreal.TextureCompressionSettings.TC_EDITOR_ICON)
+            tex.set_editor_property("compression_settings", comp)
             tex.set_editor_property("mip_gen_settings", unreal.TextureMipGenSettings.TMGS_NO_MIPMAPS)
             tex.set_editor_property("srgb", True)
             save(tex)
         except Exception:
-            manual(f"{name}: Texture Group = UI, Compression = UserInterface2D, Mip Gen = NoMipmaps, sRGB on")
+            manual(f"{name}: Texture Group = UI, Compression = {'BC7' if kind == 'screens' else 'UserInterface2D'}, "
+                   f"Mip Gen = NoMipmaps, sRGB on")
         done += 1
     log(f"textures: {done} imported")
 

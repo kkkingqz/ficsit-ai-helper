@@ -18,6 +18,8 @@ import bmesh
 from mathutils import Matrix, Vector
 
 RIM_ANGLE = math.radians(35.0)          # only edges sharper than this get a rim (cylinder segments do not)
+GROUND = 0.35                            # plate top (0.3) + margin: faces pointing down below this are never seen
+THIN = 2.2                               # parts thinner than THIN x rim get no rim (it would swallow them: slivers)
 
 
 class Node:
@@ -122,6 +124,38 @@ class Node:
         vs = [self.bm.verts.new(p) for p in pts]
         return self._ring_faces([vs[0], vs[1], vs[3], vs[2]], [vs[4], vs[5], vs[7], vs[6]])
 
+    def tube(self, points, r, seg=8):
+        """One continuous pipe through the points: a ring per point (perpendicular to the averaged direction, parallel-
+        transported so it does not twist), caps only at the two ends. Replaces a cylinder per segment."""
+        bm = self.bm
+        pts = [Vector(p) for p in points]
+        pts = [p for i, p in enumerate(pts) if i == 0 or (p - pts[i - 1]).length > 1e-4]
+        if len(pts) < 2:
+            return []
+        tang = []
+        for i in range(len(pts)):
+            d0 = (pts[i] - pts[i - 1]).normalized() if i > 0 else None
+            d1 = (pts[i + 1] - pts[i]).normalized() if i < len(pts) - 1 else None
+            t = (d0 + d1) if d0 is not None and d1 is not None else (d0 if d1 is None else d1)
+            tang.append(t.normalized() if t.length > 1e-6 else (d0 or d1))
+        ref = tang[0].orthogonal().normalized()
+        rings = []
+        for i, (p, t) in enumerate(zip(pts, tang)):
+            ref = (ref - t * ref.dot(t)).normalized()
+            side = t.cross(ref)
+            k = 1.0
+            if 0 < i < len(pts) - 1:                       # keep the wall thickness through a bend (miter)
+                c = (pts[i] - pts[i - 1]).normalized().dot(t)
+                k = 1.0 / max(c, 0.5)
+            rings.append([bm.verts.new(p + (ref * math.cos(a) + side * math.sin(a)) * r * k)
+                          for a in (2 * math.pi * j / seg for j in range(seg))])
+        out = [bm.faces.new(list(reversed(rings[0]))), bm.faces.new(rings[-1])]
+        for a, b in zip(rings[:-1], rings[1:]):
+            for j in range(seg):
+                jj = (j + 1) % seg
+                out.append(bm.faces.new((a[j], a[jj], b[jj], b[j])))
+        return out
+
     def lathe(self, profile, seg, R, center):
         """Closed (r, z) profile revolved about local Z (dish). Points with r == 0 are welded afterwards."""
         bm, c = self.bm, Vector(center)
@@ -151,6 +185,11 @@ class Node:
                 continue
             edges = {e for f in faces for e in f.edges}
             limit = rim if isinstance(rim, float) else RIM_ANGLE      # a part may pass its own angle (rocks: facets)
+            vs = {v for f in faces for v in f.verts}
+            lo = [min(v.co[i] for v in vs) for i in range(3)]
+            hi = [max(v.co[i] for v in vs) for i in range(3)]
+            if min(h - l for h, l in zip(hi, lo)) < THIN * self.rim:
+                continue
             hard = [e for e in edges if e.is_manifold and e.calc_face_angle(0.0) > limit]
             if not hard:
                 continue
@@ -160,6 +199,25 @@ class Node:
                 f[self.edge] = 1.0
         bmesh.ops.triangulate(bm, faces=bm.faces[:], quad_method="BEAUTY", ngon_method="EAR_CLIP")
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        # the hologram is always seen from above its base: faces pointing down at ground level are never visible
+        # (removed after the normals are settled - recalculating an open mesh is unreliable)
+        hidden = [f for f in bm.faces if f.normal.z < -0.9 and max(v.co.z for v in f.verts) < GROUND]
+        bmesh.ops.delete(bm, geom=hidden, context="FACES_ONLY")
+        # ... and so are bottoms of parts that stand on another part (a column on the roof): an upward face lies
+        # right under them. Removing them also ends the z-fighting of stacked bottoms (skirt + body of a column)
+        from mathutils.bvhtree import BVHTree
+        bm.faces.ensure_lookup_table()
+        tree = BVHTree.FromBMesh(bm)
+        resting = []
+        for f in bm.faces:
+            if f.normal.z > -0.9:
+                continue
+            c = f.calc_center_median()
+            for co, nrm, idx, dist in tree.find_nearest_range(c - Vector((0, 0, 2e-4)), 6e-4):
+                if idx != f.index and dist < 2.6e-4 and (nrm.z > 0.9 or nrm.z < -0.9):
+                    resting.append(f)
+                    break
+        bmesh.ops.delete(bm, geom=resting, context="FACES_ONLY")
         col = bm.loops.layers.float_color.new("Col")
         for f in bm.faces:
             c = (f[self.edge], f[self.glow], f[self.dim], 1.0)
