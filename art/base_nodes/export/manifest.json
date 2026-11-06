@@ -503,6 +503,129 @@
       "mode": "multi",
       "fbx": "export/SM_Holo_Smelter_T3_Mini.fbx",
       "rim_m": 0.564
+    },
+    "SM_Holo_Assembler_T1": {
+      "tris": 2324,
+      "verts": 1292,
+      "bbox_min": [
+        -6.47,
+        -4.0,
+        -0.03
+      ],
+      "bbox_max": [
+        6.47,
+        4.0,
+        6.55
+      ],
+      "radius_xy": 6.92,
+      "node": "assembler",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Assembler_T1.fbx",
+      "rim_m": 0.041,
+      "scale_single": 0.14519
+    },
+    "SM_Holo_Assembler_T1_Mini": {
+      "tris": 2252,
+      "verts": 1244,
+      "bbox_min": [
+        -6.45,
+        -4.0,
+        -0.03
+      ],
+      "bbox_max": [
+        6.45,
+        4.0,
+        6.55
+      ],
+      "radius_xy": 6.89,
+      "node": "assembler",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Assembler_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_Assembler_T2": {
+      "tris": 4316,
+      "verts": 2404,
+      "bbox_min": [
+        -8.56,
+        -5.0,
+        -0.03
+      ],
+      "bbox_max": [
+        8.56,
+        5.0,
+        9.24
+      ],
+      "radius_xy": 9.18,
+      "node": "assembler",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Assembler_T2.fbx",
+      "rim_m": 0.056,
+      "scale_single": 0.10753
+    },
+    "SM_Holo_Assembler_T2_Mini": {
+      "tris": 4088,
+      "verts": 2252,
+      "bbox_min": [
+        -8.55,
+        -5.0,
+        -0.03
+      ],
+      "bbox_max": [
+        8.55,
+        5.0,
+        9.24
+      ],
+      "radius_xy": 9.17,
+      "node": "assembler",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Assembler_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_Assembler_T3": {
+      "tris": 6204,
+      "verts": 3404,
+      "bbox_min": [
+        -10.46,
+        -6.0,
+        -0.03
+      ],
+      "bbox_max": [
+        10.46,
+        6.0,
+        10.68
+      ],
+      "radius_xy": 11.11,
+      "node": "assembler",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Assembler_T3.fbx",
+      "rim_m": 0.067,
+      "scale_single": 0.09002
+    },
+    "SM_Holo_Assembler_T3_Mini": {
+      "tris": 6072,
+      "verts": 3316,
+      "bbox_min": [
+        -10.45,
+        -6.0,
+        -0.03
+      ],
+      "bbox_max": [
+        10.45,
+        6.0,
+        10.68
+      ],
+      "radius_xy": 11.11,
+      "node": "assembler",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Assembler_T3_Mini.fbx",
+      "rim_m": 0.564
     }
   }
 }

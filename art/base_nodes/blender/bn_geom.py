@@ -199,7 +199,8 @@ def cross(core, arm, reach, chamfer):
 
 def plate_outline(hx, hy, k, arms=None):
     """Rectangular core (half sizes hx, hy, corner chamfer k) with optional centred arms per side:
-    arms = {"front": [half_width, reach], "right": [...], "back": [...], "left": [...]} (reach from the centre)."""
+    arms = {"front": [half_width, reach], "right": [...], "back": [...], "left": [...]} (reach from the centre);
+    left / right arms take an optional third value: Y offset of the arm centre (belts off the centre line)."""
     arms = arms or {}
     pts = [(-hx + k, -hy)]
     if "front" in arms:
@@ -207,16 +208,16 @@ def plate_outline(hx, hy, k, arms=None):
         pts += [(-a, -hy), (-a, -L), (a, -L), (a, -hy)]
     pts += [(hx - k, -hy), (hx, -hy + k)]
     if "right" in arms:
-        a, L = arms["right"]
-        pts += [(hx, -a), (L, -a), (L, a), (hx, a)]
+        a, L, o = (arms["right"] + [0.0])[:3]
+        pts += [(hx, o - a), (L, o - a), (L, o + a), (hx, o + a)]
     pts += [(hx, hy - k), (hx - k, hy)]
     if "back" in arms:
         a, L = arms["back"]
         pts += [(a, hy), (a, L), (-a, L), (-a, hy)]
     pts += [(-hx + k, hy), (-hx, hy - k)]
     if "left" in arms:
-        a, L = arms["left"]
-        pts += [(-hx, a), (-L, a), (-L, -a), (-hx, -a)]
+        a, L, o = (arms["left"] + [0.0])[:3]
+        pts += [(-hx, o + a), (-L, o + a), (-L, o - a), (-hx, o - a)]
     pts += [(-hx, -hy + k)]
     return _dedupe(pts)
 

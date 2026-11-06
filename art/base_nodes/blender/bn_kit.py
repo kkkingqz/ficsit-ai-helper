@@ -31,6 +31,8 @@ Module types
     stacks      smelter chimneys: base, body, glowing band, wide collar
     roof_fans   fan box lying on a roof, fans facing up
     gate.chevrons.kind = "heat"   wavy heat lines instead of >>> (furnace door)
+    gate.u      offset of a portal along its face (side tunnels in front of an off-centre belt)
+    robots      assembly robot arms on pedestals (joints glow), two-finger gripper
 A module with "detail": true is left out of the small multi-mode mesh (_Mini).
 """
 import math
@@ -148,17 +150,18 @@ def gate(n, m):
     f = Frame(m["side"])
     W, H, t, c = m["W"], m["H"], m["t"], m["c"]
     b, fr = m["back"], m["front"]
-    o = Vector((0, 0, 0))
+    u0 = m.get("u", 0.0)                                    # offset along the face (side tunnels in front of a belt)
+    o = f.U * u0
     n.part(n.extrude2d(G.arch_frame(W, H, t, c), b, fr, o, f.U, (0, 0, 1), f.N), rim=True)
     pd = m.get("panel", (b + fr) / 2)
-    n.part(n.box(f.p(0, pd, (H - t) / 2), (W - 2 * t + 0.1, 0.3, H - t + 0.05), yaw=f.yaw), rim=False)
+    n.part(n.box(f.p(u0, pd, (H - t) / 2), (W - 2 * t + 0.1, 0.3, H - t + 0.05), yaw=f.yaw), rim=False)
     i = m.get("inner")
     if i:
         n.part(n.extrude2d(G.arch_frame(i["W"], i["H"], i["t"], c * 0.7), pd + 0.1, fr - 0.45, o, f.U, (0, 0, 1), f.N),
                rim=True)
     ch = m.get("chevrons")
     for k in range(ch["n"] if ch else 0):
-        u = (k - (ch["n"] - 1) / 2) * ch["pitch"]
+        u = u0 + (k - (ch["n"] - 1) / 2) * ch["pitch"]
         if ch.get("kind") == "heat":                         # furnace: wavy heat lines rising (smelter)
             _heat_line(n, f, u, pd + 0.2, ch["z"], ch["h"], ch["h"] * 0.09)
             continue
@@ -166,16 +169,16 @@ def gate(n, m):
         poly = G.chevron(ch["h"], ch["h"] * 0.45, ch["h"] * 0.22)
         n.part(n.extrude2d(poly, pd + 0.15, pd + 0.28, org, f.U, (0, 0, 1), f.N), glow=1.0, rim=False)
     for s in m.get("strips", []):
-        n.part(n.box(f.p(s["u"], fr + 0.05, s["z"]), (s["w"], 0.14, s["h"]), yaw=f.yaw), glow=1.0, rim=False)
+        n.part(n.box(f.p(u0 + s["u"], fr + 0.05, s["z"]), (s["w"], 0.14, s["h"]), yaw=f.yaw), glow=1.0, rim=False)
     st = m.get("steps")
     if st:
         k = st["n"]
         for j in range(k):
             d0 = fr - 0.2 + st["len"] * j / k
             hz = st["h"] * (k - j) / k
-            n.part(n.box(f.p(0, d0 + st["len"] / k / 2 + 0.1, hz / 2), (st["w"], st["len"] / k + 0.2, hz), yaw=f.yaw),
+            n.part(n.box(f.p(u0, d0 + st["len"] / k / 2 + 0.1, hz / 2), (st["w"], st["len"] / k + 0.2, hz), yaw=f.yaw),
                    rim=True)
-            n.part(n.box(f.p(0, d0 + 0.12, hz + 0.02), (st["w"] * 0.9, 0.12, 0.05), yaw=f.yaw), glow=0.7, rim=False)
+            n.part(n.box(f.p(u0, d0 + 0.12, hz + 0.02), (st["w"] * 0.9, 0.12, 0.05), yaw=f.yaw), glow=0.7, rim=False)
 
 
 def _heat_line(n, f, u, d, z0, h, t, k=10):
@@ -582,6 +585,34 @@ def roof_fans(n, m):
         n.part(n.cylinder(c + Vector((0, 0, 0.05)), r * 0.18, 0.1, 10), glow=0.8, rim=False)
 
 
+def robots(n, m):
+    """Assembly robot arms on pedestals: base, turret, shoulder / elbow / wrist joints (glowing), two-finger gripper.
+    at: [[x, y, z0, scale, yaw_deg], ...]; yaw 0 = reaching to the front (-Y)."""
+    k = n.thin_mul if n.mini else 1.0
+    for x, y, z0, sc, yaw in m["at"]:
+        a = math.radians(yaw)
+        F = Vector((math.sin(a), -math.cos(a), 0))             # forward
+        Sd = Vector((math.cos(a), math.sin(a), 0))              # side
+        U = Vector((0, 0, 1))
+        b = Vector((x, y, z0))
+        n.part(n.box(b + U * 0.15 * sc, (1.1 * sc, 1.1 * sc, 0.3 * sc), yaw=a), rim=True)
+        n.part(n.cylinder(b + U * 0.45 * sc, 0.38 * sc, 0.3 * sc, 14), rim=True)
+        sh = b + U * 0.8 * sc
+        el = sh + (F * 0.3 + U * 1.0) * sc
+        wr = el + (F * 0.95 - U * 0.3) * sc
+        n.part(n.box(sh - U * 0.1 * sc, (0.5 * sc, 0.5 * sc, 0.4 * sc), yaw=a), rim=True)
+        Rj = Sd.to_track_quat("Z", "Y").to_matrix()             # joint axis across the arm
+        for j, r in ((sh, 0.2), (el, 0.17), (wr, 0.13)):
+            n.part(n.cylinder(j, r * sc * k, 0.36 * sc * k, 12, Rj), glow=1.0, rim=False)
+        n.part(n.beam(sh, el, 0.26 * sc * k, 0.26 * sc * k), glow=0.4, rim=False)
+        n.part(n.beam(el, wr, 0.21 * sc * k, 0.21 * sc * k), glow=0.4, rim=False)
+        g0 = wr - U * 0.12 * sc
+        n.part(n.box(g0, (0.36 * sc * k, 0.16 * sc * k, 0.12 * sc * k), yaw=a), rim=False)
+        for sg in (-1, 1):
+            tip = g0 + Sd * sg * 0.13 * sc
+            n.part(n.beam(tip, tip - U * 0.32 * sc + Sd * sg * 0.04 * sc, 0.07 * sc * k, 0.07 * sc * k), glow=0.6, rim=False)
+
+
 def crates(n, m):
     for x, y, z0, w, d, h, yaw in m["boxes"]:
         n.part(n.box((x, y, z0 + h / 2), (w, d, h), yaw=math.radians(yaw)), rim=True)
@@ -598,7 +629,8 @@ BUILDERS = {"plate": plate, "mass": mass, "pylons": pylons, "buttresses": buttre
             "shutter": shutter, "fans": fans, "tanks": tanks, "tower": tower, "railing": railing, "dish": dish,
             "antennas": antennas, "banner": banner, "pipes": pipes, "crates": crates, "box": generic_box,
             "columns": columns, "lattice": lattice, "stairs": stairs, "lamps": lamps, "units": units,
-            "profile": profile, "conveyor": conveyor, "stacks": stacks, "roof_fans": roof_fans}
+            "profile": profile, "conveyor": conveyor, "stacks": stacks, "roof_fans": roof_fans,
+            "robots": robots}
 
 
 def build(n, module):

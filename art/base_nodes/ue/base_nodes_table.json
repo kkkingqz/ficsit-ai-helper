@@ -166,5 +166,47 @@
     "PlateRadius": 1453.8,
     "Height": 1710.0,
     "ScaleSingle": 0.05848
+  },
+  {
+    "Name": "assembler_T1",
+    "NodeId": "assembler",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"assembler.name\", \"Assembly Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"assembler.type\", \"Production / Assembly\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Assembler_T1.SM_Holo_Assembler_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Assembler_T1_Mini.SM_Holo_Assembler_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Assembler_T1_Screen.T_Node_Assembler_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Assembler_T1_Icon_256.T_Node_Assembler_T1_Icon_256",
+    "PlateRadius": 688.8,
+    "Height": 660.0,
+    "ScaleSingle": 0.14519
+  },
+  {
+    "Name": "assembler_T2",
+    "NodeId": "assembler",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"assembler.name\", \"Assembly Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"assembler.type\", \"Production / Assembly\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Assembler_T2.SM_Holo_Assembler_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Assembler_T2_Mini.SM_Holo_Assembler_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Assembler_T2_Screen.T_Node_Assembler_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Assembler_T2_Icon_256.T_Node_Assembler_T2_Icon_256",
+    "PlateRadius": 917.1,
+    "Height": 930.0,
+    "ScaleSingle": 0.10753
+  },
+  {
+    "Name": "assembler_T3",
+    "NodeId": "assembler",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"assembler.name\", \"Assembly Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"assembler.type\", \"Production / Assembly\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Assembler_T3.SM_Holo_Assembler_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Assembler_T3_Mini.SM_Holo_Assembler_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Assembler_T3_Screen.T_Node_Assembler_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Assembler_T3_Icon_256.T_Node_Assembler_T3_Icon_256",
+    "PlateRadius": 1110.9,
+    "Height": 1080.0,
+    "ScaleSingle": 0.09002
   }
 ]
