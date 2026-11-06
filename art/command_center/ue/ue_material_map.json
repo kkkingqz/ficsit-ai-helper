@@ -1,0 +1,442 @@
+{
+  "_how_to": [
+    "1. In the UE editor run: py ue_import_command_center.py --discover  -> writes ue_material_discovery.json with the game's",
+    "   master materials (path + scalar / vector / texture parameter names).",
+    "2. For each slot below set 'parent' to the game master material (or material instance) to use and fill 'game_param'",
+    "   for every value that the master has (leave '' to skip). Values come from textures/manifest.json.",
+    "3. Run: py ue_import_command_center.py --import  -> creates MI_CC_<slot> and assigns them to the mesh sections.",
+    "Paint: the game master usually takes the paint-gun colours itself; then leave base_color '' on the paint slots and",
+    "check U-11 (which mask the master reads: texture, vertex colour PaintMask R/G, or the slot itself)."
+  ],
+  "slots": {
+    "M_PaintOrange": {
+      "parent": "",
+      "note": "ficsit_orange #F59B1B",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.913,
+            0.328,
+            0.011,
+            1.0
+          ]
+        },
+        "metallic": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.05
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.5
+        },
+        "detail_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_M"
+        },
+        "normal_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_N"
+        },
+        "arw_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_ARW"
+        },
+        "macro_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Macro_M"
+        }
+      }
+    },
+    "M_PaintGray": {
+      "parent": "",
+      "note": "tech_grey #5B6470",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.104,
+            0.127,
+            0.162,
+            1.0
+          ]
+        },
+        "metallic": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.05
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.6
+        },
+        "detail_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_M"
+        },
+        "normal_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_N"
+        },
+        "arw_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_ARW"
+        },
+        "macro_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Macro_M"
+        }
+      }
+    },
+    "M_MetalDark": {
+      "parent": "",
+      "note": "dark PAINTED structural metal (metallic 0)",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.0137,
+            0.0168,
+            0.0222,
+            1.0
+          ]
+        },
+        "metallic": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.0
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.45
+        },
+        "detail_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_M"
+        },
+        "normal_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_N"
+        },
+        "arw_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_ARW"
+        },
+        "macro_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Macro_M"
+        }
+      }
+    },
+    "M_MetalBare": {
+      "parent": "",
+      "note": "brushed, anisotropic along U",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.473,
+            0.509,
+            0.552,
+            1.0
+          ]
+        },
+        "metallic": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 1.0
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.25
+        },
+        "anisotropy": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.6
+        },
+        "detail_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Brushed_M"
+        },
+        "normal_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Brushed_N"
+        },
+        "arw_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_ARW"
+        },
+        "macro_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Macro_M"
+        }
+      }
+    },
+    "M_MetalTread": {
+      "parent": "",
+      "note": "diamond tread plate: floor metal inserts (service areas), hatches, threshold, step treads",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.323,
+            0.352,
+            0.381,
+            1.0
+          ]
+        },
+        "metallic": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 1.0
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.4
+        },
+        "detail_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Tread_M"
+        },
+        "normal_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Tread_N"
+        },
+        "arw_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Tread_ARW"
+        },
+        "macro_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Macro_M"
+        }
+      }
+    },
+    "M_Rubber": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.011,
+            0.013,
+            0.015,
+            1.0
+          ]
+        },
+        "metallic": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.0
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.85
+        },
+        "detail_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_M"
+        },
+        "normal_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_N"
+        },
+        "arw_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_MetalDetail_ARW"
+        },
+        "macro_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Macro_M"
+        }
+      }
+    },
+    "M_Glass": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "base_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.55,
+            0.7,
+            0.8,
+            1.0
+          ]
+        },
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.05
+        },
+        "opacity": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.08
+        }
+      }
+    },
+    "M_Hazard": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.6
+        },
+        "base_color_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_Hazard_D"
+        }
+      }
+    },
+    "M_Decal": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "roughness": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 0.6
+        },
+        "base_color_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_DecalAtlas_D"
+        }
+      }
+    },
+    "M_ScreenStatic": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "emissive_strength": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 1.2
+        },
+        "emissive_texture": {
+          "type": "texture",
+          "game_param": "",
+          "value": "T_CC_ScreenAtlas_E"
+        }
+      }
+    },
+    "M_ScreenRT": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "screen_rt": {
+          "type": "texture",
+          "game_param": "",
+          "value": "RUNTIME: render target set by AFAIHCommandCenter"
+        }
+      }
+    },
+    "M_LightWarm": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "emissive_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.93,
+            0.955,
+            1.0,
+            1.0
+          ]
+        },
+        "emissive_strength": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 8.0
+        }
+      }
+    },
+    "M_Beacon": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "emissive_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            1.0,
+            0.45,
+            0.05,
+            1.0
+          ]
+        },
+        "emissive_strength": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 15.0
+        }
+      }
+    },
+    "M_Holo": {
+      "parent": "",
+      "note": "",
+      "params": {
+        "emissive_color": {
+          "type": "vector",
+          "game_param": "",
+          "value": [
+            0.1,
+            0.55,
+            1.0,
+            1.0
+          ]
+        },
+        "emissive_strength": {
+          "type": "scalar",
+          "game_param": "",
+          "value": 4.0
+        }
+      }
+    }
+  }
+}

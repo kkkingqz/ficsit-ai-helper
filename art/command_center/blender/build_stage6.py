@@ -416,7 +416,14 @@ def main():
 
     meshes = [o for o in exp.objects if o.type == "MESH" and o.data.polygons]
     holo = [o for o in meshes if is_holo(o)]
-    body = [o for o in meshes if not is_holo(o)]
+    # stage 7 split: the main screen gets its own (non-instanced) component for the render-target material; the
+    # hologram splits into a static part (beams, scale, emitter disc, lenses — tied to the base and ceiling) and a
+    # spinning part (central object, rings, UI cards) whose pivot is SOCKET_holo
+    screen = [o for o in meshes if o.name == "DISPLAY_MAIN_RT"]
+    spin = [o for o in holo if o.name.startswith(("HOLO_PROJECTION", "HOLO_UI_card")) and
+            not o.name.startswith(("HOLO_PROJECTION_scale", "HOLO_PROJECTION_tick"))]
+    holo_static = [o for o in holo if o not in spin]
+    body = [o for o in meshes if not is_holo(o) and o not in screen]
     inner = {o.name for o in body if is_interior(o)}
     dims = {o.name: max(o.dimensions) for o in body}
     # exterior (shell + everything outside the room) and interior (room contents) are separate static meshes:
@@ -436,7 +443,13 @@ def main():
         finish_mesh(ob, (0.0, 2.0, 5.0)[lod], LOD_COLLAPSE[lod])
         result[(part, lod)] = (ob, len(objs))
     hcoll = cc_lib.collection("UE_HOLO")
-    hob = finish_mesh(join(copy_into(holo, hcoll), f"{MESH}_Holo"))
+    hob = finish_mesh(join(copy_into(holo_static, hcoll), f"{MESH}_Holo"))
+    spin_ob = finish_mesh(join(copy_into(spin, hcoll), f"{MESH}_HoloSpin"))
+    pivot = Vector((im.HOLO_XY[0], im.HOLO_XY[1], im.F + 2.05))            # = SOCKET_holo
+    for v in spin_ob.data.vertices:
+        v.co -= pivot
+    scoll = cc_lib.collection("UE_SCREEN")
+    screen_ob = finish_mesh(join(copy_into(screen, scoll), f"{MESH}_ScreenRT"))
     ucoll = cc_lib.collection("UE_UCX")
     ucx = collision(ucoll)
     socks = sockets(result[("ext", 0)][0])
@@ -450,6 +463,8 @@ def main():
         files[(part, lod)] = f"{ob.name}.fbx"
         export_fbx([ob] + (ucx + socks if (part, lod) == ("ext", 0) else []), os.path.join(a.out, files[(part, lod)]))
     export_fbx([hob], os.path.join(a.out, f"{MESH}_Holo.fbx"))
+    export_fbx([spin_ob], os.path.join(a.out, f"{MESH}_HoloSpin.fbx"))
+    export_fbx([screen_ob], os.path.join(a.out, f"{MESH}_ScreenRT.fbx"))
     with open(os.path.join(a.out, "clearance.json"), "w", encoding="utf-8") as f:
         json.dump(clearance(), f, indent=2, ensure_ascii=False)
 
@@ -461,9 +476,10 @@ def main():
         bad, chk = atlas_violations(ob)
         rows.append((ob.name, f"LOD{lod}", n, tris(ob), len(ob.data.materials), SCREEN_SIZE[lod], ok, has,
                      ob.data.has_custom_normals, f"{chk - bad}/{chk}" if chk else "—", bad == 0))
-    hok, _, _ = fit(hob)
-    rows.append((hob.name, "—", len(holo), tris(hob), len(hob.data.materials), "—", hok,
-                 bool(hob.data.uv_layers.get("UVMap")), hob.data.has_custom_normals, "—", True))
+    for ob_, n_ in ((hob, len(holo_static)), (spin_ob, len(spin)), (screen_ob, len(screen))):
+        ok_, _, _ = fit(ob_) if ob_ is not spin_ob else (True, None, None)   # spin pivot is SOCKET_holo, not origin
+        rows.append((ob_.name, "—", n_, tris(ob_), len(ob_.data.materials), "—", ok_,
+                     bool(ob_.data.uv_layers.get("UVMap")), ob_.data.has_custom_normals, "—", True))
     sections = {}
     for part in ("ext", "int"):
         base = [m.name for m in result[(part, 0)][0].data.materials]
@@ -498,6 +514,9 @@ def main():
               f"- **Пол**: точек пола без коллизии (сетка 0,5 м, кроме лестничного приямка) — {holes} "
               + ("✅" if holes == 0 else "⚠️") + ".",
               f"- **Сокеты** в `{MESH}.fbx`: " + ", ".join(f"`{o.name}`" for o in socks) + ".",
+              f"- **Для BP**: `{MESH}_ScreenRT` — главный экран отдельным мешем (обычный компонент, динамический материал с "
+              f"render target); `{MESH}_HoloSpin` — вращающаяся часть голограммы, опорная точка = `SOCKET_holo` "
+              f"(компонент крепится к сокету без смещения); `{MESH}_Holo` — статическая часть (лучи, шкала, диск, линзы).",
               f"- Вырожденные грани-иглы после булевых операций (высота < 1 мм): **{sl_before} → {sl_after}**.",
               "- Clearance: `clearance.json` (16 × 8 × " f"{cc_lib.ROOF + 0.8:.1f} м, без антенны).",
               f"- Нормали: жёсткие рёбра по углу {math.degrees(SHARP_ANGLE):.0f}°, взвешенные нормали (по площади, "
@@ -507,9 +526,10 @@ def main():
     print("\n".join(lines))
 
     if a.render:
-        render(a, result, hob, ucx, exp)
+        spin_ob.location = pivot                                              # back in place for the renders only
+        render(a, result, hob, ucx, exp, (spin_ob, screen_ob))
 
-def render(a, result, hob, ucx, exp):
+def render(a, result, hob, ucx, exp, extra=()):
     import ui_preview
     ui_preview.apply_preview_ui()
     cc_lib.setup_render(samples=a.samples)
@@ -532,13 +552,13 @@ def render(a, result, hob, ucx, exp):
     shots = {"01": ((-17.0, -21.0, 7.5), (0.0, 0.0, 3.0), None, 35), "09": ((14.0, 17.0, 5.5), (0.0, 1.0, 3.0), None, 35),
              "far": ((-34.0, -42.0, 15.0), (0.0, 0.0, 3.0), None, 35)}
     for lod in (0, 1, 2):
-        objs = [result[("ext", lod)][0]] + ([result[("int", lod)][0], hob] if lod < 2 else [])
+        objs = [result[("ext", lod)][0]] + ([result[("int", lod)][0], hob, *extra] if lod < 2 else [])
         show(objs)
         for k, (loc, tgt, ortho, lens) in shots.items():
             s.camera = cc_lib.camera(f"CAM_{lod}{k}", loc, tgt, ortho, lens)
             s.render.filepath = os.path.join(a.render, f"LOD{lod}_{k}.png")
             bpy.ops.render.render(write_still=True)
-    show([result[("ext", 0)][0], result[("int", 0)][0], hob])
+    show([result[("ext", 0)][0], result[("int", 0)][0], hob, *extra])
     for k, (loc, tgt, ortho, lens) in {"close": ((2.5, 11.0, 2.4), (-0.8, 3.9, 2.0), None, 26),
                                        "interior": ((6.3, 2.45, 3.1), (-2.5, -2.6, 2.3), None, 18)}.items():
         s.camera = cc_lib.camera(f"CAM_n{k}", loc, tgt, ortho, lens)

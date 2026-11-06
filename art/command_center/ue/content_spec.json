@@ -1,0 +1,219 @@
+{
+  "_comment": "Command Center (AI Terminal flagship, FR-01) — content spec for stage 7. Single source for ue_import_command_center.py and README_UE.md. Values marked VERIFY are game asset paths / class names that must be checked in the SML 3.12 editor before use.",
+  "mod_reference": "FicsitAIHelper",
+  "content_root": "/FicsitAIHelper/Buildings/CommandCenter",
+  "folders": {
+    "meshes": "Mesh",
+    "textures": "Texture",
+    "materials": "Material",
+    "icons": "Icon",
+    "blueprints": ""
+  },
+  "meshes": {
+    "exterior": {
+      "asset": "SM_CommandCenter",
+      "lod0": "SM_CommandCenter.fbx",
+      "lods": [
+        "SM_CommandCenter_LOD1.fbx",
+        "SM_CommandCenter_LOD2.fbx"
+      ],
+      "screen_sizes": [
+        1.0,
+        0.35,
+        0.12
+      ],
+      "collision": "UCX in LOD0 file (28 convex parts)",
+      "sockets": [
+        "SOCKET_power",
+        "SOCKET_interact",
+        "SOCKET_ui_camera",
+        "SOCKET_holo",
+        "SOCKET_door"
+      ],
+      "component": "FGColoredInstanceMeshProxy in Build_CommandCenter (paintable, instanced) — VERIFY component class in SML 3.12"
+    },
+    "interior": {
+      "asset": "SM_CommandCenter_Interior",
+      "lod0": "SM_CommandCenter_Interior.fbx",
+      "lods": [
+        "SM_CommandCenter_Interior_LOD1.fbx"
+      ],
+      "screen_sizes": [
+        1.0,
+        0.35
+      ],
+      "collision": "none (the exterior UCX covers the room contents)",
+      "component_max_draw_distance_cm": 6000,
+      "note": "the main screen (DISPLAY_MAIN_RT) is not in the interior mesh: see screen_rt",
+      "component": "FGColoredInstanceMeshProxy in Build_CommandCenter, Max Draw Distance 6000 cm"
+    },
+    "holo": {
+      "asset": "SM_CommandCenter_Holo",
+      "lod0": "SM_CommandCenter_Holo.fbx",
+      "lods": [],
+      "screen_sizes": [
+        1.0
+      ],
+      "collision": "none",
+      "component": "UStaticMeshComponent HoloStatic (C++), pivot = building origin",
+      "component_max_draw_distance_cm": 4000
+    },
+    "holo_spin": {
+      "asset": "SM_CommandCenter_HoloSpin",
+      "lod0": "SM_CommandCenter_HoloSpin.fbx",
+      "lods": [],
+      "screen_sizes": [
+        1.0
+      ],
+      "collision": "none",
+      "component": "UStaticMeshComponent HoloSpin (C++), attached to SOCKET_holo with zero offset; spins about its Z",
+      "spin_deg_per_s": 12,
+      "component_max_draw_distance_cm": 4000
+    },
+    "screen_rt": {
+      "asset": "SM_CommandCenter_ScreenRT",
+      "lod0": "SM_CommandCenter_ScreenRT.fbx",
+      "lods": [],
+      "screen_sizes": [
+        1.0
+      ],
+      "collision": "none",
+      "component": "UStaticMeshComponent MainScreen (C++), dynamic material instance with the render target",
+      "component_max_draw_distance_cm": 6000
+    }
+  },
+  "import": {
+    "nanite": false,
+    "normals": "Import Normals and Tangents",
+    "generate_lightmap_uvs": false,
+    "combine_meshes": true,
+    "auto_generate_collision": false,
+    "import_materials": false,
+    "import_textures": false,
+    "convert_scene": true,
+    "force_front_x_axis": false,
+    "units": "FBX exported in metres with FBX_SCALE_UNITS -> UE centimetres (16 m = 1600 cm)",
+    "orientation_note": "Blender front (window) = -Y. Check in the editor which UE axis the window faces and fix with import rotation if the build gun expects the front on another axis (U-2)."
+  },
+  "building": {
+    "class_cpp": "AFAIHCommandCenter (GameFacade/Buildings, parent AFGBuildableFactory — VERIFY)",
+    "blueprint": "Build_CommandCenter",
+    "display_name": "Command Center",
+    "description": "FICSIT AI Terminal, flagship model. Opens the AI assistant console: production plans, catalog, factory overview and recommended tasks.",
+    "power_consumption_mw": 10.0,
+    "needs_power": true,
+    "power_connection_socket": "SOCKET_power",
+    "interact_socket": "SOCKET_interact",
+    "footprint_foundations": "2 x 1 (16 x 8 m)",
+    "clearance_box_cm": {
+      "min": [
+        -800,
+        -400,
+        0
+      ],
+      "max": [
+        800,
+        400,
+        760
+      ]
+    },
+    "screen_render_target": {
+      "material_slot": "M_ScreenRT",
+      "parameter": "ScreenRT",
+      "size": [
+        1920,
+        1080
+      ],
+      "aspect": "16:9"
+    },
+    "no_power_behaviour": "screens dark (static atlas emissive 0), hologram hidden, UI does not open (shows 'No power' look-at text)"
+  },
+  "descriptor": {
+    "blueprint": "Desc_CommandCenter",
+    "parent_class": "/Script/FactoryGame.FGBuildingDescriptor",
+    "small_icon": "IconDesc_CommandCenter_256",
+    "big_icon": "IconDesc_CommandCenter_512",
+    "build_category": "VERIFY: special / organisation category of the build menu in SML 3.12",
+    "build_menu_priority": 10
+  },
+  "recipe": {
+    "blueprint": "Recipe_CommandCenter",
+    "parent_class": "/Script/FactoryGame.FGRecipe",
+    "produced_in": "VERIFY: /Game/FactoryGame/Equipment/BuildGun/BP_BuildGun.BP_BuildGun_C",
+    "product": "Desc_CommandCenter x1",
+    "ingredients_tier2_proposal": [
+      {
+        "item": "Reinforced Iron Plate",
+        "class": "VERIFY: /Game/FactoryGame/Resource/Parts/IronPlateReinforced/Desc_IronPlateReinforced.Desc_IronPlateReinforced_C",
+        "amount": 15
+      },
+      {
+        "item": "Modular Frame",
+        "class": "VERIFY: /Game/FactoryGame/Resource/Parts/ModularFrame/Desc_ModularFrame.Desc_ModularFrame_C",
+        "amount": 5
+      },
+      {
+        "item": "Rotor",
+        "class": "VERIFY: /Game/FactoryGame/Resource/Parts/Rotor/Desc_Rotor.Desc_Rotor_C",
+        "amount": 10
+      },
+      {
+        "item": "Cable",
+        "class": "VERIFY: /Game/FactoryGame/Resource/Parts/Cable/Desc_Cable.Desc_Cable_C",
+        "amount": 50
+      },
+      {
+        "item": "Concrete",
+        "class": "VERIFY: /Game/FactoryGame/Resource/Parts/Cement/Desc_Cement.Desc_Cement_C",
+        "amount": 80
+      }
+    ],
+    "balance_note": "Tier 2 flagship: all ingredients come from Tier 0-2 production (Part Assembly milestone). Proposal, to be balanced in play."
+  },
+  "schematic": {
+    "blueprint": "Schem_CommandCenter",
+    "parent_class": "/Script/FactoryGame.FGSchematic",
+    "type": "Milestone",
+    "tech_tier": 2,
+    "display_name": "FICSIT AI Operations",
+    "unlocks": [
+      "Recipe_CommandCenter"
+    ],
+    "cost_proposal": [
+      {
+        "item": "Reinforced Iron Plate",
+        "amount": 50
+      },
+      {
+        "item": "Rotor",
+        "amount": 40
+      },
+      {
+        "item": "Cable",
+        "amount": 200
+      }
+    ],
+    "registration": "SML GameWorldModule of the mod (mSchematics array) — VERIFY module name in the fork"
+  },
+  "materials": {
+    "map_file": "ue_material_map.json",
+    "discovery_output": "ue_material_discovery.json",
+    "slots": [
+      "M_PaintOrange",
+      "M_PaintGray",
+      "M_MetalDark",
+      "M_MetalBare",
+      "M_MetalTread",
+      "M_Rubber",
+      "M_Glass",
+      "M_LightWarm",
+      "M_Beacon",
+      "M_ScreenRT",
+      "M_ScreenStatic",
+      "M_Holo",
+      "M_Hazard",
+      "M_Decal"
+    ],
+    "manifest": "../textures/manifest.json"
+  }
+}
