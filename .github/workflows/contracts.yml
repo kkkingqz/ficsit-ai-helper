@@ -24,5 +24,6 @@ jobs:
           ajv -s schemas/screen-definition.schema.json  -d screen.example.json
           ajv -s schemas/line.schema.json               -d line.example.json
           ajv -s schemas/note.schema.json               -d note.example.json
+          ajv -s schemas/chat-card.schema.json          -d chat-card.example.json
           ajv -s schemas/blueprint-request.schema.json  -d blueprint.example.json
           ajv -s schemas/blueprint-preview.schema.json  -d blueprint-preview.example.json

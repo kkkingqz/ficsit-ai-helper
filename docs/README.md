@@ -8,6 +8,7 @@
 - `assets/*.dot` — редактируемые исходники схем Graphviz.
 - `contracts/*.json` — примеры контрактов (не готовое runtime API).
 - `contracts/schemas/*.schema.json` — JSON Schema контрактов (draft 2020-12); примеры проверяются по ним в CI.
+- `concepts/*.png` — концепт экранов: состав и компоновка, не шаблон (разбор — §6.7–§6.9).
 
 ## Главное в 2.1-draft
 

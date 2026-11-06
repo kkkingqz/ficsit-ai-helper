@@ -17,6 +17,7 @@ Notes, Work Orders, Screens), подключаемый планировщик п
 | [docs/assets/*.dot](docs/assets) | Исходники схем Graphviz |
 | [docs/contracts/*.json](docs/contracts) | Примеры предлагаемых контрактов (не runtime API) |
 | [docs/contracts/schemas](docs/contracts/schemas) | JSON Schema контрактов; примеры проверяются в CI |
+| [docs/concepts](docs/concepts) | Концепт экранов (не шаблон) и что из него реализуется |
 
 ## Главное из архитектуры
 
@@ -30,8 +31,8 @@ Notes, Work Orders, Screens), подключаемый планировщик п
 - **Планировщик:** стандартизированная обёртка (`PlanRequest` → `ProductionPlan`, интерфейс
   провайдера и UI плана), в v1.0 — заглушка. Первый кандидат провайдера — ядро
   [Satisfactory Build Calculator](https://github.com/AutoCrafter1223/satisfactory-build-calculator-mod) (MIT).
-- **Объём v1.0:** AI Terminal; экраны Dashboard, Chat, Notes, Work Orders, Screens (редактор
-  экранов вместе с инструментами модели); обёртки Planning и Graph; состояние в сохранении.
+- **Объём v1.0:** AI Terminal; экраны Обзор, Производство, Статистика, Чат с ИИ, Задачи,
+  Записки (только текст), Линии, Screens, Настройки; карточки в чате; обёртки Planning и Graph; состояние в сохранении.
   Первым идёт вертикальный срез v0.1 (терминал, Chat, Dashboard). Blueprint Builder — v1.1,
   голос — v1.2, подключение планировщика и UI плана — v1.3, AI Assistant с HUD — v1.4.
 - **Контракты:** `GameCatalog`, `PlanRequest`, `ProductionPlan`, `ScreenDefinition`, `BlueprintRequest`.

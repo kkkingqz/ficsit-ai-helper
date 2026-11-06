@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/chat-card.schema.json",
+  "title": "ChatCard",
+  "description": "Карточка в ответе модели, аргумент инструмента show_card (ARCHITECTURE.md §7.6). Один виджет из белого списка. Карточка со ссылкой (source) показывает живые данные мода; карточка с данными (data) показывается как оценка ассистента. source.id сверяется с живым каталогом метрик, линий и планов.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "type",
+    "title"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "type": {
+      "enum": [
+        "metric",
+        "timeseries",
+        "table",
+        "text",
+        "production_graph",
+        "line"
+      ]
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "id"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "metric",
+            "line",
+            "plan"
+          ]
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.]{0,63}$"
+        }
+      }
+    },
+    "options": {
+      "type": "object",
+      "maxProperties": 8,
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 100
+          },
+          {
+            "type": "number"
+          },
+          {
+            "type": "boolean"
+          }
+        ]
+      }
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "text": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "columns": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "rows": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "array",
+            "maxItems": 6,
+            "items": {
+              "type": "string",
+              "maxLength": 60
+            }
+          }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "source": true
+      },
+      "required": [
+        "source"
+      ]
+    },
+    {
+      "properties": {
+        "data": true
+      },
+      "required": [
+        "data"
+      ]
+    }
+  ],
+  "if": {
+    "properties": {
+      "data": true
+    },
+    "required": [
+      "data"
+    ]
+  },
+  "then": {
+    "properties": {
+      "type": {
+        "enum": [
+          "table",
+          "text"
+        ]
+      }
+    }
+  }
+}
