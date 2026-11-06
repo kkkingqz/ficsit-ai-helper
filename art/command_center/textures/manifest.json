@@ -6,7 +6,24 @@
   "uv0": {
     "tiling_m_per_uv": 2.0,
     "hazard_m_per_uv": 0.5,
-    "atlas_px": 2048
+    "decal_atlas_px": [
+      4096,
+      2048
+    ],
+    "screen_atlas_px": [
+      4096,
+      2048
+    ]
+  },
+  "palette": {
+    "ficsit_orange": "#F59B1B",
+    "graphite": "#1F2329",
+    "tech_grey": "#5B6470",
+    "panel_grey": "#B7BDC4",
+    "hazard_yellow": "#F3C540",
+    "light_white": "#F7FAFF",
+    "ui_blue": "#7FD7FF",
+    "plate_dark": "#2E3640"
   },
   "textures": {
     "T_CC_MetalDetail_M": {
@@ -33,6 +50,36 @@
       "compression": "Grayscale / Masks",
       "use": "large-scale variation, sample at UV0 / 8 (16 m per tile)"
     },
+    "T_CC_Tread_M": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Grayscale / Masks",
+      "use": "diamond tread detail"
+    },
+    "T_CC_Tread_N": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Normalmap (DXT5/BC5)",
+      "use": "tread normal, DirectX"
+    },
+    "T_CC_Tread_ARW": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Masks (no sRGB)",
+      "use": "tread R AO, G roughness, B wear"
+    },
+    "T_CC_Brushed_M": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Grayscale / Masks",
+      "use": "brushed streaks, bare metal"
+    },
+    "T_CC_Brushed_N": {
+      "size": 1024,
+      "srgb": false,
+      "compression": "Normalmap (DXT5/BC5)",
+      "use": "brushed normal, DirectX"
+    },
     "T_CC_Hazard_D": {
       "size": 512,
       "srgb": true,
@@ -40,16 +87,22 @@
       "use": "hazard stripes"
     },
     "T_CC_DecalAtlas_D": {
-      "size": 2048,
+      "size": [
+        4096,
+        2048
+      ],
       "srgb": true,
       "compression": "Default (DXT1/BC1)",
-      "use": "decal atlas"
+      "use": "decal atlas (labels with pictograms, signs, tags, IDs, numbers, barcode, pictograms)"
     },
     "T_CC_ScreenAtlas_E": {
-      "size": 2048,
+      "size": [
+        4096,
+        2048
+      ],
       "srgb": true,
       "compression": "Default (DXT1/BC1)",
-      "use": "screen atlas, emissive"
+      "use": "screen atlas, emissive (12 UIs + LED strip)"
     }
   },
   "slots": {
@@ -62,15 +115,16 @@
       "macro": "T_CC_Macro_M",
       "macro_uv_scale": 0.125,
       "base_color_linear": [
-        0.93,
-        0.33,
-        0.016
+        0.913,
+        0.328,
+        0.011
       ],
-      "metallic": 0.0,
-      "roughness": 0.55,
+      "metallic": 0.05,
+      "roughness": 0.5,
       "paint": "primary",
       "paint_mask": "PaintMask.R",
-      "edge_wear": "wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)"
+      "edge_wear": "wear = max(PaintMask.B * 0.7, ARW.B * 0.7) -> lerp to bare metal (0.45 grey, metallic 1)",
+      "palette": "ficsit_orange #F59B1B"
     },
     "M_PaintGray": {
       "uv": "UV0",
@@ -81,15 +135,16 @@
       "macro": "T_CC_Macro_M",
       "macro_uv_scale": 0.125,
       "base_color_linear": [
-        0.105,
-        0.122,
-        0.147
+        0.104,
+        0.127,
+        0.162
       ],
-      "metallic": 0.0,
-      "roughness": 0.55,
+      "metallic": 0.05,
+      "roughness": 0.6,
       "paint": "secondary",
       "paint_mask": "PaintMask.G",
-      "edge_wear": "wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)"
+      "edge_wear": "wear = max(PaintMask.B * 0.7, ARW.B * 0.7) -> lerp to bare metal (0.45 grey, metallic 1)",
+      "palette": "tech_grey #5B6470"
     },
     "M_MetalDark": {
       "uv": "UV0",
@@ -100,28 +155,50 @@
       "macro": "T_CC_Macro_M",
       "macro_uv_scale": 0.125,
       "base_color_linear": [
-        0.027,
-        0.031,
-        0.039
+        0.0137,
+        0.0168,
+        0.0222
       ],
-      "metallic": 0.6,
-      "roughness": 0.55
+      "metallic": 0.0,
+      "roughness": 0.45,
+      "palette": "graphite #1F2329",
+      "note": "dark PAINTED structural metal (metallic 0)"
     },
     "M_MetalBare": {
       "uv": "UV0",
       "tile_m": 2.0,
-      "detail": "T_CC_MetalDetail_M",
-      "normal": "T_CC_MetalDetail_N",
+      "detail": "T_CC_Brushed_M",
+      "normal": "T_CC_Brushed_N",
       "arw": "T_CC_MetalDetail_ARW",
       "macro": "T_CC_Macro_M",
       "macro_uv_scale": 0.125,
       "base_color_linear": [
-        0.33,
-        0.35,
-        0.38
+        0.473,
+        0.509,
+        0.552
       ],
       "metallic": 1.0,
-      "roughness": 0.3
+      "roughness": 0.25,
+      "anisotropy": 0.6,
+      "palette": "panel_grey #B7BDC4",
+      "note": "brushed, anisotropic along U"
+    },
+    "M_MetalTread": {
+      "uv": "UV0",
+      "tile_m": 2.0,
+      "detail": "T_CC_Tread_M",
+      "normal": "T_CC_Tread_N",
+      "arw": "T_CC_Tread_ARW",
+      "macro": "T_CC_Macro_M",
+      "macro_uv_scale": 0.125,
+      "base_color_linear": [
+        0.323,
+        0.352,
+        0.381
+      ],
+      "metallic": 1.0,
+      "roughness": 0.4,
+      "note": "diamond tread plate: floor metal inserts (service areas), hatches, threshold, step treads"
     },
     "M_Rubber": {
       "uv": "UV0",
@@ -173,9 +250,9 @@
     "M_LightWarm": {
       "uv": "UV0 0..1",
       "emissive_color_linear": [
-        1.0,
-        0.91,
-        0.7
+        0.93,
+        0.955,
+        1.0
       ],
       "emissive_strength": 8.0
     },

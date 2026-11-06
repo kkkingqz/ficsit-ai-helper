@@ -167,9 +167,16 @@ TEXTURES = {
                              "use": "R ambient occlusion, G roughness (absolute), B wear mask"},
     "T_CC_Macro_M": {"size": 512, "srgb": False, "compression": "Grayscale / Masks",
                      "use": "large-scale variation, sample at UV0 / 8 (16 m per tile)"},
+    "T_CC_Tread_M": {"size": 1024, "srgb": False, "compression": "Grayscale / Masks", "use": "diamond tread detail"},
+    "T_CC_Tread_N": {"size": 1024, "srgb": False, "compression": "Normalmap (DXT5/BC5)", "use": "tread normal, DirectX"},
+    "T_CC_Tread_ARW": {"size": 1024, "srgb": False, "compression": "Masks (no sRGB)", "use": "tread R AO, G roughness, B wear"},
+    "T_CC_Brushed_M": {"size": 1024, "srgb": False, "compression": "Grayscale / Masks", "use": "brushed streaks, bare metal"},
+    "T_CC_Brushed_N": {"size": 1024, "srgb": False, "compression": "Normalmap (DXT5/BC5)", "use": "brushed normal, DirectX"},
     "T_CC_Hazard_D": {"size": 512, "srgb": True, "compression": "Default (DXT1/BC1)", "use": "hazard stripes"},
-    "T_CC_DecalAtlas_D": {"size": 2048, "srgb": True, "compression": "Default (DXT1/BC1)", "use": "decal atlas"},
-    "T_CC_ScreenAtlas_E": {"size": 2048, "srgb": True, "compression": "Default (DXT1/BC1)", "use": "screen atlas, emissive"},
+    "T_CC_DecalAtlas_D": {"size": [4096, 2048], "srgb": True, "compression": "Default (DXT1/BC1)",
+                          "use": "decal atlas (labels with pictograms, signs, tags, IDs, numbers, barcode, pictograms)"},
+    "T_CC_ScreenAtlas_E": {"size": [4096, 2048], "srgb": True, "compression": "Default (DXT1/BC1)",
+                           "use": "screen atlas, emissive (12 UIs + LED strip)"},
 }
 
 
@@ -182,10 +189,19 @@ def write_manifest(path):
         col = cc_lib.COLORS.get(name, (0.5, 0.5, 0.5, 1.0))
         slot = dict(tiling, base_color_linear=[round(c, 4) for c in col[:3]],
                     metallic=cc_lib.METALLIC.get(name, 0.0), roughness=cc_lib.ROUGHNESS.get(name, 0.55))
+        wear = "wear = max(PaintMask.B * 0.7, ARW.B * 0.7) -> lerp to bare metal (0.45 grey, metallic 1)"
         if name == "M_PaintOrange":
-            slot.update(paint="primary", paint_mask="PaintMask.R", edge_wear="wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)")
+            slot.update(paint="primary", paint_mask="PaintMask.R", edge_wear=wear, palette="ficsit_orange #F59B1B")
         elif name == "M_PaintGray":
-            slot.update(paint="secondary", paint_mask="PaintMask.G", edge_wear="wear = max(PaintMask.B * 0.55, ARW.B * 0.6) -> lerp to bare metal (0.45 grey, metallic 1)")
+            slot.update(paint="secondary", paint_mask="PaintMask.G", edge_wear=wear, palette="tech_grey #5B6470")
+        elif name == "M_MetalDark":
+            slot.update(palette="graphite #1F2329", note="dark PAINTED structural metal (metallic 0)")
+        elif name == "M_MetalBare":
+            slot.update(detail="T_CC_Brushed_M", normal="T_CC_Brushed_N", anisotropy=0.6,
+                        palette="panel_grey #B7BDC4", note="brushed, anisotropic along U")
+        elif name == "M_MetalTread":
+            slot.update(detail="T_CC_Tread_M", normal="T_CC_Tread_N", arw="T_CC_Tread_ARW",
+                        note="diamond tread plate: floor metal inserts (service areas), hatches, threshold, step treads")
         elif name == "M_Glass":
             slot = {"uv": "UV0", "translucent": True, "base_color_linear": [round(c, 4) for c in (0.55, 0.7, 0.8)],
                     "opacity": 0.08, "roughness": 0.05}
@@ -202,8 +218,8 @@ def write_manifest(path):
                        "emissive_strength": strength}
     slots["M_Holo"].update(translucent="additive", fresnel_edges=True)
     data = {"mesh": "SM_CommandCenter", "vertex_color": {"PaintMask": "R primary paint, G secondary paint, B chamfer edges"},
-            "uv0": {"tiling_m_per_uv": L.TILE_M, "hazard_m_per_uv": L.HAZARD_M, "atlas_px": L.ATLAS_PX},
-            "textures": TEXTURES, "slots": slots}
+            "uv0": {"tiling_m_per_uv": L.TILE_M, "hazard_m_per_uv": L.HAZARD_M, "decal_atlas_px": [L.DECAL_W, L.DECAL_H], "screen_atlas_px": [L.SCREEN_W, L.SCREEN_H]},
+            "palette": L.PALETTE, "textures": TEXTURES, "slots": slots}
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)

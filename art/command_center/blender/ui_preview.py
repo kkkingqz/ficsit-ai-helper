@@ -19,7 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = os.path.join(HERE, "..", "textures", "preview")
 
 BG, PANEL, LINE = (9, 22, 40), (18, 40, 66), (40, 80, 120)
-ORANGE, CYAN, AMBER, GREEN, WHITE = (242, 155, 56), (90, 200, 255), (255, 190, 60), (110, 220, 140), (225, 235, 245)
+# palette of the texture concept boards (stage5_layout.PALETTE): FICSIT orange, UI blue, hazard yellow, light white
+ORANGE, CYAN, AMBER, GREEN, WHITE = (245, 155, 27), (127, 215, 255), (243, 197, 64), (110, 220, 140), (247, 250, 255)
 PLATE, PLATE_EDGE, INK = (38, 42, 50), (70, 76, 86), (215, 220, 226)
 
 from stage5_layout import LABELS  # noqa: E402  (one label list for the preview images and the decal atlas)
@@ -163,6 +164,124 @@ def make_status(path, variant):
     im.save(path)
 
 
+def _header(d, w, text):
+    d.rectangle((0, 0, w, 64), fill=LINE)
+    d.text((24, 12), text, fill=WHITE, font=_font(36))
+
+
+def make_tasks(path):
+    """Assistant: recommended tasks (the building's function: player help)."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 720), BG)
+    d = ImageDraw.Draw(im)
+    _header(d, 1280, "ASSISTANT  //  RECOMMENDED TASKS")
+    rows = (("Build 2 Coal Generators", True), ("Set up Power Grid", True), ("Increase Belt Capacity", False),
+            ("Unlock Tier 3", False))
+    for i, (txt, done) in enumerate(rows):
+        y = 100 + i * 120
+        d.rectangle((40, y, 1240, y + 96), fill=PANEL, outline=LINE, width=3)
+        d.rectangle((70, y + 24, 118, y + 72), outline=GREEN if done else CYAN, width=6)
+        if done:
+            d.line((80, y + 48, 92, y + 62, 110, y + 32), fill=GREEN, width=8)
+        d.text((150, y + 24), txt, fill=WHITE if not done else (170, 190, 205), font=_font(44))
+    d.rectangle((40, 600, 1240, 640), fill=(26, 56, 88))
+    d.rectangle((40, 600, 640, 640), fill=CYAN)
+    d.text((40, 650), "PROGRESS 2 / 4", fill=CYAN, font=_font(34))
+    im.save(path)
+
+
+def make_map(path):
+    """Site map / navigation: contour lines, route, marker."""
+    import math as _m
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 720), (10, 28, 46))
+    d = ImageDraw.Draw(im)
+    for k in range(9):
+        pts = [(x, 380 + 40 * k - 160 + 60 * _m.sin(x / 140.0 + k) + 30 * _m.cos(x / 70.0)) for x in range(0, 1281, 20)]
+        d.line(pts, fill=(34, 74, 108), width=3)
+    route = [(120, 600), (320, 470), (520, 500), (700, 330), (920, 300), (1120, 140)]
+    d.line(route, fill=AMBER, width=8)
+    for x, y in route:
+        d.ellipse((x - 10, y - 10, x + 10, y + 10), fill=AMBER)
+    d.polygon(((920, 230), (970, 320), (870, 320)), outline=AMBER, width=8)
+    d.text((912, 252), "!", fill=AMBER, font=_font(56))
+    _header(d, 1280, "SITE MAP  //  NAVIGATION")
+    im.save(path)
+
+
+def make_logistics(path):
+    """Logistics flow: truck -> arrow -> throughput bars."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 720), BG)
+    d = ImageDraw.Draw(im)
+    _header(d, 1280, "LOGISTICS  //  FLOW")
+    d.rectangle((80, 260, 330, 420), outline=CYAN, width=8)                  # truck
+    d.rectangle((330, 310, 430, 420), outline=CYAN, width=8)
+    for cx in (140, 270, 390):
+        d.ellipse((cx - 30, 410, cx + 30, 470), outline=CYAN, width=8)
+    d.line((480, 360, 700, 360), fill=AMBER, width=12)                       # arrow
+    d.polygon(((700, 320), (760, 360), (700, 400)), fill=AMBER)
+    for i, h in enumerate((120, 180, 150, 240, 210, 280)):                    # throughput bars
+        x = 820 + i * 70
+        d.rectangle((x, 470 - h, x + 46, 470), fill=CYAN)
+    d.text((80, 540), "THROUGHPUT  480 units/min", fill=WHITE, font=_font(52))
+    d.text((80, 620), "TRAINS 3   TRUCKS 12   DRONES 4", fill=(150, 180, 205), font=_font(36))
+    im.save(path)
+
+
+def make_warning(path):
+    """Warning / scheduled maintenance with a countdown."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 720), (24, 20, 8))
+    d = ImageDraw.Draw(im)
+    d.rectangle((12, 12, 1268, 708), outline=AMBER, width=12)
+    d.polygon(((200, 140), (330, 380), (70, 380)), outline=AMBER, width=14)
+    d.text((182, 210), "!", fill=AMBER, font=_font(130))
+    d.text((400, 120), "WARNING", fill=AMBER, font=_font(96))
+    d.text((400, 250), "SCHEDULED MAINTENANCE", fill=WHITE, font=_font(52))
+    d.text((400, 330), "T-00:14:27", fill=AMBER, font=_font(88))
+    for k in range(8):                                                       # hazard band
+        x = 60 + k * 150
+        d.polygon(((x, 600), (x + 70, 600), (x + 30, 670), (x - 40, 670)), fill=AMBER)
+    im.save(path)
+
+
+def make_resources(path):
+    """Resources / load: ring gauge + bars."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 720), BG)
+    d = ImageDraw.Draw(im)
+    _header(d, 1280, "RESOURCES  //  LOAD")
+    d.arc((90, 140, 470, 520), 0, 360, fill=(26, 56, 88), width=46)
+    d.arc((90, 140, 470, 520), -90, 170, fill=CYAN, width=46)
+    d.text((205, 280), "72%", fill=WHITE, font=_font(100))
+    for i, (lbl, v, col) in enumerate((("IRON", 0.82, CYAN), ("COPPER", 0.64, CYAN), ("COAL", 0.38, AMBER),
+                                        ("OIL", 0.2, ORANGE))):
+        y = 160 + i * 110
+        d.text((560, y), lbl, fill=WHITE, font=_font(40))
+        d.rectangle((800, y + 6, 1220, y + 46), fill=(26, 56, 88))
+        d.rectangle((800, y + 6, 800 + int(420 * v), y + 46), fill=col)
+    im.save(path)
+
+
+def make_idle(path):
+    """Inactive screen: dark, faint grid, STANDBY."""
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1280, 720), (6, 12, 20))
+    d = ImageDraw.Draw(im)
+    for k in range(0, 1280, 64):
+        d.line((k, 0, k, 720), fill=(12, 24, 36), width=2)
+    for k in range(0, 720, 64):
+        d.line((0, k, 1280, k), fill=(12, 24, 36), width=2)
+    f = _font(110)
+    w = d.textlength("STANDBY", font=f)
+    d.text(((1280 - w) / 2, 250), "STANDBY", fill=(60, 110, 150), font=f)
+    f2 = _font(40)
+    w2 = d.textlength("TOUCH TO WAKE", font=f2)
+    d.text(((1280 - w2) / 2, 400), "TOUCH TO WAKE", fill=(50, 80, 110), font=f2)
+    im.save(path)
+
+
 # ---- labels and signs ------------------------------------------------------------------------------------------------
 def make_label(path, lines):
     from PIL import Image, ImageDraw
@@ -231,11 +350,12 @@ def ensure_textures(force=False):
     os.makedirs(OUT, exist_ok=True)
     jobs = {"ui_main": lambda p: make_main(p), "ui_wing": lambda p: make_wing(p), "ui_list": lambda p: make_list(p),
             "ui_cam": lambda p: make_cam(p), "sign_cc": lambda p: make_sign(p), "sign_exit": lambda p: make_exit(p),
-            "sign_entry": lambda p: make_entry(p)}
+            "sign_entry": lambda p: make_entry(p), "ui_tasks": make_tasks, "ui_map": make_map,
+            "ui_logistics": make_logistics, "ui_warning": make_warning, "ui_resources": make_resources, "ui_idle": make_idle}
     for k in range(3):
         jobs[f"ui_status_{k}"] = (lambda kk: (lambda p: make_status(p, kk)))(k)
     for k, lines in enumerate(LABELS):
-        jobs[f"label_{k}"] = (lambda ll: (lambda p: make_label(p, ll)))(lines)
+        jobs[f"label_{k}"] = (lambda ll: (lambda p: make_label(p, ll[:2])))(lines)
     for key, word in FLOOR.items():
         jobs[f"floor_{key}"] = (lambda ww: (lambda p: make_floor(p, ww)))(word)
     for name, fn in jobs.items():
@@ -293,10 +413,13 @@ def apply_preview_surface():
         im.colorspace_settings.name = "Non-Color" if not name.endswith("_D") else "sRGB"
         return im
 
-    for name in ("M_PaintOrange", "M_PaintGray", "M_MetalDark", "M_MetalBare", "M_Rubber"):
+    per_slot = {"M_MetalBare": ("T_CC_Brushed_M", "T_CC_Brushed_N", "T_CC_MetalDetail_ARW"),
+                "M_MetalTread": ("T_CC_Tread_M", "T_CC_Tread_N", "T_CC_Tread_ARW")}
+    for name in ("M_PaintOrange", "M_PaintGray", "M_MetalDark", "M_MetalBare", "M_MetalTread", "M_Rubber"):
         m = bpy.data.materials.get(name)
         if not m:
             continue
+        tm, tn, ta = per_slot.get(name, ("T_CC_MetalDetail_M", "T_CC_MetalDetail_N", "T_CC_MetalDetail_ARW"))
         nt = m.node_tree
         nt.nodes.clear()
         out = nt.nodes.new("ShaderNodeOutputMaterial")
@@ -304,28 +427,28 @@ def apply_preview_surface():
         uv = nt.nodes.new("ShaderNodeUVMap")
         uv.uv_map = "UVMap"
         tex = {}
-        for t in ("T_CC_MetalDetail_M", "T_CC_MetalDetail_N", "T_CC_MetalDetail_ARW", "T_CC_Macro_M"):
+        for key, t in (("M", tm), ("N", tn), ("ARW", ta), ("MACRO", "T_CC_Macro_M")):
             n_ = nt.nodes.new("ShaderNodeTexImage")
             n_.image = img(t)
-            tex[t] = n_
+            tex[key] = n_
         sc = nt.nodes.new("ShaderNodeVectorMath")
         sc.operation = "SCALE"
         sc.inputs["Scale"].default_value = 1 / 8
         nt.links.new(uv.outputs["UV"], sc.inputs[0])
         for t, n_ in tex.items():
-            nt.links.new(sc.outputs[0] if t == "T_CC_Macro_M" else uv.outputs["UV"], n_.inputs["Vector"])
+            nt.links.new(sc.outputs[0] if t == "MACRO" else uv.outputs["UV"], n_.inputs["Vector"])
         base = nt.nodes.new("ShaderNodeRGB")
         base.outputs[0].default_value = cc_lib.COLORS[name]
         m1 = nt.nodes.new("ShaderNodeMix")
         m1.data_type, m1.blend_type = "RGBA", "MULTIPLY"
         m1.inputs["Factor"].default_value = 1.0
         nt.links.new(base.outputs[0], m1.inputs["A"])
-        nt.links.new(tex["T_CC_MetalDetail_M"].outputs["Color"], m1.inputs["B"])
+        nt.links.new(tex["M"].outputs["Color"], m1.inputs["B"])
         m2 = nt.nodes.new("ShaderNodeMix")
         m2.data_type, m2.blend_type = "RGBA", "MULTIPLY"
         m2.inputs["Factor"].default_value = 1.0
         nt.links.new(m1.outputs["Result"], m2.inputs["A"])
-        nt.links.new(tex["T_CC_Macro_M"].outputs["Color"], m2.inputs["B"])
+        nt.links.new(tex["MACRO"].outputs["Color"], m2.inputs["B"])
         col = m2.outputs["Result"]
         metal = nt.nodes.new("ShaderNodeValue")
         metal.outputs[0].default_value = cc_lib.METALLIC.get(name, 0.0)
@@ -336,14 +459,14 @@ def apply_preview_surface():
             sep = nt.nodes.new("ShaderNodeSeparateColor")
             nt.links.new(attr.outputs["Color"], sep.inputs["Color"])
             sarw = nt.nodes.new("ShaderNodeSeparateColor")
-            nt.links.new(tex["T_CC_MetalDetail_ARW"].outputs["Color"], sarw.inputs["Color"])
+            nt.links.new(tex["ARW"].outputs["Color"], sarw.inputs["Color"])
             e = nt.nodes.new("ShaderNodeMath")
             e.operation = "MULTIPLY"
-            e.inputs[1].default_value = 0.55
+            e.inputs[1].default_value = 0.7
             nt.links.new(sep.outputs["Blue"], e.inputs[0])
             w = nt.nodes.new("ShaderNodeMath")
             w.operation = "MULTIPLY"
-            w.inputs[1].default_value = 0.6
+            w.inputs[1].default_value = 0.7
             nt.links.new(sarw.outputs["Blue"], w.inputs[0])
             wear = nt.nodes.new("ShaderNodeMath")
             wear.operation = "MAXIMUM"
@@ -362,13 +485,17 @@ def apply_preview_surface():
             nt.links.new(wear.outputs[0], mm.inputs["Value"])
             met = mm.outputs["Result"]
             nt.links.new(sarw.outputs["Green"], b.inputs["Roughness"])
+        elif name == "M_MetalTread":
+            sta = nt.nodes.new("ShaderNodeSeparateColor")
+            nt.links.new(tex["ARW"].outputs["Color"], sta.inputs["Color"])
+            nt.links.new(sta.outputs["Green"], b.inputs["Roughness"])
         else:
             b.inputs["Roughness"].default_value = cc_lib.ROUGHNESS.get(name, 0.55)
         nt.links.new(col, b.inputs["Base Color"])
         nt.links.new(met, b.inputs["Metallic"])
         # DirectX normal -> Blender (OpenGL): invert green
         sn = nt.nodes.new("ShaderNodeSeparateColor")
-        nt.links.new(tex["T_CC_MetalDetail_N"].outputs["Color"], sn.inputs["Color"])
+        nt.links.new(tex["N"].outputs["Color"], sn.inputs["Color"])
         inv = nt.nodes.new("ShaderNodeMath")
         inv.operation = "SUBTRACT"
         inv.inputs[0].default_value = 1.0
@@ -379,7 +506,7 @@ def apply_preview_surface():
         nt.links.new(sn.outputs["Blue"], cn.inputs["Blue"])
         nm = nt.nodes.new("ShaderNodeNormalMap")
         nm.uv_map = "UVMap"
-        nm.inputs["Strength"].default_value = 0.6
+        nm.inputs["Strength"].default_value = 1.0 if name == "M_MetalTread" else 0.6
         nt.links.new(cn.outputs["Color"], nm.inputs["Color"])
         nt.links.new(nm.outputs["Normal"], b.inputs["Normal"])
         nt.links.new(b.outputs[0], out.inputs["Surface"])
@@ -388,7 +515,7 @@ def apply_preview_surface():
 def apply_uv_checker():
     """UV check renders: every tiling slot shows the checker (TILE_M metres per tile) in its own tint."""
     import bpy
-    for name in ("M_PaintOrange", "M_PaintGray", "M_MetalDark", "M_MetalBare", "M_Rubber"):
+    for name in ("M_PaintOrange", "M_PaintGray", "M_MetalDark", "M_MetalBare", "M_MetalTread", "M_Rubber"):
         m = bpy.data.materials.get(name)
         if m:
             _image_slot(m, os.path.join(TEX, "T_CC_UVChecker.png"), 0.0, 0.8)

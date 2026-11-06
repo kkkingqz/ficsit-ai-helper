@@ -132,9 +132,21 @@ BARE_METAL_PARTS = ("PIPE", "CONDUIT", "ANTENNA", "MAST", "WHIP", "POLE", "BOLT"
                     "HUB", "SLAT", "GUARD", "HANDLE", "TOGGLE", "LOUVRE", "COVER", "STRIP", "_RIB", "CLAMP", "TRAY")
 
 
+TREAD_PARTS = ("FLOOR_SERVICE_PLATE", "FLOOR_HOLO_PLATE", "DOOR_THRESHOLD")   # + floor hatches, step treads
+
+
+def is_tread(name):
+    """Floor metal inserts (the 'service area' code of the floor marking) -> diamond tread plate slot."""
+    n = name.upper()
+    return n in TREAD_PARTS or (n.startswith("FLOOR_HATCH_") and not any(k in n for k in ("_SEAL", "_HINGE", "_HANDLE"))) or \
+        (n.startswith("STEPS_") and n.endswith("_TREAD"))
+
+
 def material_family(name):
     """Which final slot a legacy 'M_MetalLight' part belongs to: painted grey panel or bare metal."""
     n = name.upper()
+    if is_tread(name):
+        return "M_MetalTread"
     if "LABEL" in n or n.endswith("CABINET_PLATE") or "DECALS_LOGO" in n:
         return "M_Decal"
     if "_PLATE" in n or "SERVICE_COVER" in n or n.endswith("HATCH"):
@@ -152,7 +164,7 @@ def apply_material_families(exp, M):
         fam = material_family(ob.name)
         mats = ob.data.materials
         for i, m in enumerate(mats):
-            if m is not None and m.name == "M_MetalLight":
+            if m is not None and (m.name == "M_MetalLight" or (fam == "M_MetalTread" and m.name == "M_MetalBare")):
                 mats[i] = M[fam]
         if fam == "M_Decal" and len(mats):
             mats[0] = M["M_Decal"]

@@ -32,23 +32,29 @@ DOOR_X, DOOR_W, DOOR_H = -1.0, 2.0, 2.8   # door at ground level, 4 steps inside
 
 # Material families (final slot list, see ../README.md "Слоты материалов"). Linear-space approximations.
 COLORS = {
-    "M_PaintOrange": (0.93, 0.33, 0.016, 1.0),   # painted metal, FICSIT Orange #F79A22   (paint-gun primary)
-    "M_PaintGray":   (0.105, 0.122, 0.147, 1.0), # painted metal, Panel Gray #5B626B      (paint-gun secondary)
-    "M_MetalDark":   (0.027, 0.031, 0.039, 1.0), # structural dark metal #2E3238: frames, plinth, mullions
-    "M_MetalBare":   (0.33, 0.35, 0.38, 1.0),    # clean bare metal #9AA0A6: pipes, bolts, slats, antennas
+    # palette of the texture concept boards (stage5_layout.PALETTE), linear values
+    "M_PaintOrange": (0.913, 0.328, 0.011, 1.0), # painted metal, FICSIT Orange #F59B1B   (paint-gun primary)
+    "M_PaintGray":   (0.104, 0.127, 0.162, 1.0), # painted metal, tech grey #5B6470      (paint-gun secondary)
+    "M_MetalDark":   (0.0137, 0.0168, 0.0222, 1.0),  # structural dark (painted) metal, graphite #1F2329
+    "M_MetalBare":   (0.473, 0.509, 0.552, 1.0), # brushed bare metal #B7BDC4: pipes, bolts, slats, rings, antennas
+    "M_MetalTread":  (0.323, 0.352, 0.381, 1.0), # diamond tread plate #9AA0A6: floor metal inserts (service areas)
     "M_MetalLight":  (0.11, 0.13, 0.16, 1.0),    # legacy authoring slot, remapped to PaintGray / MetalBare
     "M_Rubber":      (0.011, 0.013, 0.015, 1.0), # rubber / composite #1C1E22: seals, cables, joints
-    "M_Hazard":      (1.0, 0.58, 0.0, 1.0),      # service marking: black/yellow stripes #FFD200
+    "M_Hazard":      (0.896, 0.552, 0.051, 1.0), # service marking: black/yellow stripes #F3C540
     "M_Decal":       (0.79, 0.79, 0.79, 1.0),    # service marking: labels, text, pictograms #E6E6E6
     "REF_Foundation": (0.2, 0.2, 0.2, 1.0),      # reference foundations only (never exported)
 }
-METALLIC = {"M_MetalDark": 0.6, "M_MetalBare": 1.0, "M_MetalLight": 0.6}
-ROUGHNESS = {"M_MetalBare": 0.3, "M_Rubber": 0.85, "M_Decal": 0.6}
+# PBR from the concept boards: painted metal 0-0.1 / 0.4-0.6; dark structural metal = dark PAINTED metal (metallic 0,
+# roughness 0.45; the boards disagree, this one reads like Satisfactory frames); brushed metal 1.0 / 0.2-0.35
+METALLIC = {"M_PaintOrange": 0.05, "M_PaintGray": 0.05, "M_MetalDark": 0.0, "M_MetalBare": 1.0, "M_MetalTread": 1.0,
+            "M_MetalLight": 0.6}
+ROUGHNESS = {"M_PaintOrange": 0.5, "M_PaintGray": 0.6, "M_MetalDark": 0.45, "M_MetalBare": 0.25, "M_MetalTread": 0.4,
+             "M_Rubber": 0.85, "M_Decal": 0.6}
 EMISSIVE = {
-    "M_LightWarm":   ((1.0, 0.91, 0.70, 1.0), 8.0),   # #FFF4D6
-    "M_ScreenRT":    ((0.15, 0.55, 1.0, 1.0), 3.0),   # render-target screen (UV 0-1, 16:9)
-    "M_ScreenStatic":((0.10, 0.35, 0.85, 1.0), 2.0),
-    "M_Holo":        ((0.10, 0.55, 1.0, 1.0), 4.0),
+    "M_LightWarm":   ((0.930, 0.955, 1.0, 1.0), 8.0), # light white #F7FAFF (palette)
+    "M_ScreenRT":    ((0.212, 0.680, 1.0, 1.0), 3.0), # render-target screen (UV 0-1, 16:9), UI blue #7FD7FF
+    "M_ScreenStatic":((0.212, 0.680, 1.0, 1.0), 2.0), # UI blue #7FD7FF
+    "M_Holo":        ((0.10, 0.55, 1.0, 1.0), 4.0),   # hologram (render look: ui_preview.apply_preview_holo)
     "M_Beacon":      ((1.0, 0.45, 0.05, 1.0), 15.0),
 }
 
@@ -407,7 +413,8 @@ def render_all(out, only=None, suffix=""):
 
 MATID = {   # flat preview colours per material family (checks that zones are separated by geometry)
     "M_PaintOrange": (0.9, 0.35, 0.02), "M_PaintGray": (0.25, 0.35, 0.55), "M_MetalDark": (0.06, 0.06, 0.07),
-    "M_MetalBare": (0.75, 0.75, 0.78), "M_Rubber": (0.25, 0.02, 0.3), "M_Glass": (0.1, 0.8, 0.8),
+    "M_MetalBare": (0.75, 0.75, 0.78), "M_MetalTread": (0.45, 0.55, 0.3), "M_Rubber": (0.25, 0.02, 0.3),
+    "M_Glass": (0.1, 0.8, 0.8),
     "M_LightWarm": (1.0, 1.0, 1.0), "M_Beacon": (1.0, 0.3, 0.0), "M_ScreenRT": (0.0, 0.3, 1.0),
     "M_ScreenStatic": (0.1, 0.5, 1.0), "M_Holo": (0.0, 0.9, 1.0), "M_Hazard": (1.0, 0.85, 0.0),
     "M_Decal": (1.0, 0.0, 0.8), "REF_Foundation": (0.45, 0.45, 0.45),
