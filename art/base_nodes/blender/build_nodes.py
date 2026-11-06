@@ -139,6 +139,7 @@ def main():
     ap.add_argument("--render", default=None, help="review renders directory")
     ap.add_argument("--screens", default=None, help="prepared terminal-screen renders directory")
     ap.add_argument("--review", action="store_true", help="tier sheet + projector mock-ups (single / multi)")
+    ap.add_argument("--turnaround", default=None, help="views from many angles: per-tier sheets + projector angles")
     ap.add_argument("--samples", type=int, default=16)
     ap.add_argument("--blend", action="store_true")
     a = ap.parse_args(argv)
@@ -182,13 +183,15 @@ def main():
     if a.blend:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(a.out, "base_nodes.blend"))
 
-    if a.render or a.screens:
+    if a.render or a.screens or a.turnaround:
         import bn_render
         bn_render.setup(mat, a.samples)
         if a.screens:
             bn_render.screens(spec, built, a.screens)
         if a.render and a.review:
             bn_render.review(spec, built, single, multi, a.render)
+        if a.turnaround:
+            bn_render.turnaround(spec, built, single, multi, a.turnaround)
 
 
 if __name__ == "__main__":

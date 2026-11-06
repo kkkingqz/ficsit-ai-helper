@@ -288,8 +288,8 @@ def review(spec, built, single, multi, out):
     _projector(spec, built, single, multi, out)
 
 
-def _projector(spec, built, single, multi, out):
-    """Simple projector mock (emitter disc + scale ring) with the hologram at its display scale, seen by a player."""
+def _mock(spec):
+    """Projector mock: pedestal, emitter disc, floor, light. Returns inst(src, scale, xy, name)."""
     s = bpy.context.scene
     disp = spec["display"]
     zb = 2.05 + disp["base_z"]                    # floor = 0, SOCKET_holo at 2.05 (Command Center interior)
@@ -341,6 +341,14 @@ def _projector(spec, built, single, multi, out):
         s.collection.objects.link(ob)
         return ob
 
+    return inst
+
+
+def _projector(spec, built, single, multi, out):
+    """Simple projector mock (emitter disc + scale ring) with the hologram at its display scale, seen by a player."""
+    s = bpy.context.scene
+    disp = spec["display"]
+    inst = _mock(spec)
     key = next(iter(spec["nodes"]))
     asset = spec["nodes"][key]["asset"]
     for o in s.objects:
@@ -373,3 +381,118 @@ def _projector(spec, built, single, multi, out):
     for o in tmp:
         bpy.data.objects.remove(o)
     print("[render] projector", shots, p, asset)
+
+
+# ---------------------------------------------------------------------------------------------------------------
+TURN = [(a, 25, f"az{a:03d}") for a in range(0, 360, 45)] + [(-35, 7, "low_front_left"), (145, 7, "low_back_right"),
+                                                            (20, 62, "high_front"), (0, 90, "top")]
+
+
+def _persp_fit(cam, ob, direction, lens=50, aspect=1.6, margin=1.12):
+    """Perspective camera along `direction`, aimed at the bbox centre; distance iterated until the projected
+    vertices fill the frame (with margin)."""
+    pts = [ob.matrix_world @ v.co for v in ob.data.vertices]
+    lo = Vector([min(p[i] for p in pts) for i in range(3)])
+    hi = Vector([max(p[i] for p in pts) for i in range(3)])
+    c = (lo + hi) / 2
+    d = Vector(direction).normalized()
+    if abs(d.z) > 0.999:
+        cam.rotation_euler = (0.0, 0.0, 0.0)
+    else:
+        cam.rotation_euler = (-d).to_track_quat("-Z", "Y").to_euler()
+    R = cam.rotation_euler.to_matrix()
+    tx = 18.0 / lens                                          # tan(half horizontal fov), sensor 36 mm
+    ty = tx / aspect
+    dist = (hi - lo).length * 2.0
+    for _ in range(4):
+        eye = c + d * dist
+        m = 0.0
+        for p in pts:
+            q = R.transposed() @ (p - eye)                    # camera space: looks along -Z
+            z = max(-q.z, 1e-3)
+            m = max(m, abs(q.x) / z / tx, abs(q.y) / z / ty)
+        dist *= 0.35 + 0.65 * m * margin                      # damped: converge without overshooting
+    cam.location = c + d * dist
+
+
+def turnaround(spec, built, single, multi, out, tile=(640, 400)):
+    """Per tier: 8 views around (every 45°, 25° above), two low views, a high and a top view -> one sheet.
+    Then the projector mock seen from four player positions (single T2 and five nodes)."""
+    from PIL import Image, ImageDraw
+    os.makedirs(out, exist_ok=True)
+    s = bpy.context.scene
+    s.render.film_transparent = False
+    s.world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.004, 0.008, 0.014, 1)
+    for (key, tk, mini), ob in sorted(built.items()):
+        if mini:
+            continue
+        _only(ob)
+        cam = _cam("CAM_turn", (0, -1, 0), ortho=False, lens=50)
+        s.camera = cam
+        tiles = []
+        for az, el, name in TURN:
+            a, e = math.radians(az), math.radians(el)
+            # az 0 = front (-Y), clockwise seen from above (az 90 = right side, +X)
+            d = (math.sin(a) * math.cos(e), -math.cos(a) * math.cos(e), math.sin(e))
+            _persp_fit(cam, ob, d)
+            p = os.path.join(out, f"_t_{ob.name}_{name}.png")
+            render(p, tile)
+            tiles.append((name, p))
+        cols = 4
+        W, H = tile
+        sheet = Image.new("RGB", (cols * W, (len(tiles) + cols - 1) // cols * (H + 24) + 40), (6, 12, 20))
+        dr = ImageDraw.Draw(sheet)
+        dr.text((12, 12), f"{ob.name}   tris {len(ob.data.polygons)}   az 0 = front, clockwise; el = camera height",
+                fill=(150, 210, 255))
+        for i, (name, p) in enumerate(tiles):
+            x, y = (i % cols) * W, 40 + (i // cols) * (H + 24)
+            sheet.paste(Image.open(p).convert("RGB"), (x, y))
+            dr.text((x + 10, y + H + 4), name, fill=(190, 190, 190))
+            os.remove(p)
+        sheet.save(os.path.join(out, f"turnaround_{ob.name}.png"))
+        print("[render] turnaround", ob.name)
+    _projector_angles(spec, built, single, multi, out, tile)
+
+
+def _projector_angles(spec, built, single, multi, out, tile):
+    from PIL import Image, ImageDraw
+    s = bpy.context.scene
+    disp = spec["display"]
+    inst = _mock(spec)
+    for o in s.objects:
+        if o.type == "MESH" and not o.get("mock"):
+            o.hide_render = True
+    key = next(iter(spec["nodes"]))
+    eyes = {"operator_front_right": (1.15, -2.75, 1.65), "left_side": (-2.9, -0.6, 1.65),
+            "back": (0.4, 2.9, 1.65), "close_low": (0.9, -1.75, 1.25)}
+    cam = _cam("CAM_eye", (0, -1, 0), ortho=False, lens=30)
+    s.camera = cam
+    W, H = tile
+    rows = []
+    sets = {"single_T2": [((key, "2", False), single.get((key, "2"), 1.0), (0, 0))]}
+    lay = disp["multi"]["layouts"]["5"]
+    sets["multi5"] = [((key, tk, True), multi["5"], xy) for xy, tk in zip(lay["slots"], ["3", "1", "2", "1", "2"])]
+    for label, items in sets.items():
+        tmp = [inst(built[k], sc, xy, f"I_{label}_{i}") for i, (k, sc, xy) in enumerate(items) if k in built]
+        row = []
+        for ename, loc in eyes.items():
+            cam.location = loc
+            cam.rotation_euler = (Vector((0, 0, 1.45)) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+            p = os.path.join(out, f"_p_{label}_{ename}.png")
+            render(p, tile)
+            row.append((f"{label} / {ename}", p))
+        rows.append(row)
+        for o in tmp:
+            bpy.data.objects.remove(o)
+    sheet = Image.new("RGB", (len(eyes) * W, len(rows) * (H + 24) + 40), (6, 12, 20))
+    dr = ImageDraw.Draw(sheet)
+    dr.text((12, 12), "projector mock, player eye 1.65 m (close_low 1.25 m); multi5: other slots repeat the hub tiers",
+            fill=(150, 210, 255))
+    for j, row in enumerate(rows):
+        for i, (name, p) in enumerate(row):
+            x, y = i * W, 40 + j * (H + 24)
+            sheet.paste(Image.open(p).convert("RGB"), (x, y))
+            dr.text((x + 10, y + H + 4), name, fill=(190, 190, 190))
+            os.remove(p)
+    sheet.save(os.path.join(out, "turnaround_projector.png"))
+    print("[render] projector angles")

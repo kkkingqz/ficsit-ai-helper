@@ -84,6 +84,8 @@
 Макеты с точки зрения игрока у пульта: [`renders/review_projector_single_T3.png`](renders/review_projector_single_T3.png),
 [`_single_T1`](renders/review_projector_single_T1.png), [`_multi5`](renders/review_projector_multi5.png)
 (в макете «5 узлов» пока есть только хаб, остальные слоты — его уровни как заглушки).
+Облёт с разных ракурсов — [`renders/turnaround/`](renders/turnaround/): на каждый уровень 8 видов по кругу через 45°,
+два низких, высокий и вид сверху; проектор — один узел (T2) и пять узлов с четырёх точек (оператор, слева, сзади, вблизи).
 
 ## 3. Экраны и иконки
 
@@ -132,6 +134,7 @@ cd art/base_nodes/blender
 python build_nodes.py                                   # меши + manifest + ue/base_nodes_table.json
 python build_nodes.py --screens ../ue/screens           # + рендеры для экранов
 python build_nodes.py --render ../renders --review      # + лист уровней и макеты проектора
+python build_nodes.py --out /tmp/x --turnaround ../renders/turnaround   # облёт: 12 ракурсов на уровень + проектор с 4 точек
 python build_nodes.py --tiers 2 --screens /tmp/s        # быстрый прогон одного уровня
 ```
 
