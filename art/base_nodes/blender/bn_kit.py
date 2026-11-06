@@ -29,7 +29,6 @@ Module types
     profile     hall body: (x, z) outline extruded along Y (cut roof corners), glow strips on its faces
     conveyor    belt on legs with rails, rollers and chevrons pointing out of the building
     stacks      smelter chimneys: base, body, glowing band, wide collar; `slim`: stepped refinery stack
-    accent      `accent: true` on railings / boxes / gate & profile strips -> FICSIT orange (vertex colour A)
     roof_fans   fan box lying on a roof, fans facing up
     gate.chevrons.kind = "heat"   wavy heat lines instead of >>> (furnace door)
     gate.u      offset of a portal along its face (side tunnels in front of an off-centre belt)
@@ -173,8 +172,7 @@ def gate(n, m):
         poly = G.chevron(ch["h"], ch["h"] * 0.45, ch["h"] * 0.22)
         n.part(n.extrude2d(poly, pd + 0.15, pd + 0.28, org, f.U, (0, 0, 1), f.N), glow=1.0, rim=False)
     for s in m.get("strips", []):
-        n.part(n.box(f.p(u0 + s["u"], fr + 0.05, s["z"]), (s["w"], 0.14, s["h"]), yaw=f.yaw), glow=1.0, rim=False,
-               accent=1.0 if s.get("accent") else 0.0)
+        n.part(n.box(f.p(u0 + s["u"], fr + 0.05, s["z"]), (s["w"], 0.14, s["h"]), yaw=f.yaw), glow=1.0, rim=False)
     st = m.get("steps")
     if st:
         k = st["n"]
@@ -282,8 +280,6 @@ def tower(n, m):
 def railing(n, m):
     z, h = m["z"], m["h"]
     tp = 0.14 * n.thin_mul
-    ac = 1.0 if m.get("accent") else 0.0                    # orange safety railing
-    ag = 0.45 if ac else 0.0
     if "rect" in m:
         a = m["rect"]
         ax, ay = (a, a) if not isinstance(a, list) else a
@@ -299,9 +295,9 @@ def railing(n, m):
         k = max(1, int(math.ceil(L / 2.4)))
         for i in range(k):
             q = p0 + (p1 - p0) * (i / k)
-            n.part(n.box(q + Vector((0, 0, h / 2)), (tp, tp, h)), rim=False, glow=ag, accent=ac)
+            n.part(n.box(q + Vector((0, 0, h / 2)), (tp, tp, h)), rim=False)
         for zz in (h, h * 0.5):
-            n.part(n.beam(p0 + Vector((0, 0, zz)), p1 + Vector((0, 0, zz)), tp, tp), rim=False, glow=ag, accent=ac)
+            n.part(n.beam(p0 + Vector((0, 0, zz)), p1 + Vector((0, 0, zz)), tp, tp), rim=False)
 
 
 def dish(n, m):
@@ -520,7 +516,7 @@ def profile(n, m):
     for st in m.get("strips", []):
         f = Frame(st["side"])
         n.part(n.box(f.p(st["u"], dist[st["side"]] + 0.05, st["z"]), (st["w"], 0.14, st["h"]), yaw=f.yaw),
-               glow=1.0, rim=False, accent=1.0 if st.get("accent") else 0.0)
+               glow=1.0, rim=False)
 
 
 def conveyor(n, m):
@@ -701,8 +697,7 @@ def generic_box(n, m):
     for b in m["boxes"]:
         x, y, z, sx, sy, sz = b[:6]
         yaw = math.radians(b[6]) if len(b) > 6 else 0.0
-        n.part(n.box((x, y, z), (sx, sy, sz), yaw=yaw), glow=m.get("glow", 0.0), rim=m.get("rim", True),
-               accent=1.0 if m.get("accent") else 0.0)
+        n.part(n.box((x, y, z), (sx, sy, sz), yaw=yaw), glow=m.get("glow", 0.0), rim=m.get("rim", True))
 
 
 BUILDERS = {"plate": plate, "mass": mass, "pylons": pylons, "buttresses": buttresses, "gate": gate, "arm": arm,

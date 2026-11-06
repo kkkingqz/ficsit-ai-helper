@@ -7,7 +7,7 @@ triangulates:
     R = edge rim (1 on bevel faces)     -> bright lines along the hard edges of the hologram
     G = glow (windows, chevrons, outline, fan rings) -> brightest parts
     B = dim (1 on the inner top of the ground plate: fill darkened so only its outline reads)
-    A = accent (1 = FICSIT orange instead of the hologram blue: warning lights, safety railings)
+    A = 1 (unused)
 
 Conventions (same as the Command Center): metres, Z up, front = -Y, pivot = footprint centre on the ground.
 """
@@ -28,7 +28,6 @@ class Node:
         self.glow = self.bm.faces.layers.float.new("glow")
         self.edge = self.bm.faces.layers.float.new("edge")
         self.dim = self.bm.faces.layers.float.new("dim")
-        self.accent = self.bm.faces.layers.float.new("accent")
         self.parts = []                 # (faces, rim) per part
         self.rim = rim                  # bevel width in metres (model scale)
         self.outline = outline          # width of the glowing plate outline (model scale)
@@ -36,12 +35,11 @@ class Node:
         self.mini = mini
 
     # -- part bookkeeping ---------------------------------------------------------------------------------------
-    def part(self, faces, glow=0.0, rim=True, accent=0.0, rim_angle=None):
+    def part(self, faces, glow=0.0, rim=True, rim_angle=None):
         for f in faces:
             f[self.glow] = glow
             f[self.edge] = 0.0
             f[self.dim] = 0.0
-            f[self.accent] = accent
         self.parts.append((faces, rim if rim_angle is None or not rim else rim_angle))
         return faces
 
@@ -164,7 +162,7 @@ class Node:
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
         col = bm.loops.layers.float_color.new("Col")
         for f in bm.faces:
-            c = (f[self.edge], f[self.glow], f[self.dim], f[self.accent])
+            c = (f[self.edge], f[self.glow], f[self.dim], 1.0)
             for loop in f.loops:
                 loop[col] = c
         return bm
