@@ -751,8 +751,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_OreMine_T1": {
-      "tris": 2512,
-      "verts": 1398,
+      "tris": 2408,
+      "verts": 1346,
       "bbox_min": [
         -8.0,
         -6.0,
@@ -761,7 +761,7 @@
       "bbox_max": [
         8.0,
         6.0,
-        8.91
+        8.92
       ],
       "radius_xy": 9.71,
       "node": "ore_mine",
@@ -772,8 +772,8 @@
       "scale_single": 0.10301
     },
     "SM_Holo_OreMine_T1_Mini": {
-      "tris": 1116,
-      "verts": 635,
+      "tris": 1012,
+      "verts": 583,
       "bbox_min": [
         -8.0,
         -6.0,
@@ -782,7 +782,7 @@
       "bbox_max": [
         8.0,
         6.0,
-        8.89
+        8.88
       ],
       "radius_xy": 9.71,
       "node": "ore_mine",
@@ -792,8 +792,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_OreMine_T2": {
-      "tris": 4478,
-      "verts": 2509,
+      "tris": 4236,
+      "verts": 2388,
       "bbox_min": [
         -9.0,
         -7.0,
@@ -802,7 +802,7 @@
       "bbox_max": [
         9.0,
         7.0,
-        9.9
+        9.91
       ],
       "radius_xy": 11.04,
       "node": "ore_mine",
@@ -813,8 +813,8 @@
       "scale_single": 0.09055
     },
     "SM_Holo_OreMine_T2_Mini": {
-      "tris": 2125,
-      "verts": 1218,
+      "tris": 1883,
+      "verts": 1097,
       "bbox_min": [
         -9.0,
         -7.0,
@@ -833,8 +833,8 @@
       "rim_m": 0.564
     },
     "SM_Holo_OreMine_T3": {
-      "tris": 7230,
-      "verts": 4062,
+      "tris": 7010,
+      "verts": 3952,
       "bbox_min": [
         -10.0,
         -8.0,
@@ -843,7 +843,7 @@
       "bbox_max": [
         10.0,
         8.0,
-        11.88
+        11.89
       ],
       "radius_xy": 12.5,
       "node": "ore_mine",
@@ -854,8 +854,8 @@
       "scale_single": 0.08077
     },
     "SM_Holo_OreMine_T3_Mini": {
-      "tris": 3534,
-      "verts": 2006,
+      "tris": 3314,
+      "verts": 1896,
       "bbox_min": [
         -10.0,
         -8.0,
@@ -864,7 +864,7 @@
       "bbox_max": [
         10.0,
         8.0,
-        11.85
+        11.84
       ],
       "radius_xy": 12.4,
       "node": "ore_mine",

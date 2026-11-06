@@ -10,7 +10,7 @@ import os
 import bpy
 from mathutils import Matrix, Vector
 
-FILL = (0.016, 0.10, 0.34)        # body fill (linear), deep blue: faces stay darker than the lines
+FILL = (0.008, 0.055, 0.19)       # body fill (linear), dark navy: the body stays dark, edges and lights carry it
 EDGE = (0.16, 0.62, 1.0)          # rim lines + fresnel, cyan
 GLOW = (0.55, 0.88, 1.0)          # glow parts, towards white
 GRID = 2.0                        # panel grid, metres (model scale)
@@ -46,7 +46,7 @@ def holo_material(mat):
     L(geo.outputs["Normal"], dot.inputs[0])
     lit = _n(nt, "ShaderNodeMapRange")
     lit.inputs["From Min"].default_value, lit.inputs["From Max"].default_value = -1.0, 1.0
-    lit.inputs["To Min"].default_value, lit.inputs["To Max"].default_value = 0.25, 1.9
+    lit.inputs["To Min"].default_value, lit.inputs["To Max"].default_value = 0.3, 1.7
     L(dot.outputs["Value"], lit.inputs["Value"])
     # panel grid: distance to the nearest grid line on the two axes in the face plane
     tc = nt.nodes.new("ShaderNodeTexCoord")
@@ -93,9 +93,9 @@ def holo_material(mat):
     # fresnel
     lw = nt.nodes.new("ShaderNodeLayerWeight")
     lw.inputs["Blend"].default_value = 0.5
-    # emission = FILL * (lit + 0.45 grid) * (1 - 0.75 dim) + EDGE * (1.3 edge + 0.9 fresnel^3) [fresnel also dimmed] + GLOW * 2.6 glow
+    # emission = FILL * (lit + 0.6 grid) * (1 - 0.75 dim) + EDGE * (1.6 edge + 0.9 fresnel^3) [fresnel also dimmed] + GLOW * 2.6 glow
     g1 = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")
-    g1.inputs[1].default_value = 0.45
+    g1.inputs[1].default_value = 0.6
     L(grid.outputs[0], g1.inputs[0])
     L(lit.outputs[0], g1.inputs[2])
     dm = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")          # (1 - 0.75 * B)
@@ -118,7 +118,7 @@ def holo_material(mat):
     e1.inputs[1].default_value = 0.9
     L(fd.outputs[0], e1.inputs[0])
     e2 = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")
-    e2.inputs[1].default_value = 1.3
+    e2.inputs[1].default_value = 1.6
     L(sep.outputs["Red"], e2.inputs[0])
     L(e1.outputs[0], e2.inputs[2])
     edge = _n(nt, "ShaderNodeVectorMath", op="SCALE")

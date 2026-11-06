@@ -69,7 +69,7 @@ def plate(n, m):
     top = [f for f in faces if len(f.verts) == len(poly) and f.calc_center_median().z > h * 0.5][0]
     side = [f for f in faces if len(f.verts) == 4]
     for f in side:
-        f[n.glow] = 1.0
+        f[n.glow] = 0.45                       # plate edge: present, but quieter than the building
     before = set(n.bm.faces)
     bmesh.ops.inset_region(n.bm, faces=[top], thickness=n.outline, depth=0.0, use_even_offset=True)
     for f in set(n.bm.faces) - before:         # the new ring around the (shrunk) top face = glowing outline
@@ -626,7 +626,7 @@ def robots(n, m):
         n.part(n.box(sh - U * 0.1 * sc, (0.5 * sc, 0.5 * sc, 0.4 * sc), yaw=a), rim=True)
         Rj = Sd.to_track_quat("Z", "Y").to_matrix()             # joint axis across the arm
         for j, r in ((sh, 0.2), (el, 0.17), (wr, 0.13)):
-            n.part(n.cylinder(j, r * sc * k, 0.36 * sc * k, 12, Rj), glow=0.65, rim=False)
+            n.part(n.cylinder(j, r * sc * k, 0.36 * sc * k, 12, Rj), glow=0.45, rim=False)
         n.part(n.beam(sh, el, 0.26 * sc * k, 0.26 * sc * k), glow=0.1, rim=False)
         n.part(n.beam(el, wr, 0.21 * sc * k, 0.21 * sc * k), glow=0.1, rim=False)
         g0 = wr - U * 0.12 * sc
@@ -659,7 +659,7 @@ def _rock(n, x, y, w, d, h, seed, lean=(0.0, 0.0), z0=0.0, veins=0.0, facets=Tru
     if junk:
         bmesh.ops.delete(n.bm, geom=junk, context="VERTS")
     faces = [g for g in res["geom"] if isinstance(g, bmesh.types.BMFace) and g.is_valid]
-    n.part(faces, glow=0.0, rim=True, rim_angle=math.radians(12) if facets else None)   # facet lines (crystal rock)
+    n.part(faces, glow=0.0, rim=True, rim_angle=math.radians(24) if facets else None)   # facet lines (crystal rock)
     if veins:
         k = max(1, int(len(faces) * veins))
         for f in rnd.sample([f for f in faces if f.calc_center_median().z > z0 + h * 0.15], k):

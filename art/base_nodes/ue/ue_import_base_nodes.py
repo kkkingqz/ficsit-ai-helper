@@ -90,16 +90,16 @@ HOLO_HLSL = r"""
 float3 cell = abs(frac(P / max(Grid, 1.0) + 0.5) - 0.5);
 float3 w = step(0.5, 1.0 - abs(NL));
 float grid = max(max(step(cell.x, Line) * w.x, step(cell.y, Line) * w.y), step(cell.z, Line) * w.z);
-float lit = dot(NW, normalize(LightDir.xyz)) * 0.825 + 1.075;
+float lit = dot(NW, normalize(LightDir.xyz)) * 0.7 + 1.0;
 float dimf = 1.0 - 0.75 * VB;
 float fres = pow(saturate(1.0 - abs(dot(NW, V))), 3.0) * dimf;
 float scan = 1.0 - ScanStrength * step(0.5, frac(PW.z / max(ScanSize, 1.0) - T * ScanSpeed));
-float3 e = FillColor.rgb * (lit + 0.45 * grid) * dimf + EdgeColor.rgb * (1.3 * VR + 0.9 * fres) + GlowColor.rgb * 2.6 * VG;
+float3 e = FillColor.rgb * (lit + 0.6 * grid) * dimf + EdgeColor.rgb * (1.6 * VR + 0.9 * fres) + GlowColor.rgb * 2.6 * VG;
 return e * Intensity * Power * scan;
 """
 SCALARS = {"Intensity": 1.0, "Power": 1.0, "Grid": 200.0, "Line": 0.025, "ScanStrength": 0.06, "ScanSize": 6.0,
            "ScanSpeed": 0.15}
-VECTORS = {"FillColor": (0.016, 0.10, 0.34), "EdgeColor": (0.16, 0.62, 1.0), "GlowColor": (0.55, 0.88, 1.0),
+VECTORS = {"FillColor": (0.008, 0.055, 0.19), "EdgeColor": (0.16, 0.62, 1.0), "GlowColor": (0.55, 0.88, 1.0),
            "LightDir": (-0.35, -0.5, 0.8)}
 
 
