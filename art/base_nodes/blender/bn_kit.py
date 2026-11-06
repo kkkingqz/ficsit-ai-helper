@@ -26,6 +26,8 @@ Module types
     lamps       light masts with glowing heads
     units       boxed units with vent slats (AC, pumps)
     pipes.runs  polylines with rounded corners (loops over columns, racks along the walls)
+    profile     hall body: (x, z) outline extruded along Y (cut roof corners), glow strips on its faces
+    conveyor    belt on legs with rails, rollers and chevrons pointing out of the building
 A module with "detail": true is left out of the small multi-mode mesh (_Mini).
 """
 import math
@@ -145,13 +147,14 @@ def gate(n, m):
     b, fr = m["back"], m["front"]
     o = Vector((0, 0, 0))
     n.part(n.extrude2d(G.arch_frame(W, H, t, c), b, fr, o, f.U, (0, 0, 1), f.N), rim=True)
-    pd = m["panel"]
+    pd = m.get("panel", (b + fr) / 2)
     n.part(n.box(f.p(0, pd, (H - t) / 2), (W - 2 * t + 0.1, 0.3, H - t + 0.05), yaw=f.yaw), rim=False)
-    i = m["inner"]
-    n.part(n.extrude2d(G.arch_frame(i["W"], i["H"], i["t"], c * 0.7), pd + 0.1, fr - 0.45, o, f.U, (0, 0, 1), f.N),
-           rim=True)
-    ch = m["chevrons"]
-    for k in range(ch["n"]):
+    i = m.get("inner")
+    if i:
+        n.part(n.extrude2d(G.arch_frame(i["W"], i["H"], i["t"], c * 0.7), pd + 0.1, fr - 0.45, o, f.U, (0, 0, 1), f.N),
+               rim=True)
+    ch = m.get("chevrons")
+    for k in range(ch["n"] if ch else 0):
         u = (k - (ch["n"] - 1) / 2) * ch["pitch"]
         org = f.p(u, 0, ch["z"])
         poly = G.chevron(ch["h"], ch["h"] * 0.45, ch["h"] * 0.22)
@@ -475,6 +478,70 @@ def units(n, m):
             n.part(n.box(c, (w * 0.8, 0.08, 0.1), yaw=yaw), glow=0.45, rim=False)
 
 
+def profile(n, m):
+    """Hall body: 2D outline in (x, z) (e.g. a box with cut roof corners) extruded along Y from y0 to y1.
+    strips: glow boxes on its vertical faces (side front/back/left/right, u along the face, z)."""
+    poly = [tuple(p) for p in m["poly"]]
+    y0, y1 = m["y"]
+    cx = m.get("x", 0.0)
+    n.part(n.extrude2d(poly, y0, y1, (cx, 0, 0), (1, 0, 0), (0, 0, 1), (0, 1, 0)), rim=True)
+    xs = [p[0] for p in poly]
+    dist = {"front": -y0, "back": y1, "right": cx + max(xs), "left": -(cx + min(xs))}
+    for st in m.get("strips", []):
+        f = Frame(st["side"])
+        n.part(n.box(f.p(st["u"], dist[st["side"]] + 0.05, st["z"]), (st["w"], 0.14, st["h"]), yaw=f.yaw),
+               glow=1.0, rim=False)
+
+
+def conveyor(n, m):
+    """Belt conveyor on legs from `from` to `to` (horizontal): bed, side rails, end rollers, leg pairs every `legs` m,
+    glowing chevrons on the belt pointing away from the building (`hidden`: [a, b] range along the belt inside it)."""
+    p0, p1 = Vector(m["from"]), Vector(m["to"])
+    w = m.get("w", 2.4)
+    axis = p1 - p0
+    L = axis.length
+    A = axis.normalized()
+    S = Vector((0, 0, 1)).cross(A)                         # across the belt
+    R = A.to_track_quat("Y", "Z").to_matrix()              # local Y along the belt, Z up
+    z = p0.z
+    lo, hi = m.get("hidden", [L, L])                       # distances from p0 hidden inside the building
+    bed = 0.4
+    n.part(n.box_r((p0 + p1) / 2 + Vector((0, 0, -bed / 2)), (w, L, bed), R), rim=True)
+    n.part(n.box_r((p0 + p1) / 2 + Vector((0, 0, 0.02)), (w * 0.8, L - 0.4, 0.06), R), glow=0.12, rim=False)
+    tr = 0.18 * (n.thin_mul if n.mini else 1.0)
+    for sg in (-1, 1):
+        n.part(n.beam(p0 + S * sg * (w / 2 - tr / 2) + Vector((0, 0, 0.12)),
+                      p1 + S * sg * (w / 2 - tr / 2) + Vector((0, 0, 0.12)), tr, 0.3), rim=False)
+    for p in (p0, p1):
+        n.part(n.cylinder(p + Vector((0, 0, -bed / 2)), bed * 0.7, w * 1.02, 10,
+                          S.to_track_quat("Z", "Y").to_matrix()), glow=0.0, rim=True)
+    step = m.get("legs", 3.0)
+    lt = 0.28 * (n.thin_mul if n.mini else 1.0)
+    d = 0.6
+    while d < L - 0.3:
+        if not (lo - 0.5 < d < hi + 0.5):
+            q = p0 + A * d
+            for sg in (-1, 1):
+                n.part(n.box(q + S * sg * (w / 2 - 0.25) + Vector((0, 0, (z - bed) / 2)), (lt, lt, z - bed)), rim=False)
+            n.part(n.beam(q - S * (w / 2 - 0.25) + Vector((0, 0, 0.5)), q + S * (w / 2 - 0.25) + Vector((0, 0, 0.5)),
+                          lt, lt), rim=False)
+            n.part(n.box(q + Vector((0, 0, 0.1)), (w * 0.9, 0.5, 0.2), yaw=math.atan2(A.y, A.x) + math.pi / 2),
+                   rim=False)
+        d += step
+    k = m.get("chevrons", 3)
+    ch = min(w * 0.5, 1.2)
+    centre = (lo + hi) / 2 if hi < L else L / 2
+    for seg0, seg1, sgn in ((0.0, lo, -1), (hi, L, 1)):
+        if seg1 - seg0 < 1.0:
+            continue
+        for i in range(k):
+            dd = seg0 + (seg1 - seg0) * (i + 0.5) / k
+            sgn_i = sgn if hi < L else (1 if dd > centre else -1)
+            poly = G.chevron(ch, ch * 0.45, ch * 0.22)
+            org = p0 + A * dd + Vector((0, 0, 0.05))
+            n.part(n.extrude2d(poly, 0.0, 0.08, org, A * sgn_i, S * sgn_i, (0, 0, 1)), glow=1.0, rim=False)
+
+
 def crates(n, m):
     for x, y, z0, w, d, h, yaw in m["boxes"]:
         n.part(n.box((x, y, z0 + h / 2), (w, d, h), yaw=math.radians(yaw)), rim=True)
@@ -490,7 +557,8 @@ def generic_box(n, m):
 BUILDERS = {"plate": plate, "mass": mass, "pylons": pylons, "buttresses": buttresses, "gate": gate, "arm": arm,
             "shutter": shutter, "fans": fans, "tanks": tanks, "tower": tower, "railing": railing, "dish": dish,
             "antennas": antennas, "banner": banner, "pipes": pipes, "crates": crates, "box": generic_box,
-            "columns": columns, "lattice": lattice, "stairs": stairs, "lamps": lamps, "units": units}
+            "columns": columns, "lattice": lattice, "stairs": stairs, "lamps": lamps, "units": units,
+            "profile": profile, "conveyor": conveyor}
 
 
 def build(n, module):

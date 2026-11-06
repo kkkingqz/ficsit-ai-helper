@@ -349,7 +349,7 @@ def multi_mix(spec, built):
     other nodes' tiers round the ring; with a single node its own tiers repeat as placeholders."""
     keys = list(spec["nodes"])
     first = keys[0]
-    ring = [(k, tk) for k in keys[1:] for tk in spec["nodes"][k]["tiers"]] or \
+    ring = [(k, tk) for tk in ("3", "2", "1") for k in keys[1:] if tk in spec["nodes"][k]["tiers"]] or \
            [(first, tk) for tk in spec["nodes"][first]["tiers"]]
     ring += [(first, "1"), (first, "2")]
     out = [(first, "3", True)] + [(k, tk, True) for k, tk in ring[:4]]

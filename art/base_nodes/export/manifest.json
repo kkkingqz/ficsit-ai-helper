@@ -257,6 +257,129 @@
       "mode": "multi",
       "fbx": "export/SM_Holo_FluidPlant_T3_Mini.fbx",
       "rim_m": 0.564
+    },
+    "SM_Holo_LogisticsHub_T1": {
+      "tris": 3076,
+      "verts": 1700,
+      "bbox_min": [
+        -9.26,
+        -6.0,
+        -0.02
+      ],
+      "bbox_max": [
+        9.26,
+        6.0,
+        10.7
+      ],
+      "radius_xy": 9.65,
+      "node": "logistics_hub",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_LogisticsHub_T1.fbx",
+      "rim_m": 0.063,
+      "scale_single": 0.09524
+    },
+    "SM_Holo_LogisticsHub_T1_Mini": {
+      "tris": 2956,
+      "verts": 1620,
+      "bbox_min": [
+        -9.25,
+        -6.0,
+        -0.02
+      ],
+      "bbox_max": [
+        9.25,
+        6.0,
+        10.7
+      ],
+      "radius_xy": 9.65,
+      "node": "logistics_hub",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_LogisticsHub_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_LogisticsHub_T2": {
+      "tris": 4552,
+      "verts": 2556,
+      "bbox_min": [
+        -13.65,
+        -9.6,
+        -0.02
+      ],
+      "bbox_max": [
+        13.65,
+        9.6,
+        13.9
+      ],
+      "radius_xy": 13.72,
+      "node": "logistics_hub",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_LogisticsHub_T2.fbx",
+      "rim_m": 0.083,
+      "scale_single": 0.07194
+    },
+    "SM_Holo_LogisticsHub_T2_Mini": {
+      "tris": 3768,
+      "verts": 2060,
+      "bbox_min": [
+        -13.65,
+        -9.6,
+        -0.02
+      ],
+      "bbox_max": [
+        13.65,
+        9.6,
+        13.9
+      ],
+      "radius_xy": 13.72,
+      "node": "logistics_hub",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_LogisticsHub_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_LogisticsHub_T3": {
+      "tris": 7712,
+      "verts": 4320,
+      "bbox_min": [
+        -17.25,
+        -13.6,
+        -0.18
+      ],
+      "bbox_max": [
+        17.25,
+        13.6,
+        17.8
+      ],
+      "radius_xy": 18.6,
+      "node": "logistics_hub",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_LogisticsHub_T3.fbx",
+      "rim_m": 0.112,
+      "scale_single": 0.05376
+    },
+    "SM_Holo_LogisticsHub_T3_Mini": {
+      "tris": 6636,
+      "verts": 3656,
+      "bbox_min": [
+        -17.25,
+        -13.6,
+        -0.02
+      ],
+      "bbox_max": [
+        17.25,
+        13.6,
+        17.8
+      ],
+      "radius_xy": 18.6,
+      "node": "logistics_hub",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_LogisticsHub_T3_Mini.fbx",
+      "rim_m": 0.564
     }
   }
 }

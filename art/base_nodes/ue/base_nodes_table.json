@@ -82,5 +82,47 @@
     "PlateRadius": 2511.0,
     "Height": 3050.0,
     "ScaleSingle": 0.03279
+  },
+  {
+    "Name": "logistics_hub_T1",
+    "NodeId": "logistics_hub",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"logistics_hub.name\", \"Logistics Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"logistics_hub.type\", \"Logistics / Distribution\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_LogisticsHub_T1.SM_Holo_LogisticsHub_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_LogisticsHub_T1_Mini.SM_Holo_LogisticsHub_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_LogisticsHub_T1_Screen.T_Node_LogisticsHub_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_LogisticsHub_T1_Icon_256.T_Node_LogisticsHub_T1_Icon_256",
+    "PlateRadius": 965.2,
+    "Height": 1050.0,
+    "ScaleSingle": 0.09524
+  },
+  {
+    "Name": "logistics_hub_T2",
+    "NodeId": "logistics_hub",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"logistics_hub.name\", \"Logistics Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"logistics_hub.type\", \"Logistics / Distribution\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_LogisticsHub_T2.SM_Holo_LogisticsHub_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_LogisticsHub_T2_Mini.SM_Holo_LogisticsHub_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_LogisticsHub_T2_Screen.T_Node_LogisticsHub_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_LogisticsHub_T2_Icon_256.T_Node_LogisticsHub_T2_Icon_256",
+    "PlateRadius": 1371.9,
+    "Height": 1390.0,
+    "ScaleSingle": 0.07194
+  },
+  {
+    "Name": "logistics_hub_T3",
+    "NodeId": "logistics_hub",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"logistics_hub.name\", \"Logistics Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"logistics_hub.type\", \"Logistics / Distribution\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_LogisticsHub_T3.SM_Holo_LogisticsHub_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_LogisticsHub_T3_Mini.SM_Holo_LogisticsHub_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_LogisticsHub_T3_Screen.T_Node_LogisticsHub_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_LogisticsHub_T3_Icon_256.T_Node_LogisticsHub_T3_Icon_256",
+    "PlateRadius": 1860.1,
+    "Height": 1780.0,
+    "ScaleSingle": 0.05376
   }
 ]
