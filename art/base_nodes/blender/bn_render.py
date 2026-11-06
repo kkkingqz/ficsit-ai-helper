@@ -13,6 +13,7 @@ from mathutils import Matrix, Vector
 FILL = (0.016, 0.10, 0.34)        # body fill (linear), deep blue: faces stay darker than the lines
 EDGE = (0.16, 0.62, 1.0)          # rim lines + fresnel, cyan
 GLOW = (0.55, 0.88, 1.0)          # glow parts, towards white
+ACCENT = (0.913, 0.328, 0.011)    # FICSIT orange #F59B1B (linear): warning lights, safety railings (vertex colour A)
 GRID = 2.0                        # panel grid, metres (model scale)
 
 
@@ -136,7 +137,34 @@ def holo_material(mat):
     tot = _n(nt, "ShaderNodeVectorMath", op="ADD")
     L(base.outputs[0], tot.inputs[0])
     L(gl.outputs[0], tot.inputs[1])
-    L(tot.outputs[0], em.inputs["Color"])
+    # accent (vertex colour A): FICSIT orange, lit by the same channels -> fin = tot * (1 - A) + acc * A
+    m1 = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")
+    m1.inputs[1].default_value, m1.inputs[2].default_value = 1.4, 0.25
+    L(sep.outputs["Green"], m1.inputs[0])
+    m2 = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")
+    m2.inputs[1].default_value = 0.8
+    L(sep.outputs["Red"], m2.inputs[0])
+    L(m1.outputs[0], m2.inputs[2])
+    m3 = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")
+    m3.inputs[1].default_value = 0.2
+    L(lit.outputs[0], m3.inputs[0])
+    L(m2.outputs[0], m3.inputs[2])
+    acc = _n(nt, "ShaderNodeVectorMath", op="SCALE")
+    acc.inputs[0].default_value = ACCENT
+    L(m3.outputs[0], acc.inputs["Scale"])
+    inv = _n(nt, "ShaderNodeMath", op="SUBTRACT")
+    inv.inputs[0].default_value = 1.0
+    L(col.outputs["Alpha"], inv.inputs[1])
+    t1 = _n(nt, "ShaderNodeVectorMath", op="SCALE")
+    L(tot.outputs[0], t1.inputs[0])
+    L(inv.outputs[0], t1.inputs["Scale"])
+    t2 = _n(nt, "ShaderNodeVectorMath", op="SCALE")
+    L(acc.outputs[0], t2.inputs[0])
+    L(col.outputs["Alpha"], t2.inputs["Scale"])
+    fin = _n(nt, "ShaderNodeVectorMath", op="ADD")
+    L(t1.outputs[0], fin.inputs[0])
+    L(t2.outputs[0], fin.inputs[1])
+    L(fin.outputs[0], em.inputs["Color"])
     em.inputs["Strength"].default_value = 1.0
 
 

@@ -626,6 +626,129 @@
       "mode": "multi",
       "fbx": "export/SM_Holo_Assembler_T3_Mini.fbx",
       "rim_m": 0.564
+    },
+    "SM_Holo_Refinery_T1": {
+      "tris": 3590,
+      "verts": 1928,
+      "bbox_min": [
+        -4.0,
+        -7.67,
+        -0.02
+      ],
+      "bbox_max": [
+        4.0,
+        7.67,
+        8.0
+      ],
+      "radius_xy": 7.74,
+      "node": "refinery",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Refinery_T1.fbx",
+      "rim_m": 0.048,
+      "scale_single": 0.125
+    },
+    "SM_Holo_Refinery_T1_Mini": {
+      "tris": 3542,
+      "verts": 1896,
+      "bbox_min": [
+        -4.0,
+        -7.65,
+        -0.02
+      ],
+      "bbox_max": [
+        4.0,
+        7.65,
+        8.0
+      ],
+      "radius_xy": 7.72,
+      "node": "refinery",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Refinery_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_Refinery_T2": {
+      "tris": 5414,
+      "verts": 2876,
+      "bbox_min": [
+        -5.0,
+        -8.86,
+        -0.02
+      ],
+      "bbox_max": [
+        5.0,
+        8.86,
+        9.0
+      ],
+      "radius_xy": 8.99,
+      "node": "refinery",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Refinery_T2.fbx",
+      "rim_m": 0.054,
+      "scale_single": 0.11111
+    },
+    "SM_Holo_Refinery_T2_Mini": {
+      "tris": 5336,
+      "verts": 2828,
+      "bbox_min": [
+        -5.0,
+        -8.85,
+        -0.02
+      ],
+      "bbox_max": [
+        5.0,
+        8.85,
+        9.0
+      ],
+      "radius_xy": 8.99,
+      "node": "refinery",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Refinery_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_Refinery_T3": {
+      "tris": 8056,
+      "verts": 4500,
+      "bbox_min": [
+        -6.2,
+        -10.86,
+        -0.18
+      ],
+      "bbox_max": [
+        6.2,
+        10.86,
+        12.0
+      ],
+      "radius_xy": 10.94,
+      "node": "refinery",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_Refinery_T3.fbx",
+      "rim_m": 0.072,
+      "scale_single": 0.08333
+    },
+    "SM_Holo_Refinery_T3_Mini": {
+      "tris": 7720,
+      "verts": 4276,
+      "bbox_min": [
+        -6.2,
+        -10.85,
+        -0.35
+      ],
+      "bbox_max": [
+        6.2,
+        10.85,
+        12.0
+      ],
+      "radius_xy": 11.08,
+      "node": "refinery",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_Refinery_T3_Mini.fbx",
+      "rim_m": 0.564
     }
   }
 }

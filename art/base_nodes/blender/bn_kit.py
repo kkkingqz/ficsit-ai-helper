@@ -28,7 +28,8 @@ Module types
     pipes.runs  polylines with rounded corners (loops over columns, racks along the walls)
     profile     hall body: (x, z) outline extruded along Y (cut roof corners), glow strips on its faces
     conveyor    belt on legs with rails, rollers and chevrons pointing out of the building
-    stacks      smelter chimneys: base, body, glowing band, wide collar
+    stacks      smelter chimneys: base, body, glowing band, wide collar; `slim`: stepped refinery stack
+    accent      `accent: true` on railings / boxes / gate & profile strips -> FICSIT orange (vertex colour A)
     roof_fans   fan box lying on a roof, fans facing up
     gate.chevrons.kind = "heat"   wavy heat lines instead of >>> (furnace door)
     gate.u      offset of a portal along its face (side tunnels in front of an off-centre belt)
@@ -115,14 +116,15 @@ def _slope_box(n, side, c, b, t, o, zz, u, z, w, h, depth=0.12, glow=1.0):
 def pylons(n, m):
     a, b, t, lean = m["at"], m["base"], m["top"], m["lean"]
     ax, ay = (a, a) if not isinstance(a, list) else a
+    cx, cy = m.get("center", (0.0, 0.0))
     for sx in (-1, 1):
         for sy in (-1, 1):
             mm = {"base": [b, b], "top": [t, t], "z": m["z"], "chamfer": m["chamfer"]}
-            mass(n, mm, center=(sx * ax, sy * ay), top_offset=(-sx * lean, -sy * lean))
+            mass(n, mm, center=(cx + sx * ax, cy + sy * ay), top_offset=(-sx * lean, -sy * lean))
             d = m.get("dots")
             if d and sy < 0:                      # light dots on the front face of the two front pylons
                 for z in d["z"]:
-                    _slope_box(n, "front", (sx * ax, sy * ay), (b, b), (t, t), (-sx * lean, -sy * lean), m["z"],
+                    _slope_box(n, "front", (cx + sx * ax, cy + sy * ay), (b, b), (t, t), (-sx * lean, -sy * lean), m["z"],
                                0.0, z, d["w"], d["h"])
 
 
@@ -169,7 +171,8 @@ def gate(n, m):
         poly = G.chevron(ch["h"], ch["h"] * 0.45, ch["h"] * 0.22)
         n.part(n.extrude2d(poly, pd + 0.15, pd + 0.28, org, f.U, (0, 0, 1), f.N), glow=1.0, rim=False)
     for s in m.get("strips", []):
-        n.part(n.box(f.p(u0 + s["u"], fr + 0.05, s["z"]), (s["w"], 0.14, s["h"]), yaw=f.yaw), glow=1.0, rim=False)
+        n.part(n.box(f.p(u0 + s["u"], fr + 0.05, s["z"]), (s["w"], 0.14, s["h"]), yaw=f.yaw), glow=1.0, rim=False,
+               accent=1.0 if s.get("accent") else 0.0)
     st = m.get("steps")
     if st:
         k = st["n"]
@@ -237,7 +240,8 @@ def tanks(n, m):
         ring0 = [(x + r * math.cos(a), y + r * math.sin(a)) for a in (2 * math.pi * i / 16 for i in range(16))]
         ring1 = [(x + r * 0.55 * math.cos(a), y + r * 0.55 * math.sin(a)) for a in (2 * math.pi * i / 16 for i in range(16))]
         n.part(n.loft(ring0, z0 + h, ring1, z0 + h + r * 0.4), rim=False)
-        n.part(n.annulus((x, y, z0 + h * 0.72), r + 0.06, r - 0.05, 0.18, 16), glow=0.8, rim=False)
+        for bf in m.get("bands", [0.72]):
+            n.part(n.annulus((x, y, z0 + h * bf), r + 0.06, r - 0.05, 0.22, 16), glow=0.9, rim=False)
         if m.get("glyph") == "drop":
             yaw = math.radians(m.get("glyph_yaw", 0.0))          # 0 = glyph faces the front (-Y)
             N = Vector((math.sin(yaw), -math.cos(yaw), 0))
@@ -276,6 +280,8 @@ def tower(n, m):
 def railing(n, m):
     z, h = m["z"], m["h"]
     tp = 0.14 * n.thin_mul
+    ac = 1.0 if m.get("accent") else 0.0                    # orange safety railing
+    ag = 0.45 if ac else 0.0
     if "rect" in m:
         a = m["rect"]
         ax, ay = (a, a) if not isinstance(a, list) else a
@@ -291,9 +297,9 @@ def railing(n, m):
         k = max(1, int(math.ceil(L / 2.4)))
         for i in range(k):
             q = p0 + (p1 - p0) * (i / k)
-            n.part(n.box(q + Vector((0, 0, h / 2)), (tp, tp, h)), rim=False)
+            n.part(n.box(q + Vector((0, 0, h / 2)), (tp, tp, h)), rim=False, glow=ag, accent=ac)
         for zz in (h, h * 0.5):
-            n.part(n.beam(p0 + Vector((0, 0, zz)), p1 + Vector((0, 0, zz)), tp, tp), rim=False)
+            n.part(n.beam(p0 + Vector((0, 0, zz)), p1 + Vector((0, 0, zz)), tp, tp), rim=False, glow=ag, accent=ac)
 
 
 def dish(n, m):
@@ -496,18 +502,23 @@ def units(n, m):
 
 
 def profile(n, m):
-    """Hall body: 2D outline in (x, z) (e.g. a box with cut roof corners) extruded along Y from y0 to y1.
-    strips: glow boxes on its vertical faces (side front/back/left/right, u along the face, z)."""
+    """Hall body: 2D outline (e.g. a box with cut roof corners) extruded along Y (outline in (x, z), default) or along
+    X (`axis: "x"`, outline in (y, z)). strips: glow boxes on its vertical faces (side, u along the face, z)."""
     poly = [tuple(p) for p in m["poly"]]
-    y0, y1 = m["y"]
-    cx = m.get("x", 0.0)
-    n.part(n.extrude2d(poly, y0, y1, (cx, 0, 0), (1, 0, 0), (0, 0, 1), (0, 1, 0)), rim=True)
-    xs = [p[0] for p in poly]
-    dist = {"front": -y0, "back": y1, "right": cx + max(xs), "left": -(cx + min(xs))}
+    a0, a1 = m["y"] if "y" in m else m["x"]
+    c = m.get("x", 0.0) if m.get("axis") != "x" else m.get("y_c", 0.0)
+    if m.get("axis") == "x":
+        n.part(n.extrude2d(poly, a0, a1, (0, c, 0), (0, 1, 0), (0, 0, 1), (1, 0, 0)), rim=True)
+        ys = [p[0] for p in poly]
+        dist = {"front": -(c + min(ys)), "back": c + max(ys), "right": a1, "left": -a0}
+    else:
+        n.part(n.extrude2d(poly, a0, a1, (c, 0, 0), (1, 0, 0), (0, 0, 1), (0, 1, 0)), rim=True)
+        xs = [p[0] for p in poly]
+        dist = {"front": -a0, "back": a1, "right": c + max(xs), "left": -(c + min(xs))}
     for st in m.get("strips", []):
         f = Frame(st["side"])
         n.part(n.box(f.p(st["u"], dist[st["side"]] + 0.05, st["z"]), (st["w"], 0.14, st["h"]), yaw=f.yaw),
-               glow=1.0, rim=False)
+               glow=1.0, rim=False, accent=1.0 if st.get("accent") else 0.0)
 
 
 def conveyor(n, m):
@@ -562,6 +573,19 @@ def conveyor(n, m):
 def stacks(n, m):
     """Smelter chimneys: base block, body, glowing band, wide top collar (open look: dark inner disc)."""
     r, z0, h = m["r"], m["z0"], m["h"]
+    if m.get("slim"):                                       # refinery: stepped slim stack, small cap
+        r = r * (n.thin_mul if n.mini else 1.0) ** 0.5
+        for x, y in m["at"]:
+            n.part(n.box((x, y, z0 + 0.3), (r * 2.8, r * 2.8, 0.6)), rim=True)
+            h0 = h * 0.55
+            n.part(n.cylinder((x, y, z0 + h0 / 2), r, h0, 14), rim=True)
+            n.part(n.loft([(x + r * math.cos(a), y + r * math.sin(a)) for a in (2 * math.pi * i / 14 for i in range(14))], z0 + h0,
+                          [(x + r * 0.72 * math.cos(a), y + r * 0.72 * math.sin(a)) for a in (2 * math.pi * i / 14 for i in range(14))],
+                          z0 + h0 + 0.3), rim=False)
+            n.part(n.cylinder((x, y, z0 + (h0 + 0.3 + h) / 2), r * 0.72, h - h0 - 0.3, 14), rim=True)
+            n.part(n.annulus((x, y, z0 + h * 0.35), r + 0.07, r - 0.05, 0.25, 14), glow=0.9, rim=False)
+            n.part(n.annulus((x, y, z0 + h - 0.15), r * 0.9, r * 0.55, 0.3, 14), rim=True)
+        return
     for x, y in m["at"]:
         n.part(n.box((x, y, z0 + 0.3), (r * 2.6, r * 2.6, 0.6)), rim=True)
         n.part(n.cylinder((x, y, z0 + h / 2), r, h, 16), rim=True)
@@ -622,7 +646,8 @@ def generic_box(n, m):
     for b in m["boxes"]:
         x, y, z, sx, sy, sz = b[:6]
         yaw = math.radians(b[6]) if len(b) > 6 else 0.0
-        n.part(n.box((x, y, z), (sx, sy, sz), yaw=yaw), glow=m.get("glow", 0.0), rim=m.get("rim", True))
+        n.part(n.box((x, y, z), (sx, sy, sz), yaw=yaw), glow=m.get("glow", 0.0), rim=m.get("rim", True),
+               accent=1.0 if m.get("accent") else 0.0)
 
 
 BUILDERS = {"plate": plate, "mass": mass, "pylons": pylons, "buttresses": buttresses, "gate": gate, "arm": arm,

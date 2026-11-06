@@ -208,5 +208,47 @@
     "PlateRadius": 1110.9,
     "Height": 1080.0,
     "ScaleSingle": 0.09002
+  },
+  {
+    "Name": "refinery_T1",
+    "NodeId": "refinery",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"refinery.name\", \"Refining Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"refinery.type\", \"Processing / Smelting\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Refinery_T1.SM_Holo_Refinery_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Refinery_T1_Mini.SM_Holo_Refinery_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Refinery_T1_Screen.T_Node_Refinery_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Refinery_T1_Icon_256.T_Node_Refinery_T1_Icon_256",
+    "PlateRadius": 753.1,
+    "Height": 800.0,
+    "ScaleSingle": 0.125
+  },
+  {
+    "Name": "refinery_T2",
+    "NodeId": "refinery",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"refinery.name\", \"Refining Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"refinery.type\", \"Processing / Smelting\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Refinery_T2.SM_Holo_Refinery_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Refinery_T2_Mini.SM_Holo_Refinery_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Refinery_T2_Screen.T_Node_Refinery_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Refinery_T2_Icon_256.T_Node_Refinery_T2_Icon_256",
+    "PlateRadius": 883.2,
+    "Height": 900.0,
+    "ScaleSingle": 0.11111
+  },
+  {
+    "Name": "refinery_T3",
+    "NodeId": "refinery",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"refinery.name\", \"Refining Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"refinery.type\", \"Processing / Smelting\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Refinery_T3.SM_Holo_Refinery_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_Refinery_T3_Mini.SM_Holo_Refinery_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_Refinery_T3_Screen.T_Node_Refinery_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_Refinery_T3_Icon_256.T_Node_Refinery_T3_Icon_256",
+    "PlateRadius": 1094.2,
+    "Height": 1200.0,
+    "ScaleSingle": 0.08333
   }
 ]

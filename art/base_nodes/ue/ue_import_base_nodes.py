@@ -5,7 +5,7 @@
     py "<repo>/art/base_nodes/ue/ue_import_base_nodes.py" --table      (after the C++ module is compiled)
     py "<repo>/art/base_nodes/ue/ue_import_base_nodes.py" --verify
 
-  --import  master material MM_HoloSolid (built by script: unlit, vertex-colour channels R edge / G glow / B dim, see
+  --import  master material MM_HoloSolid (built by script: unlit, vertex-colour channels R edge / G glow / B dim / A accent, see
             README_UE.md) + MI_HoloSolid; hologram meshes SM_Holo_<Node>_T<n>[_Mini] (vertex colours REPLACE, no
             Nanite, no collision, MI_HoloSolid on slot 0); terminal-screen renders T_Node_<Node>_T<n>_Screen and icons
             T_Node_<Node>_T<n>_Icon_256 / _512 (UI texture group, no mips)
@@ -86,7 +86,7 @@ def texture_names():
 # material: MM_HoloSolid (one Custom node does the hologram look; parameters below are what MI_HoloSolid exposes)
 # ---------------------------------------------------------------------------------------------------------------------
 HOLO_HLSL = r"""
-// R = edge rim, G = glow, B = dim (vertex colour, written by blender/bn_geom.py)
+// R = edge rim, G = glow, B = dim, A = accent (vertex colour, written by blender/bn_geom.py)
 float3 cell = abs(frac(P / max(Grid, 1.0) + 0.5) - 0.5);
 float3 w = step(0.5, 1.0 - abs(NL));
 float grid = max(max(step(cell.x, Line) * w.x, step(cell.y, Line) * w.y), step(cell.z, Line) * w.z);
@@ -95,12 +95,14 @@ float dimf = 1.0 - 0.75 * VB;
 float fres = pow(saturate(1.0 - abs(dot(NW, V))), 3.0) * dimf;
 float scan = 1.0 - ScanStrength * step(0.5, frac(PW.z / max(ScanSize, 1.0) - T * ScanSpeed));
 float3 e = FillColor.rgb * (lit + 0.45 * grid) * dimf + EdgeColor.rgb * (1.3 * VR + 0.9 * fres) + GlowColor.rgb * 2.6 * VG;
+float3 acc = AccentColor.rgb * (0.2 * lit + 0.8 * VR + 1.4 * VG + 0.25);
+e = lerp(e, acc, VA);
 return e * Intensity * Power * scan;
 """
 SCALARS = {"Intensity": 1.0, "Power": 1.0, "Grid": 200.0, "Line": 0.025, "ScanStrength": 0.06, "ScanSize": 6.0,
            "ScanSpeed": 0.15}
 VECTORS = {"FillColor": (0.016, 0.10, 0.34), "EdgeColor": (0.16, 0.62, 1.0), "GlowColor": (0.55, 0.88, 1.0),
-           "LightDir": (-0.35, -0.5, 0.8)}
+           "LightDir": (-0.35, -0.5, 0.8), "AccentColor": (0.913, 0.328, 0.011)}
 
 
 def _expr(mat, cls, x, y, **props):
@@ -115,7 +117,7 @@ def build_master(mat):
     mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_OPAQUE)
     custom = _expr(mat, unreal.MaterialExpressionCustom, -300, 0, code=HOLO_HLSL,
                    output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="HoloSolid")
-    names = ["VR", "VG", "VB", "NW", "NL", "P", "PW", "V", "T"] + list(SCALARS) + list(VECTORS)
+    names = ["VR", "VG", "VB", "VA", "NW", "NL", "P", "PW", "V", "T"] + list(SCALARS) + list(VECTORS)
     inputs = []
     for n in names:
         ci = unreal.CustomInput()
@@ -123,7 +125,7 @@ def build_master(mat):
         inputs.append(ci)
     custom.set_editor_property("inputs", inputs)
     vc = _expr(mat, unreal.MaterialExpressionVertexColor, -900, -400)
-    for ch, pin in (("R", "VR"), ("G", "VG"), ("B", "VB")):
+    for ch, pin in (("R", "VR"), ("G", "VG"), ("B", "VB"), ("A", "VA")):
         mel.connect_material_expressions(vc, ch, custom, pin)
     nw = _expr(mat, unreal.MaterialExpressionVertexNormalWS, -900, -250)
     mel.connect_material_expressions(nw, "", custom, "NW")

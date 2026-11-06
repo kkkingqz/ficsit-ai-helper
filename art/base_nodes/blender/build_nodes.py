@@ -19,7 +19,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import bpy  # noqa: E402
-import bmesh  # noqa: E402,F401
+import bmesh  # noqa: E402
+from mathutils import Matrix  # noqa: E402
 
 import bn_geom as G  # noqa: E402
 import bn_kit  # noqa: E402
@@ -62,6 +63,9 @@ def build_mesh(node, tier_key, tier, scale, disp, mini, coll, mat):
     for m in tier["modules"]:
         bn_kit.build(n, m)
     bm = n.finish()
+    if tier.get("yaw"):                                     # turn the whole node (front portal towards -Y)
+        bmesh.ops.rotate(bm, verts=bm.verts, cent=(0, 0, 0),
+                         matrix=Matrix.Rotation(math.radians(tier["yaw"]), 3, "Z"))
     name = mesh_name(node, tier_key, mini)
     me = bpy.data.meshes.new(name)
     bm.to_mesh(me)
