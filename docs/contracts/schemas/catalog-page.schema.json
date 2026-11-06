@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/catalog-page.schema.json",
+  "title": "CatalogPage",
+  "description": "Страница результата поисковых инструментов каталога: search_items, get_item, list_machines, get_recipes (ARCHITECTURE.md §5.1, §7.1, ADR-017). Схемы самого GameCatalog нет сознательно — наружу он целиком не выходит, но эти страницы пересекают границу доверия и потому нормируются. Состав каталога даёт UModContentRegistry, разблокировки и числа — игровые подсистемы (§8.1).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "catalogRevision", "kind", "items"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "catalogRevision": { "type": "integer", "minimum": 0 },
+    "kind": { "enum": ["item", "recipe", "machine", "schematic"] },
+    "unlockedOnly": {
+      "type": "boolean",
+      "default": true,
+      "description": "По умолчанию модель получает только разблокированное в текущем сохранении (ADR-017)."
+    },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "description": "Размер страницы ограничен лимитом §7.4: полный каталог из сотен рецептов в одном ответе переполнил бы контекст модели.",
+      "items": { "$ref": "#/$defs/entry" }
+    },
+    "nextCursor": {
+      "description": "Курсор следующей страницы; null — страниц больше нет.",
+      "oneOf": [
+        { "type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$" },
+        { "type": "null" }
+      ]
+    },
+    "totalEstimate": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "className": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$", "maxLength": 128 },
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["className", "displayName", "unlocked", "isVanilla"],
+      "properties": {
+        "className": { "$ref": "#/$defs/className" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "unlocked": {
+          "type": "boolean",
+          "description": "Инвариант §5.1: известный рецепт не равно разблокированный в этом сохранении."
+        },
+        "isVanilla": {
+          "type": "boolean",
+          "description": "Из UModContentRegistry::IsRecipeVanilla — позволяет отличать модовый контент от игрового (§9.3)."
+        },
+        "isAlternate": { "type": "boolean" },
+        "form": { "enum": ["solid", "liquid", "gas"] },
+        "durationSec": { "type": "number", "exclusiveMinimum": 0 },
+        "producedIn": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/className" }
+        },
+        "ingredients": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/port" } },
+        "products": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/port" } },
+        "family": {
+          "enum": ["extractor", "smelter", "constructor", "assembler", "manufacturer", "refinery", "blender", "packager", "particle", "generator", "other"]
+        },
+        "powerMW": { "type": "number", "description": "Отрицательное значение — машина вырабатывает энергию." },
+        "buildable": { "type": "boolean" },
+        "maxPowerShards": { "type": "integer", "minimum": 0, "maximum": 3 },
+        "maxSomersloops": { "type": "integer", "minimum": 0, "maximum": 4 }
+      }
+    },
+    "port": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "amount"],
+      "properties": {
+        "item": { "$ref": "#/$defs/className" },
+        "amount": { "type": "number", "exclusiveMinimum": 0 },
+        "amountPerMin": { "type": "number", "minimum": 0 }
+      }
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "catalogRevision": 17,
+  "kind": "recipe",
+  "unlockedOnly": true,
+  "items": [
+    {
+      "className": "Recipe_CircuitBoard_C",
+      "displayName": "Circuit Board",
+      "unlocked": true,
+      "isVanilla": true,
+      "isAlternate": false,
+      "durationSec": 8,
+      "producedIn": ["Build_AssemblerMk1_C"],
+      "ingredients": [
+        { "item": "Desc_CopperSheet_C", "amount": 2, "amountPerMin": 15 },
+        { "item": "Desc_Plastic_C", "amount": 4, "amountPerMin": 30 }
+      ],
+      "products": [{ "item": "Desc_CircuitBoard_C", "amount": 1, "amountPerMin": 7.5 }]
+    },
+    {
+      "className": "Recipe_Alternate_CircuitBoard_1_C",
+      "displayName": "Alternate: Silicon Circuit Board",
+      "unlocked": true,
+      "isVanilla": true,
+      "isAlternate": true,
+      "durationSec": 24,
+      "producedIn": ["Build_AssemblerMk1_C"],
+      "ingredients": [
+        { "item": "Desc_CopperSheet_C", "amount": 11, "amountPerMin": 27.5 },
+        { "item": "Desc_Silica_C", "amount": 11, "amountPerMin": 27.5 }
+      ],
+      "products": [{ "item": "Desc_CircuitBoard_C", "amount": 5, "amountPerMin": 12.5 }]
+    }
+  ],
+  "nextCursor": null,
+  "totalEstimate": 2
+}

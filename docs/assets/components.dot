@@ -1,7 +1,10 @@
-// FICSIT AI v2.1-draft — компонентная схема.
+// FICSIT AI v2.2-draft — компонентная схема.
 // UI — переиспользуемые экранные модули в хостах; в v1.0 хост — AI Terminal. Планировщик — обёртка с заглушкой.
 // Два рантайма: игровой процесс и локальный сайдкар (адаптер + vanilla Foreman).
 // Входящих слушателей в игровом процессе нет: мод сам подключается к адаптеру.
+// Изменения 2.2-draft: GameFacade — единственное место типов AFG*/UFG* (ADR-029);
+// состав каталога даёт UModContentRegistry (ADR-027); телеметрия v1.0 — буфер сессии
+// без персистентности (§8.2); линейная система — второй кандидат провайдера (ADR-028).
 // Рендер: dot -Tpng -Gdpi=150 components.dot -o components.png
 digraph G {
   graph [rankdir=TB, compound=true, nodesep=.30, ranksep=.45, pad=.16, bgcolor="white",
@@ -29,17 +32,22 @@ digraph G {
       fontcolor="#54646F"; color="#D8BFA0"; style="rounded,dashed";
       validator [label="OperationRegistry + Validator\nодни операции для UI и модели\nсхема · лимиты · живой каталог", fillcolor="#FBEEDC", color="#C98F4C"];
       planner   [label="PlannerGateway (обёртка)\nPlanRequest → ProductionPlan\nv1.0 — заглушка"];
-      provider  [label="Внешний провайдер — v1.3\nпервый кандидат — ядро SBC", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
+      provider  [label="Внешний провайдер — v1.3\nкандидаты: ядро SBC · линейная система A·x = d", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       provider -> planner [style=dashed];
-      catalog   [label="CatalogProvider\nAFGRecipeManager · SML classes"];
-      telemetry [label="TelemetrySampler\nснапшоты, агрегация вне GameThread"];
       bpcore    [label="Factory Spawner core (адаптация)\nv1.1 · чертёж в библиотеку", fillcolor="#EDF0F2", color="#B9C2CA", style="rounded,filled,dashed"];
       validator -> bpcore [style=dashed];
     }
 
+    subgraph cluster_facade {
+      label="GameFacade/ — единственное место типов AFG*/UFG* (CI)"; fontsize=10;
+      fontcolor="#54646F"; color="#C8CBD9"; style="rounded,dashed";
+      catalog   [label="CatalogProvider\nсостав: UModContentRegistry\nразблокировки и числа: AFGRecipeManager", fillcolor="#ECEEF6", color="#9B9FBE"];
+      telemetry [label="TelemetrySampler\nснапшоты, агрегация вне GameThread\nбуфер сессии · 24 ч в v1.1", fillcolor="#ECEEF6", color="#9B9FBE"];
+    }
+
     link  [label="Канал к адаптеру\nисходящее соединение · loopback · токен", fillcolor="#E6F1F3", color="#7FA7B0"];
     save  [label="Состояние в сохранении\nsaveId · планы · экраны · заметки", shape=cylinder];
-    files [label="Локальные файлы по saveId\nтелеметрия · кэш рендера", shape=cylinder];
+    files [label="Локальные файлы по saveId\nкэш рендера · телеметрия с v1.1", shape=cylinder];
 
     terminal -> ui; equipment -> ui [style=dashed]; equipment -> hud [style=dashed];
     terminal -> graphview; api -> planner [style=dotted]; terminal -> rt;

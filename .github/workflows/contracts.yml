@@ -27,3 +27,4 @@ jobs:
           ajv -s schemas/chat-card.schema.json          -d chat-card.example.json
           ajv -s schemas/blueprint-request.schema.json  -d blueprint.example.json
           ajv -s schemas/blueprint-preview.schema.json  -d blueprint-preview.example.json
+          ajv -s schemas/catalog-page.schema.json       -d catalog-page.example.json
