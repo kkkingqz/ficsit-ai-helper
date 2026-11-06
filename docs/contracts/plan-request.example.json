@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "saveId": "5f0c9a52-3d1e-4b8a-9c47-2e6d8f1a7b30",
+  "catalogRevision": 17,
+  "target": { "item": "Desc_IronPlateReinforced_C", "ratePerMin": 10 },
+  "selectedAlternates": [],
+  "machineSettings": [],
+  "rawLimits": [{ "item": "Desc_OreIron_C", "maxRatePerMin": 240, "unit": "items/min" }]
+}

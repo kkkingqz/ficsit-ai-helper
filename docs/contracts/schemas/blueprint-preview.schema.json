@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/blueprint-preview.schema.json",
+  "title": "PreviewResult",
+  "description": "Результат dry-run для BlueprintRequest (ARCHITECTURE.md §5.4). Запрос с непустым errors отклоняется.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "requestId", "valid", "errors", "warnings", "estimates", "moduleSplit"],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "valid": { "type": "boolean" },
+    "errors": { "type": "array", "items": { "$ref": "#/$defs/issue" } },
+    "warnings": { "type": "array", "items": { "$ref": "#/$defs/issue" } },
+    "estimates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputs", "outputs", "powerMW", "footprint"],
+      "properties": {
+        "inputs": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+        "outputs": { "type": "array", "items": { "$ref": "#/$defs/flow" } },
+        "powerMW": { "type": "number", "minimum": 0 },
+        "footprint": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "z", "unit"],
+          "properties": {
+            "x": { "type": "number", "exclusiveMinimum": 0 },
+            "y": { "type": "number", "exclusiveMinimum": 0 },
+            "z": { "type": "number", "exclusiveMinimum": 0 },
+            "unit": { "enum": ["foundations"] }
+          }
+        }
+      }
+    },
+    "moduleSplit": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["modules", "machinesPerModule"],
+          "properties": {
+            "modules": { "type": "integer", "minimum": 2 },
+            "machinesPerModule": { "type": "integer", "minimum": 1 }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "description": "Машиночитаемый код, например MANIFOLD_RAMP_UP (обязателен для манифолдов), CLOCK_NOT_APPLIED, RECIPE_LOCKED."
+        },
+        "message": { "type": "string", "maxLength": 500 },
+        "scope": { "type": "string", "maxLength": 100 }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["item", "ratePerMin", "unit"],
+      "properties": {
+        "item": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$", "maxLength": 128 },
+        "ratePerMin": { "type": "number", "exclusiveMinimum": 0 },
+        "unit": { "enum": ["items/min", "m3/min"] },
+        "byproduct": { "type": "boolean" }
+      }
+    }
+  }
+}

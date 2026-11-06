@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/blueprint-request.schema.json",
+  "title": "BlueprintRequest",
+  "description": "Запрос на создание чертежа, общий для ручной формы и LLM (ARCHITECTURE.md §5.4, v1.1). Чертёж создаётся в библиотеке после валидации, без подтверждения игрока. Числовые лимиты — предлагаемые, уточняются spike'ом v1.1.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "requestId", "machineClass", "recipeClass", "count",
+    "clockPercent", "clockApplied", "layout", "connections", "outputName"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 2 },
+    "requestId": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
+      "description": "Идемпотентность: повторный вызов с тем же requestId не создаёт второй чертёж."
+    },
+    "machineClass": { "$ref": "#/$defs/className" },
+    "recipeClass": { "$ref": "#/$defs/className" },
+    "count": { "type": "integer", "minimum": 1, "maximum": 50 },
+    "clockPercent": { "type": "number", "exclusiveMinimum": 0, "maximum": 250 },
+    "clockApplied": {
+      "type": "boolean",
+      "description": "false — clockPercent использован только в расчёте plannedRate, в чертеже такт не выставлен."
+    },
+    "layout": { "enum": ["single_row"] },
+    "connections": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["belts", "pipes", "power"],
+      "properties": {
+        "belts": { "enum": ["manifold", "none"] },
+        "pipes": { "enum": ["manifold", "none"] },
+        "power": { "type": "boolean" }
+      }
+    },
+    "outputName": { "type": "string", "pattern": "^[A-Za-z0-9_][A-Za-z0-9_ .-]{0,63}$" }
+  },
+  "$defs": {
+    "className": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$", "maxLength": 128 }
+  }
+}

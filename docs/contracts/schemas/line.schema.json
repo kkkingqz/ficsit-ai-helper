@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/line.schema.json",
+  "title": "ProductionLine",
+  "description": "Именованная группа построек в мире (ARCHITECTURE.md §5.7). В v1.0 source = manual; auto — будущая версия. buildingId — устойчивый идентификатор постройки в сохранении (проверяется в Spike S3).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "saveId", "name", "source", "members"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+    "saveId": { "type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
+    "name": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "source": { "enum": ["manual", "auto"] },
+    "members": {
+      "type": "array",
+      "maxItems": 2000,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["buildingId", "className"],
+        "properties": {
+          "buildingId": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "className": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_]*_C$", "maxLength": 128 }
+        }
+      }
+    },
+    "notes": { "type": "string", "maxLength": 500 }
+  }
+}

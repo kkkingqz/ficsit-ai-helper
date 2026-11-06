@@ -1,5 +1,7 @@
-// FICSIT AI v2.0-draft — путь действия с игровыми последствиями (пример: Blueprint, v1.1).
-// Сетевой границы больше нет; граница доверия осталась границей кода.
+// FICSIT AI v2.1-draft — путь создания чертежа (v1.1).
+// Подтверждения игрока нет: чертёж только попадает в библиотеку, в мир его ставит игрок.
+// Паритет (ADR-018): ручной путь и инструмент модели вызывают одну и ту же операцию.
+// Граница доверия — граница кода: каждый вызов проходит валидацию.
 // Рендер: dot -Tpng -Gdpi=150 actions.dot -o actions.png
 digraph G {
   graph [rankdir=TB, nodesep=.25, ranksep=.40, pad=.15, bgcolor="white",
@@ -8,12 +10,12 @@ digraph G {
          color="#9DA8B2", fillcolor="#F7F8FA", fontcolor="#1F313B", margin=".14,.11"];
   edge  [color="#8B98A3", arrowsize=.55];
 
-  player [label="Игрок\nреплика или форма UI", fillcolor="#F9E6CA", color="#D69A53"];
-  intent [label="Структурированный запрос\nодин контракт для AI и формы"];
+  player [label="Игрок\nреплика в чате или форма UI", fillcolor="#F9E6CA", color="#D69A53"];
+  intent [label="BlueprintRequest\nодин контракт для AI и формы"];
 
   subgraph cluster_untrusted {
     label="Недоверенный источник"; fontsize=10; fontcolor="#54646F"; color="#DFE5EA"; style="rounded,dashed";
-    llm [label="Foreman / LLM\nтолько предлагает", fillcolor="#E6F1F3", color="#7FA7B0"];
+    llm [label="Foreman / LLM\nчерез адаптер", fillcolor="#E6F1F3", color="#7FA7B0"];
   }
 
   subgraph cluster_trusted {
@@ -21,17 +23,16 @@ digraph G {
     schema  [label="Валидация по JSON Schema"];
     live    [label="Сверка с живым каталогом\nclassName · recipe · unlock"];
     preview [label="PreviewResult\nпоток · габариты · warnings", fillcolor="#FBEEDC", color="#C98F4C"];
-    confirm [label="Подтверждение игроком\nrequestId, идемпотентно", fillcolor="#F9E6CA", color="#D69A53"];
-    exec    [label="Исполнение\nFactory Spawner Generate()"];
+    exec    [label="Создание\nFactory Spawner Generate()\nrequestId — идемпотентно"];
   }
 
-  result [label="Чертёж доступен в Build Gun\nошибка не оставляет частичных объектов"];
+  result [label="Чертёж в библиотеке\nв мир ставит игрок через Build Gun"];
   reject [label="Отклонено с причиной\nсохранённое состояние не изменено", fillcolor="#F4F0F0", color="#C0A8A8"];
 
-  player -> intent;
-  player -> llm [style=dashed, label="голос/текст", fontsize=9];
-  llm -> intent [style=dashed];
-  intent -> schema -> live -> preview -> confirm -> exec -> result;
+  player -> intent [label="вручную: форма или строка плана\n(без LLM)", fontsize=9];
+  player -> llm [style=dashed, label="текст / голос", fontsize=9];
+  llm -> intent [style=dashed, label="request_blueprint_creation", fontsize=9];
+  intent -> schema -> live -> preview -> exec -> result;
   schema  -> reject [style=dotted];
   live    -> reject [style=dotted];
   preview -> reject [style=dotted, label="errors", fontsize=9];

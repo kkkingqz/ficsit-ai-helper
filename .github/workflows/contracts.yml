@@ -1,0 +1,29 @@
+name: contracts
+
+on:
+  push:
+    paths: ["docs/contracts/**", ".github/workflows/contracts.yml"]
+  pull_request:
+    paths: ["docs/contracts/**", ".github/workflows/contracts.yml"]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate contract examples against JSON Schema
+        working-directory: docs/contracts
+        run: |
+          set -e
+          ajv() { npx --yes ajv-cli@5.0.0 validate --spec=draft2020 --strict=true "$@"; }
+          ajv -s schemas/plan-request.schema.json       -d plan-request.example.json
+          ajv -s schemas/production-plan.schema.json    -d plan.example.json
+          ajv -s schemas/screen-definition.schema.json  -d screen.example.json
+          ajv -s schemas/line.schema.json               -d line.example.json
+          ajv -s schemas/note.schema.json               -d note.example.json
+          ajv -s schemas/chat-card.schema.json          -d chat-card.example.json
+          ajv -s schemas/blueprint-request.schema.json  -d blueprint.example.json
+          ajv -s schemas/blueprint-preview.schema.json  -d blueprint-preview.example.json
