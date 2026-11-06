@@ -1,0 +1,44 @@
+[
+  {
+    "Name": "central_hub_T1",
+    "NodeId": "central_hub",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"central_hub.name\", \"Central Hub\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"central_hub.type\", \"Control / Coordination\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_CentralHub_T1.SM_Holo_CentralHub_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_CentralHub_T1_Mini.SM_Holo_CentralHub_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_CentralHub_T1_Screen.T_Node_CentralHub_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_CentralHub_T1_Icon_256.T_Node_CentralHub_T1_Icon_256",
+    "PlateRadius": 1896.9,
+    "Height": 1600,
+    "ScaleSingle": 0.05272
+  },
+  {
+    "Name": "central_hub_T2",
+    "NodeId": "central_hub",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"central_hub.name\", \"Central Hub\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"central_hub.type\", \"Control / Coordination\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_CentralHub_T2.SM_Holo_CentralHub_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_CentralHub_T2_Mini.SM_Holo_CentralHub_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_CentralHub_T2_Screen.T_Node_CentralHub_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_CentralHub_T2_Icon_256.T_Node_CentralHub_T2_Icon_256",
+    "PlateRadius": 2202.3,
+    "Height": 2200,
+    "ScaleSingle": 0.04541
+  },
+  {
+    "Name": "central_hub_T3",
+    "NodeId": "central_hub",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"central_hub.name\", \"Central Hub\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"central_hub.type\", \"Control / Coordination\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_CentralHub_T3.SM_Holo_CentralHub_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_CentralHub_T3_Mini.SM_Holo_CentralHub_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_CentralHub_T3_Screen.T_Node_CentralHub_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_CentralHub_T3_Icon_256.T_Node_CentralHub_T3_Icon_256",
+    "PlateRadius": 2881.4,
+    "Height": 2600,
+    "ScaleSingle": 0.03471
+  }
+]

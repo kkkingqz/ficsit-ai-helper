@@ -21,7 +21,7 @@
 | `Source/FicsitAIHelper/...` | черновик C++: `AFAIHCommandCenter` и `UFAIHTerminalEvents` (папка `GameFacade/`, ADR-021) |
 | `icons/IconDesc_CommandCenter_512.png`, `_256.png` | иконки меню строительства (прозрачный фон) |
 | `../export/ue/clearance.json` | clearance-бокс |
-| `tools/ue_stub_dryrun.py` | прогон скрипта без UE со сверкой API по стабу UE 5.6 и свойств — по заголовкам SML (§9) |
+| `tools/ue_stub_dryrun.py` | прогон скрипта без UE со сверкой API по стабу UE 5.6 и свойств — по заголовкам SML (§9); `--script` / `--modes` / `--compiled-modes` — для других скриптов импорта (узлы базы: `art/base_nodes/README.md` §4) |
 | `tools/apply_localization.py` | заполняет RU-перевод в `.po` из `content_spec.json` → `localization` (§6) |
 | `../../../tools/ci/check_adr021.py` | CI-проверка ADR-021: `AFG*`/`UFG*` только в `GameFacade/`, `core/` без Unreal (§9) |
 

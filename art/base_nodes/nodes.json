@@ -1,0 +1,373 @@
+{
+  "_doc": "Base nodes: hologram meshes for the Command Center projector + prepared renders for the terminal screens. Units: metres (model scale), Z up, front = -Y, pivot = footprint centre on the ground. Built by blender/build_nodes.py. Module types: see blender/bn_kit.py.",
+  "ue": {
+    "_doc": "UE content layout (mod plugin mount /FicsitAIHelper). Used by ue/ue_import_base_nodes.py and written into ue/base_nodes_table.json by the build.",
+    "content_root": "/FicsitAIHelper/BaseNodes",
+    "folders": {"meshes": "Mesh", "screens": "Texture/Screen", "icons": "Texture/Icon", "materials": "Material", "data": ""},
+    "material": "MI_HoloSolid",
+    "master": "MM_HoloSolid",
+    "row_struct": "/Script/FicsitAIHelper.FAIHBaseNodeVisual",
+    "table": "DT_BaseNodes",
+    "loc_namespace": "FicsitAIHelper.BaseNodes"
+  },
+  "display": {
+    "_doc": "Hologram volume of the Command Center projector (art/command_center/blender/interior_model.py: emitter disc r 0.9 at floor + 0.96, scale ring r 1.17-1.2 at floor + 1.08, SOCKET_holo at floor + 2.05). Positions below are relative to SOCKET_holo, in metres.",
+    "socket": "SOCKET_holo",
+    "base_z": -0.93,
+    "radius": 1.0,
+    "max_height": 1.0,
+    "rim_mm": 6.0,
+    "outline_mm": 10.0,
+    "single": {
+      "_doc": "One node: mesh SM_Holo_<Node>_T<n> scaled to fit radius / max_height (per tier, see export/manifest.json -> scale_single).",
+      "mesh": "full"
+    },
+    "multi": {
+      "_doc": "2-5 nodes: meshes SM_Holo_<Node>_T<n>_Mini, one common scale per layout = slot_radius / largest plate radius of all nodes and tiers, so relative sizes stay true. Slot 0 is the centre one for 5 (the hub). Slot positions are (x, y) from the socket axis; facing = same yaw as the single node.",
+      "mesh": "mini",
+      "margin": 0.92,
+      "layouts": {
+        "2": {"slot_radius": 0.5, "slots": [[-0.5, 0.0], [0.5, 0.0]]},
+        "3": {"slot_radius": 0.464, "slots": [[0.0, -0.536], [0.464, 0.268], [-0.464, 0.268]]},
+        "4": {"slot_radius": 0.414, "slots": [[-0.414, -0.414], [0.414, -0.414], [0.414, 0.414], [-0.414, 0.414]]},
+        "5": {"slot_radius": 0.333, "slots": [[0.0, 0.0], [0.0, -0.667], [0.667, 0.0], [0.0, 0.667], [-0.667, 0.0]]}
+      },
+      "thin_mul": 2.0
+    }
+  },
+  "nodes": {
+    "central_hub": {
+      "asset": "CentralHub",
+      "display_name": {"en": "Central Hub", "ru": "Центральный хаб"},
+      "type_label": {"en": "Control / Coordination", "ru": "Управление / координация"},
+      "type": "control",
+      "concept": [
+        "reference/concept_central_hub_T1.png",
+        "reference/concept_central_hub_T2.png",
+        "reference/concept_central_hub_T3.png"
+      ],
+      "identity": "persistent on every tier: front portal with >>> chevrons and steps, octagonal roof element, dish (front-left), antenna cluster (back-left), glowing plate outline",
+      "tiers": {
+        "1": {
+          "size": [28, 28, 16],
+          "modules": [
+            {"type": "plate", "core": 14.0, "arm": 0, "reach": 0, "chamfer": 1.2},
+            {
+              "type": "mass",
+              "base": [10, 10],
+              "top": [9.7, 9.7],
+              "z": [0, 9.0],
+              "chamfer": [1.0, 1.0],
+              "strips": [
+                {"side": "front", "u": -2.4, "z": 7.9, "w": 4.2, "h": 0.55},
+                {"side": "front", "u": 2.4, "z": 7.9, "w": 4.2, "h": 0.55},
+                {"side": "right", "u": -2.2, "z": 7.4, "w": 3.8, "h": 0.55},
+                {"side": "right", "u": 2.2, "z": 7.4, "w": 3.8, "h": 0.55},
+                {"side": "left", "u": -2.2, "z": 7.4, "w": 3.8, "h": 0.55},
+                {"side": "left", "u": 2.2, "z": 7.4, "w": 3.8, "h": 0.55},
+                {"side": "back", "u": 0, "z": 7.4, "w": 5.0, "h": 0.5}
+              ]
+            },
+            {
+              "type": "pylons",
+              "at": 9.8,
+              "base": 1.9,
+              "top": 1.2,
+              "lean": 0.6,
+              "z": [0, 10.2],
+              "chamfer": [0.4, 0.3],
+              "dots": {"z": [3.6, 4.6, 5.6, 6.6], "w": 0.5, "h": 0.45}
+            },
+            {
+              "type": "gate",
+              "side": "front",
+              "back": 9.0,
+              "front": 11.4,
+              "W": 11.0,
+              "H": 7.0,
+              "t": 1.1,
+              "c": 1.5,
+              "inner": {"W": 8.6, "H": 5.7, "t": 0.45},
+              "panel": 10.15,
+              "chevrons": {"n": 3, "h": 1.3, "z": 2.6, "pitch": 1.1},
+              "strips": [],
+              "steps": {"len": 2.4, "w": 6.0, "h": 0.6, "n": 3}
+            },
+            {"type": "arm", "side": "back", "from": 9.5, "to": 13.3, "w": 5.5, "h": 1.0, "chevrons": 2},
+            {"type": "arm", "side": "left", "from": 9.5, "to": 13.3, "w": 3.0, "h": 1.0, "chevrons": 2},
+            {"type": "arm", "side": "right", "from": 9.5, "to": 13.3, "w": 3.0, "h": 1.0, "chevrons": 2},
+            {"type": "shutter", "side": "right", "u": -3.6, "plane": 10.0, "w": 3.0, "h": 3.6, "z0": 0.3, "slats": 4},
+            {"type": "shutter", "side": "right", "u": 3.6, "plane": 10.0, "w": 3.0, "h": 3.6, "z0": 0.3, "slats": 4},
+            {"type": "shutter", "side": "left", "u": -3.6, "plane": 10.0, "w": 3.0, "h": 3.6, "z0": 0.3, "slats": 4},
+            {"type": "shutter", "side": "left", "u": 3.6, "plane": 10.0, "w": 3.0, "h": 3.6, "z0": 0.3, "slats": 4},
+            {"type": "shutter", "side": "back", "u": -4.2, "plane": 10.0, "w": 3.0, "h": 3.4, "z0": 0.3, "slats": 4},
+            {"type": "tower", "r": 6.4, "z": [9.0, 10.9], "windows": [{"z": 9.95, "h": 0.45, "n": 1, "w_frac": 0.6}]},
+            {"type": "railing", "rect": 9.3, "z": 9.0, "h": 0.8, "detail": true},
+            {"type": "dish", "at": [3.2, 2.6, 10.9], "mast_h": 1.6, "R": 2.1, "tilt": 40, "yaw": -45},
+            {
+              "type": "antennas",
+              "masts": [[6.6, -1.5, 9.0, 6.3, 0.16], [7.4, -0.4, 9.0, 4.6, 0.13], [5.8, -0.3, 9.0, 3.6, 0.12]]
+            },
+            {
+              "type": "crates",
+              "detail": true,
+              "boxes": [
+                [11.7, -6.6, 0.3, 2.2, 2.2, 1.8, 0],
+                [11.7, -4.1, 0.3, 2.2, 2.4, 1.8, 0],
+                [11.6, -5.4, 2.1, 2.0, 2.0, 1.4, 6],
+                [-11.6, 5.6, 0.3, 2.0, 2.4, 1.6, 0],
+                [-11.6, 7.8, 0.3, 2.0, 1.8, 1.2, 0]
+              ]
+            }
+          ]
+        },
+        "2": {
+          "size": [41, 41, 22],
+          "modules": [
+            {"type": "plate", "core": 17.0, "arm": 4.2, "reach": 20.5, "chamfer": 3.0},
+            {
+              "type": "mass",
+              "base": [16, 16],
+              "top": [13, 13],
+              "z": [0, 6.0],
+              "chamfer": [2.5, 2.0],
+              "strips": [
+                {"side": "right", "u": -3.0, "z": 4.4, "w": 4.2, "h": 0.6},
+                {"side": "right", "u": 3.0, "z": 4.4, "w": 4.2, "h": 0.6},
+                {"side": "left", "u": -3.0, "z": 4.4, "w": 4.2, "h": 0.6},
+                {"side": "left", "u": 3.0, "z": 4.4, "w": 4.2, "h": 0.6},
+                {"side": "back", "u": -3.0, "z": 4.4, "w": 4.2, "h": 0.6},
+                {"side": "back", "u": 3.0, "z": 4.4, "w": 4.2, "h": 0.6}
+              ]
+            },
+            {
+              "type": "mass",
+              "base": [12.6, 12.6],
+              "top": [10.8, 10.8],
+              "z": [6.0, 10.5],
+              "chamfer": [2.0, 1.6],
+              "strips": [
+                {"side": "front", "u": -2.8, "z": 9.6, "w": 4.0, "h": 0.45},
+                {"side": "front", "u": 2.8, "z": 9.6, "w": 4.0, "h": 0.45},
+                {"side": "right", "u": -2.6, "z": 8.6, "w": 3.8, "h": 0.6},
+                {"side": "right", "u": 2.6, "z": 8.6, "w": 3.8, "h": 0.6},
+                {"side": "left", "u": -2.6, "z": 8.6, "w": 3.8, "h": 0.6},
+                {"side": "left", "u": 2.6, "z": 8.6, "w": 3.8, "h": 0.6},
+                {"side": "back", "u": -2.6, "z": 8.6, "w": 3.8, "h": 0.6},
+                {"side": "back", "u": 2.6, "z": 8.6, "w": 3.8, "h": 0.6}
+              ]
+            },
+            {"type": "buttresses", "corner": 15.2, "to": 5.6, "z_top": 11.6, "h0": 1.6, "w": 2.2, "dots": 4},
+            {
+              "type": "gate",
+              "side": "front",
+              "back": 11.0,
+              "front": 17.8,
+              "W": 12.6,
+              "H": 8.6,
+              "t": 1.3,
+              "c": 1.8,
+              "inner": {"W": 9.6, "H": 6.8, "t": 0.5},
+              "panel": 16.2,
+              "chevrons": {"n": 3, "h": 1.6, "z": 3.0, "pitch": 1.35},
+              "strips": [{"u": 0, "z": 7.95, "w": 6.5, "h": 0.45}],
+              "steps": {"len": 2.6, "w": 7.0, "h": 0.9, "n": 4}
+            },
+            {"type": "arm", "side": "back", "from": 15.5, "to": 20.2, "w": 7.6, "h": 1.4, "chevrons": 3},
+            {"type": "arm", "side": "left", "from": 15.5, "to": 20.2, "w": 7.6, "h": 1.4, "chevrons": 3},
+            {"type": "arm", "side": "right", "from": 18.3, "to": 20.2, "w": 7.6, "h": 1.4, "chevrons": 1},
+            {
+              "type": "fans",
+              "side": "right",
+              "u": 0,
+              "plane": 15.6,
+              "size": [9.5, 2.8, 4.0],
+              "z0": 0.3,
+              "n": 3,
+              "r": 1.25
+            },
+            {
+              "type": "tower",
+              "r": 8.4,
+              "z": [10.5, 14.8],
+              "windows": [{"z": 12.6, "h": 1.0, "n": 2, "w_frac": 0.8}],
+              "crown": {"r": 6.0, "h": 1.4}
+            },
+            {"type": "railing", "octagon": 8.1, "z": 14.8, "h": 0.9, "detail": true},
+            {"type": "dish", "at": [2.6, 2.0, 16.2], "mast_h": 1.8, "R": 2.6, "tilt": 40, "yaw": -45},
+            {
+              "type": "antennas",
+              "masts": [
+                [-3.6, 1.8, 16.2, 5.6, 0.18],
+                [-2.5, 2.9, 16.2, 4.0, 0.15],
+                [-4.8, 2.9, 16.2, 2.9, 0.14],
+                [-2.2, 0.8, 16.2, 2.0, 0.12]
+              ]
+            },
+            {"type": "banner", "at": [-13.0, -16.4], "h": 14.5, "flag": [2.6, 6.6, 1.2], "chevrons": 2},
+            {"type": "banner", "at": [13.0, -16.4], "h": 14.5, "flag": [2.6, 6.6, 1.2], "chevrons": 2},
+            {
+              "type": "pipes",
+              "detail": true,
+              "r": 0.4,
+              "paths": [
+                {
+                  "curve": true,
+                  "points": [[-11.4, -5.0, 10.0], [-16.8, -5.0, 10.0], [-16.8, -5.0, 4.0]],
+                  "tail": [-16.8, -5.0, 0.3]
+                },
+                {
+                  "curve": true,
+                  "points": [[-11.4, -3.6, 10.0], [-16.8, -3.6, 10.0], [-16.8, -3.6, 4.0]],
+                  "tail": [-16.8, -3.6, 0.3]
+                }
+              ]
+            },
+            {
+              "type": "crates",
+              "detail": true,
+              "boxes": [
+                [-10.6, -16.4, 0.3, 2.0, 1.4, 1.6, 0],
+                [-8.5, -16.4, 0.3, 1.8, 1.4, 1.3, 0],
+                [9.0, -16.4, 0.3, 2.0, 1.4, 1.6, 0],
+                [10.9, -16.4, 0.3, 1.6, 1.4, 1.2, 0]
+              ]
+            }
+          ]
+        },
+        "3": {
+          "size": [49, 49, 26],
+          "modules": [
+            {"type": "plate", "core": 22.5, "arm": 5.2, "reach": 24.5, "chamfer": 4.5},
+            {
+              "type": "mass",
+              "base": [20, 20],
+              "top": [17.2, 17.2],
+              "z": [0, 5.0],
+              "chamfer": [3.0, 2.6],
+              "strips": [
+                {"side": "right", "u": 9.4, "z": 3.6, "w": 3.6, "h": 0.6},
+                {"side": "left", "u": -9.4, "z": 3.6, "w": 3.6, "h": 0.6},
+                {"side": "left", "u": 9.4, "z": 3.6, "w": 3.6, "h": 0.6},
+                {"side": "back", "u": -3.4, "z": 3.6, "w": 4.6, "h": 0.6},
+                {"side": "back", "u": 3.4, "z": 3.6, "w": 4.6, "h": 0.6}
+              ]
+            },
+            {
+              "type": "mass",
+              "base": [16.6, 16.6],
+              "top": [14, 14],
+              "z": [5.0, 10.0],
+              "chamfer": [2.5, 2.1],
+              "strips": [
+                {"side": "right", "u": -3.0, "z": 8.0, "w": 4.4, "h": 0.6},
+                {"side": "right", "u": 3.0, "z": 8.0, "w": 4.4, "h": 0.6},
+                {"side": "left", "u": -3.0, "z": 8.0, "w": 4.4, "h": 0.6},
+                {"side": "left", "u": 3.0, "z": 8.0, "w": 4.4, "h": 0.6},
+                {"side": "back", "u": -3.0, "z": 8.0, "w": 4.4, "h": 0.6},
+                {"side": "back", "u": 3.0, "z": 8.0, "w": 4.4, "h": 0.6}
+              ]
+            },
+            {
+              "type": "mass",
+              "base": [13.4, 13.4],
+              "top": [11.8, 11.8],
+              "z": [10.0, 13.5],
+              "chamfer": [2.0, 1.8],
+              "strips": [
+                {"side": "front", "u": -3.2, "z": 12.0, "w": 4.4, "h": 0.55},
+                {"side": "front", "u": 3.2, "z": 12.0, "w": 4.4, "h": 0.55},
+                {"side": "right", "u": 0, "z": 12.0, "w": 6.0, "h": 0.55},
+                {"side": "left", "u": 0, "z": 12.0, "w": 6.0, "h": 0.55},
+                {"side": "back", "u": 0, "z": 12.0, "w": 6.0, "h": 0.55}
+              ]
+            },
+            {"type": "buttresses", "corner": 19.0, "to": 6.7, "z_top": 14.4, "h0": 1.8, "w": 2.6, "dots": 6},
+            {
+              "type": "gate",
+              "side": "front",
+              "back": 13.0,
+              "front": 22.0,
+              "W": 15.0,
+              "H": 10.0,
+              "t": 1.5,
+              "c": 2.2,
+              "inner": {"W": 11.6, "H": 8.0, "t": 0.55},
+              "panel": 20.2,
+              "chevrons": {"n": 3, "h": 1.9, "z": 3.4, "pitch": 1.6},
+              "strips": [{"u": -2.7, "z": 9.25, "w": 4.2, "h": 0.5}, {"u": 2.7, "z": 9.25, "w": 4.2, "h": 0.5}],
+              "steps": {"len": 2.3, "w": 8.2, "h": 1.0, "n": 4}
+            },
+            {"type": "arm", "side": "back", "from": 19.5, "to": 24.2, "w": 9.6, "h": 1.6, "chevrons": 4},
+            {"type": "arm", "side": "left", "from": 22.6, "to": 24.2, "w": 9.6, "h": 1.6, "chevrons": 1},
+            {"type": "arm", "side": "right", "from": 22.6, "to": 24.2, "w": 9.6, "h": 1.6, "chevrons": 1},
+            {
+              "type": "fans",
+              "side": "right",
+              "u": 1.5,
+              "plane": 19.6,
+              "size": [8.0, 3.0, 5.0],
+              "z0": 0.3,
+              "n": 2,
+              "r": 1.6
+            },
+            {
+              "type": "fans",
+              "side": "left",
+              "u": 1.0,
+              "plane": 19.6,
+              "size": [9.0, 3.0, 4.6],
+              "z0": 0.3,
+              "n": 2,
+              "r": 1.5
+            },
+            {"type": "tanks", "at": [[21.2, -8.2], [21.2, -11.6]], "r": 1.3, "h": 4.8, "z0": 0.3},
+            {
+              "type": "tower",
+              "r": 10.0,
+              "z": [13.5, 19.0],
+              "windows": [{"z": 15.0, "h": 0.9, "n": 2, "w_frac": 0.8}, {"z": 17.4, "h": 0.9, "n": 3, "w_frac": 0.8}],
+              "crown": {"r": 7.2, "h": 1.6}
+            },
+            {"type": "railing", "octagon": 9.7, "z": 19.0, "h": 0.9, "detail": true},
+            {"type": "dish", "at": [3.0, 2.4, 20.6], "mast_h": 2.0, "R": 3.0, "tilt": 40, "yaw": -45},
+            {
+              "type": "antennas",
+              "masts": [
+                [-4.6, 2.0, 20.6, 5.4, 0.2],
+                [-3.4, 3.2, 20.6, 4.2, 0.17],
+                [-5.8, 3.0, 20.6, 3.2, 0.15],
+                [-3.0, 1.0, 20.6, 2.4, 0.14],
+                [7.0, -5.4, 19.0, 6.4, 0.18],
+                [-7.0, -5.2, 19.0, 4.8, 0.15]
+              ]
+            },
+            {"type": "banner", "at": [-16.5, -20.6], "h": 17.0, "flag": [3.0, 7.6, 1.4], "chevrons": 2},
+            {"type": "banner", "at": [16.5, -20.6], "h": 17.0, "flag": [3.0, 7.6, 1.4], "chevrons": 2},
+            {
+              "type": "pipes",
+              "detail": true,
+              "r": 0.42,
+              "paths": [
+                {"curve": true, "points": [[9.4, 0.0, 16.2], [20.8, 0.0, 16.2], [20.8, 0.0, 5.3]]},
+                {"curve": true, "points": [[9.4, 1.5, 16.2], [20.8, 1.5, 16.2], [20.8, 1.5, 5.3]]},
+                {"curve": true, "points": [[9.4, 3.0, 16.2], [20.8, 3.0, 16.2], [20.8, 3.0, 5.3]]}
+              ]
+            },
+            {
+              "type": "crates",
+              "detail": true,
+              "boxes": [
+                [-12.5, -20.6, 0.3, 2.2, 1.4, 1.8, 0],
+                [-10.2, -20.6, 0.3, 1.8, 1.4, 1.4, 0],
+                [-12.4, -20.6, 2.1, 1.8, 1.3, 1.2, 4],
+                [10.3, -20.6, 0.3, 2.0, 1.4, 1.6, 0],
+                [12.4, -20.6, 0.3, 2.0, 1.4, 1.8, 0]
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

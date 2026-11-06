@@ -1,0 +1,139 @@
+{
+  "display": {
+    "radius": 1.0,
+    "max_height": 1.0,
+    "base_z": -0.93,
+    "largest_plate_radius": 28.81,
+    "scale_multi": {
+      "2": 0.01596,
+      "3": 0.01481,
+      "4": 0.01322,
+      "5": 0.01063
+    }
+  },
+  "meshes": {
+    "SM_Holo_CentralHub_T1": {
+      "tris": 3788,
+      "verts": 2176,
+      "bbox_min": [
+        -14.0,
+        -14.0,
+        -0.02
+      ],
+      "bbox_max": [
+        14.0,
+        14.0,
+        15.6
+      ],
+      "radius_xy": 18.97,
+      "node": "central_hub",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_CentralHub_T1.fbx",
+      "rim_m": 0.114,
+      "scale_single": 0.05272
+    },
+    "SM_Holo_CentralHub_T1_Mini": {
+      "tris": 2848,
+      "verts": 1576,
+      "bbox_min": [
+        -14.0,
+        -14.0,
+        -0.02
+      ],
+      "bbox_max": [
+        14.0,
+        14.0,
+        15.6
+      ],
+      "radius_xy": 18.97,
+      "node": "central_hub",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_CentralHub_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_CentralHub_T2": {
+      "tris": 5624,
+      "verts": 3196,
+      "bbox_min": [
+        -20.5,
+        -20.5,
+        -0.3
+      ],
+      "bbox_max": [
+        20.5,
+        20.5,
+        22.1
+      ],
+      "radius_xy": 22.28,
+      "node": "central_hub",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_CentralHub_T2.fbx",
+      "rim_m": 0.132,
+      "scale_single": 0.04541
+    },
+    "SM_Holo_CentralHub_T2_Mini": {
+      "tris": 4400,
+      "verts": 2460,
+      "bbox_min": [
+        -20.5,
+        -20.5,
+        -0.02
+      ],
+      "bbox_max": [
+        20.5,
+        20.5,
+        22.1
+      ],
+      "radius_xy": 22.28,
+      "node": "central_hub",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_CentralHub_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_CentralHub_T3": {
+      "tris": 7512,
+      "verts": 4260,
+      "bbox_min": [
+        -24.5,
+        -24.5,
+        -0.03
+      ],
+      "bbox_max": [
+        24.5,
+        24.5,
+        26.3
+      ],
+      "radius_xy": 28.81,
+      "node": "central_hub",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_CentralHub_T3.fbx",
+      "rim_m": 0.173,
+      "scale_single": 0.03471
+    },
+    "SM_Holo_CentralHub_T3_Mini": {
+      "tris": 5948,
+      "verts": 3324,
+      "bbox_min": [
+        -24.5,
+        -24.5,
+        -0.03
+      ],
+      "bbox_max": [
+        24.5,
+        24.5,
+        26.3
+      ],
+      "radius_xy": 28.81,
+      "node": "central_hub",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_CentralHub_T3_Mini.fbx",
+      "rim_m": 0.564
+    }
+  }
+}
