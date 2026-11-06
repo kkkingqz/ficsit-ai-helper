@@ -250,5 +250,47 @@
     "PlateRadius": 1094.2,
     "Height": 1200.0,
     "ScaleSingle": 0.08333
+  },
+  {
+    "Name": "ore_mine_T1",
+    "NodeId": "ore_mine",
+    "Tier": 1,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"ore_mine.name\", \"Ore Mining Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"ore_mine.type\", \"Resource Extraction\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_OreMine_T1.SM_Holo_OreMine_T1",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_OreMine_T1_Mini.SM_Holo_OreMine_T1_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_OreMine_T1_Screen.T_Node_OreMine_T1_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_OreMine_T1_Icon_256.T_Node_OreMine_T1_Icon_256",
+    "PlateRadius": 970.8,
+    "Height": 900.0,
+    "ScaleSingle": 0.10301
+  },
+  {
+    "Name": "ore_mine_T2",
+    "NodeId": "ore_mine",
+    "Tier": 2,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"ore_mine.name\", \"Ore Mining Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"ore_mine.type\", \"Resource Extraction\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_OreMine_T2.SM_Holo_OreMine_T2",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_OreMine_T2_Mini.SM_Holo_OreMine_T2_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_OreMine_T2_Screen.T_Node_OreMine_T2_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_OreMine_T2_Icon_256.T_Node_OreMine_T2_Icon_256",
+    "PlateRadius": 1104.4,
+    "Height": 1000.0,
+    "ScaleSingle": 0.09055
+  },
+  {
+    "Name": "ore_mine_T3",
+    "NodeId": "ore_mine",
+    "Tier": 3,
+    "DisplayName": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"ore_mine.name\", \"Ore Mining Node\")",
+    "TypeLabel": "NSLOCTEXT(\"FicsitAIHelper.BaseNodes\", \"ore_mine.type\", \"Resource Extraction\")",
+    "HoloMesh": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_OreMine_T3.SM_Holo_OreMine_T3",
+    "HoloMeshMini": "/FicsitAIHelper/BaseNodes/Mesh/SM_Holo_OreMine_T3_Mini.SM_Holo_OreMine_T3_Mini",
+    "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_OreMine_T3_Screen.T_Node_OreMine_T3_Screen",
+    "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_OreMine_T3_Icon_256.T_Node_OreMine_T3_Icon_256",
+    "PlateRadius": 1238.1,
+    "Height": 1200.0,
+    "ScaleSingle": 0.08077
   }
 ]

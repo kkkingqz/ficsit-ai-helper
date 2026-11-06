@@ -2075,6 +2075,109 @@
         }
       },
       "_doc": "modelled with the belt along X and the entry portal on the -X end, then turned by tier.yaw = 90° so the portal faces the front (-Y) like the other nodes (concept view A)"
+    },
+    "ore_mine": {
+      "asset": "OreMine",
+      "display_name": {"en": "Ore Mining Node", "ru": "Узел добычи руды"},
+      "type_label": {"en": "Resource Extraction", "ru": "Добыча ресурсов"},
+      "type": "extraction",
+      "concept": ["reference/concept_ore_mine_T1.png", "reference/concept_ore_mine_T2.png", "reference/concept_ore_mine_T3.png"],
+      "identity": "no hall: faceted rock outcrop (glowing facet rims) with a rubble pile in front, mining machines (boxed bodies with louvres + digging arms); T2: control block with antenna, second smaller machine; T3: glowing ore facets, headframe tower, dish, fenced yard, tank, light masts",
+      "tiers": {
+        "1": {
+          "size": [16, 12, 9.0],
+          "modules": [
+            {"type": "plate", "core": [8, 6], "chamfer": 0.5},
+            {
+              "type": "rocks",
+              "items": [
+                [1.4, 1.4, 7.5, 6.5, 9.0, 11, -0.8, -0.4],
+                [-4.4, 1.2, 4.8, 4.2, 5.6, 23, 0.6, 0.0],
+                [5.0, -2.6, 4.0, 3.6, 3.6, 37, 0, 0]
+              ]
+            },
+            {"type": "rubble", "at": [-0.2, -2.0], "radius": [2.4, 1.4], "count": 20, "size": [0.6, 1.3], "seed": 5},
+            {"type": "units", "boxes": [[-3.6, -3.4, 0.3, 2.4, 2.0, 2.0, 0]]},
+            {"type": "robots", "at": [[-3.6, -3.2, 2.3, 1.7, 150]]}
+          ]
+        },
+        "2": {
+          "size": [18, 14, 10.0],
+          "modules": [
+            {"type": "plate", "core": [9, 7], "chamfer": 0.6},
+            {
+              "type": "rocks",
+              "items": [
+                [1.6, 2.0, 8.0, 7.0, 10.0, 11, -0.6, -0.3],
+                [-3.8, 2.4, 5.4, 4.6, 6.4, 23, 0.5, 0.0],
+                [5.8, 1.6, 4.6, 4.2, 5.0, 41, 0, 0],
+                [4.6, -2.6, 3.6, 3.2, 3.4, 37, 0, 0],
+                [0.0, 5.2, 4.0, 3.0, 4.0, 53, 0, 0]
+              ]
+            },
+            {"type": "rubble", "at": [0.4, -2.4], "radius": [3.2, 1.6], "count": 33, "size": [0.6, 1.3], "seed": 7},
+            {
+              "type": "units",
+              "boxes": [
+                [-7.0, -3.6, 0.3, 2.2, 2.4, 2.4, 0],
+                [-4.4, -3.8, 0.3, 2.8, 2.4, 2.6, 0],
+                [6.6, -4.6, 0.3, 1.8, 1.6, 1.6, 0]
+              ]
+            },
+            {"type": "antennas", "masts": [[-7.6, -2.8, 2.7, 2.6, 0.11]]},
+            {"type": "robots", "at": [[-4.4, -3.6, 2.9, 2.0, 145], [6.6, -4.5, 1.9, 1.2, 200]]}
+          ]
+        },
+        "3": {
+          "size": [20, 16, 12.0],
+          "modules": [
+            {"type": "plate", "core": [10, 8], "chamfer": 0.7},
+            {
+              "type": "rocks",
+              "veins": 0.12,
+              "items": [
+                [1.6, 2.6, 8.4, 7.4, 12.0, 11, -0.6, -0.4],
+                [-3.2, 3.0, 6.0, 5.0, 8.0, 23, 0.6, 0.0],
+                [6.4, 2.6, 5.0, 4.8, 6.6, 41, 0, 0],
+                [-6.8, 4.8, 3.6, 3.2, 4.0, 59, 0, 0],
+                [5.6, -2.0, 3.4, 3.0, 3.2, 37, 0, 0]
+              ]
+            },
+            {
+              "type": "rubble",
+              "at": [0.6, -2.6],
+              "radius": [4.2, 1.8],
+              "count": 44,
+              "size": [0.6, 1.3],
+              "seed": 9,
+              "veins": 0.1
+            },
+            {
+              "type": "units",
+              "boxes": [
+                [-7.6, -5.0, 0.3, 3.2, 2.8, 2.6, 0],
+                [-4.4, -5.4, 0.3, 3.0, 2.6, 3.0, 0],
+                [6.4, -5.6, 0.3, 2.4, 2.0, 2.0, 0],
+                [8.6, -5.4, 0.3, 1.4, 1.6, 3.0, 0]
+              ]
+            },
+            {"type": "tanks", "at": [[8.7, -2.6]], "r": 0.9, "h": 4.0, "z0": 0.3, "bands": [0.3, 0.55, 0.8]},
+            {"type": "robots", "at": [[-4.4, -5.2, 3.3, 2.2, 150], [6.4, -5.5, 2.3, 1.6, 200]]},
+            {"type": "dish", "at": [-8.2, -4.4, 2.9], "mast_h": 1.2, "R": 1.0, "tilt": 35, "yaw": -45},
+            {"type": "antennas", "masts": [[-9.3, -6.6, 0.0, 4.8, 0.12], [9.2, -7.0, 0.0, 4.2, 0.12]]},
+            {"type": "railing", "box": [-9.7, -7.7, -2.6, -3.4], "z": 0.0, "h": 0.8, "detail": true},
+            {"type": "lattice", "min": [-9.4, -1.6, 0.0], "max": [-7.8, 0.2, 6.4], "levels": 2, "deck": true},
+            {
+              "type": "pipes",
+              "r": 0.25,
+              "bend": 0.5,
+              "paths": [],
+              "runs": [[[-8.6, -0.7, 6.8], [-8.6, -0.7, 7.4], [-6.0, -0.7, 7.4], [-5.2, 1.0, 4.6]]],
+              "detail": true
+            }
+          ]
+        }
+      }
     }
   }
 }

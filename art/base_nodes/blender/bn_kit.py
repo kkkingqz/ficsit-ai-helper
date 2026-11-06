@@ -33,7 +33,9 @@ Module types
     roof_fans   fan box lying on a roof, fans facing up
     gate.chevrons.kind = "heat"   wavy heat lines instead of >>> (furnace door)
     gate.u      offset of a portal along its face (side tunnels in front of an off-centre belt)
-    robots      assembly robot arms on pedestals (joints glow), two-finger gripper
+    robots      assembly robot arms on pedestals (joints glow), two-finger gripper (also the mining arms)
+    rocks       faceted boulders (convex hull of jittered rings, seeded); veins = glowing ore facets
+    rubble      pile of small chunks scattered in an ellipse (fewer, larger in the _Mini mesh)
 A module with "detail": true is left out of the small multi-mode mesh (_Mini).
 """
 import math
@@ -637,6 +639,59 @@ def robots(n, m):
             n.part(n.beam(tip, tip - U * 0.32 * sc + Sd * sg * 0.04 * sc, 0.07 * sc * k, 0.07 * sc * k), glow=0.6, rim=False)
 
 
+def _rock(n, x, y, w, d, h, seed, lean=(0.0, 0.0), z0=0.0, veins=0.0, facets=True):
+    """Faceted boulder: convex hull of jittered rings (base ellipse, shoulder, crown) - flat facets, rims on the
+    sharp edges. lean shifts the crown (dx, dy); veins = fraction of facets that glow (ore)."""
+    import random
+    rnd = random.Random(seed)
+    pts = []
+    rings = ((0.0, 1.0, 9), (0.3, 0.96, 8), (0.58, 0.78, 7), (0.82, 0.55, 6), (1.0, 0.32, 4))
+    for k, (fz, fr, cnt) in enumerate(rings):
+        a0 = rnd.random() * math.tau
+        for i in range(cnt):
+            a = a0 + math.tau * i / cnt + rnd.uniform(-0.25, 0.25)
+            rr = fr * rnd.uniform(0.8, 1.1)
+            px = x + lean[0] * fz + w / 2 * rr * math.cos(a)
+            py = y + lean[1] * fz + d / 2 * rr * math.sin(a)
+            pz = z0 + (h * (fz - rnd.uniform(0.0, 0.08 if k == len(rings) - 1 else 0.05)) if k else 0.0)
+            pts.append(Vector((px, py, max(z0, pz))))
+    verts = [n.bm.verts.new(p) for p in pts]
+    res = bmesh.ops.convex_hull(n.bm, input=verts)
+    junk = list({g for g in res.get("geom_interior", []) + res.get("geom_unused", []) if isinstance(g, bmesh.types.BMVert)})
+    if junk:
+        bmesh.ops.delete(n.bm, geom=junk, context="VERTS")
+    faces = [g for g in res["geom"] if isinstance(g, bmesh.types.BMFace) and g.is_valid]
+    n.part(faces, glow=0.0, rim=True, rim_angle=math.radians(12) if facets else None)   # facet lines (crystal rock)
+    if veins:
+        k = max(1, int(len(faces) * veins))
+        for f in rnd.sample([f for f in faces if f.calc_center_median().z > z0 + h * 0.15], k):
+            f[n.glow] = 0.3
+
+
+def rocks(n, m):
+    """Faceted boulders: items = [[x, y, w, d, h, seed, lean_x, lean_y], ...]; veins = glowing ore facets."""
+    for it in m["items"]:
+        x, y, w, d, h, seed = it[:6]
+        lean = (it[6], it[7]) if len(it) > 7 else (0.0, 0.0)
+        _rock(n, x, y, w, d, h, int(seed), lean, veins=m.get("veins", 0.0))
+
+
+def rubble(n, m):
+    """Pile of small rock chunks scattered in an ellipse: at [x, y], radius [rx, ry], count, size [min, max]."""
+    import random
+    rnd = random.Random(m.get("seed", 1))
+    (cx, cy), (rx, ry) = m["at"], m["radius"]
+    cnt = m["count"] if not n.mini else max(3, m["count"] // 3)
+    s0, s1 = m["size"]
+    if n.mini:
+        s0, s1 = s0 * 1.6, s1 * 1.6
+    for i in range(cnt):
+        a, r = rnd.random() * math.tau, math.sqrt(rnd.random())
+        sz = rnd.uniform(s0, s1) * (1.25 - 0.5 * r)          # bigger chunks in the middle of the pile
+        _rock(n, cx + rx * r * math.cos(a), cy + ry * r * math.sin(a), sz * 1.2, sz, sz * 0.75,
+              rnd.randrange(1 << 30), veins=m.get("veins", 0.0), facets=False)
+
+
 def crates(n, m):
     for x, y, z0, w, d, h, yaw in m["boxes"]:
         n.part(n.box((x, y, z0 + h / 2), (w, d, h), yaw=math.radians(yaw)), rim=True)
@@ -655,7 +710,7 @@ BUILDERS = {"plate": plate, "mass": mass, "pylons": pylons, "buttresses": buttre
             "antennas": antennas, "banner": banner, "pipes": pipes, "crates": crates, "box": generic_box,
             "columns": columns, "lattice": lattice, "stairs": stairs, "lamps": lamps, "units": units,
             "profile": profile, "conveyor": conveyor, "stacks": stacks, "roof_fans": roof_fans,
-            "robots": robots}
+            "robots": robots, "rocks": rocks, "rubble": rubble}
 
 
 def build(n, module):

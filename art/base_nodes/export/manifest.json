@@ -749,6 +749,129 @@
       "mode": "multi",
       "fbx": "export/SM_Holo_Refinery_T3_Mini.fbx",
       "rim_m": 0.564
+    },
+    "SM_Holo_OreMine_T1": {
+      "tris": 3940,
+      "verts": 2050,
+      "bbox_min": [
+        -8.0,
+        -6.0,
+        0.0
+      ],
+      "bbox_max": [
+        8.0,
+        6.0,
+        8.91
+      ],
+      "radius_xy": 9.71,
+      "node": "ore_mine",
+      "tier": 1,
+      "mode": "single",
+      "fbx": "export/SM_Holo_OreMine_T1.fbx",
+      "rim_m": 0.058,
+      "scale_single": 0.10301
+    },
+    "SM_Holo_OreMine_T1_Mini": {
+      "tris": 1948,
+      "verts": 1018,
+      "bbox_min": [
+        -8.0,
+        -6.0,
+        0.0
+      ],
+      "bbox_max": [
+        8.0,
+        6.0,
+        8.89
+      ],
+      "radius_xy": 9.71,
+      "node": "ore_mine",
+      "tier": 1,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_OreMine_T1_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_OreMine_T2": {
+      "tris": 7158,
+      "verts": 3743,
+      "bbox_min": [
+        -9.0,
+        -7.0,
+        0.0
+      ],
+      "bbox_max": [
+        9.0,
+        7.0,
+        9.9
+      ],
+      "radius_xy": 11.04,
+      "node": "ore_mine",
+      "tier": 2,
+      "mode": "single",
+      "fbx": "export/SM_Holo_OreMine_T2.fbx",
+      "rim_m": 0.066,
+      "scale_single": 0.09055
+    },
+    "SM_Holo_OreMine_T2_Mini": {
+      "tris": 3726,
+      "verts": 1957,
+      "bbox_min": [
+        -9.0,
+        -7.0,
+        0.0
+      ],
+      "bbox_max": [
+        9.0,
+        7.0,
+        9.87
+      ],
+      "radius_xy": 11.04,
+      "node": "ore_mine",
+      "tier": 2,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_OreMine_T2_Mini.fbx",
+      "rim_m": 0.564
+    },
+    "SM_Holo_OreMine_T3": {
+      "tris": 11324,
+      "verts": 6009,
+      "bbox_min": [
+        -10.0,
+        -8.0,
+        -0.18
+      ],
+      "bbox_max": [
+        10.0,
+        8.0,
+        11.88
+      ],
+      "radius_xy": 12.48,
+      "node": "ore_mine",
+      "tier": 3,
+      "mode": "single",
+      "fbx": "export/SM_Holo_OreMine_T3.fbx",
+      "rim_m": 0.074,
+      "scale_single": 0.08077
+    },
+    "SM_Holo_OreMine_T3_Mini": {
+      "tris": 6022,
+      "verts": 3194,
+      "bbox_min": [
+        -10.0,
+        -8.0,
+        -0.35
+      ],
+      "bbox_max": [
+        10.0,
+        8.0,
+        11.85
+      ],
+      "radius_xy": 12.38,
+      "node": "ore_mine",
+      "tier": 3,
+      "mode": "multi",
+      "fbx": "export/SM_Holo_OreMine_T3_Mini.fbx",
+      "rim_m": 0.564
     }
   }
 }

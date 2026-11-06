@@ -36,13 +36,13 @@ class Node:
         self.mini = mini
 
     # -- part bookkeeping ---------------------------------------------------------------------------------------
-    def part(self, faces, glow=0.0, rim=True, accent=0.0):
+    def part(self, faces, glow=0.0, rim=True, accent=0.0, rim_angle=None):
         for f in faces:
             f[self.glow] = glow
             f[self.edge] = 0.0
             f[self.dim] = 0.0
             f[self.accent] = accent
-        self.parts.append((faces, rim))
+        self.parts.append((faces, rim if rim_angle is None or not rim else rim_angle))
         return faces
 
     # -- primitives ---------------------------------------------------------------------------------------------
@@ -152,7 +152,8 @@ class Node:
             if not (rim and self.rim > 0):
                 continue
             edges = {e for f in faces for e in f.edges}
-            hard = [e for e in edges if e.is_manifold and e.calc_face_angle(0.0) > RIM_ANGLE]
+            limit = rim if isinstance(rim, float) else RIM_ANGLE      # a part may pass its own angle (rocks: facets)
+            hard = [e for e in edges if e.is_manifold and e.calc_face_angle(0.0) > limit]
             if not hard:
                 continue
             res = bmesh.ops.bevel(bm, geom=hard, offset=self.rim, offset_type="OFFSET", segments=1, profile=0.5,

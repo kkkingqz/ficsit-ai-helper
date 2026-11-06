@@ -22,8 +22,30 @@ UP = 4                                   # supersampling before the threshold
 TOP, BOTTOM = (178, 240, 255), (96, 206, 250)   # flat fill with a slight vertical gradient (concept icon colours)
 
 
+def frame_inner(im):
+    """Inside of the orange icon frame (top-right panel). Sheets come in different sizes, so the frame is found:
+    orange pixels in the right fifth / upper half, first run of orange rows (the tier bars below are cut off)."""
+    a = np.asarray(im).astype(np.int16)
+    H, W = a.shape[:2]
+    x0r, y0r, y1r = int(W * 0.78), int(H * 0.13), int(H * 0.5)    # below the header (its orange bars)
+    sub = a[y0r:y1r, x0r:]
+    r, g, b = sub[..., 0], sub[..., 1], sub[..., 2]
+    orange = (r > 190) & (g > 110) & (g < 200) & (b < 90)
+    # the frame's top / bottom edges are the only long orange rows (header slashes and tier bars are short)
+    strong = np.nonzero(orange.sum(1) > 0.45 * orange.shape[1])[0]
+    if len(strong) < 2:
+        return FRAME_INNER
+    y0, y1 = strong[0], strong[-1]
+    cols = np.nonzero(orange[y0:y1 + 1].sum(0) > 0.45 * (y1 - y0))[0]
+    x0, x1 = cols[0] + x0r, cols[-1] + x0r
+    w, h = x1 - x0, y1 - y0
+    y0, y1 = y0 + y0r, y1 + y0r
+    return (int(x0 + 0.055 * w), int(y0 + 0.055 * h), int(x1 - 0.055 * w), int(y1 - 0.055 * h))
+
+
 def pictogram_mask(sheet):
-    im = Image.open(sheet).convert("RGB").crop(FRAME_INNER)
+    im = Image.open(sheet).convert("RGB")
+    im = im.crop(frame_inner(im))
     im = im.resize((im.width * UP, im.height * UP), Image.LANCZOS)
     a = np.asarray(im).astype(np.float32)
     r, g, b = a[..., 0], a[..., 1], a[..., 2]
