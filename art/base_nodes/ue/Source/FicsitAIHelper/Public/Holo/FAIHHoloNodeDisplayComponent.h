@@ -12,6 +12,8 @@
 
 class UDataTable;
 class UStaticMeshComponent;
+class USplineMeshComponent;
+class UMaterialInterface;
 
 UCLASS(ClassGroup = (FAIH), meta = (BlueprintSpawnableComponent))
 class FICSITAIHELPER_API UFAIHHoloNodeDisplayComponent : public USceneComponent
@@ -41,6 +43,71 @@ public:
 	bool GetVisual(FName NodeId, int32 Tier, FFAIHBaseNodeVisual& OutVisual) const;
 
 	const FFAIHBaseNodeVisual* FindVisual(FName NodeId, int32 Tier) const;
+
+	/** Connections between the shown nodes (art/base_nodes/blender/bn_links.py is the reference): one ribbon per link
+	 *  on the hologram floor, chevron dashes run From -> To, width / speed from the rate. Multi-node mode: curves
+	 *  between the plates, bent around a node in the way, two-way pairs keep to their right-hand lanes. Single-node
+	 *  mode: stubs from the plate edge to the platform edge, incoming from the left, outgoing to the right. Links
+	 *  whose ends are not shown are skipped. Kept and re-routed by ShowSingle / ShowMulti. */
+	UFUNCTION(BlueprintCallable, Category = "FAIH|Holo")
+	void SetLinks(const TArray<FFAIHNodeLink>& Links);
+
+	UFUNCTION(BlueprintCallable, Category = "FAIH|Holo")
+	void ClearLinks();
+
+	/** Links actually drawn (after skipping the ones whose nodes are not shown). */
+	UFUNCTION(BlueprintPure, Category = "FAIH|Holo")
+	int32 GetLinkCount() const { return DrawnLinks.Num(); }
+
+	UFUNCTION(BlueprintPure, Category = "FAIH|Holo")
+	FFAIHNodeLink GetLink(int32 Index) const { return DrawnLinks.IsValidIndex(Index) ? DrawnLinks[Index] : FFAIHNodeLink(); }
+
+	/** World position for the link's label widget (middle of the ribbon; outer end of a stub). On the projector it
+	 *  is meant for the links of the selected node only - the full labelled graph lives on the terminal screen. */
+	UFUNCTION(BlueprintPure, Category = "FAIH|Holo")
+	FVector GetLinkLabelLocation(int32 Index) const;
+
+	/** SM_Holo_Link: 1 m strip along +X, UV u along it (nodes.json display.links.mesh). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	TObjectPtr<UStaticMesh> LinkMesh;
+
+	/** MI_HoloLink (master MM_HoloLink): reads custom primitive data 0 = start distance, 1 = segment length (cm),
+	 *  2 = dash speed (cm/s). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	TObjectPtr<UMaterialInterface> LinkMaterial;
+
+	/** display.links: rate range (items/min, log mapped), width and speed in hologram mm. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	FVector2D LinkRateRange = FVector2D(15.f, 1200.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	FVector2D LinkWidthMM = FVector2D(18.f, 48.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	FVector2D LinkSpeedMMs = FVector2D(30.f, 110.f);
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	float LinkLiftMM = 4.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	float LinkGapMM = 6.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	float LinkLaneMM = 14.f;
+
+	/** A node closer than this (cm) to a straight link makes it bend around (display.links.obstacle_radius). */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	float LinkObstacleRadius = 31.f;
+
+	/** Single-node mode: stubs end at this radius (cm), just past the scale ring; spread +- degrees per side. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	float LinkSingleEdge = 124.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	float LinkSingleSpread = 45.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo|Links")
+	int32 LinkSamples = 12;
 
 	/** DT_BaseNodes (row struct FFAIHBaseNodeVisual). */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|Holo")
@@ -73,6 +140,25 @@ private:
 	UStaticMeshComponent* GetSlot(int32 Index);
 	void Place(int32 Index, UStaticMesh* Mesh, const FVector2D& XY, float Scale, bool bDimmed);
 	float LargestPlateRadius() const;
+	void RebuildLinks();
+	void AddRibbon(const TArray<FVector2D>& Pts, float Z, float WidthCm, float SpeedCmS);
+	FVector2D Anchor(int32 Shown, const FVector2D& Towards) const;
+	float RateT(float Rate) const;
+
+	struct FShownNode
+	{
+		FName Id;
+		FVector2D XY;
+		float Scale = 1.f;
+		TArray<FVector2D> Outline;       // cm, model space
+	};
+	TArray<FShownNode> ShownNodes;
+	TArray<FFAIHNodeLink> RequestedLinks;
+	TArray<FFAIHNodeLink> DrawnLinks;
+	TArray<FVector> LinkLabels;          // component space
+
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<USplineMeshComponent>> LinkSegments;
 
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UStaticMeshComponent>> SlotComponents;

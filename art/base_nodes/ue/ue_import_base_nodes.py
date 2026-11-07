@@ -5,7 +5,8 @@
     py "<repo>/art/base_nodes/ue/ue_import_base_nodes.py" --table      (after the C++ module is compiled)
     py "<repo>/art/base_nodes/ue/ue_import_base_nodes.py" --verify
 
-  --import  master material MM_HoloSolid (built by script: unlit, vertex-colour channels R edge / G glow / B dim, see
+  --import  link material MM_HoloLink + MI_HoloLink and the link strip SM_Holo_Link (links between nodes, README §3);
+            master material MM_HoloSolid (built by script: unlit, vertex-colour channels R edge / G glow / B dim, see
             README_UE.md) + MI_HoloSolid; hologram meshes SM_Holo_<Node>_T<n>[_Mini] (vertex colours REPLACE, no
             Nanite, no collision, MI_HoloSolid on slot 0); terminal-screen renders T_Node_<Node>_T<n>_Screen and icons
             T_Node_<Node>_T<n>_Icon_256 / _512 (UI texture group, no mips)
@@ -149,24 +150,68 @@ def build_master(mat):
     mel.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
 
 
-def material_instance():
+LINK = SPEC["display"]["links"]
+LINK_HLSL = r"""
+// links between nodes: chevron dashes run along +u (From -> To); custom primitive data set per spline segment
+float dist = DistStart + UV.x * SegLen;                  // cm along the whole link
+float s = (dist - T * Speed) / Pitch;
+float v = abs(UV.y - 0.5);
+float dash = step(frac(s + 1.1 * v), 0.32);              // '>' pointing along the flow
+float edge = step(0.42, v) * 0.55;                        // side rails
+return EdgeColor.rgb * (max(dash, edge) * 2.4 + 0.12) * Intensity * Power;
+"""
+
+
+def build_link_master(mat):
+    """MM_HoloLink: unlit, additive, two-sided ribbon; dashes continuous over all spline segments of a link."""
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    mat.set_editor_property("two_sided", True)
+    custom = _expr(mat, unreal.MaterialExpressionCustom, -300, 0, code=LINK_HLSL,
+                   output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="HoloLink")
+    names = ["UV", "T", "DistStart", "SegLen", "Speed", "Pitch", "Intensity", "Power", "EdgeColor"]
+    inputs = []
+    for n in names:
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", n)
+        inputs.append(ci)
+    custom.set_editor_property("inputs", inputs)
+    mel.connect_material_expressions(_expr(mat, unreal.MaterialExpressionTextureCoordinate, -900, -300), "", custom, "UV")
+    mel.connect_material_expressions(_expr(mat, unreal.MaterialExpressionTime, -900, -200), "", custom, "T")
+    for i, n in enumerate(("DistStart", "SegLen", "Speed")):      # from USplineMeshComponent custom primitive data
+        p = _expr(mat, unreal.MaterialExpressionScalarParameter, -900, -100 + i * 90, parameter_name=n,
+                  default_value=(0.0, 100.0, 7.0)[i], use_custom_primitive_data=True, primitive_data_index=i)
+        mel.connect_material_expressions(p, "", custom, n)
+    for i, (n, v) in enumerate((("Pitch", LINK["pitch_mm"] / 10.0), ("Intensity", 1.0), ("Power", 1.0))):
+        p = _expr(mat, unreal.MaterialExpressionScalarParameter, -900, 200 + i * 90, parameter_name=n, default_value=v)
+        mel.connect_material_expressions(p, "", custom, n)
+    r, g, b = VECTORS["EdgeColor"]
+    p = _expr(mat, unreal.MaterialExpressionVectorParameter, -900, 500, parameter_name="EdgeColor",
+              default_value=unreal.LinearColor(r, g, b, 1.0))
+    mel.connect_material_expressions(p, "", custom, "EdgeColor")
+    mel.connect_material_property(custom, "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+
+
+def material_instance(master_name=None, mi_name=None, builder=None):
+    master_name, mi_name = master_name or UE["master"], mi_name or UE["material"]
+    builder = builder or build_master
     mfolder = FOLDER["materials"]
-    mpath = f"{mfolder}/{UE['master']}"
+    mpath = f"{mfolder}/{master_name}"
     master = unreal.load_asset(mpath) if eal.does_asset_exist(mpath) else None
     if master is None:
         try:
-            master = tools.create_asset(UE["master"], mfolder, unreal.Material, unreal.MaterialFactoryNew())
-            build_master(master)
+            master = tools.create_asset(master_name, mfolder, unreal.Material, unreal.MaterialFactoryNew())
+            builder(master)
             mel.recompile_material(master)
             save(master)
-            log(f"master {UE['master']} created")
+            log(f"master {master_name} created")
         except Exception as e:
-            manual(f"{UE['master']} could not be built by script ({e}); build it by hand (README_UE.md §2)")
+            manual(f"{master_name} could not be built by script ({e}); build it by hand (README.md §4)")
             return None
-    ipath = f"{mfolder}/{UE['material']}"
+    ipath = f"{mfolder}/{mi_name}"
     mi = unreal.load_asset(ipath) if eal.does_asset_exist(ipath) else None
     if mi is None:
-        mi = tools.create_asset(UE["material"], mfolder, unreal.MaterialInstanceConstant,
+        mi = tools.create_asset(mi_name, mfolder, unreal.MaterialInstanceConstant,
                                 unreal.MaterialInstanceConstantFactoryNew())
     mel.set_material_instance_parent(mi, master)
     save(mi)
@@ -198,7 +243,7 @@ def fbx_options():
     return ui
 
 
-def import_meshes(mi):
+def import_meshes(mi, link_mi=None):
     prev = None
     try:
         prev = unreal.SystemLibrary.get_console_variable_bool_value(LEGACY_FBX_CVAR)
@@ -207,7 +252,7 @@ def import_meshes(mi):
         manual(f"if the FBX options were ignored (Interchange), run '{LEGACY_FBX_CVAR} 0' and re-run --import")
     done = 0
     try:
-        for name in mesh_names():
+        for name in list(mesh_names()) + [LINK["mesh"]]:
             src = os.path.join(ART, "export", name + ".fbx")
             if not os.path.exists(src):
                 manual(f"{src} missing: run blender/build_nodes.py")
@@ -216,11 +261,12 @@ def import_meshes(mi):
             if mesh is None:
                 manual(f"mesh import failed: {src}")
                 continue
-            if mi is not None:
+            m = link_mi if name == LINK["mesh"] else mi
+            if m is not None:
                 try:
-                    mesh.set_material(0, mi)
+                    mesh.set_material(0, m)
                 except Exception:
-                    manual(f"{name}: material slot 0 = {UE['material']}")
+                    manual(f"{name}: material slot 0 = {m.get_name()}")
             save(mesh)
             done += 1
     finally:
@@ -259,7 +305,8 @@ def import_textures():
 
 def do_import():
     mi = material_instance()
-    import_meshes(mi)
+    link_mi = material_instance(LINK["master"], LINK["material"], build_link_master)
+    import_meshes(mi, link_mi)
     import_textures()
 
 
@@ -285,7 +332,7 @@ def do_table():
 
 
 def do_verify():
-    for name in mesh_names():
+    for name in list(mesh_names()) + [LINK["mesh"]]:
         p = f"{FOLDER['meshes']}/{name}"
         ok = eal.does_asset_exist(p)
         extra = ""
@@ -300,7 +347,7 @@ def do_verify():
     for kind, _, name in texture_names():
         p = f"{FOLDER[kind]}/{name}"
         log(f"  {'OK ' if eal.does_asset_exist(p) else 'MISSING'} {p}")
-    for n in (UE["master"], UE["material"]):
+    for n in (UE["master"], UE["material"], LINK["master"], LINK["material"]):
         p = f"{FOLDER['materials']}/{n}"
         log(f"  {'OK ' if eal.does_asset_exist(p) else 'MISSING'} {p}")
     p = f"{FOLDER['data']}/{UE['table']}"

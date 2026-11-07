@@ -185,6 +185,33 @@ T3 — пристройка слева с проёмом для ленты, ве
   таблице как `FText` (`NSLOCTEXT("FicsitAIHelper.BaseNodes", "<node>.name" / "<node>.type", …)`). Русские строки —
   в `nodes.json → display_name / type_label → ru`, в `.po` их вносят так же, как тексты командного центра (`art/command_center/ue/README_UE.md` §6).
 
+## 3а. Связи между узлами
+
+**Одна линия на связь**, сколько бы ресурсов по ней ни шло: подпись перечисляет ресурсы, темп — сумма. Показываем
+**направление и темп**, без статусов. Эталон алгоритма — [`blender/bn_links.py`](blender/bn_links.py), в UE его
+повторяет `UFAIHHoloNodeDisplayComponent::SetLinks`; параметры — `nodes.json → display.links`.
+
+| | Как |
+|---|---|
+| вид | светящаяся лента на полу голограммы (над плитами на 4 мм), по ней бегут шевроны `>` от узла-источника к получателю, по краям тонкие «рельсы» |
+| темп | ширина ленты 18–48 мм и скорость бега 30–110 мм/с растут с логарифмом темпа (15 … 1200 шт/мин) |
+| начало и конец | край плиты узла со стороны партнёра (контур плиты — `PlateOutline` в таблице, считается автоматически, вручную ничего не задаётся) |
+| маршрут, 2–5 узлов | плавная кривая; если на пути стоит другой узел, лента огибает его; встречная пара A→B и B→A идёт двумя полосами, каждая по своей правой стороне |
+| один узел | короткие отрезки от плиты до края платформы (r 1,24 м, за шкалой): входящие слева, исходящие справа, разведены на ±45° |
+| подпись | виджет UI в точке `GetLinkLabelLocation(i)`: середина ленты (у встречной пары — на трети своей полосы), конец отрезка в режиме «один узел». На проекторе подписи — только у связей выбранного узла; полная подписанная схема — на экране терминала |
+| экран терминала | та же схема в 2D: карточки узлов (заготовленные рендеры) на местах слотов проектора, ленты с шевронами и подписи |
+
+Макеты: [`renders/review_links_multi5_top.jpg`](renders/review_links_multi5_top.jpg),
+[`review_links_multi5_operator.jpg`](renders/review_links_multi5_operator.jpg),
+[`review_links_single.jpg`](renders/review_links_single.jpg), экран — [`review_links_screen.jpg`](renders/review_links_screen.jpg).
+Связи в макетах — примерные (`nodes.json → demo_links`), не данные игры.
+
+UE: меш `SM_Holo_Link` (полоса 1 × 1 м вдоль +X, 8 сегментов) изгибается по кривой отрезками `USplineMeshComponent`;
+материал `MM_HoloLink` (неосвещённый, аддитивный) берёт начало отрезка, его длину и скорость из custom primitive data,
+поэтому штрихи бегут непрерывно по всей ленте. **Нужно в командном центре:** пока показаны узлы, приглушать светящийся
+диск эмиттера (`emitter_dim` = 0,2), иначе ленты на нём тонут — правка `AFAIHCommandCenter`, отложена вместе с ним.
+Проверить в редакторе: ось масштаба сечения у `USplineMeshComponent` (`SetStartScale.X` → ширина по Y меша).
+
 ## 4. UE
 
 | Файл | Что |
@@ -192,7 +219,7 @@ T3 — пристройка слева с проёмом для ленты, ве
 | [`ue/ue_import_base_nodes.py`](ue/ue_import_base_nodes.py) | `--import`: строит мастер `MM_HoloSolid` (один Custom-узел HLSL + параметры) и `MI_HoloSolid`; импортирует меши (цвет вершин Replace, без Nanite и коллизии, MI на слот 0), рендеры экранов (группа UI, BC7, без мипов) и иконки (группа UI, без сжатия, без мипов). `--table`: `DT_BaseNodes` из `ue/base_nodes_table.json`. `--verify`: что есть / чего нет |
 | `ue/base_nodes_table.json` | строки таблицы (пишет сборка): `central_hub_T1..T3`, `fluid_plant_T1..T3`, `logistics_hub_T1..T3`, `smelter_T1..T3`, `assembler_T1..T3`, `refinery_T1..T3`, `ore_mine_T1..T3` → пути к мешам и текстурам, `PlateRadius`, `Height` (см), `ScaleSingle` |
 | `ue/Source/FicsitAIHelper/Public/Holo/FAIHBaseNodeTypes.h` | `FFAIHBaseNodeVisual` (строка таблицы), `FFAIHBaseNodeRef`, `FFAIHHoloLayout` |
-| `ue/Source/.../Holo/FAIHHoloNodeDisplayComponent.{h,cpp}` | компонент проектора: `ShowSingle(NodeId, Tier)`, `ShowMulti([...до 5])`, `Clear()`, `SetPowered()`, `GetVisual()` для UI; до 5 дочерних мешей, MID на слот (`Intensity` для приглушённых узлов) |
+| `ue/Source/.../Holo/FAIHHoloNodeDisplayComponent.{h,cpp}` | компонент проектора: `ShowSingle(NodeId, Tier)`, `ShowMulti([...до 5])`, `SetLinks([...])` / `ClearLinks()` / `GetLinkLabelLocation(i)`, `Clear()`, `SetPowered()`, `GetVisual()` для UI; до 5 дочерних мешей, MID на слот (`Intensity` для приглушённых узлов) |
 
 Типы игры в этом коде не используются, поэтому он лежит вне `GameFacade/`. Проверка ADR-021 (`tools/ci/check_adr021.py`)
 по всем `Source/`: 6 файлов, 0 нарушений.

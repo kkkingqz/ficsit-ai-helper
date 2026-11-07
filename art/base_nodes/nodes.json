@@ -33,6 +33,24 @@
         "5": {"slot_radius": 0.333, "slots": [[0.0, 0.0], [0.0, -0.667], [0.667, 0.0], [0.0, 0.667], [-0.667, 0.0]]}
       },
       "thin_mul": 2.0
+    },
+    "links": {
+      "_doc": "Links on the projector (blender/bn_links.py, C++ UFAIHHoloNodeDisplayComponent::SetLinks). One ribbon per connection on the floor of the hologram; several resources between two nodes = one link (label lists them, rate = sum). Width and dash speed grow with log(rate). Hologram millimetres. While nodes are shown, the Command Center emitter disc is dimmed to emitter_dim (otherwise the ribbons drown in it).",
+      "mesh": "SM_Holo_Link",
+      "material": "MI_HoloLink",
+      "master": "MM_HoloLink",
+      "rate_range": [15, 1200],
+      "width_mm": [18, 48],
+      "speed_mm_s": [30, 110],
+      "pitch_mm": 45,
+      "lift_mm": 4,
+      "gap_mm": 6,
+      "lane_mm": 14,
+      "samples": 12,
+      "obstacle_radius": 0.31,
+      "single_edge": 1.24,
+      "spread": 45,
+      "emitter_dim": 0.2
     }
   },
   "nodes": {
@@ -2185,6 +2203,25 @@
           ]
         }
       }
+    }
+  },
+  "demo_links": {
+    "_doc": "Example flows for the preview renders only (not game data).",
+    "multi": [
+      {"from": "smelter", "to": "assembler", "rate": 240, "label": "Iron Ingot, Copper Ingot · 240/min"},
+      {"from": "fluid_plant", "to": "assembler", "rate": 45, "label": "Plastic · 45/min"},
+      {"from": "assembler", "to": "logistics_hub", "rate": 90, "label": "Reinforced Plate, Rotor · 90/min"},
+      {"from": "logistics_hub", "to": "fluid_plant", "rate": 20, "label": "Rubber · 20/min"},
+      {"from": "logistics_hub", "to": "central_hub", "rate": 15, "label": "Supplies · 15/min"},
+      {"from": "fluid_plant", "to": "logistics_hub", "rate": 60, "label": "Fuel · 60/min"}
+    ],
+    "single": {
+      "node": "assembler",
+      "links": [
+        {"from": "smelter", "to": "assembler", "rate": 240, "label": "Smelting Node · 240/min"},
+        {"from": "fluid_plant", "to": "assembler", "rate": 45, "label": "Fluid Processing Plant · 45/min"},
+        {"from": "assembler", "to": "logistics_hub", "rate": 90, "label": "Logistics Node · 90/min"}
+      ]
     }
   }
 }

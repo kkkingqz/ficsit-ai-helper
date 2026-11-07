@@ -39,6 +39,37 @@ def plate_radius(tier):
     return G.poly_radius(G.plate_poly(p))
 
 
+def plate_outline(tier):
+    """Plate outline in model metres after the tier yaw (links start on this edge)."""
+    pts = G.plate_poly(next(m for m in tier["modules"] if m["type"] == "plate"))
+    yaw = math.radians(tier.get("yaw", 0.0))
+    c, s = math.cos(yaw), math.sin(yaw)
+    return [(x * c - y * s, x * s + y * c) for x, y in pts]
+
+
+def export_link_mesh(coll, mat, out):
+    """SM_Holo_Link: flat strip 1 m along +X (forward axis of a spline mesh) x 1 m wide (Y -0.5..0.5), 8 segments,
+    UV0 u 0..1 along X, v 0..1 across. The component bends it along the link and scales the width."""
+    bm = bmesh.new()
+    n = 8
+    rows = [[bm.verts.new((i / n, y, 0.0)) for y in (0.5, -0.5)] for i in range(n + 1)]
+    uv = bm.loops.layers.uv.new("UVMap")
+    for i in range(n):
+        f = bm.faces.new((rows[i][0], rows[i][1], rows[i + 1][1], rows[i + 1][0]))
+        for loop in f.loops:
+            co = loop.vert.co
+            loop[uv].uv = (co.x, 0.5 - co.y)
+    me = bpy.data.meshes.new("SM_Holo_Link")
+    bm.to_mesh(me)
+    bm.free()
+    me.materials.append(mat)
+    ob = bpy.data.objects.new("SM_Holo_Link", me)
+    coll.objects.link(ob)
+    path = export_fbx(ob, out)
+    print("[nodes] link mesh", os.path.relpath(path, os.path.join(HERE, "..")))
+    return ob
+
+
 def scales(spec):
     """Display scales: single (per tier, fit) and multi (per layout, common for all nodes)."""
     d = spec["display"]
@@ -126,6 +157,7 @@ def write_table(spec, single):
                 "PlateRadius": round(plate_radius(tier) * 100, 1),
                 "Height": round(tier["size"][2] * 100, 1),
                 "ScaleSingle": round(single[(key, tk)], 5),
+                "PlateOutline": [{"X": round(x * 100, 1), "Y": round(y * 100, 1)} for x, y in plate_outline(tier)],
             })
     path = os.path.join(HERE, "..", "ue", "base_nodes_table.json")
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -189,6 +221,8 @@ def main():
         json.dump(manifest, f, indent=2, ensure_ascii=False)
     if not a.node and not a.tiers:
         write_table(spec, single)
+        link_mat = bpy.data.materials.new(spec["display"]["links"]["material"])
+        export_link_mesh(coll, link_mat, a.out).hide_render = True
     if a.blend:
         bpy.ops.wm.save_as_mainfile(filepath=os.path.join(a.out, "base_nodes.blend"))
 
@@ -199,6 +233,7 @@ def main():
             bn_render.screens(spec, built, a.screens)
         if a.render and a.review:
             bn_render.review(spec, built, single, multi, a.render)
+            bn_render.links_review(spec, built, single, multi, a.render, plate_outline)
         if a.turnaround:
             bn_render.turnaround(spec, built, single, multi, a.turnaround)
 

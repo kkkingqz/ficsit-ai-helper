@@ -54,6 +54,32 @@ struct FICSITAIHELPER_API FFAIHBaseNodeVisual : public FTableRowBase
 	/** Uniform scale that fits this tier into the projector volume in single-node mode. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|BaseNode")
 	float ScaleSingle = 1.f;
+
+	/** Ground plate outline, cm, model space (after the tier yaw): links start on this edge. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "FAIH|BaseNode")
+	TArray<FVector2D> PlateOutline;
+};
+
+/** One connection between two nodes: ONE line, whatever number of resources it carries (Label lists them,
+ *  RatePerMin is the sum). Direction From -> To and the rate are what the ribbon shows. */
+USTRUCT(BlueprintType)
+struct FICSITAIHELPER_API FFAIHNodeLink
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FAIH|BaseNode")
+	FName From;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FAIH|BaseNode")
+	FName To;
+
+	/** Items per minute, all resources of the link together: ribbon width and dash speed grow with log(rate). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FAIH|BaseNode")
+	float RatePerMin = 0.f;
+
+	/** "Iron Ingot, Copper Ingot · 240/min" - drawn by the UI at GetLinkLabelLocation(). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "FAIH|BaseNode")
+	FText Label;
 };
 
 /** One node to show in multi-node mode. */

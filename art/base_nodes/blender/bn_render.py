@@ -515,3 +515,248 @@ def _projector_angles(spec, built, single, multi, out, tile):
             os.remove(p)
     sheet.save(os.path.join(out, "turnaround_projector.jpg"), quality=88, optimize=True)
     print("[render] projector angles")
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# links between nodes (bn_links): projector mock-ups with the demo flows + a 2D screen mock-up
+# ---------------------------------------------------------------------------------------------------------------------
+def link_material():
+    """Preview of MM_HoloLink: additive glow, chevron dashes along the link (static frame), edge rails."""
+    import bn_links  # noqa: F401
+    m = bpy.data.materials.new("PREVIEW_HoloLink")
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    L = nt.links.new
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    addsh = nt.nodes.new("ShaderNodeAddShader")
+    tr = nt.nodes.new("ShaderNodeBsdfTransparent")
+    em = nt.nodes.new("ShaderNodeEmission")
+    em.inputs["Color"].default_value = (*EDGE, 1.0)
+    L(tr.outputs[0], addsh.inputs[0])
+    L(em.outputs[0], addsh.inputs[1])
+    L(addsh.outputs[0], out.inputs["Surface"])
+    uv = nt.nodes.new("ShaderNodeUVMap")
+    uv.uv_map = "UVMap"
+    sx = nt.nodes.new("ShaderNodeSeparateXYZ")
+    L(uv.outputs[0], sx.inputs[0])
+    v = _n(nt, "ShaderNodeMath", op="SUBTRACT")
+    v.inputs[1].default_value = 0.5
+    L(sx.outputs["Y"], v.inputs[0])
+    av = _n(nt, "ShaderNodeMath", op="ABSOLUTE")
+    L(v.outputs[0], av.inputs[0])
+    pitch = _n(nt, "ShaderNodeMath", op="DIVIDE")
+    pitch.inputs[1].default_value = LINK["pitch_mm"] / 1000.0
+    L(sx.outputs["X"], pitch.inputs[0])
+    sh = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")          # s + 1.1 |v - 0.5|  -> '>' pointing along the flow
+    sh.inputs[1].default_value = 1.1
+    L(av.outputs[0], sh.inputs[0])
+    L(pitch.outputs[0], sh.inputs[2])
+    fr = _n(nt, "ShaderNodeMath", op="FRACT")
+    L(sh.outputs[0], fr.inputs[0])
+    dash = _n(nt, "ShaderNodeMath", op="LESS_THAN")
+    dash.inputs[1].default_value = 0.32
+    L(fr.outputs[0], dash.inputs[0])
+    edge = _n(nt, "ShaderNodeMath", op="GREATER_THAN")
+    edge.inputs[1].default_value = 0.42
+    L(av.outputs[0], edge.inputs[0])
+    e2 = _n(nt, "ShaderNodeMath", op="MULTIPLY")
+    e2.inputs[1].default_value = 0.55
+    L(edge.outputs[0], e2.inputs[0])
+    mx = _n(nt, "ShaderNodeMath", op="MAXIMUM")
+    L(dash.outputs[0], mx.inputs[0])
+    L(e2.outputs[0], mx.inputs[1])
+    base = _n(nt, "ShaderNodeMath", op="MULTIPLY_ADD")         # glow * 2.4 + 0.12 fill
+    base.inputs[1].default_value, base.inputs[2].default_value = 2.4, 0.12
+    L(mx.outputs[0], base.inputs[0])
+    L(base.outputs[0], em.inputs["Strength"])
+    return m
+
+
+LINK = {}
+
+
+def _link_objects(paths, z, mat):
+    import bmesh
+    import bn_links
+    obs = []
+    for i, p in enumerate(paths):
+        verts, uvs, faces = bn_links.ribbon(p, z)
+        bm = bmesh.new()
+        vs = [bm.verts.new(v) for v in verts]
+        lay = bm.loops.layers.uv.new("UVMap")
+        for f in faces:
+            face = bm.faces.new([vs[k] for k in f])
+            for loop in face.loops:
+                loop[lay].uv = uvs[loop.vert.index]
+        me = bpy.data.meshes.new(f"LINK_{i}")
+        bm.verts.index_update()
+        for face in bm.faces:
+            for loop in face.loops:
+                loop[lay].uv = uvs[vs.index(loop.vert)]
+        bm.to_mesh(me)
+        bm.free()
+        me.materials.append(mat)
+        ob = bpy.data.objects.new(f"LINK_{i}", me)
+        ob["mock"] = True
+        bpy.context.scene.collection.objects.link(ob)
+        obs.append(ob)
+    return obs
+
+
+def _labels(path_png, paths, z, cam, slots_names=None):
+    """Draw the link labels where a UI widget would sit (projected label anchors)."""
+    from PIL import Image, ImageDraw, ImageFont
+    from bpy_extras.object_utils import world_to_camera_view
+    s = bpy.context.scene
+    im = Image.open(path_png).convert("RGB")
+    dr = ImageDraw.Draw(im)
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 15)
+    except OSError:
+        font = ImageFont.load_default()
+    W, H = im.size
+    for p in paths:
+        c = world_to_camera_view(s, cam, Vector((p.label_at[0], p.label_at[1], z + 0.05)))
+        x, y = c.x * W, (1 - c.y) * H
+        t = p.link["label"]
+        bb = dr.textbbox((0, 0), t, font=font)
+        w, h = bb[2] - bb[0] + 14, bb[3] - bb[1] + 10
+        dr.rectangle([x - w / 2, y - h - 6, x + w / 2, y - 6], fill=(6, 18, 30), outline=(90, 190, 255))
+        dr.text((x - w / 2 + 7, y - h - 3), t, fill=(190, 235, 255), font=font)
+        dr.line([(x, y - 6), (x, y)], fill=(90, 190, 255))
+    im.save(path_png)
+
+
+def links_review(spec, built, single, multi, out, plate_outline):
+    """Projector with links: five nodes (demo flows) from the operator and from above; one node with stubs."""
+    import bn_links
+    LINK.update(spec["display"]["links"])
+    cfg = LINK
+    s = bpy.context.scene
+    for o in list(s.objects):                                  # fresh mock (review() made one already)
+        if o.get("mock") or o.name.startswith("MOCK_"):
+            bpy.data.objects.remove(o)
+    inst = _mock(spec)
+    for o in s.objects:
+        if o.type == "MESH" and not o.get("mock"):
+            o.hide_render = True
+    disc = bpy.data.objects.get("MOCK_disc")
+    if disc:                                                   # node mode: emitter disc dimmed (cfg emitter_dim)
+        b = disc.active_material.node_tree.nodes["Principled BSDF"]
+        b.inputs["Emission Strength"].default_value *= cfg.get("emitter_dim", 1.0)
+    disp = spec["display"]
+    zb = 2.05 + disp["base_z"]
+    z = zb + 0.003 + cfg["lift_mm"] / 1000.0
+    mat = link_material()
+    lay = disp["multi"]["layouts"]["5"]
+    keys = multi_mix(spec, built)
+    slots, outlines, scales = {}, {}, {}
+    tmp = []
+    for (k, tk, mini), xy in zip(keys, lay["slots"]):
+        tmp.append(inst(built[(k, tk, mini)], multi["5"], xy, f"I_link_{k}"))
+        slots[k] = tuple(xy)
+        outlines[k] = plate_outline(spec["nodes"][k]["tiers"][tk])
+        scales[k] = multi["5"]
+    paths = bn_links.route_multi(spec["demo_links"]["multi"], slots, outlines, scales, cfg)
+    lobs = _link_objects(paths, z, mat)
+    shots = {"review_links_multi5_operator": ((1.15, -2.75, 1.65), (0, 0, 1.25), 30),
+             "review_links_multi5_top": ((0.0, -1.4, 4.4), (0, 0, 1.1), 32)}
+    for name, (loc, tgt, lens) in shots.items():
+        cam = _cam("CAM_" + name, (0, -1, 0), ortho=False, lens=lens)
+        cam.location = loc
+        cam.rotation_euler = (Vector(tgt) - Vector(loc)).to_track_quat("-Z", "Y").to_euler()
+        s.camera = cam
+        p = os.path.join(out, name + ".png")
+        render(p, (1280, 800))
+        _labels(p, paths, z, cam)
+        to_jpg(p)
+    for o in tmp + lobs:
+        bpy.data.objects.remove(o)
+    # single node with stubs
+    sd = spec["demo_links"]["single"]
+    k = sd["node"]
+    tk = "3"
+    o = inst(built[(k, tk, False)], single[(k, tk)], (0, 0), "I_link_single")
+    paths = bn_links.route_single(sd["links"], k, plate_outline(spec["nodes"][k]["tiers"][tk]), single[(k, tk)], cfg)
+    lobs = _link_objects(paths, z, mat)
+    cam = _cam("CAM_links_single", (0, -1, 0), ortho=False, lens=28)
+    cam.location = (0.4, -3.1, 2.3)
+    cam.rotation_euler = (Vector((0, 0, 1.3)) - cam.location).to_track_quat("-Z", "Y").to_euler()
+    s.camera = cam
+    p = os.path.join(out, "review_links_single.png")
+    render(p, (1280, 800))
+    _labels(p, paths, z, cam)
+    to_jpg(p)
+    for ob in [o] + lobs:
+        bpy.data.objects.remove(ob)
+    screen_mock(spec, built, out)
+    print("[render] links")
+
+
+def screen_mock(spec, built, out):
+    """2D terminal screen: node cards (prepared renders) placed like the projector slots, links with chevrons."""
+    import bn_links
+    from PIL import Image, ImageDraw, ImageFont
+    cfg = LINK
+    W, H = 1280, 800
+    im = Image.new("RGB", (W, H), (5, 14, 24))
+    dr = ImageDraw.Draw(im)
+    for x in range(0, W, 40):
+        dr.line([(x, 0), (x, H)], fill=(10, 26, 40))
+    for y in range(0, H, 40):
+        dr.line([(0, y), (W, y)], fill=(10, 26, 40))
+    try:
+        font = ImageFont.truetype("DejaVuSans.ttf", 15)
+        fb = ImageFont.truetype("DejaVuSans-Bold.ttf", 16)
+    except OSError:
+        font = fb = ImageFont.load_default()
+    keys = multi_mix(spec, built)
+    lay = spec["display"]["multi"]["layouts"]["5"]
+    KX, KY = 570.0, 440.0                                      # px per hologram metre (screen is wider than tall)
+    K = (KX + KY) / 2
+    cx, cy = W / 2, H / 2 + 10
+    P = lambda p: (cx + p[0] * KX, cy - p[1] * KY)
+    card = (206, 128)
+    slots = {k: tuple(xy) for (k, _, _), xy in zip(keys, lay["slots"])}
+    # cards as rectangles -> outlines in "model" units of the 2D plane (half card size in hologram metres)
+    hx, hy = card[0] / 2 / KX + 0.008, card[1] / 2 / KY + 0.008
+    rect = [(-hx, -hy), (hx, -hy), (hx, hy), (-hx, hy)]
+    paths = bn_links.route_multi(spec["demo_links"]["multi"], slots, {k: rect for k in slots}, {k: 1.0 for k in slots},
+                                 dict(cfg, obstacle_radius=max(hx, hy) * 1.05, gap_mm=4))
+    for p in paths:                                            # ribbon: rails + chevrons
+        wpx = max(6, p.width * K * 0.9)
+        pts = [P(q) for q in p.pts]
+        dr.line(pts, fill=(18, 60, 96), width=int(wpx), joint="curve")
+        step = 26
+        d = step / 2
+        while d < p.dist[-1] * K:
+            i = max(j for j in range(len(p.dist)) if p.dist[j] * K <= d)
+            i = min(i, len(pts) - 2)
+            a, b = pts[i], pts[i + 1]
+            seg = math.hypot(b[0] - a[0], b[1] - a[1]) or 1
+            t = (d - p.dist[i] * K) / seg
+            x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+            ux, uy = (b[0] - a[0]) / seg, (b[1] - a[1]) / seg
+            hh = wpx * 0.45
+            dr.line([(x - ux * hh - uy * hh, y - uy * hh + ux * hh), (x + ux * hh * 0.4, y + uy * hh * 0.4),
+                     (x - ux * hh + uy * hh, y - uy * hh - ux * hh)], fill=(150, 225, 255), width=3)
+            d += step
+    for (k, tk, mini), xy in zip(keys, lay["slots"]):
+        x, y = P(xy)
+        r = Image.open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "ue", "screens",
+                                    f"T_Node_{spec['nodes'][k]['asset']}_T{tk}_Screen_640.png")).convert("RGBA")
+        r = r.resize(card, Image.LANCZOS)
+        box = [x - card[0] / 2, y - card[1] / 2, x + card[0] / 2, y + card[1] / 2]
+        dr.rectangle(box, fill=(8, 24, 40), outline=(60, 150, 220), width=2)
+        im.paste(r, (int(box[0]), int(box[1])), r)
+        dr.text((box[0] + 8, box[3] - 22), spec["nodes"][k]["display_name"]["en"] + f"  T{tk}", fill=(200, 238, 255),
+                font=fb)
+    for p in paths:
+        x, y = P(p.label_at)
+        t = p.link["label"]
+        bb = dr.textbbox((0, 0), t, font=font)
+        w, h = bb[2] - bb[0] + 12, bb[3] - bb[1] + 8
+        dr.rectangle([x - w / 2, y - h / 2, x + w / 2, y + h / 2], fill=(6, 18, 30), outline=(90, 190, 255))
+        dr.text((x - w / 2 + 6, y - h / 2 + 2), t, fill=(190, 235, 255), font=font)
+    im.save(os.path.join(out, "review_links_screen.jpg"), quality=90)
