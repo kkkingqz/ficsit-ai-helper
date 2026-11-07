@@ -31,6 +31,7 @@ Module types
     stacks      smelter chimneys: base, body, glowing band, wide collar; `slim`: stepped refinery stack
     roof_fans   fan box lying on a roof, fans facing up
     gate.chevrons.kind = "heat"   wavy heat lines instead of >>> (furnace door)
+    gate.chevrons.kind = "target" / "drop" / "swap"   node sign on the portal (hub / fluid plant / logistics)
     gate.u      offset of a portal along its face (side tunnels in front of an off-centre belt)
     robots      assembly robot arms on pedestals (joints glow), two-finger gripper (also the mining arms)
     rocks       faceted boulders (convex hull of jittered rings, seeded); veins = glowing ore facets
@@ -163,6 +164,9 @@ def gate(n, m):
         n.part(n.extrude2d(G.arch_frame(i["W"], i["H"], i["t"], c * 0.7), pd + 0.1, fr - 0.45, o, f.U, (0, 0, 1), f.N),
                rim=True)
     ch = m.get("chevrons")
+    if ch and ch.get("kind") in GLYPHS:                     # one node sign instead of >>> (see GLYPHS)
+        GLYPHS[ch["kind"]](n, f, u0, pd + 0.15, ch["z"], ch["h"])
+        ch = None
     for k in range(ch["n"] if ch else 0):
         u = u0 + (k - (ch["n"] - 1) / 2) * ch["pitch"]
         if ch.get("kind") == "heat":                         # furnace: wavy heat lines rising (smelter)
@@ -182,6 +186,39 @@ def gate(n, m):
             n.part(n.box(f.p(u0, d0 + st["len"] / k / 2 + 0.1, hz / 2), (st["w"], st["len"] / k + 0.2, hz), yaw=f.yaw),
                    rim=True)
             n.part(n.box(f.p(u0, d0 + 0.12, hz + 0.02), (st["w"] * 0.9, 0.12, 0.05), yaw=f.yaw), glow=0.7, rim=False)
+
+
+def _stroke(n, f, d, a, b, t):
+    """Glowing stroke on a face: from (u, z) a to b, square section t, standing on the panel at depth d."""
+    n.part(n.beam(f.p(a[0], d + t / 2, a[1]), f.p(b[0], d + t / 2, b[1]), t, t), glow=1.0, rim=False)
+
+
+def _sign_target(n, f, u, d, z, h):
+    """Central hub (control): diamond frame with a centre point."""
+    s, t = h * 0.95, h * 0.22
+    pts = [(u + s, z), (u, z + s), (u - s, z), (u, z - s)]
+    for a, b in zip(pts, pts[1:] + pts[:1]):
+        _stroke(n, f, d, a, b, t)
+    n.part(n.box(f.p(u, d + t * 0.6, z), (t * 1.8, t * 1.2, t * 1.8), yaw=f.yaw), glow=1.0, rim=False)
+
+
+def _sign_drop(n, f, u, d, z, h):
+    """Fluid plant: the drop of its tanks."""
+    n.part(n.extrude2d(G.drop(h * 1.9), d, d + 0.13, f.p(u, 0, z), f.U, (0, 0, 1), f.N), glow=1.0, rim=False)
+
+
+def _sign_swap(n, f, u, d, z, h):
+    """Logistics: two opposed arrows (receive / dispatch)."""
+    L, t, hh = h * 2.6, h * 0.22, h * 0.75
+    for sg, dz in ((1, h * 0.42), (-1, -h * 0.42)):
+        a, b = (u - sg * L / 2, z + dz), (u + sg * (L / 2 - hh * 0.4), z + dz)
+        _stroke(n, f, d, a, b, t)
+        head = G.chevron(hh, hh * 0.5, t * 1.1)
+        org = f.p(u + sg * (L / 2 - hh * 0.3), 0, z + dz)
+        n.part(n.extrude2d(head, d, d + t, org, f.U * sg, (0, 0, 1), f.N), glow=1.0, rim=False)
+
+
+GLYPHS = {"target": _sign_target, "drop": _sign_drop, "swap": _sign_swap}
 
 
 def _heat_line(n, f, u, d, z0, h, t, k=10):

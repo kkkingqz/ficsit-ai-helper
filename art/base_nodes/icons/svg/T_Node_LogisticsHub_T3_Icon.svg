@@ -16,11 +16,18 @@
     <rect x="77" y="76" width="16" height="4" rx="0.0" fill="white"/>
     <rect x="74" y="81" width="22" height="9" rx="0.0" fill="white"/>
     <rect x="78" y="84" width="14" height="2.5" rx="0.0" fill="black"/>
-    <polyline points="40.0,70.5 43.5,74 40.0,77.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
-    <polyline points="45.5,70.5 49.0,74 45.5,77.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
-    <polyline points="51.0,70.5 54.5,74 51.0,77.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="39.0,69.8 59.5,69.8" fill="none" stroke="white" stroke-width="3.6" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polygon points="61.0,69.8 56.5,66.2 56.5,73.39999999999999" fill="white"/>
+    <polyline points="61.0,76.2 40.5,76.2" fill="none" stroke="white" stroke-width="3.6" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polygon points="39.0,76.2 43.5,72.60000000000001 43.5,79.8" fill="white"/>
     <rect x="22" y="31" width="10" height="4" rx="0.0" fill="white"/>
     <polyline points="38,35 38,29 54,29 54,35" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="21,35 21,10" fill="none" stroke="white" stroke-width="3" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <polyline points="47,35 47,10" fill="none" stroke="white" stroke-width="3" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="18" y="8" width="32" height="4" rx="0.0" fill="white"/>
+    <rect x="30" y="12" width="8" height="4" rx="0.0" fill="white"/>
+    <polyline points="34,16 34,22" fill="none" stroke="white" stroke-width="1.6" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="31.5" y="22" width="5.0" height="3.5" rx="0.0" fill="white"/>
     <rect x="60" y="31" width="10" height="4" rx="0.0" fill="white"/>
     <polyline points="84,35 84,4" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
     <rect x="81.3" y="22" width="5.400000000000006" height="2.3999999999999986" rx="0.0" fill="white"/>

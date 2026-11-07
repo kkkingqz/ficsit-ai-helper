@@ -122,8 +122,8 @@
     "ScreenImage": "/FicsitAIHelper/BaseNodes/Texture/Screen/T_Node_LogisticsHub_T3_Screen.T_Node_LogisticsHub_T3_Screen",
     "Icon": "/FicsitAIHelper/BaseNodes/Texture/Icon/T_Node_LogisticsHub_T3_Icon_256.T_Node_LogisticsHub_T3_Icon_256",
     "PlateRadius": 1860.1,
-    "Height": 1780.0,
-    "ScaleSingle": 0.05376
+    "Height": 2010.0,
+    "ScaleSingle": 0.04975
   },
   {
     "Name": "smelter_T1",

@@ -17,7 +17,8 @@
     <rect x="78" y="82" width="14" height="4" rx="0.0" fill="white"/>
     <polyline points="8,86 8,44" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
     <polyline points="92,86 92,44" fill="none" stroke="white" stroke-width="4.5" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
-    <rect x="43" y="79" width="14" height="3" rx="0.0" fill="white"/>
+    <polyline points="56.5,77 50,70.5 43.5,77 50,83.5 56.5,77 50,70.5" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
+    <rect x="48.4" y="75.4" width="3.200000000000003" height="3.1999999999999886" rx="0.0" fill="white"/>
     <polyline points="38,37 38,12" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
     <polyline points="44,37 44,20" fill="none" stroke="white" stroke-width="3.0" stroke-linejoin="miter" stroke-linecap="butt" stroke-miterlimit="6"/>
     <rect x="33" y="31" width="23" height="5" rx="0.0" fill="white"/>

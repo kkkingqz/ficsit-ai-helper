@@ -89,7 +89,7 @@
               "c": 1.5,
               "inner": {"W": 8.6, "H": 5.7, "t": 0.45},
               "panel": 10.15,
-              "chevrons": {"n": 3, "h": 1.3, "z": 2.6, "pitch": 1.1},
+              "chevrons": {"kind": "target", "h": 1.3, "z": 2.9},
               "strips": [],
               "steps": {"len": 2.4, "w": 6.0, "h": 0.6, "n": 3}
             },
@@ -169,7 +169,7 @@
               "c": 1.8,
               "inner": {"W": 9.6, "H": 6.8, "t": 0.5},
               "panel": 16.2,
-              "chevrons": {"n": 3, "h": 1.6, "z": 3.0, "pitch": 1.35},
+              "chevrons": {"kind": "target", "h": 1.6, "z": 3.3},
               "strips": [{"u": 0, "z": 7.95, "w": 6.5, "h": 0.45}],
               "steps": {"len": 2.6, "w": 7.0, "h": 0.9, "n": 4}
             },
@@ -294,7 +294,7 @@
               "c": 2.2,
               "inner": {"W": 11.6, "H": 8.0, "t": 0.55},
               "panel": 20.2,
-              "chevrons": {"n": 3, "h": 1.9, "z": 3.4, "pitch": 1.6},
+              "chevrons": {"kind": "target", "h": 1.9, "z": 3.6999999999999997},
               "strips": [{"u": -2.7, "z": 9.25, "w": 4.2, "h": 0.5}, {"u": 2.7, "z": 9.25, "w": 4.2, "h": 0.5}],
               "steps": {"len": 2.3, "w": 8.2, "h": 1.0, "n": 4}
             },
@@ -426,7 +426,7 @@
               "c": 1.3,
               "inner": {"W": 7.4, "H": 4.7, "t": 0.4},
               "panel": 6.65,
-              "chevrons": {"n": 3, "h": 1.1, "z": 2.2, "pitch": 0.95},
+              "chevrons": {"kind": "drop", "h": 1.1, "z": 2.5},
               "strips": [{"u": -1.8, "z": 5.3, "w": 2.8, "h": 0.4}, {"u": 1.8, "z": 5.3, "w": 2.8, "h": 0.4}],
               "steps": {"len": 2.0, "w": 5.6, "h": 0.5, "n": 3}
             },
@@ -504,7 +504,7 @@
               "c": 1.5,
               "inner": {"W": 8.2, "H": 5.5, "t": 0.45},
               "panel": 9.65,
-              "chevrons": {"n": 3, "h": 1.3, "z": 2.6, "pitch": 1.1},
+              "chevrons": {"kind": "drop", "h": 1.3, "z": 2.9},
               "strips": [{"u": -2.0, "z": 6.22, "w": 3.0, "h": 0.45}, {"u": 2.0, "z": 6.22, "w": 3.0, "h": 0.45}],
               "steps": {"len": 2.0, "w": 6.4, "h": 0.6, "n": 3}
             },
@@ -634,7 +634,7 @@
               "c": 1.9,
               "inner": {"W": 11.0, "H": 6.9, "t": 0.5},
               "panel": 11.15,
-              "chevrons": {"n": 3, "h": 1.6, "z": 3.0, "pitch": 1.35},
+              "chevrons": {"kind": "drop", "h": 1.6, "z": 3.3},
               "strips": [{"u": -2.6, "z": 7.7, "w": 4.0, "h": 0.5}, {"u": 2.6, "z": 7.7, "w": 4.0, "h": 0.5}],
               "steps": {"len": 2.4, "w": 8.0, "h": 0.7, "n": 3}
             },
@@ -746,7 +746,7 @@
         "reference/concept_logistics_hub_T2.png",
         "reference/concept_logistics_hub_T3.png"
       ],
-      "identity": "shared family: front portal with >>>, corner pylons with light dots, light strips, plate outline, dish + antenna; own: hall with cut roof corners over a through conveyor (belts on legs out of both sides, chevrons pointing outwards), side tunnel frames; T2: side blocks, roll-up door, crate stacks; T3: two belts, fan block, roof crate storage, pipes",
+      "identity": "shared family: front portal with >>>, corner pylons with light dots, light strips, plate outline, dish + antenna; own: hall with cut roof corners over a through conveyor (belts on legs out of both sides, chevrons pointing outwards), side tunnel frames; T2: side blocks, roll-up door, crate stacks; T3: two belts, fan block, roof crate storage, pipes; T3: gantry crane over the roof storage",
       "tiers": {
         "1": {
           "size": [16, 12, 10.5],
@@ -782,7 +782,7 @@
               "c": 1.0,
               "inner": {"W": 4.6, "H": 3.7, "t": 0.3},
               "panel": 3.75,
-              "chevrons": {"n": 3, "h": 0.8, "z": 2.2, "pitch": 0.7},
+              "chevrons": {"kind": "swap", "h": 0.8, "z": 2.4000000000000004},
               "strips": [{"u": -1.1, "z": 4.15, "w": 1.8, "h": 0.3}, {"u": 1.1, "z": 4.15, "w": 1.8, "h": 0.3}],
               "steps": {"len": 1.2, "w": 3.0, "h": 0.3, "n": 2}
             },
@@ -886,7 +886,7 @@
               "c": 1.3,
               "inner": {"W": 6.0, "H": 5.2, "t": 0.4},
               "panel": 5.15,
-              "chevrons": {"n": 3, "h": 1.0, "z": 2.6, "pitch": 0.85},
+              "chevrons": {"kind": "swap", "h": 1.0, "z": 2.8000000000000003},
               "strips": [{"u": -1.6, "z": 5.9, "w": 2.4, "h": 0.4}, {"u": 1.6, "z": 5.9, "w": 2.4, "h": 0.4}],
               "steps": {"len": 1.4, "w": 4.0, "h": 0.35, "n": 2}
             },
@@ -953,7 +953,7 @@
           ]
         },
         "3": {
-          "size": [32, 24, 17.8],
+          "size": [32, 24, 20.1],
           "modules": [
             {
               "type": "plate",
@@ -1017,7 +1017,7 @@
               "c": 1.7,
               "inner": {"W": 8.6, "H": 6.7, "t": 0.45},
               "panel": 7.15,
-              "chevrons": {"n": 3, "h": 1.3, "z": 3.2, "pitch": 1.1},
+              "chevrons": {"kind": "swap", "h": 1.3, "z": 3.4000000000000004},
               "strips": [{"u": -2.1, "z": 7.55, "w": 3.2, "h": 0.45}, {"u": 2.1, "z": 7.55, "w": 3.2, "h": 0.45}],
               "steps": {"len": 1.6, "w": 6.0, "h": 0.4, "n": 2}
             },
@@ -1127,7 +1127,20 @@
             {
               "type": "antennas",
               "masts": [[2.0, 3.0, 11.5, 6.0, 0.15], [1.2, 3.8, 11.5, 4.4, 0.13], [2.8, 4.0, 11.5, 3.0, 0.12]]
-            }
+            },
+            {
+              "type": "lattice",
+              "min": [-6.6, -4.4, 11.5],
+              "max": [-1.4, 0.8, 17.6],
+              "levels": 2,
+              "x": ["left", "right"],
+              "t": 0.4
+            },
+            {"type": "box", "rim": true, "boxes": [[-4.0, -1.8, 17.95, 1.8, 6.0, 0.7]]},
+            {"type": "box", "rim": true, "boxes": [[-4.0, -2.4, 17.1, 1.4, 1.4, 0.9]]},
+            {"type": "box", "rim": false, "boxes": [[-4.0, -2.4, 15.2, 0.14, 0.14, 2.9]]},
+            {"type": "box", "rim": false, "glow": 0.6, "boxes": [[-4.0, -2.4, 13.5, 0.7, 0.7, 0.5]]},
+            {"type": "lamps", "at": [[-1.4, 0.8]], "z0": 18.3, "h": 1.0}
           ]
         }
       }

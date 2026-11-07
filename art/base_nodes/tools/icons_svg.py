@@ -60,6 +60,18 @@ class Icon:
             xx = x + i * gap
             self.line([(xx, y - h / 2), (xx + h / 2, y), (xx, y + h / 2)], sw)
 
+    def sign_target(self, cx, cy, s=6.5, sw=w):
+        """Central hub sign: diamond frame with a centre point."""
+        self.line([(cx + s, cy), (cx, cy - s), (cx - s, cy), (cx, cy + s), (cx + s, cy), (cx, cy - s)], sw)
+        self.rect(cx - 1.6, cy - 1.6, cx + 1.6, cy + 1.6)
+
+    def sign_swap(self, cx, cy, L=17.0, sw=w):
+        """Logistics sign: two opposed arrows."""
+        for sg, dy in ((1, -3.2), (-1, 3.2)):
+            y = cy + dy
+            self.line([(cx - sg * L / 2, y), (cx + sg * (L / 2 - 1.5), y)], sw)
+            self.poly([(cx + sg * L / 2, y), (cx + sg * (L / 2 - 4.5), y - 3.6), (cx + sg * (L / 2 - 4.5), y + 3.6)])
+
     def arch(self, x0, x1, y_top, y_bot, ch=4.0, sw=W, cut=False):
         """Portal arch: two legs and a top with chamfered corners (open at the bottom)."""
         self.line([(x0, y_bot), (x0, y_top + ch), (x0 + ch, y_top), (x1 - ch, y_top), (x1, y_top + ch), (x1, y_bot)],
@@ -168,10 +180,7 @@ def central_hub(t):
             i.line([(x, 86), (x, 44)], W)
             if t == 3:
                 i.rect(x - 4, 42, x + 4, 45)
-    if t == 2:
-        i.rect(43, 79, 57, 82)
-    else:
-        i.chevrons(41, 80, 7, 3, 5.5)
+    i.sign_target(50, 77, 6.5 if t > 1 else 6.0)
     # roof: control box, masts, dish
     if t == 1:
         i.line([(40, 39), (40, 34.5), (55, 34.5), (55, 39)], w)
@@ -194,7 +203,7 @@ def fluid_plant(t):
     i.rect(8, 53, 68, 57)
     i.arch(8, 68, 59, 90, 5)
     i.arch(16, 60, 66, 90, 4)
-    i.chevrons(30, 80, 7, 3, 5.5)
+    i.drop(38, 77, 18, cut=False)
     i.rect(4, 89, 96, 92)
     if t == 1:
         i.line([(12, 52), (12, 44), (36, 44), (36, 52)], w)
@@ -239,7 +248,7 @@ def logistics_hub(t):
         i.rect(x0 + 3, 76, x1 - 3, 80)
         i.rect(x0, 81, x1, 90)
         i.rect(x0 + 4, 84, x1 - 4, 86.5, cut=True)
-    i.chevrons(40, 74, 7, 3, 5.5)
+    i.sign_swap(50, 73, L=22.0, sw=3.6)
     # roof box, mast, dish
     if t < 3:
         i.line([(41, 41), (41, 34), (59, 34), (59, 41)], w)
@@ -250,6 +259,13 @@ def logistics_hub(t):
     else:
         i.rect(22, 31, 32, 35)
         i.line([(38, 35), (38, 29), (54, 29), (54, 35)], w)
+        # gantry crane over the roof storage
+        i.line([(21, 35), (21, 10)], 3)
+        i.line([(47, 35), (47, 10)], 3)
+        i.rect(18, 8, 50, 12)
+        i.rect(30, 12, 38, 16)
+        i.line([(34, 16), (34, 22)], 1.6)
+        i.rect(31.5, 22, 36.5, 25.5)
         i.rect(60, 31, 70, 35)
         i.mast(84, 4, 35, collar=22)
         i.dish(74, 17, 5.5, 9, 25, (82, 26))
