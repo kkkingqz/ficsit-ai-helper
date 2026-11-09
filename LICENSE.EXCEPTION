@@ -1,0 +1,52 @@
+FICSIT AI — дополнительное разрешение по §7 GNU GPL версии 3
+=============================================================
+
+Этот файл дополняет LICENSE (GNU General Public License, версия 3)
+и является его неотъемлемой частью применительно к данной программе.
+
+Дополнительное разрешение в соответствии с разделом 7 GNU GPL v3
+----------------------------------------------------------------
+
+В качестве дополнительного разрешения по разделу 7 GNU General Public
+License версии 3 авторы FICSIT AI предоставляют право связывать
+(linking), компоновать и распространять эту программу совместно с:
+
+  (a) игрой Satisfactory и входящими в её состав модулями,
+      распространяемыми Coffee Stain Studios;
+  (b) Unreal Engine и его модулями, распространяемыми Epic Games
+      на условиях Unreal Engine End User License Agreement;
+  (c) Satisfactory Mod Loader и сопутствующими компонентами
+      модификационной платформы,
+
+а также распространять полученный результат, не распространяя
+на перечисленные компоненты требования GNU GPL и не принимая
+обязательства предоставлять их исходный код.
+
+Это разрешение относится только к перечисленным компонентам. На все
+остальные части комбинированного произведения условия GNU GPL
+распространяются в полном объёме. Если вы изменяете эту программу, вы
+можете распространить это разрешение на свою версию, но не обязаны;
+удалив его, вы должны удалить его из всех файлов, где оно указано.
+
+
+Why this exception exists (English summary)
+-------------------------------------------
+
+FICSIT AI is a modification for Satisfactory. It is compiled against,
+and must be loaded by, the game itself, Unreal Engine and Satisfactory
+Mod Loader. The game and the engine are distributed under proprietary
+terms, so without this additional permission the project could not
+honestly grant GPL rights over the resulting combination.
+
+The exception covers only the game, the engine and the modding
+platform. Everything else in the combined work remains under the GPL.
+
+
+Заимствованный код
+------------------
+
+Код, заимствованный из сторонних проектов, размещается в
+third_party/<project>/ вместе с исходным файлом лицензии, файлом
+NOTICE и перечнем внесённых изменений по файлам. Условия исходных
+лицензий этих компонентов сохраняются; см. docs/ARCHITECTURE.md §2.2
+и §18.

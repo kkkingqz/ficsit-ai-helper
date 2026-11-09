@@ -4,9 +4,12 @@
   "machineClass": "Build_OilRefinery_C",
   "recipeClass": "Recipe_Plastic_C",
   "count": 4,
-  "clockPercent": 100,
-  "clockApplied": false,
+  "clockPercent": 150,
   "layout": "single_row",
-  "connections": { "belts": "manifold", "pipes": "manifold", "power": true },
+  "connections": {
+    "belts": "manifold",
+    "pipes": "manifold",
+    "power": true
+  },
   "outputName": "AI_Plastic_4x"
 }

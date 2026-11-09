@@ -72,14 +72,27 @@ R-12 (лицензия Ficsit Remote Monitoring) закрыт отрицател
 
 ## Лицензия
 
-**Apache-2.0** — та же, что у FICSIT Foreman. Решение принято, §2.2 документа.
+**GPL-3.0-or-later** — [LICENSE](LICENSE) — плюс дополнительное разрешение по §7 на линковку
+с игрой Satisfactory, Unreal Engine и SML: [LICENSE.EXCEPTION](LICENSE.EXCEPTION). Без этого
+разрешения проект не мог бы честно выдавать GPL-права на комбинацию, в которую входят
+проприетарные компоненты.
 
-Совместимы и используются: MIT (SML, слой данных SBC, Factory Spawner, MCP TypeScript SDK,
-`satisfactory-file-parser`), Apache-2.0 (sherpa-onnx, `sf-save-data`, `sf-flow`),
-MPL-2.0 (Eigen), BSD-3-Clause (IXWebSocket).
+Решение принято на своих основаниях, а не выведено из лицензии платформы. По пути выяснилось,
+что **SML распространяется под GPL-3.0, а не под MIT**, как утверждали прежние редакции
+документа (проверено по `LICENSE.txt`, linking exception отсутствует). Вопрос «является ли мод
+производным произведением от SML» мы не решаем: при выбранной лицензии ответ на него ни на что
+не влияет. Подробный разбор — §2.2 документа.
 
-Исключены по несовместимости при линковке: EPL-1.0 (Graphviz), GPL-3.0 (piper1-gpl;
-FicsIt-Networks — отсюда интеграция через reflection-конвенцию, без зависимости).
+Совместимы и используются: GPL-3.0 (SML, FicsIt-Networks), MIT (слой данных SBC, Factory Spawner,
+MCP TypeScript SDK, `satisfactory-file-parser`), Apache-2.0 (sherpa-onnx, `sf-save-data`,
+`sf-flow`, Foreman как отдельный процесс), MPL-2.0 (Eigen), BSD-3-Clause (IXWebSocket).
+
+Исключена по несовместимости: EPL-1.0 (Graphviz — из архитектуры убран и так).
 Исключён из источников кода из-за отсутствия лицензии: Ficsit Remote Monitoring.
 
-Заимствованный код размещается в `third_party/<project>/` с `LICENSE`, `NOTICE` и перечнем патчей.
+Внешние моды обращаются к нашему публичному API по имени класса через Blueprint или рефлексию,
+без включения заголовков и без линковки, поэтому могут оставаться под любой лицензией, включая
+MIT (§3.7, ADR-023).
+
+Заимствованный код размещается в `third_party/<project>/` с исходным `LICENSE`, `NOTICE`
+и перечнем патчей; условия исходных лицензий сохраняются.
