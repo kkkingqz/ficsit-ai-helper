@@ -106,7 +106,7 @@ lang: ru-RU
 
 | Задача | Кто | Ч·д |
 |---|---|---|
-| Интерфейсы `IScreenHost` и `IScreenModule` — эскиз и ревью | Co | 0,5 |
+| Интерфейсы `IScreenHost` и `IScreenModule` — эскиз ([docs/interfaces/screen-host-and-module.md](interfaces/screen-host-and-module.md)) и ревью | Co | 0,5 |
 | Класс терминала: строительный объект с потреблением 10 MW, рецепт и схема через `UModContentRegistry`, меш-заготовка с экраном 16:9 | Gf | 2 |
 | Хост в терминале: два тестовых модуля, переключение; те же модули в тестовом хосте без изменений | Gf | 2 |
 | Состояние «нет питания» по E | Gf | 0,5 |

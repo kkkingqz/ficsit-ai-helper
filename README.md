@@ -17,6 +17,7 @@ Notes, Work Orders, Screens), подключаемый планировщик п
 | [docs/MODULES.md](docs/MODULES.md) | Реестр модулей: готовое решение, лицензия, остаток работы по каждому |
 | [docs/README.md](docs/README.md) | Состав пакета документа, сборка схем и PDF/DOCX |
 | [docs/assets/*.dot](docs/assets) | Исходники схем Graphviz |
+| [docs/interfaces](docs/interfaces) | Эскизы C++-интерфейсов на ревью (хост и экранный модуль) |
 | [docs/contracts/*.json](docs/contracts) | Примеры предлагаемых контрактов (не runtime API) |
 | [docs/contracts/schemas](docs/contracts/schemas) | JSON Schema контрактов; примеры проверяются в CI |
 | [docs/concepts](docs/concepts) | Концепт экранов (не шаблон) и что из него реализуется |
