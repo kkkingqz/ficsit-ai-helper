@@ -1,0 +1,186 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" font-family="DejaVu Sans, Verdana, sans-serif">
+  <title>FICSIT AI — AI Terminal frame (D-1), 1920x1080 @ UI scale 100%</title>
+  <defs>
+    <style>
+      .bg{fill:#0A1724}
+      .panel{fill:#0E2032;stroke:#1E3D59;stroke-width:2}
+      .zone{fill:none;stroke:#2FB8DE;stroke-width:2;stroke-dasharray:8 6}
+      .slot{fill:#122A40;stroke:#1E3D59;stroke-width:2}
+      .accent{fill:#F5871F}
+      .t{fill:#E6F0F7;font-size:17px}
+      .tm{fill:#8FA9BF;font-size:15px}
+      .ts{fill:#8FA9BF;font-size:13px;letter-spacing:1px}
+      .cap{fill:#E6F0F7;font-size:15px;letter-spacing:2px;font-weight:bold}
+      .val{fill:#E6F0F7;font-size:20px;font-weight:bold}
+      .ok{fill:#46C46B;font-size:16px;font-weight:bold}
+      .orange{fill:#F5871F;font-size:16px;font-weight:bold}
+      .num{fill:#F5871F;font-size:15px;font-weight:bold}
+      .numc{fill:#0A1724;font-size:15px;font-weight:bold}
+      .ann{fill:#9CC4DB;font-size:15px}
+      .annb{fill:#E6F0F7;font-size:15px;font-weight:bold}
+      .dim{fill:#2FB8DE;font-size:14px}
+      .icon{fill:none;stroke:#9CC4DB;stroke-width:2.2}
+      .iconA{fill:none;stroke:#0A1724;stroke-width:2.4}
+    </style>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1920" height="1080"/>
+
+  <!-- ============ 1. TOP STATUS BAR (h 64) ============ -->
+  <rect x="0" y="0" width="1920" height="64" fill="#0E2032"/>
+  <rect x="0" y="62" width="1920" height="2" fill="#1E3D59"/>
+  <!-- 2. brand block, aligned to rail width -->
+  <text class="cap" x="24" y="29">FICSIT</text>
+  <text class="ts" x="24" y="48">FACTORY OS</text>
+  <rect x="178" y="12" width="2" height="40" fill="#1E3D59"/>
+  <!-- 3. screen title -->
+  <polygon class="accent" points="200,14 196,50 204,50 208,14"/>
+  <polygon class="accent" points="214,14 210,50 218,50 222,14"/>
+  <text class="cap" x="238" y="40" font-size="22">STATISTICS</text>
+  <!-- 4. link status group -->
+  <rect x="820" y="12" width="2" height="40" fill="#1E3D59"/>
+  <circle cx="848" cy="25" r="6" fill="#46C46B"/>
+  <text class="ts" x="864" y="29">TELEMETRY</text>
+  <text class="ok" x="864" y="50">LIVE</text>
+  <circle cx="1006" cy="25" r="6" fill="#46C46B"/>
+  <text class="ts" x="1022" y="29">SIDECAR</text>
+  <text class="ok" x="1022" y="50">LINKED</text>
+  <rect x="1130" y="12" width="2" height="40" fill="#1E3D59"/>
+  <!-- 5. factory status cluster -->
+  <path class="icon" d="M1160 16 l-10 16 h8 l-4 14 12 -18 h-8 z"/>
+  <text class="ts" x="1182" y="26">POWER</text>
+  <text class="val" x="1182" y="48" font-size="17">1.20 / 1.50 GW</text>
+  <rect x="1356" y="36" width="96" height="10" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect x="1356" y="36" width="77" height="10" rx="2" fill="#F5871F"/>
+  <text class="tm" x="1356" y="28" font-size="13">80%</text>
+  <rect x="1478" y="12" width="2" height="40" fill="#1E3D59"/>
+  <rect class="icon" x="1504" y="20" width="6" height="22"/><rect class="icon" x="1514" y="14" width="6" height="28"/><rect class="icon" x="1524" y="26" width="6" height="16"/>
+  <text class="ts" x="1546" y="26">ACTIVE LINES</text>
+  <text class="val" x="1546" y="50" font-size="17">12 / 12</text>
+  <rect x="1682" y="12" width="2" height="40" fill="#1E3D59"/>
+  <path class="icon" d="M1708 28 l12 -7 12 7 -12 7 z M1708 28 v10 l12 7 12 -7 v-10"/>
+  <text class="ts" x="1748" y="26">LOAD</text>
+  <text class="val" x="1748" y="50" font-size="17">86%</text>
+
+  <!-- ============ 6. SIDE MENU RAIL (w 180) ============ -->
+  <rect x="0" y="64" width="180" height="960" fill="#0C1C2C"/>
+  <rect x="178" y="64" width="2" height="960" fill="#1E3D59"/>
+
+  <!-- rail items: slot = 76 px, icon y0+16..y0+48, label baseline y0+64 -->
+  <!-- 1 OVERVIEW (y0 72) -->
+  <path class="icon" d="M76 104 l14 -12 14 12 v16 h-28 z"/>
+  <text class="ts" x="90" y="136" text-anchor="middle">OVERVIEW</text>
+  <!-- 2 PLANNER (y0 148) — stub until v1.3 -->
+  <path class="icon" d="M90 168 v10 M76 178 h28 M76 178 v8 M104 178 v8 M90 178 v8"/>
+  <text class="ts" x="90" y="212" text-anchor="middle">PLANNER</text>
+  <!-- 3 PRODUCTION (y0 224) -->
+  <rect class="icon" x="78" y="250" width="6" height="14"/><rect class="icon" x="88" y="244" width="6" height="20"/><rect class="icon" x="98" y="254" width="6" height="10"/>
+  <text class="ts" x="90" y="288" text-anchor="middle">PRODUCTION</text>
+  <!-- 4 STATISTICS (y0 300) — active -->
+  <rect x="0" y="300" width="180" height="76" fill="#F5871F"/>
+  <rect x="0" y="300" width="5" height="76" fill="#FFF1E0"/>
+  <rect class="iconA" x="78" y="326" width="6" height="14"/><rect class="iconA" x="88" y="320" width="6" height="20"/><rect class="iconA" x="98" y="330" width="6" height="10"/>
+  <text class="ts" x="90" y="364" text-anchor="middle" fill="#0A1724" font-weight="bold">STATISTICS</text>
+  <!-- 5 CHAT (y0 376) -->
+  <path class="icon" d="M74 398 h32 v20 h-20 l-8 8 v-8 h-4 z"/>
+  <text class="ts" x="90" y="440" text-anchor="middle">CHAT</text>
+  <!-- 6 WORK ORDERS (y0 452) -->
+  <rect class="icon" x="76" y="474" width="28" height="22"/><path class="icon" d="M82 484 l5 5 9 -11"/>
+  <text class="ts" x="90" y="516" text-anchor="middle">WORK ORDERS</text>
+  <!-- 7 NOTES (y0 528) -->
+  <path class="icon" d="M78 550 h24 v24 h-24 z M84 558 h12 M84 566 h12"/>
+  <text class="ts" x="90" y="592" text-anchor="middle">NOTES</text>
+  <!-- 8 LINES (y0 604) -->
+  <path class="icon" d="M74 626 h12 m8 0 h12 m8 0 h8"/><circle class="icon" cx="90" cy="626" r="5"/>
+  <text class="ts" x="90" y="668" text-anchor="middle">LINES</text>
+  <!-- 9 SCREENS (y0 680) -->
+  <rect class="icon" x="76" y="700" width="28" height="18"/><path class="icon" d="M90 718 v6 M84 724 h12"/>
+  <text class="ts" x="90" y="744" text-anchor="middle">SCREENS</text>
+  <!-- 10 SETTINGS (y0 756) -->
+  <path class="icon" d="M76 778 h28 M76 790 h28"/><circle class="icon" cx="86" cy="778" r="4"/><circle class="icon" cx="96" cy="790" r="4"/>
+  <text class="ts" x="90" y="820" text-anchor="middle">SETTINGS</text>
+
+  <!-- hidden-items rule marker -->
+  <rect x="12" y="860" width="156" height="52" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tm" x="90" y="882" text-anchor="middle" font-size="12">LOGISTICS — v1.5,</text>
+  <text class="tm" x="90" y="900" text-anchor="middle" font-size="12">пункт скрыт</text>
+
+  <!-- ============ 9. CONTENT AREA ============ -->
+  <rect class="zone" x="200" y="84" width="1700" height="920"/>
+  <text class="dim" x="216" y="110">SCREEN MODULE AREA · 1700 × 920 @ 1920×1080 · отдаётся IScreenModule целиком</text>
+
+  <!-- legend inside the empty content area -->
+  <g transform="translate(240,150)">
+    <text class="annb" x="0" y="0" font-size="19">Каркас терминала — зоны хоста (D-1, неделя 1)</text>
+
+    <circle cx="12" cy="44" r="13" fill="#F5871F"/><text class="numc" x="12" y="49" text-anchor="middle">1</text>
+    <text class="annb" x="38" y="42">Верхняя полоса статуса — 64 px</text>
+    <text class="ann" x="38" y="64">высота фиксирована, содержимое справа сжимается первым (§6.7)</text>
+
+    <circle cx="12" cy="110" r="13" fill="#F5871F"/><text class="numc" x="12" y="115" text-anchor="middle">2</text>
+    <text class="annb" x="38" y="108">Блок идентичности — ширина равна рельсу (180 px)</text>
+    <text class="ann" x="38" y="130">FICSIT / FACTORY OS; версия мода — в «Настройках», не в полосе</text>
+
+    <circle cx="12" cy="176" r="13" fill="#F5871F"/><text class="numc" x="12" y="181" text-anchor="middle">3</text>
+    <text class="annb" x="38" y="174">Заголовок экрана</text>
+    <text class="ann" x="38" y="196">строку даёт модуль через IScreenHost; шевроны — хоста, не модуля</text>
+
+    <circle cx="12" cy="242" r="13" fill="#F5871F"/><text class="numc" x="12" y="247" text-anchor="middle">4</text>
+    <text class="annb" x="38" y="240">Связь: TELEMETRY и SIDECAR</text>
+    <text class="ann" x="38" y="262">LIVE / STALE / OFF и LINKED / OFFLINE — источник телеметрия (§8.2)</text>
+
+    <circle cx="12" cy="308" r="13" fill="#F5871F"/><text class="numc" x="12" y="313" text-anchor="middle">5</text>
+    <text class="annb" x="38" y="306">Состояние фабрики: POWER, ACTIVE LINES, LOAD</text>
+    <text class="ann" x="38" y="328">только отображение; модель в полосе не участвует</text>
+
+    <circle cx="12" cy="374" r="13" fill="#F5871F"/><text class="numc" x="12" y="379" text-anchor="middle">6</text>
+    <text class="annb" x="38" y="372">Боковое меню — 180 px, пункт 76 px</text>
+    <text class="ann" x="38" y="394">10 пунктов v1.0; в v0.1 видны только STATISTICS и CHAT</text>
+
+    <circle cx="12" cy="440" r="13" fill="#F5871F"/><text class="numc" x="12" y="445" text-anchor="middle">7</text>
+    <text class="annb" x="38" y="438">Активный пункт — заливка акцентом + полоса 5 px слева</text>
+    <text class="ann" x="38" y="460">наведение и фокус клавиатуры различимы между собой</text>
+
+    <circle cx="12" cy="506" r="13" fill="#F5871F"/><text class="numc" x="12" y="511" text-anchor="middle">8</text>
+    <text class="annb" x="38" y="504">Нереализованный раздел — пункт скрыт, не заблокирован (§6.7)</text>
+    <text class="ann" x="38" y="526">исключение: PLANNER с v1.0 открывает заглушку обёртки (§6.4)</text>
+
+    <circle cx="12" cy="572" r="13" fill="#F5871F"/><text class="numc" x="12" y="577" text-anchor="middle">9</text>
+    <text class="annb" x="38" y="570">Область экранного модуля</text>
+    <text class="ann" x="38" y="592">хост не рисует внутри неё ничего; размер сообщается модулю</text>
+
+    <circle cx="12" cy="638" r="13" fill="#F5871F"/><text class="numc" x="12" y="643" text-anchor="middle">10</text>
+    <text class="annb" x="38" y="636">Нижняя полоса клавиш — 56 px</text>
+    <text class="ann" x="38" y="658">Esc — всегда хоста; остальные клавиши объявляет модуль</text>
+
+    <circle cx="12" cy="704" r="13" fill="#F5871F"/><text class="numc" x="12" y="709" text-anchor="middle">11</text>
+    <text class="annb" x="38" y="702">Зарезервированное место счётчика предупреждений</text>
+    <text class="ann" x="38" y="724">в v1.0 пусто: системы оповещений нет (§6.8)</text>
+  </g>
+
+  <!-- dimension marks -->
+  <path d="M0 74 h180" stroke="#2FB8DE" stroke-width="1"/>
+  <text class="dim" x="188" y="78">180</text>
+  <path d="M1906 0 v64" stroke="#2FB8DE" stroke-width="1"/>
+  <text class="dim" x="1856" y="80">64</text>
+  <path d="M1906 1024 v56" stroke="#2FB8DE" stroke-width="1"/>
+  <text class="dim" x="1856" y="1016">56</text>
+
+  <!-- ============ 10. BOTTOM KEY BAR (h 56) ============ -->
+  <rect x="0" y="1024" width="1920" height="56" fill="#0E2032"/>
+  <rect x="0" y="1024" width="1920" height="2" fill="#1E3D59"/>
+  <g>
+    <rect class="slot" x="24" y="1038" width="34" height="28" rx="4"/><text class="t" x="41" y="1058" text-anchor="middle">R</text>
+    <text class="tm" x="68" y="1058">REFRESH</text>
+    <rect class="slot" x="172" y="1038" width="34" height="28" rx="4"/><text class="t" x="189" y="1058" text-anchor="middle">F</text>
+    <text class="tm" x="216" y="1058">FOCUS</text>
+    <rect class="slot" x="300" y="1038" width="34" height="28" rx="4"/><text class="t" x="317" y="1058" text-anchor="middle">C</text>
+    <text class="tm" x="344" y="1058">EXPORT CSV</text>
+    <rect class="slot" x="476" y="1038" width="52" height="28" rx="4"/><text class="t" x="502" y="1058" text-anchor="middle">Esc</text>
+    <text class="tm" x="538" y="1058">BACK</text>
+    <text class="tm" x="640" y="1058" font-size="13" fill="#5E7D96">· далее — клавиши текущего экрана (объявляет модуль) ·</text>
+  </g>
+  <!-- 11. reserved alert slot -->
+  <rect x="1656" y="1034" width="240" height="36" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tm" x="1776" y="1057" text-anchor="middle" font-size="13">RESERVED · alerts (не v1.0)</text>
+</svg>

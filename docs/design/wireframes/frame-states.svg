@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1180" width="1920" height="1180" font-family="DejaVu Sans, Verdana, sans-serif">
+  <title>FICSIT AI — AI Terminal frame states (D-1)</title>
+  <defs>
+    <style>
+      .bg{fill:#071320}
+      .panel{fill:#0A1724;stroke:#1E3D59;stroke-width:2}
+      .bar{fill:#0E2032;stroke:#1E3D59;stroke-width:2}
+      .slot{fill:#122A40;stroke:#1E3D59;stroke-width:2}
+      .h{fill:#E6F0F7;font-size:21px;font-weight:bold;letter-spacing:1px}
+      .cap{fill:#F5871F;font-size:16px;font-weight:bold;letter-spacing:2px}
+      .t{fill:#E6F0F7;font-size:17px}
+      .tm{fill:#8FA9BF;font-size:15px}
+      .ts{fill:#8FA9BF;font-size:13px;letter-spacing:1px}
+      .ann{fill:#9CC4DB;font-size:14px}
+      .big{fill:#E6F0F7;font-size:40px;font-weight:bold;letter-spacing:3px}
+      .icon{fill:none;stroke:#8FA9BF;stroke-width:2.4}
+      .warn{fill:#F5871F;font-size:16px;font-weight:bold}
+      .off{fill:#6A8398;font-size:16px;font-weight:bold}
+      .ok{fill:#46C46B;font-size:16px;font-weight:bold}
+      .stale{fill:#E8C33C;font-size:16px;font-weight:bold}
+    </style>
+  </defs>
+  <rect class="bg" x="0" y="0" width="1920" height="1180"/>
+  <text class="h" x="60" y="52">Состояния каркаса — для V-1 (Gf, неделя 5)</text>
+  <text class="ann" x="60" y="78">Два состояния забирают весь экран вместо каркаса. Полный набор состояний (сайдкар не подключён, пустые данные) — неделя 3.</text>
+
+  <!-- ===== A. NO POWER ===== -->
+  <text class="cap" x="60" y="118">A · NO POWER — §6.1</text>
+  <rect class="panel" x="60" y="134" width="860" height="484"/>
+  <g transform="translate(60,134)">
+    <circle cx="430" cy="170" r="58" fill="none" stroke="#3A5A74" stroke-width="3"/>
+    <path d="M438 134 l-26 42 h20 l-10 36 30 -46 h-20 z" fill="none" stroke="#6A8398" stroke-width="3"/>
+    <path d="M388 128 l84 84" stroke="#6A8398" stroke-width="3"/>
+    <text class="big" x="430" y="282" text-anchor="middle" fill="#A8BECE">NO POWER</text>
+    <text class="t" x="430" y="320" text-anchor="middle" fill="#8FA9BF">This terminal requires 10 MW</text>
+    <text class="tm" x="430" y="348" text-anchor="middle">Connect it to a powered grid to use the screens</text>
+    <text class="ts" x="430" y="392" text-anchor="middle">Notes, screens and work orders are not lost</text>
+    <rect class="slot" x="356" y="420" width="52" height="28" rx="4"/><text class="t" x="382" y="440" text-anchor="middle">Esc</text>
+    <text class="tm" x="418" y="440">CLOSE</text>
+  </g>
+  <text class="ann" x="60" y="646">Каркаса нет: ни меню, ни полос. Экран в мире не рендерится (§6.6).</text>
+  <text class="ann" x="60" y="668">Текст без упоминания ИИ: питания нет у терминала, а не у мода.</text>
+
+  <!-- ===== B. INERT (MP) ===== -->
+  <text class="cap" x="1000" y="118">B · INERT — §4.2, AC-10</text>
+  <rect class="panel" x="1000" y="134" width="860" height="484"/>
+  <g transform="translate(1000,134)">
+    <circle cx="430" cy="170" r="58" fill="none" stroke="#6B4A1E" stroke-width="3"/>
+    <circle cx="416" cy="156" r="9" fill="none" stroke="#F5871F" stroke-width="3"/><path d="M402 188 a14 16 0 0 1 28 0" fill="none" stroke="#F5871F" stroke-width="3"/><circle cx="448" cy="162" r="8" fill="none" stroke="#F5871F" stroke-width="3"/><path d="M436 190 a12 14 0 0 1 24 0" fill="none" stroke="#F5871F" stroke-width="3"/>
+    <path d="M388 128 l84 84" stroke="#F5871F" stroke-width="3"/>
+    <text class="big" x="430" y="282" text-anchor="middle" fill="#F0B36B" font-size="29">UNAVAILABLE IN MULTIPLAYER</text>
+    <text class="t" x="430" y="320" text-anchor="middle" fill="#8FA9BF">Another player is in this session</text>
+    <text class="tm" x="430" y="348" text-anchor="middle">The mod is inert: screens are closed and the sidecar link is dropped</text>
+    <text class="ts" x="430" y="392" text-anchor="middle">Work resumes on its own once remote players leave</text>
+    <rect class="slot" x="356" y="420" width="52" height="28" rx="4"/><text class="t" x="382" y="440" text-anchor="middle">Esc</text>
+    <text class="tm" x="418" y="440">CLOSE</text>
+  </g>
+  <text class="ann" x="1000" y="646">Причина названа прямо. Кнопки «повторить» нет: режим снимается</text>
+  <text class="ann" x="1000" y="668">уходом игроков, а не действием. Тот же экран при загрузке MP-сессии.</text>
+
+  <!-- ===== C. TOP BAR DEGRADATION ===== -->
+  <text class="cap" x="60" y="712">C · Деградация верхней полосы — те же 64 px, меняются только значения</text>
+
+  <!-- C1 normal -->
+  <rect class="bar" x="60" y="736" width="1800" height="64"/>
+  <text class="ts" x="84" y="760">FICSIT</text><text class="ts" x="84" y="782">FACTORY OS</text>
+  <circle cx="320" cy="760" r="6" fill="#46C46B"/><text class="ts" x="336" y="764">TELEMETRY</text><text class="ok" x="336" y="786">LIVE</text>
+  <circle cx="500" cy="760" r="6" fill="#46C46B"/><text class="ts" x="516" y="764">SIDECAR</text><text class="ok" x="516" y="786">LINKED</text>
+  <text class="ts" x="700" y="764">POWER</text><text class="t" x="700" y="786">1.20 / 1.50 GW</text>
+  <text class="ts" x="900" y="764">ACTIVE LINES</text><text class="t" x="900" y="786">12 / 12</text>
+  <text class="ts" x="1080" y="764">LOAD</text><text class="t" x="1080" y="786">86%</text>
+  <text class="ann" x="1320" y="774">C1 — норма: все значения живые</text>
+
+  <!-- C2 sidecar offline -->
+  <rect class="bar" x="60" y="826" width="1800" height="64"/>
+  <text class="ts" x="84" y="850">FICSIT</text><text class="ts" x="84" y="872">FACTORY OS</text>
+  <circle cx="320" cy="850" r="6" fill="#46C46B"/><text class="ts" x="336" y="854">TELEMETRY</text><text class="ok" x="336" y="876">LIVE</text>
+  <circle cx="500" cy="850" r="6" fill="#6A8398"/><text class="ts" x="516" y="854">SIDECAR</text><text class="off" x="516" y="876">OFFLINE</text>
+  <text class="ts" x="700" y="854">POWER</text><text class="t" x="700" y="876">1.20 / 1.50 GW</text>
+  <text class="ts" x="900" y="854">ACTIVE LINES</text><text class="t" x="900" y="876">12 / 12</text>
+  <text class="ts" x="1080" y="854">LOAD</text><text class="t" x="1080" y="876">86%</text>
+  <text class="ann" x="1320" y="864">C2 — сайдкара нет: ручные пути работают (FR-10),</text>
+  <text class="ann" x="1320" y="884">недоступен только CHAT; пункт остаётся и объясняет</text>
+
+  <!-- C3 telemetry stale -->
+  <rect class="bar" x="60" y="916" width="1800" height="64"/>
+  <text class="ts" x="84" y="940">FICSIT</text><text class="ts" x="84" y="962">FACTORY OS</text>
+  <circle cx="320" cy="940" r="6" fill="#E8C33C"/><text class="ts" x="336" y="944">TELEMETRY</text><text class="stale" x="336" y="966">STALE · 42 s</text>
+  <circle cx="500" cy="940" r="6" fill="#46C46B"/><text class="ts" x="516" y="944">SIDECAR</text><text class="ok" x="516" y="966">LINKED</text>
+  <text class="ts" x="700" y="944">POWER</text><text class="off" x="700" y="966">1.18 / 1.50 GW</text>
+  <text class="ts" x="900" y="944">ACTIVE LINES</text><text class="off" x="900" y="966">12 / 12</text>
+  <text class="ts" x="1080" y="944">LOAD</text><text class="off" x="1080" y="966">84%</text>
+  <text class="ann" x="1320" y="954">C3 — данные устарели: значения тускнеют и получают возраст,</text>
+  <text class="ann" x="1320" y="974">но не прячутся и не заменяются прочерками</text>
+
+  <!-- ===== D. BOTTOM BAR VARIANT ===== -->
+  <text class="cap" x="60" y="1032">D · Нижняя полоса: клавиши объявляет модуль, Esc всегда у хоста</text>
+  <rect class="bar" x="60" y="1056" width="1800" height="56"/>
+  <rect class="slot" x="84" y="1070" width="34" height="28" rx="4"/><text class="t" x="101" y="1090" text-anchor="middle">R</text><text class="tm" x="128" y="1090">REFRESH</text>
+  <rect class="slot" x="232" y="1070" width="34" height="28" rx="4"/><text class="t" x="249" y="1090" text-anchor="middle">C</text><text class="tm" x="276" y="1090">EXPORT CSV</text>
+  <rect class="slot" x="424" y="1070" width="52" height="28" rx="4"/><text class="t" x="450" y="1090" text-anchor="middle">Esc</text><text class="tm" x="486" y="1090">BACK</text>
+  <rect x="1620" y="1066" width="216" height="36" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tm" x="1728" y="1089" text-anchor="middle" font-size="13">RESERVED · alerts</text>
+  <text class="ann" x="620" y="1090" font-size="13" fill="#5E7D96">у «Чата» клавиши другие: Enter — отправить, Esc — отмена потока, затем выход</text>
+</svg>
