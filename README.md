@@ -13,6 +13,7 @@ Notes, Work Orders, Screens), подключаемый планировщик п
 | Файл | Что это |
 |---|---|
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Архитектурный документ v2.2-draft (источник истины) |
+| [docs/PLAN-v0.1.md](docs/PLAN-v0.1.md) | План этапа 1: спайки и вертикальный срез v0.1 |
 | [docs/MODULES.md](docs/MODULES.md) | Реестр модулей: готовое решение, лицензия, остаток работы по каждому |
 | [docs/README.md](docs/README.md) | Состав пакета документа, сборка схем и PDF/DOCX |
 | [docs/assets/*.dot](docs/assets) | Исходники схем Graphviz |
