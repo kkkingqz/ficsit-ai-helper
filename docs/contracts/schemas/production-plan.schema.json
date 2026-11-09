@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ficsit-ai/contracts/production-plan.schema.json",
   "title": "ProductionPlan",
-  "description": "Вычисляемая модель производства (ARCHITECTURE.md §5.2). Считается ядром планировщика в моде (§8.3). Цикл рецептов — ошибка расчёта RECIPE_CYCLE_UNSUPPORTED, план при этом не строится.",
+  "description": "Вычисляемая модель производства (ARCHITECTURE.md §5.2). Считается подключённым провайдером за обёрткой планировщика (§8.3). Ошибки расчёта, при которых план не строится: RECIPE_CYCLE_UNSUPPORTED (провайдер не поддерживает циклы), SYSTEM_INFEASIBLE (набор рецептов не может дать цель). BYPRODUCT_NOT_BALANCED сообщает об излишке побочного продукта.",
   "type": "object",
   "additionalProperties": false,
   "required": [

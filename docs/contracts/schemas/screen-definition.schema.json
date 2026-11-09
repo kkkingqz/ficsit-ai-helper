@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://ficsit-ai/contracts/screen-definition.schema.json",
   "title": "ScreenDefinition",
-  "description": "Декларативная белая схема экрана (ARCHITECTURE.md §5.3, ADR-005). Незнакомые поля и типы отвергаются. Проверки, которые схема не выражает, выполняет Validator в моде: допустимость слота для пресета layout, существование source.id в живом каталоге метрик и планах, зажим refreshSec в допустимый диапазон.",
+  "description": "Декларативная белая схема экрана (ARCHITECTURE.md §5.3, ADR-005). Незнакомые поля и типы отвергаются. Проверки, которые схема не выражает, выполняет Validator в моде: допустимость слота для пресета layout, существование source.id в живом каталоге метрик, линиях и планах, зажим refreshSec в допустимый диапазон.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "scope", "title", "layout", "widgets"],
@@ -24,14 +24,14 @@
         "required": ["id", "type", "slot", "source"],
         "properties": {
           "id": { "$ref": "#/$defs/localId" },
-          "type": { "enum": ["text", "metric", "table", "timeseries", "production_graph", "notes", "work_orders"] },
+          "type": { "enum": ["text", "metric", "table", "timeseries", "production_graph", "line", "notes", "work_orders"] },
           "slot": { "enum": ["main", "side", "foot"] },
           "source": {
             "type": "object",
             "additionalProperties": false,
             "required": ["kind", "id"],
             "properties": {
-              "kind": { "enum": ["plan", "metric", "work_orders", "notes", "static"] },
+              "kind": { "enum": ["plan", "metric", "line", "work_orders", "notes", "static"] },
               "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{0,63}$" }
             }
           },
