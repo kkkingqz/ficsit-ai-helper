@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src data:; base-uri 'none'; form-action 'none'">
+  <title>FICSIT AI · S8</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="third_party/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="load.css">
+  <script defer src="third_party/uplot/uPlot.iife.min.js"></script>
+  <script defer src="load.js"></script>
+</head>
+<body>
+  <main class="workload">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow" data-copy="eyebrow"></p>
+        <h1 data-copy="title"></h1>
+      </div>
+      <div class="run-meta">
+        <div class="source">
+          <strong data-copy="source"></strong>
+          <output id="elapsed"></output>
+        </div>
+        <label for="points">
+          <span data-copy="window"></span>
+          <select id="points"></select>
+        </label>
+      </div>
+    </header>
+
+    <section class="metrics" id="metrics" aria-label="Telemetry metrics"></section>
+
+    <div class="details">
+      <section class="charts" id="charts" aria-label="Telemetry charts"></section>
+      <section class="panel equipment" aria-labelledby="equipment-title">
+        <h2 id="equipment-title" data-copy="equipment"></h2>
+        <table>
+          <thead><tr id="columns"></tr></thead>
+          <tbody id="equipment-rows"></tbody>
+        </table>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
