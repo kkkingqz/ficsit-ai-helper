@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import express, { type Request, type Response } from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -11,8 +12,9 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
-import { loadConfig, mcpUrlFor, type Config } from "./config.js";
+import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
 import { createLogger, type Logger } from "./log.js";
+import { createNormalizerApp } from "./normalizer.js";
 import { UpstreamMcp } from "./upstream.js";
 
 /**
@@ -151,8 +153,34 @@ async function main(): Promise<void> {
     process.exit(1);
   });
 
+  // Нормализатор ответов провайдера (ADR-034): отдельный слушатель на петле в
+  // этом же процессе — не новый исполняемый файл в архиве и не новая запись в
+  // лаунчере, потому что каждый процесс в поставке проверяется у пилотного
+  // тестера (R-11, ADR-015). Цена — связность: падает адаптер, падает и он.
+  const normalizerUrl = normalizerUrlFor(config);
+  let normalizerServer: HttpServer | undefined;
+  if (config.llmUpstreamBaseUrl !== undefined && normalizerUrl !== undefined) {
+    const normalizer = createNormalizerApp(config.llmUpstreamBaseUrl, log);
+    normalizerServer = normalizer.listen(config.normalizerPort, config.host);
+    normalizerServer.on("listening", () => {
+      log.info(`нормализатор ответов слушает ${normalizerUrl} → ${config.llmUpstreamBaseUrl}`);
+      log.info(`LLM_BASE_URL для Foreman: ${normalizerUrl}`);
+    });
+    normalizerServer.on("error", (err: NodeJS.ErrnoException) => {
+      if (err.code === "EADDRINUSE") {
+        log.error(`порт нормализатора ${config.normalizerPort} занят — остановите прежний адаптер`);
+      } else {
+        log.error("нормализатор не поднялся", err);
+      }
+      process.exit(1);
+    });
+  } else {
+    log.info("нормализатор ответов выключен: LLM_UPSTREAM_BASE_URL не задан");
+  }
+
   const shutdown = (signal: string) => {
     log.info(`${signal}: останавливаюсь`);
+    normalizerServer?.close();
     httpServer.close(() => process.exit(0));
   };
   process.on("SIGINT", () => shutdown("SIGINT"));

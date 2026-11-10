@@ -25,6 +25,7 @@ ADAPTER_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../adapter" && pwd)"
 SF_MCP_PORT="${SF_MCP_PORT:-8723}"
 FF_SERVER_PORT="${FF_SERVER_PORT:-8724}"
 ADAPTER_PORT="${ADAPTER_PORT:-8730}"
+NORMALIZER_PORT="${NORMALIZER_PORT:-8731}"
 HOST_LOOPBACK=127.0.0.1
 
 RUN_DIR="$FICSITAI_DATA/run"
@@ -102,7 +103,7 @@ llm_env() {
       # провайдера у Foreman для него нет, и это ровно тот случай, под который
       # там сделан LLM_BASE_URL.
       export LLM_PROVIDER=openai
-      export LLM_BASE_URL="${LLM_BASE_URL:-$GEMINI_OPENAI_BASE}"
+      export LLM_UPSTREAM_BASE_URL="${LLM_UPSTREAM_BASE_URL:-$GEMINI_OPENAI_BASE}"
       export LLM_MODEL="${LLM_MODEL:-$KEY_FILE_DEFAULT_MODEL_CHAT}"
       export LLM_SUMMARY_MODEL="${LLM_SUMMARY_MODEL:-$KEY_FILE_DEFAULT_MODEL_SUMMARY}"
       ;;
@@ -114,6 +115,18 @@ llm_env() {
       exit 1
       ;;
   esac
+
+  # Нормализатор ответов провайдера (ADR-034) живёт в процессе адаптера:
+  # Foreman ходит к нему, а он — к провайдеру. Выключается FICSITAI_NORMALIZER=off,
+  # и тогда Foreman обращается к провайдеру напрямую, теряя вызовы инструментов.
+  if [ "${FICSITAI_NORMALIZER:-on}" = "on" ] && [ -n "${LLM_UPSTREAM_BASE_URL:-}" ]; then
+    export NORMALIZER_PORT
+    export LLM_BASE_URL="http://$HOST_LOOPBACK:$NORMALIZER_PORT"
+  elif [ -n "${LLM_UPSTREAM_BASE_URL:-}" ]; then
+    export LLM_BASE_URL="${LLM_UPSTREAM_BASE_URL}"
+    unset LLM_UPSTREAM_BASE_URL
+    echo "предупреждение: нормализатор выключен — вызовы инструментов у Gemini потеряются (ADR-034)" >&2
+  fi
 
   if [ -z "${LLM_API_KEY:-}" ]; then
     echo "предупреждение: ключа LLM нет ($key_file) — поднимется всё, кроме ответа в чате." >&2
@@ -176,7 +189,7 @@ cmd_start() {
   [ -d "$FOREMAN_SRC" ] || { echo "нет клона Foreman: $FOREMAN_SRC (коммит — foreman.pin.json)" >&2; exit 1; }
   [ -d "$ADAPTER_SRC/node_modules" ] || run_node "$ADAPTER_SRC" npm install --no-audit --no-fund
   # Занятый порт — повод остановиться, а не поднимать второй экземпляр поверх.
-  for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT"; do
+  for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT" "$NORMALIZER_PORT"; do
     if [ -n "$(listeners_on "$port")" ]; then
       echo "порт $port уже занят (pid $(listeners_on "$port" | tr "\n" " ")) — сначала stop" >&2
       exit 1
@@ -184,7 +197,16 @@ cmd_start() {
   done
   start_bg sf-mcp "$FOREMAN_SRC" npm run start:mcp
   start_bg ff-server "$FOREMAN_SRC" npm run start:server
-  start_bg adapter "$ADAPTER_SRC" npm run dev
+  # Адаптер поднимается собранным, а не под tsx watch: наблюдатель переподнимает
+  # процесс на каждую правку файла, и при нескольких поколениях они дрались за
+  # порт 8730 — выжившее поколение отвечало со старой конфигурацией (10.11.2026).
+  # Режим разработки включается осознанно: ADAPTER_MODE=dev.
+  if [ "${ADAPTER_MODE:-build}" = "dev" ]; then
+    start_bg adapter "$ADAPTER_SRC" npm run dev
+  else
+    run_node "$ADAPTER_SRC" npm run build > /dev/null
+    start_bg adapter "$ADAPTER_SRC" npm run start
+  fi
   echo
   cmd_urls
 }
@@ -207,7 +229,7 @@ cmd_stop() {
   # Контрольный проход по портам: если что-то осталось висеть, порт занят и
   # следующий start поднимется мимо — молча и с чужой конфигурацией.
   local leftover=0
-  for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT"; do
+  for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT" "$NORMALIZER_PORT"; do
     local pids; pids="$(listeners_on "$port")"
     for pid in $pids; do
       kill -TERM "$pid" 2>/dev/null && { echo "добит слушатель порта $port (pid $pid)"; leftover=1; }
@@ -233,8 +255,8 @@ cmd_status() {
   done
   echo
   echo "слушатели (должны быть только 127.0.0.1):"
-  ss -ltnp 2>/dev/null | awk -v p1="$SF_MCP_PORT" -v p2="$FF_SERVER_PORT" -v p3="$ADAPTER_PORT" \
-    'NR==1 || $4 ~ ":"p1"$" || $4 ~ ":"p2"$" || $4 ~ ":"p3"$"'
+  ss -ltnp 2>/dev/null | awk -v p1="$SF_MCP_PORT" -v p2="$FF_SERVER_PORT" -v p3="$ADAPTER_PORT" -v p4="$NORMALIZER_PORT" \
+    'NR==1 || $4 ~ ":"p1"$" || $4 ~ ":"p2"$" || $4 ~ ":"p3"$" || $4 ~ ":"p4"$"'
 }
 
 cmd_urls() {
@@ -242,6 +264,7 @@ cmd_urls() {
   echo "sf-mcp     http://$HOST_LOOPBACK:$SF_MCP_PORT/health   (MCP: /mcp, без аутентификации — только петля)"
   echo "ff-server  http://$HOST_LOOPBACK:$FF_SERVER_PORT"
   echo "адаптер    http://$HOST_LOOPBACK:$ADAPTER_PORT/health"
+  echo "нормализ.  http://$HOST_LOOPBACK:$NORMALIZER_PORT → провайдер (ADR-034, в процессе адаптера)"
   echo "MCP_URL    http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=<в $TOKEN_FILE>"
   llm_env
   echo "LLM        ${FICSITAI_LLM:-gemini} → провайдер $LLM_PROVIDER, модель ${LLM_MODEL:-по умолчанию у Foreman}${LLM_API_KEY:+, ключ на месте}"

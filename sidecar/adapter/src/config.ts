@@ -27,6 +27,13 @@ const schema = z.object({
   sfMcpUrl: z.string().url().default("http://127.0.0.1:8723/mcp"),
   /** Версия публичного API мода, с которой адаптер совместим (docs/interfaces/public-api-v0.md). */
   apiVersion: z.string().default("0.1.0"),
+  /**
+   * Настоящий адрес LLM-провайдера. Задан — поднимается нормализатор ответов
+   * (ADR-034) на своём порту, и `LLM_BASE_URL` Foreman указывает на него.
+   * Не задан — нормализатор не поднимается, Foreman ходит к провайдеру сам.
+   */
+  llmUpstreamBaseUrl: z.string().url().optional(),
+  normalizerPort: z.coerce.number().int().min(1).max(65535).default(8731),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -40,6 +47,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     foremanBaseUrl: env.FOREMAN_BASE_URL,
     sfMcpUrl: env.SF_MCP_URL,
     apiVersion: env.FICSITAI_API_VERSION,
+    llmUpstreamBaseUrl: env.LLM_UPSTREAM_BASE_URL,
+    normalizerPort: env.NORMALIZER_PORT,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 
@@ -48,6 +57,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     throw new Error(`не настроено окружение адаптера:\n${lines.join("\n")}`);
   }
   return parsed.data;
+}
+
+/** Строка, которую лаунчер кладёт в LLM_BASE_URL Foreman, когда нормализатор включён. */
+export function normalizerUrlFor(config: Config): string | undefined {
+  if (config.llmUpstreamBaseUrl === undefined) return undefined;
+  const host = config.host === "::1" ? "[::1]" : config.host;
+  return `http://${host}:${config.normalizerPort}`;
 }
 
 /** Строка, которую лаунчер кладёт в MCP_URL Foreman. */
