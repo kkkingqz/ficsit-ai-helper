@@ -218,10 +218,44 @@ cd ~/Projects/SatisfactoryModLoader
 
 ## 7. Сборка мода через Alpakit Win64 под Wine
 
-1. В стартовом проекте в меню плагина **Alpakit** выберите целевой мод (`FicsitAI`).
-2. Целевая платформа упаковки: **Windows / Win64**.
-3. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
-4. Результат сборки помещается в `Saved/Alpakit/<ModReference>/`.
+### 7.1 Важные требования к окружению перед сборкой
+1. **Wine в `$PATH`:** убедитесь, что `wine` доступен в `$PATH` процесса (проверить: `command -v wine && wine --version`). Если Wine установлен через Nix, добавьте путь к бинарникам Wine:
+   ```bash
+   export PATH="/nix/store/f88bpklr2ka5fv005058fwddh4vlwsjy-wine-wow64-11.0/bin:$PATH"
+   ```
+   *(либо сделайте symlink в `~/.local/bin`).* **Внимание:** если `wine` отсутствует в `$PATH`, вызовы компилятора ресурсов `rc.exe` внутри обёртки MSVC молча зависают на чтении FIFO!
+2. **Переменная MSVC:** `export UE_WINE_MSVC="$HOME/msvc"`.
+3. **Лимит открытых файлов (ulimit):** при упаковке ассетов утилита Zen пытается выставить бесконечный лимит `nofile`, что на Linux вызывает ошибку без явного задания:
+   ```bash
+   ulimit -n 1048576
+   ```
+4. **Раздел `/tmp`:** должен быть смонтирован с правом исполнения (`exec`): `sudo mount -o remount,exec /tmp`.
+
+### 7.2 Сборка через редактор (Alpakit UI)
+1. Запустите редактор из терминала с настроенным `$PATH` и `$UE_WINE_MSVC`:
+   ```bash
+   ~/UnrealEngineCSS/Engine/Binaries/Linux/UnrealEditor \
+     ~/Projects/SatisfactoryModLoader/FactoryGame.uproject
+   ```
+2. В меню плагина **Alpakit** выберите целевой мод (`FicsitAI`).
+3. Целевая платформа упаковки: **Windows / Win64**.
+4. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
+5. Результат сборки помещается в `Saved/Alpakit/<ModReference>/`.
+
+### 7.3 Сборка из командной строки (UAT)
+```bash
+export PATH="/nix/store/f88bpklr2ka5fv005058fwddh4vlwsjy-wine-wow64-11.0/bin:$PATH"
+export UE_WINE_MSVC="$HOME/msvc"
+ulimit -n 1048576 2>/dev/null || true
+
+~/UnrealEngineCSS/Engine/Build/BatchFiles/RunUAT.sh \
+  -ScriptsForProject="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
+  PackagePlugin \
+  -Project="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
+  -dlcname=<ModReference> \
+  -merge -build -clientconfig=Shipping \
+  -platform=Win64 -nocompileeditor -installed
+```
 
 ---
 
