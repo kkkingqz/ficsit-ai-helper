@@ -28,12 +28,32 @@ class Workload(HTMLParser):
             self.tiles += 1
         if tag == "tbody":
             self.in_table_body = True
-        if tag == "tr" and self.in_table_body:
+        if tag == "tr" and self.in_table_body and dict(attributes).get("class") != "generator-group":
             self.rows += 1
 
     def handle_endtag(self, tag):
         if tag == "tbody":
             self.in_table_body = False
+
+
+def check_generator_groups(html, total_generation):
+    groups = re.findall(r"<tbody[^>]*>(.*?)</tbody>", html, re.S)
+    names = []
+    total_output = 0
+    for group in groups:
+        summary = re.search(
+            r'<th scope="rowgroup">([^<]+)</th><td>(\d+) / (\d+) running</td><td>(\d+)</td>', group,
+        )
+        assert summary, "У группы генераторов отсутствует заголовок с итогами"
+        name, running, total, output = summary.groups()
+        rows = re.findall(r'<td class="(running|standby)">[^<]+</td><td>(\d+)</td>', group)
+        assert int(total) == len(rows) == 4
+        assert int(running) == sum(state == "running" for state, _ in rows) == 3
+        assert int(output) == sum(int(value) for _, value in rows)
+        names.append(name)
+        total_output += int(output)
+    assert names == ["Coal", "Fuel", "Geothermal"], names
+    assert total_output == total_generation
 
 
 def check_page(chrome, bundle, profile, size, points, query):
@@ -52,7 +72,8 @@ def check_page(chrome, bundle, profile, size, points, query):
     assert tick and int(tick[1]) >= 2, "Обновление телеметрии с частотой 1 Гц не наблюдалось"
     generation = re.search(r'Generation</h2><p class="metric-value"><span class="metric-number">(\d+)</span>', result.stdout)
     assert generation and int(generation[1]) != 555, "Значение генерации осталось начальным"
-    print(f"{size}, {points} точек: два графика, восемь плиток, 12 строк, обновление 1 Гц")
+    check_generator_groups(result.stdout, int(generation[1]))
+    print(f"{size}, {points} точек: два графика, восемь плиток, 12 генераторов в трёх группах, обновление 1 Гц")
 
 
 def main():

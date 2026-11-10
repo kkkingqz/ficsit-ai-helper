@@ -7,7 +7,7 @@
     title: "Terminal render workload",
     source: "FIXTURE · 1 Hz",
     window: "History",
-    equipment: "Generators",
+    equipment: "Generators by type",
     columns: ["Generator", "State", "Output (MW)"],
     metrics: ["Generation", "Consumption", "Capacity", "Headroom",
               "Resource inflow", "Resource outflow", "Resource balance", "Online generators"],
@@ -15,12 +15,18 @@
     live: "LIVE",
     running: "Running",
     standby: "Standby",
+    groupStatus: (running, total) => `${running} / ${total} running`,
     samples: (count) => `${count} samples per series`,
     generator: (index) => `GEN-${String(index + 1).padStart(2, "0")}`,
   };
 
   const windows = [60, 300, 600];
-  const generatorCount = 12;
+  const generatorTypes = [
+    { name: "Coal", total: 4, running: 3 },
+    { name: "Fuel", total: 4, running: 3 },
+    { name: "Geothermal", total: 4, running: 3 },
+  ];
+  const runningCount = generatorTypes.reduce((count, type) => count + type.running, 0);
   const charts = [
     { title: "Power (MW)", labels: ["Generation", "Consumption"], max: 800, fields: [0, 1] },
     { title: "Resources (items/min)", labels: ["Inflow", "Outflow"], max: 200, fields: [4, 5] },
@@ -44,7 +50,7 @@
     const inflow = 142 + Math.round(19 * wave(7));
     const outflow = 120 + Math.round(18 * wave(5));
     return [generation, consumption, capacity, capacity - consumption,
-            inflow, outflow, inflow - outflow, activeOutputs.length];
+            inflow, outflow, inflow - outflow, runningCount];
   }
 
   document.querySelectorAll("[data-copy]").forEach((node) => {
@@ -68,16 +74,33 @@
     document.getElementById("columns").append(header);
   }
 
-  const activeOutputs = [];
-  for (let index = 0; index < generatorCount; index += 1) {
-    const running = index % 4 !== 3;
-    const row = element("tr");
-    const value = element("td", "", "0");
-    row.append(element("td", "", copy.generator(index)),
-               element("td", running ? "running" : "standby", running ? copy.running : copy.standby), value);
-    document.getElementById("equipment-rows").append(row);
-    if (running) activeOutputs.push(value);
-  }
+  const table = document.getElementById("generator-table");
+  let generatorIndex = 0;
+  const generatorGroups = generatorTypes.map(({ name, total, running }) => {
+    const body = element("tbody");
+    const summary = element("tr", "generator-group");
+    const groupName = element("th", "", name);
+    groupName.scope = "rowgroup";
+    const groupOutput = element("td", "", "0");
+    summary.append(groupName, element("td", "", copy.groupStatus(running, total)), groupOutput);
+    body.append(summary);
+
+    const activeOutputs = [];
+    for (let index = 0; index < total; index += 1) {
+      const active = index < running;
+      const row = element("tr");
+      const generatorName = element("th", "", copy.generator(generatorIndex));
+      generatorName.scope = "row";
+      generatorIndex += 1;
+      const value = element("td", "", "0");
+      row.append(generatorName,
+                 element("td", active ? "running" : "standby", active ? copy.running : copy.standby), value);
+      body.append(row);
+      if (active) activeOutputs.push(value);
+    }
+    table.append(body);
+    return { groupOutput, activeOutputs };
+  });
 
   let elapsed = 0;
   let history = [];
@@ -160,10 +183,18 @@
       tile.textContent = number.format(values[index]);
     }
 
-    const baseOutput = Math.floor(values[0] / activeOutputs.length);
-    const extra = values[0] % activeOutputs.length;
-    for (const [index, output] of activeOutputs.entries()) {
-      output.textContent = number.format(baseOutput + Number(index < extra));
+    const baseOutput = Math.floor(values[0] / runningCount);
+    let extra = values[0] % runningCount;
+    for (const { groupOutput, activeOutputs } of generatorGroups) {
+      let totalOutput = 0;
+      for (const output of activeOutputs) {
+        const additional = Number(extra > 0);
+        const reading = baseOutput + additional;
+        extra -= additional;
+        totalOutput += reading;
+        output.textContent = number.format(reading);
+      }
+      groupOutput.textContent = number.format(totalOutput);
     }
   }
 
