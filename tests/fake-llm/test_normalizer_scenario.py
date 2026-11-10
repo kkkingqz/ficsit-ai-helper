@@ -1,18 +1,55 @@
 #!/usr/bin/env python3
-# FICSIT AI — Тест сценария поломки стриминга провайдера и нормализатора ADR-034 (Co-23, MODULES E7)
+# FICSIT AI — Тест сценариев fake-LLM и двунаправленного нормализатора ADR-034 (Co-23, Co-27, Co2-6, MODULES E7)
 # Роль: Gf2
 #
 # Проверяет:
-# 1. Сырой сценарий Google Gemini (broken_provider_stream):
-#    Провайдер отдаёт tool_calls, но finish_reason="stop".
-#    Логика ff-server (Foreman) отбрасывает вызовы -> чат молчит (ошибка V-04).
-# 2. Поведение через нормализатор ADR-034:
-#    Нормализатор сайдкара исправляет finish_reason="stop" -> "tool_calls".
-#    ff-server успешно распознаёт вызов инструмента -> V-04 выполняется.
+# 1. Штатный текст (normal_text):
+#    Нормализатор НЕ трогает finish_reason="stop", когда tool_calls не было (проверка Co2-9).
+# 2. Штатный вызов инструмента (normal_tool_call):
+#    Провайдер отдаёт tool_calls и finish_reason="tool_calls".
+# 3. Ход 1 (ответ провайдера, Co2-4, Co-23):
+#    - Провайдер Gemini отдаёт tool_calls и thought_signature, но finish_reason="stop".
+#    - Сырой поток: ff-server отбрасывает вызовы -> чат молчит (дефект V-04).
+#    - Через нормализатор: finish_reason="stop" -> "tool_calls", thought_signature запоминается.
+# 4. Ход 2 (запрос к провайдеру, Co2-6, Co-27):
+#    - Без нормализатора: Foreman отправляет результат вызова инструмента, теряя thought_signature.
+#      Провайдер отвечает HTTP 400 "Function call is missing a thought_signature".
+#    - С нормализатором: нормализатор восстанавливает thought_signature в исходящем теле.
+#      Провайдер отвечает HTTP 200, отдаёт финальный текст -> V-04 завершается успешно.
 
 import json
 import sys
-from scenarios import get_chunks_for_scenario
+from scenarios import (
+    get_chunks_for_scenario,
+    MissingThoughtSignatureError,
+    THOUGHT_SIGNATURE_MOCK
+)
+
+
+class MockSignatureStore:
+    """Эмулирует SignatureStore нормализатора сайдкара (ADR-034)."""
+    def __init__(self):
+        self.signatures = {}
+
+    def remember(self, tool_calls):
+        for tc in tool_calls:
+            cid = tc.get("id")
+            sig = tc.get("extra_content", {}).get("google", {}).get("thought_signature")
+            if cid and sig:
+                self.signatures[cid] = sig
+
+    def restore(self, messages):
+        restored = 0
+        for m in messages:
+            if m.get("role") == "assistant" and isinstance(m.get("tool_calls"), list):
+                for call in m["tool_calls"]:
+                    cid = call.get("id")
+                    extra = call.setdefault("extra_content", {})
+                    google = extra.setdefault("google", {})
+                    if "thought_signature" not in google and cid in self.signatures:
+                        google["thought_signature"] = self.signatures[cid]
+                        restored += 1
+        return restored
 
 
 def simulate_foreman_stream_parser(chunks):
@@ -41,6 +78,8 @@ def simulate_foreman_stream_parser(chunks):
                         tool_calls[idx]["name"] = func["name"]
                     if "arguments" in func:
                         tool_calls[idx]["arguments"] += func["arguments"]
+                    if "extra_content" in tc:
+                        tool_calls[idx]["extra_content"] = tc["extra_content"]
             if choice.get("finish_reason"):
                 finish_reason = choice["finish_reason"]
 
@@ -54,24 +93,23 @@ def simulate_foreman_stream_parser(chunks):
     }
 
 
-def normalize_stream_chunks_adr034(chunks):
+def normalize_stream_chunks_adr034(chunks, sig_store: MockSignatureStore):
     """
-    Эмулирует логику слушателя-нормализатора сайдкара (ADR-034):
-    Если в потоке зафиксированы tool_calls, а финальный finish_reason равен 'stop',
-    нормализатор заменяет его на 'tool_calls'.
+    Эмулирует логику слушателя-нормализатора сайдкара (ADR-034 на ответах):
+    1. Запоминает thought_signature.
+    2. Исправляет finish_reason: "stop" -> "tool_calls", если были tool_calls.
     """
     has_seen_tool_calls = False
     normalized = []
 
     for chunk in chunks:
-        # Клонируем чанк
         c_copy = json.loads(json.dumps(chunk))
         for choice in c_copy.get("choices", []):
             delta = choice.get("delta", {})
             if delta.get("tool_calls"):
                 has_seen_tool_calls = True
+                sig_store.remember(delta["tool_calls"])
             if choice.get("finish_reason") == "stop" and has_seen_tool_calls:
-                # Нормализация по ADR-034
                 choice["finish_reason"] = "tool_calls"
         normalized.append(c_copy)
 
@@ -79,35 +117,96 @@ def normalize_stream_chunks_adr034(chunks):
 
 
 def run_tests():
-    print("=== Тестирование сценариев fake-LLM и нормализатора ADR-034 (Co-23) ===")
+    print("=== Тестирование сценариев fake-LLM и двунаправленного нормализатора ADR-034 (Co-23, Co-27) ===")
+    sig_store = MockSignatureStore()
 
-    # 1. Базовый сценарий: нормальный вызов инструмента
+    # 1. Штатный текстовый ответ (Co2-9)
+    chunks_text = get_chunks_for_scenario("normal_text")
+    res_text_raw = simulate_foreman_stream_parser(chunks_text)
+    assert res_text_raw["finish_reason"] == "stop"
+    assert res_text_raw["stop_reason"] == "stop"
+    assert res_text_raw["tools_executed"] is False
+    assert "Factory is operating normally." in res_text_raw["text"]
+
+    chunks_text_norm = normalize_stream_chunks_adr034(chunks_text, sig_store)
+    res_text_norm = simulate_foreman_stream_parser(chunks_text_norm)
+    assert res_text_norm["finish_reason"] == "stop", "Нормализатор НЕ должен менять finish_reason без tool_calls"
+    assert res_text_norm["text"] == res_text_raw["text"], "Текст ответа должен оставаться неизменным"
+    print("✅ 1. normal_text: штатный текст не повреждается нормализатором (Co2-9)")
+
+    # 2. Штатный вызов инструмента
     chunks_norm = get_chunks_for_scenario("normal_tool_call")
     res_norm = simulate_foreman_stream_parser(chunks_norm)
-    assert res_norm["tools_executed"] is True, "Штатный вызов должен исполняться"
+    assert res_norm["tools_executed"] is True
     assert res_norm["stop_reason"] == "tool_use"
-    print("✅ 1. normal_tool_call: штатный стриминг распознаётся Foreman (stop_reason='tool_use')")
+    print("✅ 2. normal_tool_call: штатный вызов инструмента отдаёт stop_reason='tool_use'")
 
-    # 2. Сценарий поломки Gemini (Co2-4): finish_reason='stop' при наличии tool_calls
+    # 3. Ход 1 (ответ провайдера Gemini, Co2-4, Co-23)
     chunks_broken = get_chunks_for_scenario("broken_provider_stream")
     res_broken = simulate_foreman_stream_parser(chunks_broken)
-    # Демонстрация воспроизведения бага:
-    assert len(res_broken["tool_calls"]) > 0, "Вызовы инструментов были переданы"
-    assert res_broken["finish_reason"] == "stop", "Провайдер ошибочно отдал finish_reason='stop'"
-    assert res_broken["stop_reason"] == "stop", "Foreman выставил stop_reason='stop'"
-    assert res_broken["tools_executed"] is False, "Foreman сбросил вызовы: чат замолчал!"
-    print("✅ 2. broken_provider_stream: воспроизведена поломка Co2-4 (вызовы есть, но отброшены Foreman)")
+    # Воспроизведение поломки finish_reason:
+    assert len(res_broken["tool_calls"]) > 0
+    assert res_broken["finish_reason"] == "stop"
+    assert res_broken["stop_reason"] == "stop"
+    assert res_broken["tools_executed"] is False, "Foreman сбросил вызовы: чат молчит"
+    print("✅ 3. broken_provider_stream (ход 1, сырой): воспроизведена поломка finish_reason='stop'")
 
-    # 3. Сценарий нормализации по ADR-034:
-    chunks_fixed = normalize_stream_chunks_adr034(chunks_broken)
+    # Нормализация хода 1:
+    chunks_fixed = normalize_stream_chunks_adr034(chunks_broken, sig_store)
     res_fixed = simulate_foreman_stream_parser(chunks_fixed)
-    assert len(res_fixed["tool_calls"]) > 0
-    assert res_fixed["finish_reason"] == "tool_calls", "Нормализатор исправил finish_reason на 'tool_calls'"
-    assert res_fixed["stop_reason"] == "tool_use", "Foreman получил tool_use"
-    assert res_fixed["tools_executed"] is True, "Инструмент успешно передан на исполнение!"
-    print("✅ 3. normalizer_adr034: нормализатор сайдкара восстановил цепочку вызова инструмента (V-04 спасён)")
+    assert res_fixed["finish_reason"] == "tool_calls"
+    assert res_fixed["stop_reason"] == "tool_use"
+    assert res_fixed["tools_executed"] is True
+    assert "call_broken_gemini_999" in sig_store.signatures
+    assert sig_store.signatures["call_broken_gemini_999"] == THOUGHT_SIGNATURE_MOCK
+    print("✅ 4. normalizer_adr034 (ход 1, нормализован): finish_reason исправлен, подпись сохранена в кэш")
 
-    print("\nВсе проверки сценария поломки и нормализации пройдены успешно!")
+    # 4. Ход 2 (запрос к провайдеру Gemini, Co2-6, Co-27)
+    # Foreman готовит сообщение для следующего хода:
+    # Стандартная OpenAI-схема Foreman теряет extra_content!
+    foreman_messages = [
+        {"role": "user", "content": "Сколько железной руды поступает на завод?"},
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "call_broken_gemini_999",
+                    "type": "function",
+                    "function": {"name": "total_raw_inputs", "arguments": "{\"item\":\"Desc_OreIron_C\"}"}
+                    # extra_content потерян!
+                }
+            ]
+        },
+        {
+            "role": "tool",
+            "tool_call_id": "call_broken_gemini_999",
+            "content": "{\"rate\": 450.0, \"unit\": \"items/min\"}"
+        }
+    ]
+
+    # Попытка 4A: Отправка сырого запроса Foreman без нормализатора
+    raw_req_messages = json.loads(json.dumps(foreman_messages))
+    try:
+        get_chunks_for_scenario("broken_provider_stream", messages=raw_req_messages)
+        assert False, "Провайдер должен вернуть ошибку 400 без thought_signature"
+    except MissingThoughtSignatureError as err:
+        assert "missing a thought_signature" in str(err)
+        print("✅ 5. broken_provider_stream (ход 2, сырой): воспроизведён отказ Gemini 400 (Co2-6)")
+
+    # Попытка 4B: Пропуск через нормализатор исходящих запросов ADR-034
+    normalized_req_messages = json.loads(json.dumps(foreman_messages))
+    restored_count = sig_store.restore(normalized_req_messages)
+    assert restored_count == 1, "Нормализатор должен восстановить 1 подпись мысли"
+
+    # Теперь запрос уходит в Gemini fake-LLM:
+    turn2_chunks = get_chunks_for_scenario("broken_provider_stream", messages=normalized_req_messages)
+    res_turn2 = simulate_foreman_stream_parser(turn2_chunks)
+    assert res_turn2["finish_reason"] == "stop"
+    assert "Total raw inputs for Iron Ore: 450 items/min." in res_turn2["text"]
+    print("✅ 6. normalizer_adr034 (ход 2, нормализован): подпись восстановлена, провайдер ответил текстом")
+
+    print("\nВсе тесты двунаправленной нормализации ADR-034 и fake-LLM успешно пройдены!")
     return 0
 
 

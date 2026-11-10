@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-# FICSIT AI — Fake-LLM сервер для детерминированных тестов AI-контура (MODULES E7, V-12)
+# FICSIT AI — Fake-LLM сервер для детерминированных тестов AI-контура (MODULES E7, V-12, Co-23, Co-27)
 # Роль: Gf2
 #
 # Эмулирует OpenAI-совместимый эндпоинт (/v1/chat/completions).
 # Поддерживает стриминг SSE и сценарии:
 # - normal_text
 # - normal_tool_call
-# - broken_provider_stream (Co2-4 / Co-23 / ADR-034: Gemini stream finish_reason="stop" with tool_calls)
+# - broken_provider_stream (Co2-4 / Co-23 / Co-27 / ADR-034: Gemini stream finish_reason="stop" + thought_signature)
 
 import argparse
 import http.server
@@ -15,11 +15,34 @@ import socketserver
 import sys
 from urllib.parse import urlparse, parse_qs
 
-from scenarios import get_chunks_for_scenario, format_sse_stream
+from scenarios import (
+    get_chunks_for_scenario,
+    format_sse_stream,
+    MissingThoughtSignatureError
+)
 
 
 class FakeLLMRequestHandler(http.server.BaseHTTPRequestHandler):
     scenario_override = "broken_provider_stream"
+
+    def do_HEAD(self):
+        self.send_response(200)
+        self.end_headers()
+
+    def do_GET(self):
+        parsed_url = urlparse(self.path)
+        if parsed_url.path == "/health":
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"status":"ok"}')
+            return
+        if parsed_url.path == "/v1/chat/completions":
+            self.handle_completions(parsed_url, is_stream=True, model="fake-model", messages=[])
+            return
+        self.send_response(404)
+        self.end_headers()
+        self.wfile.write(b"Not Found")
 
     def do_POST(self):
         parsed_url = urlparse(self.path)
@@ -28,14 +51,6 @@ class FakeLLMRequestHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"Not Found")
             return
-
-        # Определяем сценарий
-        query_params = parse_qs(parsed_url.query)
-        scenario = self.headers.get("X-Mock-Scenario")
-        if not scenario and "scenario" in query_params:
-            scenario = query_params["scenario"][0]
-        if not scenario:
-            scenario = self.scenario_override
 
         content_length = int(self.headers.get("Content-Length", 0))
         post_data = self.rfile.read(content_length) if content_length > 0 else b"{}"
@@ -47,35 +62,72 @@ class FakeLLMRequestHandler(http.server.BaseHTTPRequestHandler):
 
         is_stream = req_json.get("stream", True)
         model = req_json.get("model", "fake-model")
+        messages = req_json.get("messages", [])
+        self.handle_completions(parsed_url, is_stream=is_stream, model=model, messages=messages)
+
+    def handle_completions(self, parsed_url, is_stream: bool, model: str, messages: list):
+        # Определение сценария: приоритет за заголовком X-Mock-Scenario, затем query-параметр ?scenario=
+        query_params = parse_qs(parsed_url.query)
+        scenario = self.headers.get("X-Mock-Scenario")
+        if not scenario and "scenario" in query_params:
+            scenario = query_params["scenario"][0]
+        if not scenario:
+            scenario = self.scenario_override
 
         try:
-            chunks = get_chunks_for_scenario(scenario, model=model)
-        except ValueError as e:
+            chunks = get_chunks_for_scenario(scenario, model=model, messages=messages)
+        except MissingThoughtSignatureError as e:
+            # Воспроизведение ошибки Gemini 3.x во втором ходе без thought_signature (Co-27, Co2-6)
+            err_body = json.dumps({
+                "error": {
+                    "code": 400,
+                    "message": str(e),
+                    "status": "INVALID_ARGUMENT"
+                }
+            }).encode("utf-8")
             self.send_response(400)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(err_body)))
+            self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode("utf-8"))
+            self.wfile.write(err_body)
+            self.wfile.flush()
+            self.close_connection = True
+            return
+        except ValueError as e:
+            err_body = json.dumps({"error": str(e)}).encode("utf-8")
+            self.send_response(400)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(err_body)))
+            self.send_header("Connection", "close")
+            self.end_headers()
+            self.wfile.write(err_body)
+            self.wfile.flush()
+            self.close_connection = True
             return
 
         if is_stream:
+            sse_text = format_sse_stream(chunks)
+            sse_bytes = sse_text.encode("utf-8")
+
             self.send_response(200)
-            self.send_header("Content-Type", "text/event-stream")
+            self.send_header("Content-Type", "text/event-stream; charset=utf-8")
             self.send_header("Cache-Control", "no-cache")
-            self.send_header("Connection", "keep-alive")
+            self.send_header("Content-Length", str(len(sse_bytes)))
+            self.send_header("Connection", "close")
             self.end_headers()
 
-            sse_body = format_sse_stream(chunks)
-            self.wfile.write(sse_body.encode("utf-8"))
+            self.wfile.write(sse_bytes)
             self.wfile.flush()
+            self.close_connection = True
         else:
-            # Непотоковый ответ (для проверки, что без стриминга tool_calls отдаются нормально)
             final_finish_reason = "tool_calls" if "tool" in scenario else "stop"
             tool_calls = []
             if "tool" in scenario:
                 tool_calls = [{
                     "id": "call_nonstream_123",
                     "type": "function",
-                    "function": {"name": "total_raw_inputs", "arguments": "{\"item\":\"Desc_OreIron_C\"}"}
+                    "function": {"name": "total_raw_inputs", "arguments": '{"item":"Desc_OreIron_C"}'}
                 }]
             resp = {
                 "id": "chatcmpl-fake-nostream",
@@ -92,10 +144,15 @@ class FakeLLMRequestHandler(http.server.BaseHTTPRequestHandler):
                     "finish_reason": final_finish_reason
                 }]
             }
+            resp_bytes = json.dumps(resp).encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(resp_bytes)))
+            self.send_header("Connection", "close")
             self.end_headers()
-            self.wfile.write(json.dumps(resp).encode("utf-8"))
+            self.wfile.write(resp_bytes)
+            self.wfile.flush()
+            self.close_connection = True
 
     def log_message(self, format, *args):
         # Отключаем дефолтный вывод логов запросов в stdout, чтобы не засорять тесты

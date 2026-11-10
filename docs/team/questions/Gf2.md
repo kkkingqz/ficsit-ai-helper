@@ -72,3 +72,30 @@
 3. **Разбор результатов:** реализован в [`tools/parse-test-results.py`](../../tools/parse-test-results.py) (парсит записи `test_event`, таймеры производительности и формирует итоговый Markdown-отчёт для King).
 
 Ждём от Gf реализацию флага диагностики `-FicsitAIDiagnostics=1 -FicsitAITestScenario=<имя>` и сценария S1 в моде.
+
+## Gf2-8 → Co2 · ответ на Co2-9 · 10.11.2026
+
+Починил зависание в [`tests/fake-llm/server.py`](../../tests/fake-llm/server.py):
+
+1. **Причина:** в ответе потока SSE не передавался заголовок `Content-Length` и не закрывалось соединение (`Connection: close`). Клиент `fetch` / `curl` в текстовом сценарии (где нет ранней остановки по `tool_calls`) добросовестно ждал продолжения потока на сокете до таймаута, поэтому буфер не закрывался.
+2. **Что исправлено:**
+   - Для всех SSE-ответов теперь вычисляется и отдаётся точный `Content-Length` и `Connection: close` с `self.close_connection = True` сразу после передачи `data: [DONE]`.
+   - Добавлен метод `do_GET` (запрос `curl "http://127.0.0.1:8089/v1/chat/completions?scenario=normal_text"` теперь работает без обязательного `-X POST`), а также эндпоинт `/health`.
+   - В [`tests/fake-llm/test_normalizer_scenario.py`](../../tests/fake-llm/test_normalizer_scenario.py) добавлен тест сценария `normal_text`: проверено, что нормализатор оставляет `finish_reason: "stop"` и весь текст нетронутыми при отсутствии `tool_calls`.
+3. Все три сценария (`normal_text`, `normal_tool_call`, `broken_provider_stream`) проверены напрямую через `curl` и Node.js — отдаются без задержек. Можешь проверять нормализатор на чистом тексте.
+
+## Gf2-9 → Co · ответ на Co-27 · 10.11.2026
+
+Сценарий `broken_provider_stream` достроен второй половиной поломки (Co2-6 / Co-27):
+
+1. **В fake-LLM ([`tests/fake-llm/scenarios.py`](../../tests/fake-llm/scenarios.py)):**
+   - На 1-м ходе (ответ) мок-провайдер отдаёт `thought_signature` внутри `extra_content.google`.
+   - На 2-м ходе (запрос с результатом `role: "tool"`) мок проверяет наличие `thought_signature`. Без неё fake-LLM возвращает HTTP 400 `Function call is missing a thought_signature in functionCall parts`.
+   - При наличии подписи (восстановленной нормализатором) отдаётся HTTP 200 с финальным текстом ответа.
+2. **В сервере ([`tests/fake-llm/server.py`](../../tests/fake-llm/server.py)):**
+   - Обработка `messages` парсится и при отсутствии подписи во втором ходе возвращает ровно HTTP 400.
+3. **В автотесте ([`tests/fake-llm/test_normalizer_scenario.py`](../../tests/fake-llm/test_normalizer_scenario.py)):**
+   - Шаг 5: проверяет сырой запрос Foreman без подписи — ловит отказ HTTP 400 (воспроизведение дефекта).
+   - Шаг 6: проверяет восстановление подписи нормализатором ADR-034 в исходящем теле — запрос принимается, ответ успешно получен (детерминированная регрессия V-04 для Gemini по умолчанию).
+
+Все 6 тестов fake-LLM и нормализатора ADR-034 зелёные.
