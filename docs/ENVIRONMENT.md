@@ -47,6 +47,10 @@ nix --extra-experimental-features "nix-command flakes" shell \
   nixpkgs#msitools nixpkgs#wineWow64Packages.stable nixpkgs#dos2unix nixpkgs#patch
 ```
 
+> [!NOTE]
+> Если вы работаете в изолированном окружении (песочнице, Flatpak-контейнере IDE), вызывайте системные инструменты хоста через явные пути `/usr/bin/git`, `/usr/bin/gh` (например, `flatpak-spawn --host /usr/bin/git`).
+
+
 ---
 
 ## 3. Установка MSVC и Windows SDK через `msvc-wine`
@@ -159,7 +163,7 @@ cd ~/Projects/SatisfactoryModLoader
      --filter Packages=SDK \
      --filter DeploymentPlatforms=Windows_vc160 \
      --filter DeploymentPlatforms=Windows_vc170 \
-     --filter DeploymentPlatforms=Linux
+     --filter DeploymentPlatforms=Linux \
      --filter DeploymentPlatforms=
 
    wwise-cli integrate-ue \
@@ -219,11 +223,23 @@ cd ~/Projects/SatisfactoryModLoader
 ## 7. Сборка мода через Alpakit Win64 под Wine
 
 ### 7.1 Важные требования к окружению перед сборкой
-1. **Wine в `$PATH`:** убедитесь, что `wine` доступен в `$PATH` процесса (проверить: `command -v wine && wine --version`). Если Wine установлен через Nix, добавьте путь к бинарникам Wine:
-   ```bash
-   export PATH="/nix/store/f88bpklr2ka5fv005058fwddh4vlwsjy-wine-wow64-11.0/bin:$PATH"
-   ```
-   *(либо сделайте symlink в `~/.local/bin`).* **Внимание:** если `wine` отсутствует в `$PATH`, вызовы компилятора ресурсов `rc.exe` внутри обёртки MSVC молча зависают на чтении FIFO!
+1. **Wine в `$PATH`:** убедитесь, что `wine` (64-bit / WoW64) доступен в `$PATH` процесса (проверить: `command -v wine && wine --version`).
+   **Внимание:** если `wine` отсутствует в `$PATH`, вызовы компилятора ресурсов `rc.exe` внутри обёртки MSVC молча зависают на чтении FIFO!
+   - **Системный Wine (apt / Ubuntu):** бинарник обычно находится в `/usr/bin/wine` и доступен по умолчанию.
+   - **Wine в Nix:** путь к бинарнику в `/nix/store/` содержит хэш конкретной ревизии `nixpkgs` вашей системы. Чтобы получить путь к бинарникам автоматически, можно определить его через `which` или Nix CLI:
+     ```bash
+     # Вариант А: если wine уже активен в nix-shell
+     WINE_BIN_DIR="$(dirname "$(which wine)")"
+     export PATH="$WINE_BIN_DIR:$PATH"
+
+     # Вариант Б: вывод пути через nix build
+     export PATH="$(nix build --no-link --print-out-paths 'nixpkgs#wineWow64Packages.stable')/bin:$PATH"
+
+     # Либо создайте симлинк в ~/.local/bin:
+     mkdir -p ~/.local/bin
+     ln -sf "$(which wine)" ~/.local/bin/wine
+     export PATH="$HOME/.local/bin:$PATH"
+     ```
 2. **Переменная MSVC:** `export UE_WINE_MSVC="$HOME/msvc"`.
 3. **Лимит открытых файлов (ulimit):** при упаковке ассетов утилита Zen пытается выставить бесконечный лимит `nofile`, что на Linux вызывает ошибку без явного задания:
    ```bash
@@ -242,20 +258,58 @@ cd ~/Projects/SatisfactoryModLoader
 4. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
 5. Результат сборки помещается в `Saved/Alpakit/<ModReference>/`.
 
-### 7.3 Сборка из командной строки (UAT)
+### 7.3 Сборка и упаковка из командной строки (UAT)
+
+#### Создание тестового пустого мода BlankMod (для проверки упаковки)
+Если вы хотите проверить упаковку чистого изолированного мода, создайте скелет:
 ```bash
-export PATH="/nix/store/f88bpklr2ka5fv005058fwddh4vlwsjy-wine-wow64-11.0/bin:$PATH"
+mkdir -p "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/Content"
+cat << 'EOF' > "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/BlankMod.uplugin"
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "1.0.0",
+	"SemVersion": "1.0.0",
+	"GameVersion": ">=491125",
+	"FriendlyName": "Blank Mod",
+	"Description": "Test blank mod for verification",
+	"Category": "Modding",
+	"CreatedBy": "FICSIT AI Team",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": false,
+	"Installed": false,
+	"Plugins": [
+		{
+			"Name": "SML",
+			"Enabled": true,
+			"SemVersion": "^3.12.0"
+		}
+	]
+}
+EOF
+```
+
+#### Запуск сборки через RunUAT.sh
+Задайте имя целевого мода в переменной `MOD_NAME` (например, `BlankMod` или `SML`):
+```bash
+MOD_NAME="BlankMod"
 export UE_WINE_MSVC="$HOME/msvc"
 ulimit -n 1048576 2>/dev/null || true
 
-~/UnrealEngineCSS/Engine/Build/BatchFiles/RunUAT.sh \
+# Убедитесь, что wine доступен в $PATH
+command -v wine && wine --version
+
+"$HOME/UnrealEngineCSS/Engine/Build/BatchFiles/RunUAT.sh" \
   -ScriptsForProject="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
   PackagePlugin \
   -Project="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
-  -dlcname=<ModReference> \
+  -dlcname="$MOD_NAME" \
   -merge -build -clientconfig=Shipping \
   -platform=Win64 -nocompileeditor -installed
 ```
+
+Результат упаковки будет сохранён в каталоге `$HOME/Projects/SatisfactoryModLoader/Saved/ArchivedPlugins/$MOD_NAME/` (архивы `$MOD_NAME.zip` и `$MOD_NAME-Windows.zip`, содержащие упакованные файлы `.pak`, `.ucas`, `.utoc`).
 
 ---
 
@@ -277,7 +331,7 @@ ulimit -n 1048576 2>/dev/null || true
 ## 9. Критерий завершения задачи P-1
 
 Задача P-1 считается закрытой, когда:
-- [x] Инструкция составлена и прошла ревью Co (PR #36).
+- [ ] Инструкция в PR #36: ревью передано Gs по решению King (Co-28, Gs-9, замечания Gs-10 устранены).
 - [x] MSVC 17.8 и SDK 10.0.22621 развёрнуты через `msvc-wine` у Gf (`~/msvc`).
 - [x] Пустой тестовый мод и C++ модули SML собираются через Alpakit Win64 под Wine (проверено: 594 actions C++ SML и `BlankMod` упакованы в `.pak`, `.ucas`, `.utoc`, `.zip`).
 - [ ] Мод успешно загружается в Satisfactory под Proton **у всех трёх разработчиков мода: Gf, Co и Gs**.
