@@ -29,13 +29,20 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FCatalogUnavailableWorldTest, "FicsitAI.Catalog
 
 bool FCatalogUnavailableWorldTest::RunTest(const FString&)
 {
-    TArray<FRecipe> Previous;
-    Previous.AddDefaulted_GetRef().ClassName = TEXT("Recipe_Previous_C");
-    TestFalse(TEXT("Missing world is unavailable"), TryReadRecipes(nullptr, Previous));
-    TestEqual(TEXT("Failure keeps the previous snapshot"), Previous.Num(), 1);
-    if (Previous.Num() == 1)
+    FSnapshot Previous;
+    Previous.Recipes.AddDefaulted_GetRef().ClassName = TEXT("Recipe_Previous_C");
+    Previous.Items.AddDefaulted_GetRef().Id.ClassName = TEXT("Desc_Previous_C");
+    Previous.Buildings.AddDefaulted_GetRef().Id.ClassName = TEXT("Build_Previous_C");
+
+    TestFalse(TEXT("Missing world is unavailable"), TryReadCatalog(nullptr, Previous));
+    TestEqual(TEXT("Failure keeps the previous recipes"), Previous.Recipes.Num(), 1);
+    TestEqual(TEXT("Failure keeps the previous items"), Previous.Items.Num(), 1);
+    TestEqual(TEXT("Failure keeps the previous buildings"), Previous.Buildings.Num(), 1);
+    if (Previous.Recipes.Num() == 1 && Previous.Items.Num() == 1 && Previous.Buildings.Num() == 1)
     {
-        TestEqual(TEXT("Failure keeps previous recipe data"), Previous[0].ClassName, FName(TEXT("Recipe_Previous_C")));
+        TestEqual(TEXT("Previous recipe ID is preserved"), Previous.Recipes[0].ClassName, FName(TEXT("Recipe_Previous_C")));
+        TestEqual(TEXT("Previous item ID is preserved"), Previous.Items[0].Id.ClassName, FName(TEXT("Desc_Previous_C")));
+        TestEqual(TEXT("Previous building ID is preserved"), Previous.Buildings[0].Id.ClassName, FName(TEXT("Build_Previous_C")));
     }
     return true;
 }

@@ -49,6 +49,32 @@ struct FRecipe
     TArray<FClassId> ProducedIn;
 };
 
-// Read on the game thread after the save has started. Failure leaves OutRecipes intact.
-bool TryReadRecipes(UWorld* World, TArray<FRecipe>& OutRecipes);
+struct FItem
+{
+    FClassId Id;
+    FText DisplayName;
+    FName OwnerMod;
+    TOptional<ERecipeUnit> Unit;
+    bool bIsVanilla = false;
+    bool bUnlocked = false;
+    bool bIsBuildingDescriptor = false;
+};
+
+struct FBuilding
+{
+    FClassId Id;
+    TArray<FClassId> Descriptors;
+    TOptional<double> DefaultProducingPowerConsumptionMW;
+    bool bBuildable = false;
+};
+
+struct FSnapshot
+{
+    TArray<FRecipe> Recipes;
+    TArray<FItem> Items;
+    TArray<FBuilding> Buildings;
+};
+
+// Read on the game thread after the save has started. Failure leaves OutSnapshot intact.
+bool TryReadCatalog(UWorld* World, FSnapshot& OutSnapshot);
 }

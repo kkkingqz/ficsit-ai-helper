@@ -1,10 +1,12 @@
 #include "CatalogProvider.h"
 
+#include "Buildables/FGBuildableFactory.h"
 #include "Engine/World.h"
 #include "FGRecipe.h"
 #include "FGRecipeManager.h"
 #include "FGSchematic.h"
 #include "Registry/ModContentRegistry.h"
+#include "Resources/FGBuildingDescriptor.h"
 #include "Resources/FGItemDescriptor.h"
 #include "Unlocks/FGUnlockRecipe.h"
 
@@ -15,6 +17,20 @@ namespace
 FClassId ReadClassId(const UClass& Class)
 {
     return {Class.GetFName(), Class.GetPathName()};
+}
+
+TOptional<ERecipeUnit> ReadItemUnit(TSubclassOf<UFGItemDescriptor> ItemClass)
+{
+    switch (UFGItemDescriptor::GetForm(ItemClass))
+    {
+    case EResourceForm::RF_SOLID:
+        return ERecipeUnit::Items;
+    case EResourceForm::RF_LIQUID:
+    case EResourceForm::RF_GAS:
+        return ERecipeUnit::CubicMeters;
+    default:
+        return {};
+    }
 }
 
 TArray<FRecipeAmount> ReadAmounts(const TArray<FItemAmount>& Amounts, double DurationSeconds)
@@ -29,10 +45,7 @@ TArray<FRecipeAmount> ReadAmounts(const TArray<FItemAmount>& Amounts, double Dur
             continue;
         }
 
-        const EResourceForm Form = UFGItemDescriptor::GetForm(Amount.ItemClass);
-        const ERecipeUnit Unit = Form == EResourceForm::RF_LIQUID || Form == EResourceForm::RF_GAS
-            ? ERecipeUnit::CubicMeters
-            : ERecipeUnit::Items;
+        const ERecipeUnit Unit = ReadItemUnit(Amount.ItemClass).Get(ERecipeUnit::Items);
         Result.Add({ReadClassId(*ItemClass), FRecipeQuantity::FromGameUnits(Amount.Amount, Unit, DurationSeconds)});
     }
     return Result;
@@ -66,6 +79,58 @@ TSet<UClass*> ReadAlternateRecipes(const UModContentRegistry& Registry)
     }
     return Recipes;
 }
+
+void ReadDescriptors(const UModContentRegistry& Registry, const AFGRecipeManager& RecipeManager, FSnapshot& Snapshot)
+{
+    const TArray<FGameObjectRegistration> Registrations = Registry.GetLoadedItemDescriptors();
+    Snapshot.Items.Reserve(Registrations.Num());
+    TMap<const UClass*, int32> BuildingIndices;
+
+    for (const FGameObjectRegistration& Registration : Registrations)
+    {
+        UClass* Descriptor = Cast<UClass>(Registration.RegisteredObject.Get());
+        if (!Descriptor || !Descriptor->IsChildOf(UFGItemDescriptor::StaticClass()))
+        {
+            continue;
+        }
+
+        FItem& Item = Snapshot.Items.AddDefaulted_GetRef();
+        Item.Id = ReadClassId(*Descriptor);
+        Item.DisplayName = UFGItemDescriptor::GetItemName(Descriptor);
+        Item.OwnerMod = Registration.OwnedByModReference;
+        Item.Unit = ReadItemUnit(Descriptor);
+        Item.bIsVanilla = Registration.HasAnyFlags(EGameObjectRegistrationFlags::BuiltIn);
+        Item.bUnlocked = RecipeManager.IsItemDescriptorAvailable(Descriptor);
+        Item.bIsBuildingDescriptor = Descriptor->IsChildOf(UFGBuildingDescriptor::StaticClass());
+        if (!Item.bIsBuildingDescriptor)
+        {
+            continue;
+        }
+
+        const TSubclassOf<AFGBuildable> Buildable = UFGBuildingDescriptor::GetBuildableClass(Descriptor);
+        const UClass* BuildingClass = Buildable.Get();
+        if (!BuildingClass)
+        {
+            continue;
+        }
+
+        if (const int32* ExistingIndex = BuildingIndices.Find(BuildingClass))
+        {
+            Snapshot.Buildings[*ExistingIndex].Descriptors.Add(Item.Id);
+            continue;
+        }
+
+        BuildingIndices.Add(BuildingClass, Snapshot.Buildings.Num());
+        FBuilding& Building = Snapshot.Buildings.AddDefaulted_GetRef();
+        Building.Id = ReadClassId(*BuildingClass);
+        Building.Descriptors.Add(Item.Id);
+        Building.bBuildable = RecipeManager.IsBuildingAvailable(Buildable);
+        if (const AFGBuildableFactory* Factory = Cast<AFGBuildableFactory>(BuildingClass->GetDefaultObject()))
+        {
+            Building.DefaultProducingPowerConsumptionMW = Factory->GetDefaultProducingPowerConsumption();
+        }
+    }
+}
 }
 
 FRecipeQuantity FRecipeQuantity::FromGameUnits(int32 Amount, ERecipeUnit Unit, double DurationSeconds)
@@ -80,7 +145,7 @@ FRecipeQuantity FRecipeQuantity::FromGameUnits(int32 Amount, ERecipeUnit Unit, d
     return Result;
 }
 
-bool TryReadRecipes(UWorld* World, TArray<FRecipe>& OutRecipes)
+bool TryReadCatalog(UWorld* World, FSnapshot& OutSnapshot)
 {
     if (!IsInGameThread() || !IsValid(World) || !World->IsGameWorld() || !World->HasBegunPlay())
     {
@@ -96,8 +161,8 @@ bool TryReadRecipes(UWorld* World, TArray<FRecipe>& OutRecipes)
 
     const TSet<UClass*> Alternates = ReadAlternateRecipes(*Registry);
     const TArray<FGameObjectRegistration> Registrations = Registry->GetRegisteredRecipes();
-    TArray<FRecipe> Recipes;
-    Recipes.Reserve(Registrations.Num());
+    FSnapshot Snapshot;
+    Snapshot.Recipes.Reserve(Registrations.Num());
 
     for (const FGameObjectRegistration& Registration : Registrations)
     {
@@ -107,7 +172,7 @@ bool TryReadRecipes(UWorld* World, TArray<FRecipe>& OutRecipes)
             continue;
         }
 
-        FRecipe& Recipe = Recipes.AddDefaulted_GetRef();
+        FRecipe& Recipe = Snapshot.Recipes.AddDefaulted_GetRef();
         Recipe.ClassName = RecipeClass->GetFName();
         Recipe.ClassPath = RecipeClass->GetPathName();
         Recipe.DisplayName = UFGRecipe::GetRecipeName(RecipeClass);
@@ -128,7 +193,8 @@ bool TryReadRecipes(UWorld* World, TArray<FRecipe>& OutRecipes)
         }
     }
 
-    OutRecipes = MoveTemp(Recipes);
+    ReadDescriptors(*Registry, *RecipeManager, Snapshot);
+    OutSnapshot = MoveTemp(Snapshot);
     return true;
 }
 }
