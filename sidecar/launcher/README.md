@@ -39,8 +39,8 @@ Node 22 берётся системный; если его нет, а есть `
 |---|---|
 | `LLM_PROVIDER` | `openai` |
 | `LLM_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai` |
-| `LLM_MODEL` | `gemini-2.5-pro` (значение по умолчанию в скрипте; имя сверяется командой `models`) |
-| `LLM_SUMMARY_MODEL` | `gemini-2.5-flash` — дешёвая модель для сжатия истории |
+| `LLM_MODEL` | `gemini-3.5-flash-lite` — единственная из проверенных, что отвечает текстом (см. ниже) |
+| `LLM_SUMMARY_MODEL` | `gemini-3.5-flash-lite` — дешёвая модель для сжатия истории |
 | `LLM_API_KEY` | ключ из Google AI Studio; в репозитории не лежит |
 
 Скрипт выставляет это сам при `FICSITAI_LLM=gemini` (значение по умолчанию); `anthropic` и `openai` тоже принимаются.
@@ -50,7 +50,35 @@ sidecar/launcher/dev/foreman-local.sh set-key   # ключ вводится вр
 sidecar/launcher/dev/foreman-local.sh models    # имена моделей из API, чтобы не угадывать
 ```
 
-Ключ лежит в `~/.local/share/ficsitai/foreman/llm.key` с правами 600, вводится без эха и не попадает ни в историю команд, ни в логи. **`LLM_SUMMARY_MODEL` задавать обязательно:** при `LLM_PROVIDER=openai` Foreman по умолчанию берёт `gpt-4.1-mini`, и на ключе Google сжатие истории падало бы отдельно от чата.
+**Имена моделей нельзя брать из головы.** Список из `models` и реальные ответы OpenAI-совместимого эндпоинта расходятся, проверено 10.11.2026 на нашем ключе:
+
+| Модель | Что отдаёт `/chat/completions` |
+|---|---|
+| `gemini-3.5-flash-lite`, `gemini-3.6-flash` | отвечают; инструменты вызывают, но см. «потоковый `finish_reason`» ниже |
+| `gemini-3.8-flash`, `gemini-3.7-flash`, `gemini-3.5-flash` | `503 UNAVAILABLE` — «high demand», состояние временное |
+| `gemini-3.1-pro-preview` | `429` — квота: модели класса pro на бесплатном уровне недоступны |
+| `gemini-2.5-pro`, `gemini-2.5-flash` | `404 NOT_FOUND`, хотя в списке `models` они есть |
+
+### Потоковый `finish_reason` ломает вызовы инструментов
+
+**Главная находка P-3, и она не про выбор модели.** OpenAI-совместимый эндпоинт Google в потоковом режиме отдаёт `finish_reason: "stop"` даже тогда, когда в том же ответе пришли `tool_calls`. В непотоковом режиме тот же запрос отдаёт корректный `finish_reason: "tool_calls"`. Проверено 10.11.2026 на `gemini-3.5-flash-lite` и `gemini-3.6-flash`:
+
+| Режим | `finish_reason` | `tool_calls` |
+|---|---|---|
+| `stream: true` | `stop` | есть |
+| `stream: false` | `tool_calls` | есть |
+
+`ff-server` всегда стримит и решает по `finish_reason`:
+
+```ts
+return { text, toolCalls, stopReason: finishReason === 'tool_calls' ? 'tool_use' : 'stop' };
+```
+
+Поэтому вызовы инструментов собираются и **молча отбрасываются**: модель попросила `total_raw_inputs`, Foreman закончил ход, в SSE — только `event: done`, ни текста, ни ошибки. Снаружи это выглядит как «чат не отвечает», а на самом деле сломан ровно путь модель → инструмент → ответ, то есть критерий V-04.
+
+Чем это лечится — решение Co и King (вопрос Co2-4), варианты: тонкий переводчик OpenAI-совместимых ответов в сайдкаре (правит `finish_reason`, когда в ответе есть `tool_calls`), upstream-PR в Foreman на одну строку, либо провайдер с корректным потоком. Патчить Foreman у себя нельзя (ADR-012).
+
+Поэтому модель меняется одной переменной, а перед сменой прогоняется `models` и пробный запрос. Ключ лежит в `~/.local/share/ficsitai/foreman/llm.key` с правами 600, вводится без эха и не попадает ни в историю команд, ни в логи. **`LLM_SUMMARY_MODEL` задавать обязательно:** при `LLM_PROVIDER=openai` Foreman по умолчанию берёт `gpt-4.1-mini`, и на ключе Google сжатие истории падало бы отдельно от чата.
 
 **Подписка Google AI Pro сама ключа к API не даёт** — она про приложение Gemini. Ключ к Gemini API берётся в [AI Studio](https://aistudio.google.com/apikey) на том же аккаунте: есть бесплатный уровень с лимитами и платный через биллинг проекта. Для альфы это важно: тестеры вводят **свой** ключ при первом запуске, и подписка им не поможет — это пункт в инструкции, а не мелочь.
 

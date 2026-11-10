@@ -12,7 +12,7 @@
 #   FICSITAI_DATA данные сайдкара: база, саквояж саveов, токен, логи, pid
 #                 (по умолчанию ~/.local/share/ficsitai/foreman)
 #   FICSITAI_LLM  gemini (по умолчанию, решение King 10.11.2026), anthropic или openai
-#   LLM_MODEL     модель чата; для gemini по умолчанию gemini-2.5-pro
+#   LLM_MODEL     модель чата; для gemini по умолчанию gemini-3.5-flash-lite
 #   LLM_API_KEY   ключ провайдера; если не задан, берётся из <FICSITAI_DATA>/llm.key
 #                 (кладётся командой set-key, права 600). Без ключа поднимается всё,
 #                 кроме ответа в чате
@@ -65,7 +65,12 @@ start_bg() { # start_bg <имя> <рабочий каталог> <команда
   # </dev/null и отдельная сессия: иначе процесс держит открытым конвейер вызывающего,
   # и запуск из скрипта с пайпом (например, в tail) не возвращает управление.
   (cd "$dir" && setsid nohup ${prefix} "$@" >>"$LOG_DIR/$name.log" 2>&1 </dev/null & echo $! >"$RUN_DIR/$name.pid")
-  echo "$name запущен (pid $(cat "$RUN_DIR/$name.pid")), лог $LOG_DIR/$name.log"
+  local pid; pid="$(cat "$RUN_DIR/$name.pid")"
+  # Запоминаем группу процессов, а не только pid: npm и nix порождают цепочку
+  # обёрток, и node живёт внучатым процессом. Убийство одного pid его не трогает,
+  # а порт остаётся занятым — на этом уже попались (P-3, 10.11.2026).
+  ps -o pgid= -p "$pid" 2>/dev/null | tr -d " " >"$RUN_DIR/$name.pgid" || true
+  echo "$name запущен (pid $pid, группа $(cat "$RUN_DIR/$name.pgid" 2>/dev/null)), лог $LOG_DIR/$name.log"
 }
 
 ensure_token() {
@@ -80,8 +85,8 @@ ensure_token() {
   export ADAPTER_TOKEN
 }
 
-KEY_FILE_DEFAULT_MODEL_CHAT="gemini-2.5-pro"
-KEY_FILE_DEFAULT_MODEL_SUMMARY="gemini-2.5-flash"
+KEY_FILE_DEFAULT_MODEL_CHAT="gemini-3.5-flash-lite"
+KEY_FILE_DEFAULT_MODEL_SUMMARY="gemini-3.5-flash-lite"
 GEMINI_OPENAI_BASE="https://generativelanguage.googleapis.com/v1beta/openai"
 
 llm_env() {
@@ -170,6 +175,13 @@ cmd_start() {
   common_env
   [ -d "$FOREMAN_SRC" ] || { echo "нет клона Foreman: $FOREMAN_SRC (коммит — foreman.pin.json)" >&2; exit 1; }
   [ -d "$ADAPTER_SRC/node_modules" ] || run_node "$ADAPTER_SRC" npm install --no-audit --no-fund
+  # Занятый порт — повод остановиться, а не поднимать второй экземпляр поверх.
+  for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT"; do
+    if [ -n "$(listeners_on "$port")" ]; then
+      echo "порт $port уже занят (pid $(listeners_on "$port" | tr "\n" " ")) — сначала stop" >&2
+      exit 1
+    fi
+  done
   start_bg sf-mcp "$FOREMAN_SRC" npm run start:mcp
   start_bg ff-server "$FOREMAN_SRC" npm run start:server
   start_bg adapter "$ADAPTER_SRC" npm run dev
@@ -179,15 +191,33 @@ cmd_start() {
 
 cmd_stop() {
   for name in adapter ff-server sf-mcp; do
-    local pid_file="$RUN_DIR/$name.pid"
-    [ -f "$pid_file" ] || continue
-    local pid; pid="$(cat "$pid_file")"
-    if kill -0 "$pid" 2>/dev/null; then
-      kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
-      echo "$name остановлен (pid $pid)"
+    local pid_file="$RUN_DIR/$name.pid" pgid_file="$RUN_DIR/$name.pgid"
+    if [ -f "$pgid_file" ] && [ -s "$pgid_file" ]; then
+      local pgid; pgid="$(cat "$pgid_file")"
+      if kill -0 "-$pgid" 2>/dev/null; then
+        kill -TERM -- "-$pgid" 2>/dev/null || true
+        echo "$name остановлен (группа $pgid)"
+      fi
+    elif [ -f "$pid_file" ]; then
+      local pid; pid="$(cat "$pid_file")"
+      kill -0 "$pid" 2>/dev/null && { kill "$pid" 2>/dev/null || true; echo "$name остановлен (pid $pid)"; }
     fi
-    rm -f "$pid_file"
+    rm -f "$pid_file" "$pgid_file"
   done
+  # Контрольный проход по портам: если что-то осталось висеть, порт занят и
+  # следующий start поднимется мимо — молча и с чужой конфигурацией.
+  local leftover=0
+  for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT"; do
+    local pids; pids="$(listeners_on "$port")"
+    for pid in $pids; do
+      kill -TERM "$pid" 2>/dev/null && { echo "добит слушатель порта $port (pid $pid)"; leftover=1; }
+    done
+  done
+  [ "$leftover" = 0 ] || sleep 1
+}
+
+listeners_on() { # listeners_on <порт> → pid'"'"'ы, слушающие этот порт
+  ss -ltnpH "sport = :$1" 2>/dev/null | grep -o "pid=[0-9]*" | cut -d= -f2 | sort -u
 }
 
 cmd_status() {

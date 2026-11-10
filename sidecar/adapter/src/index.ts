@@ -3,10 +3,17 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { AddressInfo } from "node:net";
 import express, { type Request, type Response } from "express";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import {
+  CallToolRequestSchema,
+  ErrorCode,
+  ListToolsRequestSchema,
+  McpError,
+} from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig, mcpUrlFor, type Config } from "./config.js";
 import { createLogger, type Logger } from "./log.js";
+import { UpstreamMcp } from "./upstream.js";
 
 /**
  * Каркас адаптера (P-3, задача #4).
@@ -30,14 +37,44 @@ function tokenMatches(expected: string, given: unknown): boolean {
   return timingSafeEqual(a, b);
 }
 
-export function createMcpServer(): McpServer {
-  const server = new McpServer({ name: SERVER_NAME, version: SERVER_VERSION });
-  // Инструментов нет намеренно: до белого списка и реестра операций (S2, V-3)
-  // модели выставлять нечего, а пустой список — валидный ответ MCP.
+export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
+  // Низкоуровневый Server, а не McpServer с сахаром: список инструментов должен
+  // приходить из реестра операций (S2, V-3), а не собираться из регистраций в
+  // коде адаптера. Возможность `tools` объявляется сразу и пустым списком —
+  // иначе Foreman получает на `tools/list` ошибку -32601 «Method not found» и
+  // чат падает ещё до обращения к провайдеру (проверено на P-3).
+  const server = new Server(
+    { name: SERVER_NAME, version: SERVER_VERSION },
+    { capabilities: { tools: {} } },
+  );
+
+  // v0: инструменты игровых данных Foreman проходят насквозь — иначе модель
+  // зовёт их по системному промпту Foreman, и ход обрывается без ответа.
+  // Белый список и свои инструменты из реестра надеваются сверху в S2 и V-3.
+  server.setRequestHandler(ListToolsRequestSchema, async () => {
+    const tools = await upstream.listTools();
+    log.debug(`tools/list: пропускаю ${tools.length} инструментов sf-mcp`);
+    return { tools };
+  });
+
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+    const { name, arguments: args } = request.params;
+    try {
+      return await upstream.callTool(name, args ?? {});
+    } catch (err: unknown) {
+      log.warn(`инструмент «${name}» не выполнен`, err);
+      throw new McpError(
+        ErrorCode.InternalError,
+        `инструмент «${name}» недоступен: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  });
+
   return server;
 }
 
 export async function createApp(config: Config, log: Logger) {
+  const upstream = new UpstreamMcp(config.sfMcpUrl, log);
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -65,7 +102,7 @@ export async function createApp(config: Config, log: Logger) {
       return;
     }
 
-    const server = createMcpServer();
+    const server = createMcpServer(upstream, log);
     const transport = new StreamableHTTPServerTransport({});
     res.on("close", () => {
       void transport.close();
@@ -94,10 +131,24 @@ async function main(): Promise<void> {
   const log = createLogger(config.logLevel);
   const { app } = await createApp(config, log);
 
-  const httpServer = app.listen(config.port, config.host, () => {
-    const addr = httpServer.address() as AddressInfo;
-    log.info(`адаптер слушает http://${config.host}:${addr.port} (только петля)`);
+  const httpServer = app.listen(config.port, config.host);
+
+  httpServer.on("listening", () => {
+    const addr = httpServer.address();
+    const port = typeof addr === "object" && addr !== null ? (addr as AddressInfo).port : config.port;
+    log.info(`адаптер слушает http://${config.host}:${port} (только петля)`);
     log.info(`MCP_URL для Foreman: ${mcpUrlFor(config)}`); // токен в логе скрывается
+  });
+
+  // Без этого обработчика занятый порт выглядел как ошибка чтения address():
+  // слушатель не поднялся, а падало на строке логирования (P-3, 10.11.2026).
+  httpServer.on("error", (err: NodeJS.ErrnoException) => {
+    if (err.code === "EADDRINUSE") {
+      log.error(`порт ${config.port} уже занят — остановите прежний адаптер (foreman-local.sh stop)`);
+    } else {
+      log.error("слушатель не поднялся", err);
+    }
+    process.exit(1);
   });
 
   const shutdown = (signal: string) => {
