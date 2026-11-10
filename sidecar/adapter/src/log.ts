@@ -6,9 +6,12 @@ const LEVELS = { debug: 10, info: 20, warn: 30, error: 40 } as const;
 export type Level = keyof typeof LEVELS;
 
 const SECRET_PATTERNS: RegExp[] = [
-  /([?&](?:token|key|secret|api[-_]?key)=)[^&\s"']+/gi,
+  // Любой параметр запроса, в имени которого есть key/token/secret/password/
+  // signature/auth. Прежний список перечислял имена целиком, и `x-goog-api-key`
+  // в строке запроса оставался открытым — ревью Gs-11, п. 4.
+  /([?&][\w.-]*(?:token|key|secret|password|signature|auth)[\w.-]*=)[^&\s"']+/gi,
   /\b(sk-[A-Za-z0-9-_]{8,})\b/g,
-  /(x-anthropic-api-key:\s*)\S+/gi,
+  /((?:x-anthropic-api-key|x-goog-api-key|api-key|authorization):\s*)\S+/gi,
   /\b(Bearer\s+)[A-Za-z0-9._-]{8,}/gi,
 ];
 
@@ -16,6 +19,24 @@ export function redact(input: unknown): string {
   let text = typeof input === "string" ? input : safeStringify(input);
   for (const re of SECRET_PATTERNS) text = text.replace(re, "$1<скрыто>");
   return text;
+}
+
+/**
+ * Безопасная часть адреса: схема, хост, путь. Строка запроса и данные входа
+ * отбрасываются целиком, а не маскируются по именам параметров.
+ *
+ * Почему целиком: ключ провайдера ездит именно в query, а список имён его один
+ * раз уже пропустил (Gs-11, п. 4). Маскировка выше осталась сетью под теми
+ * адресами, которые попадают в лог не через эту функцию, — например внутри
+ * текста ошибки от библиотеки.
+ */
+export function safeUrl(value: string): string {
+  try {
+    const url = new URL(value);
+    return `${url.protocol}//${url.host}${url.pathname}`;
+  } catch {
+    return "<адрес не разобран>";
+  }
 }
 
 function safeStringify(value: unknown): string {

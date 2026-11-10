@@ -13,7 +13,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
-import { createLogger, type Logger } from "./log.js";
+import { createLogger, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
 import { UpstreamMcp } from "./upstream.js";
 
@@ -30,6 +30,17 @@ import { UpstreamMcp } from "./upstream.js";
 
 const SERVER_NAME = "ficsitai-adapter";
 const SERVER_VERSION = "0.0.1";
+
+/**
+ * Инструменты мода — из реестра операций (V-3), а не из `sf-mcp`. В v0 набор
+ * пуст: канала мода ещё нет (S2).
+ *
+ * Он здесь, чтобы граница была в коде, а не в голове (граница доверия §7,
+ * Co-29): проброс `sf-mcp` ниже до операций мода не дотягивается, потому что
+ * имена из этого набора в него не попадают, и `sf-mcp` не может занять имя
+ * инструмента мода — список фильтруется по тому же набору.
+ */
+const MOD_TOOL_NAMES = new Set<string>();
 
 function tokenMatches(expected: string, given: unknown): boolean {
   if (typeof given !== "string") return false;
@@ -54,13 +65,25 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
   // зовёт их по системному промпту Foreman, и ход обрывается без ответа.
   // Белый список и свои инструменты из реестра надеваются сверху в S2 и V-3.
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const tools = await upstream.listTools();
-    log.debug(`tools/list: пропускаю ${tools.length} инструментов sf-mcp`);
-    return { tools };
+    const passthrough = (await upstream.listTools()).filter((tool) => !MOD_TOOL_NAMES.has(tool.name));
+    log.debug(
+      `tools/list: инструментов мода ${MOD_TOOL_NAMES.size}, ` +
+        `проброшено из sf-mcp ${passthrough.length}`,
+    );
+    return { tools: passthrough };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+
+    // Операции мода идут своим каналом и до `sf-mcp` не доходят.
+    if (MOD_TOOL_NAMES.has(name)) {
+      throw new McpError(
+        ErrorCode.InvalidRequest,
+        `инструмент мода «${name}» появится вместе с каналом мода (S2)`,
+      );
+    }
+
     try {
       return await upstream.callTool(name, args ?? {});
     } catch (err: unknown) {
@@ -158,12 +181,15 @@ async function main(): Promise<void> {
   // лаунчере, потому что каждый процесс в поставке проверяется у пилотного
   // тестера (R-11, ADR-015). Цена — связность: падает адаптер, падает и он.
   const normalizerUrl = normalizerUrlFor(config);
+  const upstreamBaseUrl = config.llmUpstreamBaseUrl;
   let normalizerServer: HttpServer | undefined;
-  if (config.llmUpstreamBaseUrl !== undefined && normalizerUrl !== undefined) {
-    const normalizer = createNormalizerApp(config.llmUpstreamBaseUrl, log);
+  if (upstreamBaseUrl !== undefined && normalizerUrl !== undefined) {
+    const normalizer = createNormalizerApp(upstreamBaseUrl, log);
     normalizerServer = normalizer.listen(config.normalizerPort, config.host);
     normalizerServer.on("listening", () => {
-      log.info(`нормализатор ответов слушает ${normalizerUrl} → ${config.llmUpstreamBaseUrl}`);
+      // Адрес провайдера — только схема, хост и путь: ключ ездит в строке
+      // запроса, и в лог она не попадает (ревью Gs-11, п. 4).
+      log.info(`нормализатор ответов слушает ${normalizerUrl} → ${safeUrl(upstreamBaseUrl)}`);
       log.info(`LLM_BASE_URL для Foreman: ${normalizerUrl}`);
     });
     normalizerServer.on("error", (err: NodeJS.ErrnoException) => {
