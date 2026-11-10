@@ -5,8 +5,8 @@
 #include "FicsitAIWorldModule.generated.h"
 
 /**
- * Игровой модуль мира FICSIT AI.
- * Регистрирует подсистему AFicsitAISubsystem, схемы и контент терминала через UModContentRegistry.
+ * Корневой игровой модуль мира FICSIT AI (SML 3.12).
+ * Автоматически регистрирует подсистему AFicsitAISubsystem и схему терминала через mSchematics.
  */
 UCLASS()
 class FICSITAICORE_API UFicsitAIWorldModule : public UGameWorldModule
@@ -15,6 +15,4 @@ class FICSITAICORE_API UFicsitAIWorldModule : public UGameWorldModule
 
 public:
     UFicsitAIWorldModule();
-
-    virtual void DispatchLifecycleEvent(ELifecyclePhase Phase) override;
 };

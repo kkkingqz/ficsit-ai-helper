@@ -1,5 +1,23 @@
 #include "Host/FicsitAITestScreenHost.h"
 
+static bool CheckApiCompatibility(const FString& RequiredVersion, const FString& SupportedVersion = TEXT("0.3.0"))
+{
+    if (RequiredVersion.IsEmpty())
+    {
+        return false;
+    }
+
+    TArray<FString> ReqParts;
+    TArray<FString> SuppParts;
+    RequiredVersion.ParseIntoArray(ReqParts, TEXT("."));
+    SupportedVersion.ParseIntoArray(SuppParts, TEXT("."));
+
+    const int32 ReqMajor = ReqParts.Num() > 0 ? FCString::Atoi(*ReqParts[0]) : -1;
+    const int32 SuppMajor = SuppParts.Num() > 0 ? FCString::Atoi(*SuppParts[0]) : -1;
+
+    return ReqMajor == SuppMajor;
+}
+
 void UFicsitAITestScreenHost::InitializeTestHost(const FString& InSaveId, TScriptInterface<IFicsitAIScreenModuleFactory> InFactory)
 {
     HostContext.SaveId = InSaveId;
@@ -74,6 +92,13 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
     }
 
     if (!TargetModule)
+    {
+        return false;
+    }
+
+    // Проверка совместимости версии API (§5.5, Gs-15.4) ДО вызова OnAttach
+    const FString RequiredApi = TargetModule->GetRequiredApiVersion();
+    if (!CheckApiCompatibility(RequiredApi, TEXT("0.3.0")))
     {
         return false;
     }

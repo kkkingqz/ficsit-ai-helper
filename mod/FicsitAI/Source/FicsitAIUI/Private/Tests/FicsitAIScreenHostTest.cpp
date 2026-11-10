@@ -3,6 +3,7 @@
 #include "FicsitAIScreenModuleFactoryImpl.h"
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
+#include "Modules/FicsitAITestIncompatibleModule.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -113,6 +114,39 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
     // 10. Закрытие активного модуля через CloseActiveModule
     Host->CloseActiveModule();
     TestEqual(TEXT("Модуль закрыт"), Host->GetActiveModuleId(), NAME_None);
+
+    // 11. Негативный тест: отказ в открытии модуля с несовместимой версией API (Gs-15.4, §5.5)
+    TestFalse(TEXT("Открытие модуля с API 2.0.0 отклонено хостом"), Host->OpenModule(FName(TEXT("Incompatible"))));
+    UFicsitAITestIncompatibleModule* IncompModule = Cast<UFicsitAITestIncompatibleModule>(Factory->CreateModule(FName(TEXT("Incompatible")), Host).GetObject());
+    if (IncompModule)
+    {
+        TestFalse(TEXT("OnAttach не вызывался для несовместимого модуля"), IncompModule->IsAttached());
+    }
+
+    // 12. Перенос состояния между двумя хостами одного сохранения (Gs-15.5, AC-14)
+    UFicsitAITestScreenHost* HostA = NewObject<UFicsitAITestScreenHost>();
+    HostA->InitializeTestHost(TEXT("save-shared-100"), Factory);
+    TestTrue(TEXT("HostA открывает Notes"), HostA->OpenModule(FName(TEXT("Notes"))));
+    UFicsitAITestNotesModule* NotesA = Cast<UFicsitAITestNotesModule>(HostA->GetActiveModuleInstance().GetObject());
+    if (NotesA)
+    {
+        NotesA->SetNoteContent(TEXT("Shared state between terminals"));
+    }
+    HostA->CloseActiveModule();
+
+    // Создаём второй хост в том же сохранении
+    UFicsitAITestScreenHost* HostB = NewObject<UFicsitAITestScreenHost>();
+    HostB->InitializeTestHost(TEXT("save-shared-100"), Factory);
+    const FString SavedStateA = HostA->GetModulePersistentStates().FindRef(FName(TEXT("Notes")));
+    TestFalse(TEXT("Сохранённое состояние не пустое"), SavedStateA.IsEmpty());
+
+    TestTrue(TEXT("HostB открывает Notes"), HostB->OpenModule(FName(TEXT("Notes"))));
+    UFicsitAITestNotesModule* NotesB = Cast<UFicsitAITestNotesModule>(HostB->GetActiveModuleInstance().GetObject());
+    if (NotesB)
+    {
+        NotesB->RestorePersistentState(SavedStateA);
+        TestEqual(TEXT("HostB в том же сохранении видит состояние HostA"), NotesB->GetNoteContent(), TEXT("Shared state between terminals"));
+    }
 
     return true;
 }

@@ -27,6 +27,9 @@ public:
     virtual void BeginPlay() override;
     virtual void Tick(float DeltaSeconds) override;
 
+    // IFGSaveInterface
+    virtual void PreSaveGame_Implementation(int32 SaveVersion, int32 GameVersion) override;
+
     // IFGUseableInterface (интеракция с игроком по E)
     virtual void OnUse_Implementation(class AFGCharacterPlayer* byCharacter, const FUseState& state) override;
     virtual bool IsUseable_Implementation() const override;
@@ -40,6 +43,10 @@ public:
     virtual FName GetActiveModuleId() const override { return ActiveModuleId; }
     virtual void RequestInputFocus(bool bWanted) override;
     virtual void NotifyContentChanged() override;
+
+    /** Немедленная запись текущего состояния открытого модуля в подсистему (Gs-15.5) */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
+    void FlushActiveModuleState();
 
     /** Обработка действия «Назад» (Esc / геймпад) по соглашению Gs-4 и D-1 */
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
