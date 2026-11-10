@@ -11,7 +11,7 @@ lang: ru-RU
 | Поле | Значение |
 |---|---|
 | Что это | **Замороженный контракт API v0** — имена, формы и семантика. Не реализация |
-| `apiVersion` | **0.2.0** (журнал версий — в конце документа) |
+| `apiVersion` | **0.3.0** (журнал версий — в конце документа) |
 | Заморожен | Неделя 1–2 вместо недели 6 (решение King 09.11.2026) |
 | Зачем раньше плана | Co2 строит фасад API для страниц в S6 на неделе 4. Без замороженного контракта он построит его по эскизу, и переделка попадёт в недели 6–7, где у него уже V-5, V-6 и V-7 |
 | Ревью | Gs |
@@ -112,7 +112,8 @@ struct FFicsitAIMetricDescriptor
      *  Добавлено 10.11.2026 по Gs-3.1: без этого ни экран, ни модель не могли заполнить ScopeId. */
     UPROPERTY(BlueprintReadOnly) TArray<FFicsitAIScopeRef> AvailableScopes;
 
-    /** true — список обрезан потолком 50; полный перечень берётся запросом ListScopes. */
+    /** true — список обрезан потолком 50. Экран берёт полный перечень запросом ListScopes,
+     *  модель — тем же ListMetrics с MetricId и ScopeCursor (Gs-8.1). */
     UPROPERTY(BlueprintReadOnly) bool bScopesTruncated = false;
 };
 
@@ -186,12 +187,20 @@ struct FFicsitAISeries
 | Запрос | Вход | Выход |
 |---|---|---|
 | `GetStatus` | — | `FFicsitAIApiStatus`: `apiVersion`, `saveId`, текущий `EFicsitAIDataSource`, `bInert`, `LastSnapshotSessionTimeSec`, `bSidecarConnected`, `ApiVersionMismatch`, `Reason` |
-| `ListMetrics` | необязательный фильтр по `Scope` и подстроке, `PageSize`, `Cursor` | страница `FFicsitAIMetricDescriptor` плюс `NextCursor` |
+| `ListMetrics` | необязательные `MetricId`, фильтр по `Scope` и подстроке, `PageSize`, `Cursor`; `ScopeFilter` и `ScopeCursor` — только вместе с `MetricId` | страница `FFicsitAIMetricDescriptor` плюс `NextCursor`; при заданном `MetricId` — ещё `NextScopeCursor` |
 | `QueryMetric` | `MetricId`, необязательный `ScopeId` | `FFicsitAIValue` |
 | `QuerySeries` | `MetricId`, `Window`, необязательный `ScopeId` | `FFicsitAISeries` |
-| `ListScopes` | `MetricId` | массив `FFicsitAIScopeRef` — доступные сети, предметы, типы машин |
+| `ListScopes` | `MetricId`, необязательные `ScopeFilter`, `PageSize`, `Cursor` | страница `FFicsitAIScopeRef` плюс `NextCursor` — доступные сети, предметы, типы машин |
 
-`ListMetrics` принимает также необязательные `ScopeFilter` (подстрока по названию области) и `ScopeCursor` — добавлено 10.11.2026 по Gs-5.1. Без них модель, у которой всего два инструмента, не могла получить ключ области за пределом первых 50 в `AvailableScopes`. `ListScopes` остаётся для экранов, где нужен полный перечень без фильтра.
+`ListMetrics` принимает также необязательные `ScopeFilter` (подстрока по названию области) и `ScopeCursor` — добавлено 10.11.2026 по Gs-5.1. Без них модель, у которой всего два инструмента, не могла получить ключ области за пределом первых 50 в `AvailableScopes`.
+
+**Пагинация областей привязана к одной метрике** (уточнено 10.11.2026 по Gs-8.1). Прежняя форма была дырой: `ScopeCursor` стоял на входе, а на выходе страницы метрик курсора областей не было вовсе, и неясно было, к какой из метрик страницы он относится. Поэтому:
+
+- `ScopeFilter` и `ScopeCursor` допустимы **только вместе с `MetricId`**; иначе — `INVALID_ARGUMENT`. Ответ тогда содержит ровно один дескриптор, и `NextScopeCursor` однозначен.
+- `NextScopeCursor` пуст, когда областей больше нет. `bScopesTruncated` при этом остаётся признаком «есть ещё, спроси с курсором» для клиента, который не передал ни фильтра, ни курсора.
+- Курсор областей и курсор метрик — разные непрозрачные значения и не взаимозаменяемы. Передача одного вместо другого — `INVALID_ARGUMENT`, а не пустая страница: пустая страница выглядела бы как «областей больше нет».
+
+`ListScopes` остаётся для экранов, где нужен полный перечень; с 0.3.0 он отдаётся страницами в той же форме (`PageSize`, `Cursor`, `NextCursor`), чтобы в контракте была одна пагинация, а не две. Модель `ListScopes` не вызывает — у неё два инструмента (§7 архитектуры), поэтому её путь к областям идёт только через `ListMetrics`.
 
 **Почему `GetStatus` в API, а не в хосте.** Верхняя полоса статуса каркаса терминала (§6.7) показывает состояние телеметрии и связи с сайдкаром, а экран «Чат» — состояние «не подключено». И то и другое нужно модулям, а модули знают только API. Хост про сайдкар не знает и знать не должен.
 
@@ -240,6 +249,7 @@ struct FFicsitAISeries
 | `RATE_LIMITED` | клиент превысил свой лимит (§7.4) |
 | `SCOPE_NOT_FOUND` | `ScopeId` неизвестен или исчез — например, электросеть распалась после демонтажа |
 | `SOURCE_UNAVAILABLE` | источник данных не готов: игра не загружена, запись не открыта |
+| `INVALID_ARGUMENT` | аргументы противоречивы: `ScopeFilter` или `ScopeCursor` без `MetricId`, курсор метрик вместо курсора областей, `PageSize` вне допустимого (Gs-8.1) |
 
 **Клиент обязан трактовать незнакомый код как общую ошибку.** Поэтому добавление нового кода аддитивно и мажорную версию не поднимает; `SCOPE_NOT_FOUND` добавлен так 10.11.2026.
 
@@ -276,8 +286,10 @@ struct FFicsitAISeries
   "values":     [401.0, 412.5],
   "timestamps": [1810.0, 1830.0],
   "firstPointSessionTimeSec": 1810.0,
-  "windowIncomplete": true }
+  "windowIncomplete": false }
 ```
+
+Пример сокращён: показаны две последние точки окна, а не все. `windowIncomplete` здесь `false`, потому что сессия идёт 1830 с и окно 900 с полное — флаг означает короткую сессию, а не пропуск внутри окна (исправлено 10.11.2026 по Gs-8.2). Пропуск виден только по `timestamps`, и это и есть причина, по которой они в контракте.
 
 **`timestamps` — единственный источник времени точки.** `intervalSec` номинален и для восстановления времён не годится: потребитель прежней формы поставил бы вторую точку в 1815 вместо 1830 и не заметил бы этого. Поэтому фасад для страниц (S6) и наборы Fixture берут обновлённую форму, а не прежнюю (Gs-5.3).
 
@@ -287,13 +299,14 @@ struct FFicsitAISeries
 |---|---|---|
 | 0.1.0 | 09.11.2026 | Первая заморозка: `GetStatus`, `ListMetrics`, `QueryMetric`, `QuerySeries`; события `metrics.snapshot`, `mod.inert`; семь кодов ошибок |
 | 0.2.0 | 10.11.2026 | По ревью Gs: `ListScopes`, `AvailableScopes` и `bScopesTruncated`, `Timestamps` в ряду, событие `api.status`, код `SCOPE_NOT_FOUND`, `ScopeFilter` и `ScopeCursor` в `ListMetrics`, `ApiVersionMismatch` и `Reason` в статусе |
+| 0.3.0 | 10.11.2026 | По Gs-8: `MetricId` на входе `ListMetrics` и `NextScopeCursor` на выходе, пагинация `ListScopes`, код `INVALID_ARGUMENT`. Пагинация областей стала однозначной: курсор привязан к одной метрике |
 
 # Лимиты
 
 Стартовые значения, уточняются по замерам S3 на воротах G1:
 
 - Запросы на клиента: 10/с для экранов, 2/с для модели.
-- `PageSize` для `ListMetrics`: по умолчанию 50, максимум 200.
+- `PageSize` для `ListMetrics` и `ListScopes`: по умолчанию 50, максимум 200. Вне этих границ — `INVALID_ARGUMENT`.
 - Нижний порог обновления виджета: `SampleIntervalSec` метрики, для `CostClass = heavy` — не чаще 15 с.
 - Превышение — `RATE_LIMITED`, а не молчаливое отбрасывание.
 

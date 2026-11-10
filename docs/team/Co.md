@@ -96,7 +96,7 @@
 Внутренний API, через который работают экраны и модель.
 
 - [ ] Контракт заморожен ещё на неделе 1–2: типы `FicsitAIApi`, схемы `list_metrics` и `query_metric` — до того, как Co2 начнёт фасад в S6
-- [ ] Запросы метрик и рядов, события `metrics.snapshot`, `mod.inert` и `api.status`, `apiVersion` 0.2.0
+- [ ] Запросы метрик и рядов, события `metrics.snapshot`, `mod.inert` и `api.status`, `apiVersion` 0.3.0
 
 ### [V-3 · Контракты метрик, реестр операций, тест паритета](https://github.com/kkkingqz/ficsit-ai-helper/issues/20) · #20
 
