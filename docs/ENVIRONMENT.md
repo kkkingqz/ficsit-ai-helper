@@ -160,6 +160,7 @@ cd ~/Projects/SatisfactoryModLoader
      --filter DeploymentPlatforms=Windows_vc160 \
      --filter DeploymentPlatforms=Windows_vc170 \
      --filter DeploymentPlatforms=Linux
+     --filter DeploymentPlatforms=
 
    wwise-cli integrate-ue \
      --integration-version "2023.1.14.3555" \
