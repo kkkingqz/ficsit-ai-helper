@@ -5,15 +5,17 @@
 # архива и первого запуска с вопросами. Это воспроизводимый запуск на машине
 # разработки, из которого лаунчер потом вырастет.
 #
-#   foreman-local.sh start|stop|status|urls|migrate
+#   foreman-local.sh start|stop|status|urls|migrate|set-key|models
 #
 # Окружение:
 #   FOREMAN_SRC   клон Foreman на зафиксированном коммите (по умолчанию ~/Projects/foreman-src)
 #   FICSITAI_DATA данные сайдкара: база, саквояж саveов, токен, логи, pid
 #                 (по умолчанию ~/.local/share/ficsitai/foreman)
-#   LLM_API_KEY   ключ провайдера; без него чат ответит ошибкой, всё остальное работает
-#   LLM_PROVIDER  anthropic (по умолчанию) или openai
-#   LLM_BASE_URL  адрес OpenAI-совместимого провайдера
+#   FICSITAI_LLM  gemini (по умолчанию, решение King 10.11.2026), anthropic или openai
+#   LLM_MODEL     модель чата; для gemini по умолчанию gemini-2.5-pro
+#   LLM_API_KEY   ключ провайдера; если не задан, берётся из <FICSITAI_DATA>/llm.key
+#                 (кладётся командой set-key, права 600). Без ключа поднимается всё,
+#                 кроме ответа в чате
 set -euo pipefail
 
 FOREMAN_SRC="${FOREMAN_SRC:-$HOME/Projects/foreman-src}"
@@ -78,6 +80,65 @@ ensure_token() {
   export ADAPTER_TOKEN
 }
 
+KEY_FILE_DEFAULT_MODEL_CHAT="gemini-2.5-pro"
+KEY_FILE_DEFAULT_MODEL_SUMMARY="gemini-2.5-flash"
+GEMINI_OPENAI_BASE="https://generativelanguage.googleapis.com/v1beta/openai"
+
+llm_env() {
+  local key_file="$FICSITAI_DATA/llm.key"
+  if [ -z "${LLM_API_KEY:-}" ] && [ -s "$key_file" ]; then
+    LLM_API_KEY="$(cat "$key_file")"
+    export LLM_API_KEY
+  fi
+
+  case "${FICSITAI_LLM:-gemini}" in
+    gemini)
+      # Gemini подключается через OpenAI-совместимый эндпоинт Google: своего
+      # провайдера у Foreman для него нет, и это ровно тот случай, под который
+      # там сделан LLM_BASE_URL.
+      export LLM_PROVIDER=openai
+      export LLM_BASE_URL="${LLM_BASE_URL:-$GEMINI_OPENAI_BASE}"
+      export LLM_MODEL="${LLM_MODEL:-$KEY_FILE_DEFAULT_MODEL_CHAT}"
+      export LLM_SUMMARY_MODEL="${LLM_SUMMARY_MODEL:-$KEY_FILE_DEFAULT_MODEL_SUMMARY}"
+      ;;
+    anthropic|openai)
+      export LLM_PROVIDER="$FICSITAI_LLM"
+      ;;
+    *)
+      echo "FICSITAI_LLM: ожидается gemini, anthropic или openai" >&2
+      exit 1
+      ;;
+  esac
+
+  if [ -z "${LLM_API_KEY:-}" ]; then
+    echo "предупреждение: ключа LLM нет ($key_file) — поднимется всё, кроме ответа в чате." >&2
+    echo "                положить ключ: $(basename "${BASH_SOURCE[0]}") set-key" >&2
+  fi
+}
+
+cmd_set_key() {
+  mkdir -p "$FICSITAI_DATA"
+  local key_file="$FICSITAI_DATA/llm.key" key=""
+  echo "Ключ LLM-провайдера (ввод не отображается, в историю команд не попадает)."
+  echo "Для Gemini ключ берётся в Google AI Studio: https://aistudio.google.com/apikey"
+  printf 'Ключ: '
+  IFS= read -rs key
+  echo
+  [ -n "$key" ] || { echo "пусто — ничего не записал" >&2; exit 1; }
+  (umask 077; printf '%s' "$key" >"$key_file")
+  chmod 600 "$key_file"
+  echo "записан $key_file (права 600)"
+}
+
+cmd_models() {
+  llm_env
+  [ -n "${LLM_API_KEY:-}" ] || { echo "нет ключа: сначала set-key" >&2; exit 1; }
+  # Список моделей — чтобы имя в LLM_MODEL не угадывать, а брать из ответа API.
+  curl -sS "https://generativelanguage.googleapis.com/v1beta/models" \
+    -H "x-goog-api-key: $LLM_API_KEY" |
+    grep -o '"name": *"models/[^"]*"' | sed 's/.*models\///; s/"$//' | sort
+}
+
 common_env() {
   ensure_token
   mkdir -p "$FICSITAI_DATA/saves"
@@ -96,6 +157,7 @@ common_env() {
   export ADAPTER_PORT
   export SF_MCP_URL="http://$HOST_LOOPBACK:$SF_MCP_PORT/mcp"
   export FOREMAN_BASE_URL="http://$HOST_LOOPBACK:$FF_SERVER_PORT"
+  llm_env
 }
 
 cmd_migrate() {
@@ -148,6 +210,8 @@ cmd_urls() {
   echo "ff-server  http://$HOST_LOOPBACK:$FF_SERVER_PORT"
   echo "адаптер    http://$HOST_LOOPBACK:$ADAPTER_PORT/health"
   echo "MCP_URL    http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=<в $TOKEN_FILE>"
+  llm_env
+  echo "LLM        ${FICSITAI_LLM:-gemini} → провайдер $LLM_PROVIDER, модель ${LLM_MODEL:-по умолчанию у Foreman}${LLM_API_KEY:+, ключ на месте}"
 }
 
 case "${1:-}" in
@@ -156,5 +220,7 @@ case "${1:-}" in
   status) cmd_status ;;
   urls) cmd_urls ;;
   migrate) cmd_migrate ;;
-  *) sed -n '1,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 1 ;;
+  set-key) cmd_set_key ;;
+  models) cmd_models ;;
+  *) sed -n '1,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 1 ;;
 esac
