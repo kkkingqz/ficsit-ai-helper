@@ -11,7 +11,7 @@ lang: ru-RU
 | Поле | Значение |
 |---|---|
 | Что это | **Замороженный контракт API v0** — имена, формы и семантика. Не реализация |
-| `apiVersion` | **0.3.0** (журнал версий — в конце документа) |
+| `apiVersion` | **0.4.0** (журнал версий — в конце документа; в плане, задачах и issues версия не дублируется — источник один) |
 | Заморожен | Неделя 1–2 вместо недели 6 (решение King 09.11.2026) |
 | Зачем раньше плана | Co2 строит фасад API для страниц в S6 на неделе 4. Без замороженного контракта он построит его по эскизу, и переделка попадёт в недели 6–7, где у него уже V-5, V-6 и V-7 |
 | Ревью | Gs |
@@ -61,6 +61,15 @@ enum class EFicsitAIDataSource : uint8
     Recorded,        // воспроизведение записи сессии
     Fixture,         // подготовленный набор для тестов
     Planned          // плановое значение, не наблюдаемое (§8.4)
+};
+
+/** Есть ли у значения смысл в этом снимке (Gs-13). NotApplicable — нормальное состояние мира,
+ *  а не сбой: «времени до разряда нет», потому что сеть не разряжается. */
+UENUM(BlueprintType)
+enum class EFicsitAIValueState : uint8
+{
+    Value,           // Value можно читать
+    NotApplicable    // метрика и область существуют, но значения по смыслу нет; Value не читается
 };
 
 /** Единицы (§5.6). Переводы делаются один раз, на границе CatalogProvider. */
@@ -137,6 +146,9 @@ struct FFicsitAIValue
     /** Идентификатор объекта в пределах Scope: className предмета, id сети. Пусто для Factory. */
     UPROPERTY(BlueprintReadOnly) FString ScopeId;
 
+    /** Читается только при State == Value. Добавлено 10.11.2026 по Gs-13. */
+    UPROPERTY(BlueprintReadOnly) EFicsitAIValueState State = EFicsitAIValueState::Value;
+
     UPROPERTY(BlueprintReadOnly) double Value = 0.0;
     UPROPERTY(BlueprintReadOnly) EFicsitAIUnit Unit = EFicsitAIUnit::Count;
     UPROPERTY(BlueprintReadOnly) EFicsitAIDataSource Source = EFicsitAIDataSource::Live;
@@ -179,6 +191,14 @@ struct FFicsitAISeries
     UPROPERTY(BlueprintReadOnly) bool bWindowIncomplete = false;
 };
 ```
+
+**Неприменимое значение — успешный ответ, а не ошибка** (добавлено 10.11.2026 по Gs-13). Время до заряда сети без батарей, время до разряда сети, которая не разряжается, — метрика и область существуют, снимок готов, но числа нет по смыслу. Геттеры игры в этих случаях возвращают ноль (каталог S3, `metrics-v0.1.md`), поэтому сборщик обязан решать «применимо ли» сам, по направлению потока, а не по значению. Три способа это выразить отвергнуты:
+
+- **ноль** — читается как «разрядится прямо сейчас», то есть ровно противоположное правде;
+- **код ошибки** — модель воспринимает ошибку как сбой и повторяет запрос или извиняется, а экран рисует красное там, где всё в порядке;
+- **отсутствие ответа** — неотличимо от `SOURCE_UNAVAILABLE`.
+
+Поэтому `QueryMetric` возвращает значение с `State = NotApplicable`. В канонической форме: `"state": "notApplicable"` и `"value": null` — `value` равен `null` тогда и только тогда, когда состояние `notApplicable`, и это проверяет схема V-3. Экран показывает прочерк, модель говорит «неприменимо», Fixture задаёт это состояние явно. **В ряду неприменимые точки не пишутся**: пропуск честно виден по `timestamps`, а отдельное состояние на точку ряду не нужно — на графике «нет разряда» и есть разрыв линии.
 
 # Запросы v0
 
@@ -273,7 +293,16 @@ struct FFicsitAISeries
 { "op": "queryMetric", "args": { "metricId": "power.consumption" } }
 { "kind": "value", "metricId": "power.consumption", "scopeId": "",
   "value": 412.5, "unit": "megawatt", "source": "live",
-  "sessionTimeSec": 1830.2, "precisionDigits": 1 }
+  "sessionTimeSec": 1830.2, "precisionDigits": 1, "state": "value" }
+```
+
+Неприменимое значение — сеть без батарей:
+
+```json
+{ "op": "queryMetric", "args": { "metricId": "power.network.battery_time_to_empty", "scopeId": "net-3" } }
+{ "kind": "value", "metricId": "power.network.battery_time_to_empty", "scopeId": "net-3",
+  "value": null, "state": "notApplicable", "unit": "seconds", "source": "live",
+  "sessionTimeSec": 1830.2, "precisionDigits": 0 }
 ```
 
 Ряд — с окном, и здесь пропуск: точки в 1810 и 1830 секунд при номинальном шаге 5 с.
@@ -300,6 +329,7 @@ struct FFicsitAISeries
 | 0.1.0 | 09.11.2026 | Первая заморозка: `GetStatus`, `ListMetrics`, `QueryMetric`, `QuerySeries`; события `metrics.snapshot`, `mod.inert`; семь кодов ошибок |
 | 0.2.0 | 10.11.2026 | По ревью Gs: `ListScopes`, `AvailableScopes` и `bScopesTruncated`, `Timestamps` в ряду, событие `api.status`, код `SCOPE_NOT_FOUND`, `ScopeFilter` и `ScopeCursor` в `ListMetrics`, `ApiVersionMismatch` и `Reason` в статусе |
 | 0.3.0 | 10.11.2026 | По Gs-8: `MetricId` на входе `ListMetrics` и `NextScopeCursor` на выходе, пагинация `ListScopes`, код `INVALID_ARGUMENT`. Пагинация областей стала однозначной: курсор привязан к одной метрике |
+| 0.4.0 | 10.11.2026 | По Gs-13: `EFicsitAIValueState` и поле `State` у значения — неприменимое значение как успешный ответ, `value: null` в канонической форме; неприменимые точки в ряд не пишутся |
 
 # Лимиты
 
