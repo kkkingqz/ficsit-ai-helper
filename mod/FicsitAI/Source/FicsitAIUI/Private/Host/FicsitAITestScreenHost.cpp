@@ -26,9 +26,14 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
         return true;
     }
 
-    // Закрываем текущий
+    // Закрываем текущий с сохранением состояния
     if (ActiveModuleInstance)
     {
+        FString StateJson;
+        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        {
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+        }
         ActiveModuleInstance->OnDetach();
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;
@@ -57,6 +62,13 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
     ActiveModuleId = ModuleId;
     ActiveModuleInstance = TargetModule;
     ActiveModuleInstance->OnAttach(HostContext);
+
+    // Восстанавливаем состояние, если было сохранено
+    if (const FString* SavedState = ModulePersistentStates.Find(ModuleId))
+    {
+        ActiveModuleInstance->RestorePersistentState(*SavedState);
+    }
+
     return true;
 }
 
@@ -64,6 +76,11 @@ void UFicsitAITestScreenHost::CloseModule(FName ModuleId)
 {
     if (ActiveModuleId == ModuleId && ActiveModuleInstance)
     {
+        FString StateJson;
+        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        {
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+        }
         ActiveModuleInstance->OnDetach();
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;
@@ -95,6 +112,11 @@ void UFicsitAITestScreenHost::SetTestHostState(EFicsitAIHostState NewState)
     HostContext.HostState = NewState;
     if (NewState != EFicsitAIHostState::Ready && ActiveModuleInstance)
     {
+        FString StateJson;
+        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        {
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+        }
         ActiveModuleInstance->OnDetach();
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;

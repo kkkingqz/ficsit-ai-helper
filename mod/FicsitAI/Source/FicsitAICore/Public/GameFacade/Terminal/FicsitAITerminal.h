@@ -77,6 +77,10 @@ protected:
     UPROPERTY()
     TMap<FName, TScriptInterface<IFicsitAIScreenModule>> CachedModules;
 
+    /** Сохранённые состояния экранных модулей (ADR-014, AC-07, AC-14) */
+    UPROPERTY(SaveGame)
+    TMap<FName, FString> ModulePersistentStates;
+
     UFUNCTION()
     void OnRep_HostContext();
 

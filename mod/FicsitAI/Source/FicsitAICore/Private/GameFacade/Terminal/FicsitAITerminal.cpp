@@ -1,5 +1,6 @@
 #include "GameFacade/Terminal/FicsitAITerminal.h"
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
+#include "FicsitAIScreenModuleFactoryImpl.h"
 #include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY(LogFicsitAITerminal);
@@ -40,6 +41,12 @@ void AFicsitAITerminal::BeginPlay()
     HostContext.SizePx = FIntPoint(1920, 1080);
     HostContext.AspectRatio = 16.0f / 9.0f;
     HostContext.bWorldSurface = false;
+
+    // Фабрика модулей по умолчанию (Notes, Status)
+    if (!ModuleFactory)
+    {
+        ModuleFactory = NewObject<UFicsitAIScreenModuleFactoryImpl>(this);
+    }
 
     UpdateHostState();
 }
@@ -90,6 +97,11 @@ void AFicsitAITerminal::UpdateHostState()
         HostContext.HostState = EFicsitAIHostState::NoPower;
         if (ActiveModuleInstance)
         {
+            FString StateJson;
+            if (ActiveModuleInstance->SavePersistentState(StateJson))
+            {
+                ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+            }
             ActiveModuleInstance->OnDetach();
             ActiveModuleInstance = nullptr;
             ActiveModuleId = NAME_None;
@@ -148,9 +160,14 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
         return true;
     }
 
-    // Отсоединяем текущий активный модуль
+    // Отсоединяем текущий активный модуль с сохранением состояния (AC-14)
     if (ActiveModuleInstance)
     {
+        FString StateJson;
+        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        {
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+        }
         ActiveModuleInstance->OnDetach();
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;
@@ -180,6 +197,13 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
     ActiveModuleId = ModuleId;
     ActiveModuleInstance = TargetModule;
     ActiveModuleInstance->OnAttach(HostContext);
+
+    // Восстанавливаем сохранённое состояние модуля, если есть (AC-14)
+    if (const FString* SavedState = ModulePersistentStates.Find(ModuleId))
+    {
+        ActiveModuleInstance->RestorePersistentState(*SavedState);
+    }
+
     UE_LOG(LogFicsitAITerminal, Log, TEXT("Открыт экранный модуль: %s"), *ModuleId.ToString());
     return true;
 }
@@ -188,6 +212,11 @@ void AFicsitAITerminal::CloseModule(FName ModuleId)
 {
     if (ActiveModuleId == ModuleId && ActiveModuleInstance)
     {
+        FString StateJson;
+        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        {
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+        }
         ActiveModuleInstance->OnDetach();
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;

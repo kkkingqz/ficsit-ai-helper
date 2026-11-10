@@ -6,6 +6,7 @@ DEFINE_LOG_CATEGORY(LogFicsitAISubsystem);
 
 AFicsitAISubsystem::AFicsitAISubsystem()
 {
+    PrimaryActorTick.bCanEverTick = true;
     ReplicationPolicy = ESubsystemReplicationPolicy::SpawnOnServer;
 }
 
@@ -50,6 +51,33 @@ void AFicsitAISubsystem::BeginPlay()
         bDiagnosticsActive = true;
         DiagnosticsScenario = FName(TEXT("S1"));
         UE_LOG(LogFicsitAISubsystem, Log, TEXT("Активирован режим диагностики (сценарий по умолчанию: S1)"));
+    }
+}
+
+void AFicsitAISubsystem::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+
+    // Отслеживание входа удалённых игроков в ходе сессии (ADR-016, S1 fallback)
+    if (UWorld* World = GetWorld())
+    {
+        int32 NumPlayers = 0;
+        for (FConstPlayerControllerIterator It = World->GetPlayerControllerIterator(); It; ++It)
+        {
+            if (It->IsValid())
+            {
+                NumPlayers++;
+            }
+        }
+
+        if (NumPlayers > 1 || GetNetMode() != NM_Standalone)
+        {
+            if (!bInertMode)
+            {
+                bInertMode = true;
+                UE_LOG(LogFicsitAISubsystem, Warning, TEXT("Обнаружено подключение удалённого игрока (%d игроков в мире). Переход в инертный режим (ADR-016)."), NumPlayers);
+            }
+        }
     }
 }
 

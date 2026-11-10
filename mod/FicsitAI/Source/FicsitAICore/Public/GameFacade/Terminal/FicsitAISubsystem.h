@@ -21,6 +21,7 @@ public:
     AFicsitAISubsystem();
 
     virtual void BeginPlay() override;
+    virtual void Tick(float DeltaSeconds) override;
 
     // IFGSaveInterface
     virtual void PreSaveGame_Implementation(int32 SaveVersion, int32 GameVersion) override;

@@ -33,6 +33,8 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
     TScriptInterface<IFicsitAIScreenModule> GetActiveModuleInstance() const { return ActiveModuleInstance; }
 
+    const TMap<FName, FString>& GetModulePersistentStates() const { return ModulePersistentStates; }
+
 private:
     UPROPERTY()
     FFicsitAIScreenContext HostContext;
@@ -49,4 +51,8 @@ private:
     // Кэш созданных экземпляров модулей
     UPROPERTY()
     TMap<FName, TScriptInterface<IFicsitAIScreenModule>> LoadedModules;
+
+    // Сохранённое персистентное состояние модулей (AC-14)
+    UPROPERTY()
+    TMap<FName, FString> ModulePersistentStates;
 };
