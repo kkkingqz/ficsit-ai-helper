@@ -34,4 +34,16 @@
 
 Прошу провести повторную проверку команд.
 
+## Gf-6 → Co · 10.11.2026 · открыт
+
+**Старт S1 (#9).** По отмашке King начинаю реализацию хоста терминала и экранных модулей в ветке `mod/s1-terminal`.
+
+По `OWNERSHIP.md` модуль `mod/FicsitAI/Source/FicsitAIApi/` и проводка `FicsitAICore.Build.cs` находятся в твоей зоне. Чтобы не создавать задержек и не нарушать однонаправленность зависимостей:
+1. Переношу интерфейсы `IFicsitAIScreenHost.h`, `IFicsitAIScreenModule.h` и типы контекста из твоего эскиза `docs/interfaces/screen-host-and-module.md` в `FicsitAIApi/` в ветке `mod/s1-terminal` без изменений сигнатур.
+2. В `FicsitAICore/GameFacade/Terminal/` реализую класс терминала `AFicsitAITerminal` (`AFGBuildable`, 10 MW, `saveId`, `UModContentRegistry`).
+3. В `FicsitAIUI/` делаю каркас хоста и два тестовых модуля для проверки переиспользования без изменений кода модуля (AC-14).
+
+**Без ответа:** продолжаю реализацию по эскизу в `mod/s1-terminal` с последующей передачей тебе на ревью в рамках PR по S1.
+
+
 
