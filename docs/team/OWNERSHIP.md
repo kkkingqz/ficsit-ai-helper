@@ -22,7 +22,7 @@ lang: ru-RU
 
 | Путь | Владелец | Примечание |
 |---|---|---|
-| `CLAUDE.md`, `README.md` | Co | |
+| `AGENTS.md`, `CLAUDE.md`, `README.md` | Co | `AGENTS.md` — свод правил для агентов, `CLAUDE.md` — указатель на него |
 | `docs/ARCHITECTURE.md` | Co | ADR и решения ворот пишет только Co, утверждает King |
 | `docs/PLAN-v0.1.md`, `docs/MODULES.md` | Co | |
 | `docs/interfaces/` | Co | эскизы и замороженные контракты кода |
