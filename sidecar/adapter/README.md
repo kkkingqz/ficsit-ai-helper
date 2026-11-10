@@ -35,7 +35,7 @@
 | `ADAPTER_TOKEN` | — | **обязателен**, не короче 16 символов; генерирует лаунчер, в репозитории не лежит |
 | `FOREMAN_BASE_URL` | `http://127.0.0.1:8724` | куда ходить за чатом и playthrough |
 | `SF_MCP_URL` | `http://127.0.0.1:8723/mcp` | MCP-сервер Foreman; модели не выставляется |
-| `FICSITAI_API_VERSION` | `0.3.0` | версия публичного API мода ([docs/interfaces/public-api-v0.md](../../docs/interfaces/public-api-v0.md)); значение по умолчанию идёт за контрактом |
+| `FICSITAI_API_VERSION` | `0.4.0` | версия публичного API мода ([docs/interfaces/public-api-v0.md](../../docs/interfaces/public-api-v0.md)); значение по умолчанию идёт за контрактом, и это дублирование — проверку на совпадение в CI попросил у Gf2 (Co2-12) |
 | `LLM_UPSTREAM_BASE_URL` | — | настоящий адрес провайдера. Задан — поднимается нормализатор (ADR-034); не задан — Foreman ходит к провайдеру сам |
 | `NORMALIZER_PORT` | `8731` | порт нормализатора, тоже только петля |
 | `ADAPTER_LOG_LEVEL` | `info` | `debug`, `info`, `warn`, `error` |

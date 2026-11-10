@@ -163,7 +163,7 @@ describe("п. 4 — ключ провайдера не попадает в ло�
 });
 
 describe("п. 5 — версия API по умолчанию идёт за контрактом", () => {
-  it("0.3.0, пока окружение не сказало иначе", () => {
-    expect(loadConfig({ ADAPTER_TOKEN: "0".repeat(32) }).apiVersion).toBe("0.3.0");
+  it("0.4.0, пока окружение не сказало иначе", () => {
+    expect(loadConfig({ ADAPTER_TOKEN: "0".repeat(32) }).apiVersion).toBe("0.4.0");
   });
 });
