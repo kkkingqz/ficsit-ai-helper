@@ -44,25 +44,27 @@ GitHub Actions для всего, что собирается без движк�
 
 Сохранения с известным состоянием фабрики для S3, S6 и профилирования (MODULES I5). King предоставляет, Gf2 описывает их состав в `fixtures/`.
 
-- [ ] Описание состава каждого сохранения
+- [x] Спецификация и требования к составу каждого сохранения ([`fixtures/saves-specification.md`](../../fixtures/saves-specification.md))
+- [ ] Описание фактического состава после передачи файлов King
 
 Общие пункты задачи:
 
-- [ ] Раннее сохранение
-- [ ] Среднее: 1–2 тыс. построек
-- [ ] Позднее: 5 тыс.+ построек
-- [ ] Сохранение с модом, добавляющим рецепты
+- [ ] Раннее сохранение (Save A)
+- [ ] Среднее: 1–2 тыс. построек (Save B)
+- [ ] Позднее: 5 тыс.+ построек (Save C)
+- [ ] Сохранение с модом, добавляющим рецепты (Save D)
 
 ### [P-7 · Тест-план этапа 1](https://github.com/kkkingqz/ficsit-ai-helper/issues/32) · #32
 
 **Неделя:** 1–2 · **Оценка для Gf2:** 2 ч·д
 
-Условия готовности спайков из ARCHITECTURE §13 и критерии V-01…V-11 — в проверяемые чек-листы; протоколы замеров кадрового времени и стоимости телеметрии.
+Условия готовности спайков из ARCHITECTURE §13 и критерии V-01…V-11 — в проверяемые чек-листы; протоколы замеров кадрового времени и стоимости телеметрии (индекс: [`tests/test-plan/README.md`](../../tests/test-plan/README.md)).
 
-- [ ] Чек-листы для спайков (S8 готов: [`tests/test-plan/s8-checklist.md`](../../tests/test-plan/s8-checklist.md); S1, S2, S3, S6, S5-lite — неделя 2)
-- [ ] Чек-листы V-01…V-11
-- [ ] Протокол замеров кадрового времени (S8) и стоимости выборки (S3)
-- [ ] Шаблон отчёта о проверке для ворот W, G1, G2
+- [x] Чек-листы для всех спайков: S8 ([`s8-checklist.md`](../../tests/test-plan/s8-checklist.md)), S1, S2, S3, S5-lite, S6 ([`spikes-checklist.md`](../../tests/test-plan/spikes-checklist.md))
+- [x] Чек-листы критериев V-01…V-11 ([`acceptance-v01-checklist.md`](../../tests/test-plan/acceptance-v01-checklist.md))
+- [x] Протоколы замеров кадрового времени (S8) и стоимости телеметрии (S3) ([`telemetry-protocol.md`](../../tests/test-plan/telemetry-protocol.md))
+- [x] Чек-лист проверок на чистой Windows для пилотного тестера ([`windows-pilot-checklist.md`](../../tests/test-plan/windows-pilot-checklist.md))
+- [x] Шаблоны отчётов о проверке для ворот W, G1, G2 ([`gate-report-templates.md`](../../tests/test-plan/gate-report-templates.md))
 
 ### [S3 · Каталог, телеметрия, линии](https://github.com/kkkingqz/ficsit-ai-helper/issues/11) · #11
 

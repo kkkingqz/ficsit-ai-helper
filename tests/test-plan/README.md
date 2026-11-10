@@ -14,11 +14,18 @@ lang: ru-RU
 
 | Документ | Статус | Назначение |
 |---|---|---|
-| [s8-checklist.md](s8-checklist.md) | **Готов (конец недели 1)** | Чек-лист спайка S8 «Веб-экраны через BLUI», протокол замеров кадрового времени и критерии для ворот W |
-| `spikes-checklist.md` | В плане (неделя 2) | Чек-листы завершения спайков S1, S2, S3, S6, S5-lite по условиям ARCHITECTURE.md §13 |
-| `acceptance-v01-checklist.md` | В плане (неделя 2) | Чек-листы приёмки критериев вертикального среза V-01…V-11 по PLAN-v0.1.md §2 |
-| `telemetry-budget-protocol.md` | В плане (неделя 2) | Протокол замеров бюджета GameThread и стоимости выборки телеметрии (S3, V-09) на тестовых сохранениях P-5 |
-| `gate-report-templates.md` | В плане (неделя 2) | Шаблоны отчётов о проверке критериев для ворот решений W, G1, G2 |
+| [**s8-checklist.md**](s8-checklist.md) | **Готов** | Чек-лист спайка S8 «Веб-экраны через BLUI», протокол замеров кадрового времени и критерии ворот W |
+| [**spikes-checklist.md**](spikes-checklist.md) | **Готов** | Чек-листы завершения спайков S1, S2, S3, S5-lite, S6 по условиям ARCHITECTURE.md §13 |
+| [**acceptance-v01-checklist.md**](acceptance-v01-checklist.md) | **Готов** | Чек-листы приёмки всех критериев вертикального среза V-01…V-11 по PLAN-v0.1.md §2 |
+| [**telemetry-protocol.md**](telemetry-protocol.md) | **Готов** | Протокол замеров бюджета GameThread и стоимости выборки телеметрии (S3, V-09) |
+| [**windows-pilot-checklist.md**](windows-pilot-checklist.md) | **Готов** | Чек-лист проверок на чистой Windows для пилотного тестера (AC-12, V-08, ADR-033, R-27) |
+| [**gate-report-templates.md**](gate-report-templates.md) | **Готов** | Шаблоны отчётов о проверке критериев для ворот решений W, G1, G2 |
+
+## Связанные материалы
+
+- Спецификация тестовых сохранений P-5: [`fixtures/saves-specification.md`](../../fixtures/saves-specification.md).
+- Скрипт проверки архитектурных инвариантов: [`tools/ci/check-invariants.sh`](../../tools/ci/check-invariants.sh).
+- Проверка очереди вопросов между агентами: [`tools/questions.py`](../../tools/questions.py).
 
 ## Принцип работы
 
