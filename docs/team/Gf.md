@@ -60,11 +60,11 @@ GitHub Actions для всего, что собирается без движк�
 
 Терминал с питанием как хост экранных модулей; `saveId`; мультиплеер; клавиши. Ведёт Gf, интерфейсы и ревью — Co.
 
-- [ ] Класс терминала: строительный объект, 10 MW, рецепт и схема через `UModContentRegistry`, меш-заготовка с экраном 16:9
-- [ ] Хост в терминале: два тестовых модуля и переключение; те же модули в тестовом хосте без изменений
-- [ ] Состояние «нет питания» по E
-- [ ] `AModSubsystem` + `IFGSaveInterface`: `saveId` переживает сохранение, переименование файла и ротацию автосохранений
-- [ ] `RequiredOnRemote`, `NetMode` при загрузке, событие входа удалённого игрока — в паре с Co
+- [x] Класс терминала: строительный объект, 10 MW, рецепт и схема через `UModContentRegistry`, меш-заготовка с экраном 16:9 ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
+- [x] Хост в терминале: два тестовых модуля (`Notes`, `Status`) и переключение; те же модули в тестовом хосте без изменений ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
+- [x] Состояние «нет питания» по E ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
+- [x] `AModSubsystem` + `IFGSaveInterface`: `saveId` переживает сохранение, переименование файла и ротацию автосохранений ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
+- [x] `RequiredOnRemote`, `NetMode` при загрузке, событие входа удалённого игрока — в паре с Co ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
 - [ ] Действие Enhanced Input видно в штатном меню переназначения клавиш
 
 Готово, когда: условие S1 из ARCHITECTURE §13 выполнено или принят fallback (опрос игроков; свой экран клавиш)
