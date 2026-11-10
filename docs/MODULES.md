@@ -106,7 +106,7 @@ lang: ru-RU
 
 | ID | Модуль | Готовое решение | Лицензия · статус | Остаётся нам | Где · версия · ссылки |
 |---|---|---|---|---|---|
-| E1 | Канал мод ↔ адаптер | UE-модули `HTTP` и `WebSockets`; fallback — вендорить [IXWebSocket](https://github.com/machinezone/IXWebSocket) (мейнтейнер публично ищет себе замену). Входящего слушателя в игре нет | UE, BSD-3-Clause · **не подтверждено** (доступность модулей в сборке игры; WebSocket или long-poll) | одно исходящее соединение на loopback с токеном, сетевой код вне GameThread, переподключение | `FicsitAICore` · v1.0 · §3.3, ADR-012, S2 |
+| E1 | Канал мод ↔ адаптер | UE-модуль `HTTP` игры: поток (`GET` с построчным JSON) или long-poll; fallback — вендорить [IXWebSocket](https://github.com/machinezone/IXWebSocket) (мейнтейнер публично ищет себе замену). Входящего слушателя в игре нет | UE, BSD-3-Clause · **проверено по поставке 10.11.2026:** `HTTP` есть (WinHttp и libcurl, потоковое чтение тела), `WebSockets` нет; загрузка из мода и `http://` на петле — Spike S2 | одно исходящее соединение на loopback с токеном, сетевой код вне GameThread, переподключение | `FicsitAICore` · v1.0 · §3.3, ADR-012, S2 |
 | E2 | Адаптер сайдкара | [MCP TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk) — официальный | **Apache-2.0** (проект переходит с MIT; старый код частично MIT) · подтверждено 09.11.2026 | MCP-сервер для Foreman, белый список, автологин в Better Auth, сопоставление `saveId` с playthrough, удаление `savePath`, `apiVersion` | адаптер · v1.0 · §3.3, §3.4 |
 | E3 | Foreman | FICSIT Foreman как есть: `ff-server`, `sf-mcp`, SQLite, chat SSE, Work Orders | Apache-2.0 · подтверждено | ничего; fallback — upstream-PR `MCP_EXTRA_URLS` для готового `McpAggregateGateway` | сайдкар · v1.0 · §3.4, R-17 |
 | E4 | Клиент чата в моде | Поглощён E1: ответ потоком идёт тем же каналом | — · подтверждено | отмена ответа, история, субтитры | `FicsitAIUI` · v1.0 · FR-08 |
@@ -168,7 +168,7 @@ lang: ru-RU
 
 | Что проверить | Модуль | Последствие провала | Форма |
 |---|---|---|---|
-| Доступность UE-модулей `HTTP` / `WebSockets` в сборке игры; WebSocket или long-poll | E1 | Вендоринг IXWebSocket; рост объёма | **Spike S2, критический путь** |
+| `HTTP` из мода выполняет `http://` на петле под Proton и на Windows; поток или long-poll (`WebSockets` в поставке нет — проверено 10.11.2026) | E1 | Вендоринг IXWebSocket; рост объёма | **Spike S2, критический путь** |
 | Действия мода в штатном меню переназначения клавиш | A5 | Свой экран переназначения в настройках мода | Spike S1 |
 | `NetMode` при загрузке и событие входа удалённого игрока | A3 | Нужен другой сигнал входа игрока; без него AC-10 не выполним | Spike S1 |
 | Сохранение `AModSubsystem` в save-файл и загрузка старых сохранений | A6 | Своя сериализация состояния в сохранение | Milestone 1 |
