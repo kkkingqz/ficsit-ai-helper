@@ -225,6 +225,88 @@ def get_chunks_for_scenario(scenario_name: str, model: str = "fake-model", messa
             }
         ]
 
+    elif scenario_name in ("mixed_stream", "mixed_choices_stream"):
+        # Сценарий Gs-11 / Co2-12: несколько choices в одном потоке
+        # choice[0] - вызов инструмента с поломкой Gemini (finish_reason="stop")
+        # choice[1] - текстовый ответ со штатным finish_reason="stop"
+        return [
+            {
+                "id": "chatcmpl-mixed-stream",
+                "object": "chat.completion.chunk",
+                "created": 1762776000,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {
+                            "role": "assistant",
+                            "tool_calls": [{
+                                "index": 0,
+                                "id": "call_mixed_001",
+                                "type": "function",
+                                "function": {"name": "query_metric", "arguments": ""},
+                                "extra_content": {"google": {"thought_signature": "sig_mixed_001"}}
+                            }]
+                        },
+                        "finish_reason": None
+                    },
+                    {
+                        "index": 1,
+                        "delta": {
+                            "role": "assistant",
+                            "content": "Analyzing"
+                        },
+                        "finish_reason": None
+                    }
+                ]
+            },
+            {
+                "id": "chatcmpl-mixed-stream",
+                "object": "chat.completion.chunk",
+                "created": 1762776000,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {
+                            "tool_calls": [{
+                                "index": 0,
+                                "function": {"arguments": "{\"metric\": \"power.production\"}"}
+                            }]
+                        },
+                        "finish_reason": None
+                    },
+                    {
+                        "index": 1,
+                        "delta": {
+                            "content": " power grid telemetry..."
+                        },
+                        "finish_reason": None
+                    }
+                ]
+            },
+            {
+                "id": "chatcmpl-mixed-stream",
+                "object": "chat.completion.chunk",
+                "created": 1762776000,
+                "model": model,
+                "choices": [
+                    {
+                        "index": 0,
+                        "delta": {},
+                        # Поломка Gemini: ошибочно stop для вызова инструмента (требует правки в tool_calls)
+                        "finish_reason": "stop"
+                    },
+                    {
+                        "index": 1,
+                        "delta": {},
+                        # Обычный текст: легитимный stop (нормализатор ОБЯЗАН сохранить stop!)
+                        "finish_reason": "stop"
+                    }
+                ]
+            }
+        ]
+
     else:
         raise ValueError(f"Неизвестный сценарий: {scenario_name}")
 

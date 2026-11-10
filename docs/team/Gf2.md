@@ -132,7 +132,7 @@ GitHub Actions для всего, что собирается без движк�
 
 V-09 и V-10: CI зелёный, бюджет GameThread измерен.
 
-- [x] fake-LLM: сценарии normal, tool-вызовов и воспроизведения провайдерской поломки Gemini (ADR-034, Co-23) в [`tests/fake-llm/`](../../tests/fake-llm/README.md)
+- [x] fake-LLM: сценарии normal, tool-вызовов, Gemini (ADR-034, Co-23/27), mixed choices и изоляции разговоров (Gs-11, Co2-12) в [`tests/fake-llm/`](../../tests/fake-llm/README.md) (8 тестов зелёные)
 - [ ] fake-LLM: тесты адаптера; инварианты
 - [ ] Автотесты веб-экранов на Fixture в браузере
 
