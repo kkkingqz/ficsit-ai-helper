@@ -16,20 +16,18 @@ class FICSITAIUI_API UFicsitAITestNotesModule : public UUserWidget, public IFics
 
 public:
     virtual FName GetModuleId() const override { return FName(TEXT("Notes")); }
+    virtual FString GetRequiredApiVersion() const override { return TEXT("0.3.0"); }
     virtual FText GetDisplayName() const override { return NSLOCTEXT("FicsitAI", "NotesModuleTitle", "Заметки"); }
-    virtual uint8 GetSupportedLayouts() const override { return 0xFF; }
-    virtual float GetPreferredAspectRatio() const override { return 16.0f / 9.0f; }
-
     virtual TArray<FFicsitAIHotkeyHint> GetHotkeyHints() const override;
 
     virtual void OnAttach(const FFicsitAIScreenContext& Context) override;
+    virtual void OnContextChanged(const FFicsitAIScreenContext& Context) override;
     virtual void OnDetach() override;
-    virtual void OnContextChanged(const FFicsitAIScreenContext& NewContext) override;
-    virtual void OnFocusGained() override;
-    virtual void OnFocusLost() override;
+
+    virtual FString SavePersistentState() const override;
+    virtual void RestorePersistentState(const FString& State) override;
+    virtual bool WantsInputFocus() const override { return true; }
     virtual bool HandleBackAction() override;
-    virtual bool SavePersistentState(FString& OutJson) const override;
-    virtual bool RestorePersistentState(const FString& InJson) override;
 
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
     const FString& GetNoteContent() const { return NoteContent; }
@@ -39,6 +37,11 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
     bool IsAttached() const { return bIsAttached; }
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
+    bool HasInputFocus() const { return bHasFocus; }
+
+    void SetInputFocus(bool bFocus) { bHasFocus = bFocus; }
 
 private:
     UPROPERTY()

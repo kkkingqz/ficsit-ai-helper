@@ -51,9 +51,21 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Subsystem")
     FName GetDiagnosticsScenario() const { return DiagnosticsScenario; }
 
+    /** Сохраняет состояние модуля по составному ключу (SaveId, ModuleId) (ADR-014, AC-14) */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Subsystem")
+    void SaveModuleState(const FString& InSaveId, FName ModuleId, const FString& State);
+
+    /** Загружает состояние модуля по составному ключу (SaveId, ModuleId) (ADR-014, AC-14) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Subsystem")
+    FString GetModuleState(const FString& InSaveId, FName ModuleId) const;
+
 protected:
     UPROPERTY(SaveGame, BlueprintReadOnly, Category = "FICSIT AI|Subsystem")
     FString SaveId;
+
+    /** Постоянное состояние экранных модулей по ключу (SaveId, ModuleId) (ADR-014, AC-14) */
+    UPROPERTY(SaveGame)
+    TMap<FString, FString> ModuleStatesByKey;
 
     UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Subsystem")
     bool bInertMode = false;

@@ -99,6 +99,23 @@ void AFicsitAISubsystem::PostLoadGame_Implementation(int32 SaveVersion, int32 Ga
     UE_LOG(LogFicsitAISubsystem, Log, TEXT("PostLoadGame: восстановлен SaveId: %s"), *SaveId);
 }
 
+void AFicsitAISubsystem::SaveModuleState(const FString& InSaveId, FName ModuleId, const FString& State)
+{
+    const FString Key = FString::Printf(TEXT("%s:%s"), *InSaveId, *ModuleId.ToString());
+    ModuleStatesByKey.FindOrAdd(Key) = State;
+    UE_LOG(LogFicsitAISubsystem, Log, TEXT("Сохранено состояние модуля [%s] в состоянии мода (SaveId: %s)"), *ModuleId.ToString(), *InSaveId);
+}
+
+FString AFicsitAISubsystem::GetModuleState(const FString& InSaveId, FName ModuleId) const
+{
+    const FString Key = FString::Printf(TEXT("%s:%s"), *InSaveId, *ModuleId.ToString());
+    if (const FString* Found = ModuleStatesByKey.Find(Key))
+    {
+        return *Found;
+    }
+    return FString();
+}
+
 AFicsitAISubsystem* AFicsitAISubsystem::Get(UObject* WorldContext)
 {
     if (!WorldContext)

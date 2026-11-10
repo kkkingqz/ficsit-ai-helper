@@ -2,7 +2,12 @@
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
 
-TScriptInterface<IFicsitAIScreenModule> UFicsitAIScreenModuleFactoryImpl::CreateModuleWidget(FName ModuleId, UObject* Outer)
+TArray<FName> UFicsitAIScreenModuleFactoryImpl::GetRegisteredModules() const
+{
+    return { FName(TEXT("Notes")), FName(TEXT("Status")) };
+}
+
+TScriptInterface<IFicsitAIScreenModule> UFicsitAIScreenModuleFactoryImpl::CreateModule(FName ModuleId, UObject* Outer)
 {
     if (ModuleId == FName(TEXT("Notes")))
     {

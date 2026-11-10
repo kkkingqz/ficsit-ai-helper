@@ -3,15 +3,30 @@
 void UFicsitAITestScreenHost::InitializeTestHost(const FString& InSaveId, TScriptInterface<IFicsitAIScreenModuleFactory> InFactory)
 {
     HostContext.SaveId = InSaveId;
-    HostContext.HostId = FName(TEXT("TestScreenHost"));
-    HostContext.Layout = EFicsitAIScreenLayout::Slots1;
+    HostContext.HostId = FName(TEXT("TestHost"));
+    HostContext.Layout = EFicsitAIScreenLayout::Slots3;
     HostContext.SizePx = FIntPoint(1920, 1080);
     HostContext.AspectRatio = 16.0f / 9.0f;
     HostContext.bWorldSurface = false;
     HostContext.HostState = EFicsitAIHostState::Ready;
     HostContext.bHasInputFocus = false;
+    HostContext.Host.SetObject(this);
+    HostContext.Host.SetInterface(Cast<IFicsitAIScreenHost>(this));
 
     ModuleFactory = InFactory;
+
+    UFicsitAIScreenSurfaceWidget* SurfaceWidget = NewObject<UFicsitAIScreenSurfaceWidget>(this);
+    ScreenSurface.SetObject(SurfaceWidget);
+    ScreenSurface.SetInterface(Cast<IFicsitAIScreenSurface>(SurfaceWidget));
+}
+
+TArray<FName> UFicsitAITestScreenHost::GetAvailableModules() const
+{
+    if (ModuleFactory)
+    {
+        return ModuleFactory->GetRegisteredModules();
+    }
+    return { FName(TEXT("Notes")), FName(TEXT("Status")) };
 }
 
 bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
@@ -26,28 +41,32 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
         return true;
     }
 
-    // Закрываем текущий с сохранением состояния
+    // Сохранение и отсоединение текущего модуля (AC-14)
     if (ActiveModuleInstance)
     {
-        FString StateJson;
-        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        const FString State = ActiveModuleInstance->SavePersistentState();
+        if (!State.IsEmpty())
         {
-            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = State;
         }
         ActiveModuleInstance->OnDetach();
+        if (ScreenSurface)
+        {
+            ScreenSurface->ClearModule();
+        }
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;
     }
 
-    // Ищем или создаем модуль через фабрику
+    // Создание или загрузка из кэша
     TScriptInterface<IFicsitAIScreenModule> TargetModule;
-    if (TScriptInterface<IFicsitAIScreenModule>* Found = LoadedModules.Find(ModuleId))
+    if (TScriptInterface<IFicsitAIScreenModule>* Cached = LoadedModules.Find(ModuleId))
     {
-        TargetModule = *Found;
+        TargetModule = *Cached;
     }
     else if (ModuleFactory)
     {
-        TargetModule = ModuleFactory->CreateModuleWidget(ModuleId, this);
+        TargetModule = ModuleFactory->CreateModule(ModuleId, this);
         if (TargetModule)
         {
             LoadedModules.Add(ModuleId, TargetModule);
@@ -61,45 +80,66 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
 
     ActiveModuleId = ModuleId;
     ActiveModuleInstance = TargetModule;
+
+    // Жизненный цикл по docs/interfaces/screen-host-and-module.md:
+    // CreateModule -> OnAttach(Context) -> RestorePersistentState(State) -> Surface->SetModule
     ActiveModuleInstance->OnAttach(HostContext);
 
-    // Восстанавливаем состояние, если было сохранено
     if (const FString* SavedState = ModulePersistentStates.Find(ModuleId))
     {
         ActiveModuleInstance->RestorePersistentState(*SavedState);
     }
 
+    if (ScreenSurface)
+    {
+        ScreenSurface->SetModule(TargetModule);
+    }
+
     return true;
 }
 
-void UFicsitAITestScreenHost::CloseModule(FName ModuleId)
+void UFicsitAITestScreenHost::CloseActiveModule()
 {
-    if (ActiveModuleId == ModuleId && ActiveModuleInstance)
+    if (ActiveModuleInstance)
     {
-        FString StateJson;
-        if (ActiveModuleInstance->SavePersistentState(StateJson))
+        const FString State = ActiveModuleInstance->SavePersistentState();
+        if (!State.IsEmpty())
         {
-            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = State;
         }
         ActiveModuleInstance->OnDetach();
+        if (ScreenSurface)
+        {
+            ScreenSurface->ClearModule();
+        }
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;
+        HostContext.bHasInputFocus = false;
     }
 }
 
-void UFicsitAITestScreenHost::SetFocusToModule(bool bFocus)
+void UFicsitAITestScreenHost::SetTestHostState(EFicsitAIHostState NewState)
 {
-    HostContext.bHasInputFocus = bFocus;
+    HostContext.HostState = NewState;
+
+    if (UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+    {
+        SurfaceWidget->SetHostState(NewState);
+    }
+
+    // При Ready -> NoPower или Ready -> Inert модуль закрывается с сохранением состояния (Gs-15.3)
+    if (NewState != EFicsitAIHostState::Ready && ActiveModuleInstance)
+    {
+        CloseActiveModule();
+    }
+}
+
+void UFicsitAITestScreenHost::RequestInputFocus(bool bWanted)
+{
+    HostContext.bHasInputFocus = bWanted;
     if (ActiveModuleInstance)
     {
-        if (bFocus)
-        {
-            ActiveModuleInstance->OnFocusGained();
-        }
-        else
-        {
-            ActiveModuleInstance->OnFocusLost();
-        }
+        ActiveModuleInstance->OnContextChanged(HostContext);
     }
 }
 
@@ -107,18 +147,13 @@ void UFicsitAITestScreenHost::NotifyContentChanged()
 {
 }
 
-void UFicsitAITestScreenHost::SetTestHostState(EFicsitAIHostState NewState)
+bool UFicsitAITestScreenHost::HandleBackAction()
 {
-    HostContext.HostState = NewState;
-    if (NewState != EFicsitAIHostState::Ready && ActiveModuleInstance)
+    if (ActiveModuleInstance && ActiveModuleInstance->HandleBackAction())
     {
-        FString StateJson;
-        if (ActiveModuleInstance->SavePersistentState(StateJson))
-        {
-            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
-        }
-        ActiveModuleInstance->OnDetach();
-        ActiveModuleInstance = nullptr;
-        ActiveModuleId = NAME_None;
+        return true;
     }
+
+    CloseActiveModule();
+    return true;
 }

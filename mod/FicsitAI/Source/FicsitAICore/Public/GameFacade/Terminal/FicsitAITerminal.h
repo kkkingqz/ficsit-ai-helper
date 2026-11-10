@@ -33,21 +33,38 @@ public:
     virtual void UpdateUseState_Implementation(class AFGCharacterPlayer* byCharacter, const FVector& atLocation, class UPrimitiveComponent* componentHit, FUseState& out_useState) override;
 
     // IFicsitAIScreenHost
-    virtual const FFicsitAIScreenContext& GetHostContext() const override { return HostContext; }
-    virtual EFicsitAIHostState GetHostState() const override;
+    virtual FFicsitAIScreenContext GetScreenContext() const override { return HostContext; }
+    virtual TArray<FName> GetAvailableModules() const override;
     virtual bool OpenModule(FName ModuleId) override;
-    virtual void CloseModule(FName ModuleId) override;
-    virtual FName GetActiveModule() const override { return ActiveModuleId; }
-    virtual void SetFocusToModule(bool bFocus) override;
+    virtual void CloseActiveModule() override;
+    virtual FName GetActiveModuleId() const override { return ActiveModuleId; }
+    virtual void RequestInputFocus(bool bWanted) override;
     virtual void NotifyContentChanged() override;
+
+    /** Обработка действия «Назад» (Esc / геймпад) по соглашению Gs-4 и D-1 */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
+    bool HandleBackAction();
 
     /** Проверяет наличие питания (10 MW) на силовой цепи */
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
     bool HasPower() const;
 
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    EFicsitAIHostState GetHostState() const { return HostContext.HostState; }
+
     /** Устанавливает модуль-фабрику для инстанцирования виджетов UI */
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
     void SetModuleFactory(TScriptInterface<IFicsitAIScreenModuleFactory> InFactory);
+
+    /** Устанавливает поверхность экрана */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
+    void SetScreenSurface(TScriptInterface<IFicsitAIScreenSurface> InSurface);
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    TScriptInterface<IFicsitAIScreenSurface> GetScreenSurface() const { return ScreenSurface; }
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    TScriptInterface<IFicsitAIScreenModule> GetActiveModuleInstance() const { return ActiveModuleInstance; }
 
     /** Компонент информации о питании (10 MW) */
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Power")
@@ -75,14 +92,14 @@ protected:
     TScriptInterface<IFicsitAIScreenModuleFactory> ModuleFactory;
 
     UPROPERTY()
-    TMap<FName, TScriptInterface<IFicsitAIScreenModule>> CachedModules;
+    TScriptInterface<IFicsitAIScreenSurface> ScreenSurface;
 
-    /** Сохранённые состояния экранных модулей (ADR-014, AC-07, AC-14) */
-    UPROPERTY(SaveGame)
-    TMap<FName, FString> ModulePersistentStates;
+    UPROPERTY()
+    TMap<FName, TScriptInterface<IFicsitAIScreenModule>> CachedModules;
 
     UFUNCTION()
     void OnRep_HostContext();
 
     void UpdateHostState();
+    void TeardownActiveModule();
 };

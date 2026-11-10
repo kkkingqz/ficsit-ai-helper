@@ -11,5 +11,6 @@ class FICSITAIUI_API UFicsitAIScreenModuleFactoryImpl : public UObject, public I
     GENERATED_BODY()
 
 public:
-    virtual TScriptInterface<IFicsitAIScreenModule> CreateModuleWidget(FName ModuleId, UObject* Outer) override;
+    virtual TArray<FName> GetRegisteredModules() const override;
+    virtual TScriptInterface<IFicsitAIScreenModule> CreateModule(FName ModuleId, UObject* Outer) override;
 };

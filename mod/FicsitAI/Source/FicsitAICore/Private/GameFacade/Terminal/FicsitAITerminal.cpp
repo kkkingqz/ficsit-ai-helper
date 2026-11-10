@@ -1,6 +1,7 @@
 #include "GameFacade/Terminal/FicsitAITerminal.h"
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
 #include "FicsitAIScreenModuleFactoryImpl.h"
+#include "Surface/FicsitAIScreenSurfaceWidget.h"
 #include "Net/UnrealNetwork.h"
 
 DEFINE_LOG_CATEGORY(LogFicsitAITerminal);
@@ -41,11 +42,21 @@ void AFicsitAITerminal::BeginPlay()
     HostContext.SizePx = FIntPoint(1920, 1080);
     HostContext.AspectRatio = 16.0f / 9.0f;
     HostContext.bWorldSurface = false;
+    HostContext.Host.SetObject(this);
+    HostContext.Host.SetInterface(Cast<IFicsitAIScreenHost>(this));
 
     // Фабрика модулей по умолчанию (Notes, Status)
     if (!ModuleFactory)
     {
         ModuleFactory = NewObject<UFicsitAIScreenModuleFactoryImpl>(this);
+    }
+
+    // Поверхность экрана 16:9
+    if (!ScreenSurface)
+    {
+        UFicsitAIScreenSurfaceWidget* SurfaceWidget = NewObject<UFicsitAIScreenSurfaceWidget>(this);
+        ScreenSurface.SetObject(SurfaceWidget);
+        ScreenSurface.SetInterface(Cast<IFicsitAIScreenSurface>(SurfaceWidget));
     }
 
     UpdateHostState();
@@ -78,38 +89,77 @@ bool AFicsitAITerminal::HasPower() const
     return PowerInfoComponent && PowerInfoComponent->HasPower();
 }
 
-EFicsitAIHostState AFicsitAITerminal::GetHostState() const
+void AFicsitAITerminal::TeardownActiveModule()
 {
-    return HostContext.HostState;
+    if (ActiveModuleInstance)
+    {
+        // Сохраняем состояние в подсистеме мода по ключу (SaveId, ModuleId) (ADR-014, AC-14, Gs-15.3)
+        const FString State = ActiveModuleInstance->SavePersistentState();
+        if (!State.IsEmpty())
+        {
+            if (AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this))
+            {
+                Subsystem->SaveModuleState(HostContext.SaveId, ActiveModuleId, State);
+            }
+        }
+
+        ActiveModuleInstance->OnDetach();
+
+        if (ScreenSurface)
+        {
+            ScreenSurface->ClearModule();
+        }
+
+        ActiveModuleInstance = nullptr;
+        ActiveModuleId = NAME_None;
+        HostContext.bHasInputFocus = false;
+    }
 }
 
 void AFicsitAITerminal::UpdateHostState()
 {
     AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this);
-    if (Subsystem && Subsystem->IsInertMode())
+    const bool bInert = Subsystem && Subsystem->IsInertMode();
+
+    if (bInert)
     {
-        HostContext.HostState = EFicsitAIHostState::Inert;
+        if (HostContext.HostState != EFicsitAIHostState::Inert)
+        {
+            HostContext.HostState = EFicsitAIHostState::Inert;
+            TeardownActiveModule();
+            if (UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+            {
+                SurfaceWidget->SetHostState(EFicsitAIHostState::Inert);
+            }
+            UE_LOG(LogFicsitAITerminal, Warning, TEXT("Терминал переведён в инертный режим (вход удалённого игрока). Экран закрыт."));
+        }
         return;
     }
 
     if (!HasPower())
     {
-        HostContext.HostState = EFicsitAIHostState::NoPower;
-        if (ActiveModuleInstance)
+        if (HostContext.HostState != EFicsitAIHostState::NoPower)
         {
-            FString StateJson;
-            if (ActiveModuleInstance->SavePersistentState(StateJson))
+            HostContext.HostState = EFicsitAIHostState::NoPower;
+            TeardownActiveModule();
+            if (UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
             {
-                ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
+                SurfaceWidget->SetHostState(EFicsitAIHostState::NoPower);
             }
-            ActiveModuleInstance->OnDetach();
-            ActiveModuleInstance = nullptr;
-            ActiveModuleId = NAME_None;
+            UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал обесточен (требуется 10 МВт). Экран погашен."));
         }
     }
     else
     {
-        HostContext.HostState = EFicsitAIHostState::Ready;
+        if (HostContext.HostState != EFicsitAIHostState::Ready)
+        {
+            HostContext.HostState = EFicsitAIHostState::Ready;
+            if (UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+            {
+                SurfaceWidget->SetHostState(EFicsitAIHostState::Ready);
+            }
+            UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал запитан (10 МВт). Готов к работе."));
+        }
     }
 }
 
@@ -125,14 +175,18 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
 
     if (HostContext.HostState == EFicsitAIHostState::Inert)
     {
-        UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал в инертном режиме (мультиплеерная сессия)."));
+        UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал в инертном режиме (мультиплеерная сессия). Экран недоступен."));
         return;
     }
 
-    // Если нет открытого модуля, открываем модуль по умолчанию (Notes)
+    // Если нет открытого модуля, открываем модуль по умолчанию (Notes), иначе переключаем/закрываем
     if (ActiveModuleId == NAME_None)
     {
         OpenModule(FName(TEXT("Notes")));
+    }
+    else
+    {
+        CloseActiveModule();
     }
 }
 
@@ -144,6 +198,15 @@ bool AFicsitAITerminal::IsUseable_Implementation() const
 void AFicsitAITerminal::UpdateUseState_Implementation(AFGCharacterPlayer* byCharacter, const FVector& atLocation, class UPrimitiveComponent* componentHit, FUseState& out_useState)
 {
     out_useState.SetUseState(UFGUseState_Valid::StaticClass());
+}
+
+TArray<FName> AFicsitAITerminal::GetAvailableModules() const
+{
+    if (ModuleFactory)
+    {
+        return ModuleFactory->GetRegisteredModules();
+    }
+    return { FName(TEXT("Notes")), FName(TEXT("Status")) };
 }
 
 bool AFicsitAITerminal::OpenModule(FName ModuleId)
@@ -163,14 +226,7 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
     // Отсоединяем текущий активный модуль с сохранением состояния (AC-14)
     if (ActiveModuleInstance)
     {
-        FString StateJson;
-        if (ActiveModuleInstance->SavePersistentState(StateJson))
-        {
-            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
-        }
-        ActiveModuleInstance->OnDetach();
-        ActiveModuleInstance = nullptr;
-        ActiveModuleId = NAME_None;
+        TeardownActiveModule();
     }
 
     // Ищем в кэше или запрашиваем у фабрики
@@ -181,7 +237,7 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
     }
     else if (ModuleFactory)
     {
-        TargetModule = ModuleFactory->CreateModuleWidget(ModuleId, this);
+        TargetModule = ModuleFactory->CreateModule(ModuleId, this);
         if (TargetModule)
         {
             CachedModules.Add(ModuleId, TargetModule);
@@ -196,47 +252,45 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
 
     ActiveModuleId = ModuleId;
     ActiveModuleInstance = TargetModule;
+
+    // Жизненный цикл по docs/interfaces/screen-host-and-module.md:
+    // CreateModule -> OnAttach(Context) -> RestorePersistentState(State) -> Surface->SetModule
     ActiveModuleInstance->OnAttach(HostContext);
 
-    // Восстанавливаем сохранённое состояние модуля, если есть (AC-14)
-    if (const FString* SavedState = ModulePersistentStates.Find(ModuleId))
+    // Восстанавливаем сохранённое состояние модуля из подсистемы по (SaveId, ModuleId)
+    if (AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this))
     {
-        ActiveModuleInstance->RestorePersistentState(*SavedState);
+        const FString SavedState = Subsystem->GetModuleState(HostContext.SaveId, ModuleId);
+        if (!SavedState.IsEmpty())
+        {
+            ActiveModuleInstance->RestorePersistentState(SavedState);
+        }
+    }
+
+    if (ScreenSurface)
+    {
+        ScreenSurface->SetModule(TargetModule);
     }
 
     UE_LOG(LogFicsitAITerminal, Log, TEXT("Открыт экранный модуль: %s"), *ModuleId.ToString());
     return true;
 }
 
-void AFicsitAITerminal::CloseModule(FName ModuleId)
+void AFicsitAITerminal::CloseActiveModule()
 {
-    if (ActiveModuleId == ModuleId && ActiveModuleInstance)
+    if (ActiveModuleInstance)
     {
-        FString StateJson;
-        if (ActiveModuleInstance->SavePersistentState(StateJson))
-        {
-            ModulePersistentStates.FindOrAdd(ActiveModuleId) = StateJson;
-        }
-        ActiveModuleInstance->OnDetach();
-        ActiveModuleInstance = nullptr;
-        ActiveModuleId = NAME_None;
-        UE_LOG(LogFicsitAITerminal, Log, TEXT("Закрыт экранный модуль: %s"), *ModuleId.ToString());
+        UE_LOG(LogFicsitAITerminal, Log, TEXT("Закрытие активного модуля: %s"), *ActiveModuleId.ToString());
+        TeardownActiveModule();
     }
 }
 
-void AFicsitAITerminal::SetFocusToModule(bool bFocus)
+void AFicsitAITerminal::RequestInputFocus(bool bWanted)
 {
-    HostContext.bHasInputFocus = bFocus;
+    HostContext.bHasInputFocus = bWanted;
     if (ActiveModuleInstance)
     {
-        if (bFocus)
-        {
-            ActiveModuleInstance->OnFocusGained();
-        }
-        else
-        {
-            ActiveModuleInstance->OnFocusLost();
-        }
+        ActiveModuleInstance->OnContextChanged(HostContext);
     }
 }
 
@@ -244,7 +298,23 @@ void AFicsitAITerminal::NotifyContentChanged()
 {
 }
 
+bool AFicsitAITerminal::HandleBackAction()
+{
+    if (ActiveModuleInstance && ActiveModuleInstance->HandleBackAction())
+    {
+        return true;
+    }
+
+    CloseActiveModule();
+    return true;
+}
+
 void AFicsitAITerminal::SetModuleFactory(TScriptInterface<IFicsitAIScreenModuleFactory> InFactory)
 {
     ModuleFactory = InFactory;
+}
+
+void AFicsitAITerminal::SetScreenSurface(TScriptInterface<IFicsitAIScreenSurface> InSurface)
+{
+    ScreenSurface = InSurface;
 }

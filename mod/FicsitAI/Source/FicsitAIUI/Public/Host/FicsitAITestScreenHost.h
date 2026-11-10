@@ -4,6 +4,7 @@
 #include "UObject/NoExportTypes.h"
 #include "IFicsitAIScreenHost.h"
 #include "IFicsitAIScreenModule.h"
+#include "Surface/FicsitAIScreenSurfaceWidget.h"
 #include "FicsitAITestScreenHost.generated.h"
 
 /**
@@ -19,19 +20,29 @@ class FICSITAIUI_API UFicsitAITestScreenHost : public UObject, public IFicsitAIS
 public:
     void InitializeTestHost(const FString& InSaveId, TScriptInterface<IFicsitAIScreenModuleFactory> InFactory);
 
-    virtual const FFicsitAIScreenContext& GetHostContext() const override { return HostContext; }
-    virtual EFicsitAIHostState GetHostState() const override { return HostContext.HostState; }
+    // IFicsitAIScreenHost
+    virtual FFicsitAIScreenContext GetScreenContext() const override { return HostContext; }
+    virtual TArray<FName> GetAvailableModules() const override;
     virtual bool OpenModule(FName ModuleId) override;
-    virtual void CloseModule(FName ModuleId) override;
-    virtual FName GetActiveModule() const override { return ActiveModuleId; }
-    virtual void SetFocusToModule(bool bFocus) override;
+    virtual void CloseActiveModule() override;
+    virtual FName GetActiveModuleId() const override { return ActiveModuleId; }
+    virtual void RequestInputFocus(bool bWanted) override;
     virtual void NotifyContentChanged() override;
 
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Test")
     void SetTestHostState(EFicsitAIHostState NewState);
 
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
+    EFicsitAIHostState GetHostState() const { return HostContext.HostState; }
+
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Test")
+    bool HandleBackAction();
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
     TScriptInterface<IFicsitAIScreenModule> GetActiveModuleInstance() const { return ActiveModuleInstance; }
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
+    TScriptInterface<IFicsitAIScreenSurface> GetScreenSurface() const { return ScreenSurface; }
 
     const TMap<FName, FString>& GetModulePersistentStates() const { return ModulePersistentStates; }
 
@@ -47,6 +58,9 @@ private:
 
     UPROPERTY()
     TScriptInterface<IFicsitAIScreenModuleFactory> ModuleFactory;
+
+    UPROPERTY()
+    TScriptInterface<IFicsitAIScreenSurface> ScreenSurface;
 
     // Кэш созданных экземпляров модулей
     UPROPERTY()
