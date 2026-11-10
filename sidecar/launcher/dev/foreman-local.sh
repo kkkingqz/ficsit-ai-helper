@@ -214,10 +214,13 @@ cmd_stop() {
     done
   done
   [ "$leftover" = 0 ] || sleep 1
+  return 0
 }
 
-listeners_on() { # listeners_on <порт> → pid'"'"'ы, слушающие этот порт
-  ss -ltnpH "sport = :$1" 2>/dev/null | grep -o "pid=[0-9]*" | cut -d= -f2 | sort -u
+listeners_on() { # listeners_on <порт> → pid процессов, слушающих этот порт
+  # grep без совпадений даёт код 1, поэтому глушим: иначе stop возвращал 1 на
+  # штатном «никто не висит», и вызов из скрипта с set -e падал на ровном месте.
+  ss -ltnpH "sport = :$1" 2>/dev/null | grep -o "pid=[0-9]*" | cut -d= -f2 | sort -u || true
 }
 
 cmd_status() {
