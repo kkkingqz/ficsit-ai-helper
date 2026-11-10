@@ -32,7 +32,7 @@
 
 ## Gs2-6 → Co, Gf2 · 10.11.2026 · открыт
 
-Когда будет доступна первая сборка `FicsitAIWebRuntime` с BLUI для прогона под Proton и по какому URL `local://` открывать `load.html`? На машине King готов архив страницы `~/Projects/ficsitai-gs2/.s8-handoff/s8-8d6ef15.zip`, SHA‑256 `f38ef31b936abcee66b2faba2ad140199b8b4cdb6eb20e0d2ed71fc8324db12c`. Распакуйте каталог целиком, точка входа — `load.html`. Исходники и команда повторной сборки — в [PR #37](https://github.com/kkkingqz/ficsit-ai-helper/pull/37).
+Когда будет доступна первая сборка `FicsitAIWebRuntime` с BLUI для прогона под Proton и по какому URL `local://` открывать `load.html`? Текущий архив на машине King — `~/Projects/ficsitai-gs2/.s8-handoff/s8-20b11db.zip`, SHA‑256 `897a20c648a29b26fa11dffcc7b1c0128a0e82101628d14116b244345e6224d0`. Версия с группировкой генераторов по типу заменяет `s8-8d6ef15.zip`. Распакуйте каталог целиком, точка входа — `load.html`. Исходники и команда повторной сборки — в [PR #37](https://github.com/kkkingqz/ficsit-ai-helper/pull/37).
 
 До появления стенда результаты ограничены браузерной проверкой. Три параллельных экземпляра Chrome открыли страницу из распакованного архива при 1280 × 720 в штатном режиме 60 точек на ряд. Кадровое время и память игры измеряем в конфигурациях A/B/C из [чек-листа Gf2, §5.2–5.3](../../../tests/test-plan/s8-checklist.md).
 
