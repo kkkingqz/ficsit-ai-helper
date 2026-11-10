@@ -141,7 +141,7 @@ cd ~/Projects/SatisfactoryModLoader
 - `Mods/WwisePatches` — автоматические патчи аудиодвижка Wwise под Linux (`applyPatches.sh`).
 
 ### 5.2 Установка `wwise-cli` и интеграция Wwise SDK
-Для работы аудиосистемы требуется интеграция Wwise SDK (версия `2025.1.6.9117`).
+Для работы аудиосистемы требуется интеграция Wwise SDK (для SML 3.12 / Satisfactory 1.2 используются SDK `2023.1.14.8770` и интеграция UE `2023.1.14.3555`):
 
 1. Скачайте бинарник `wwise-cli` из релизов:
    ```bash
@@ -149,18 +149,50 @@ cd ~/Projects/SatisfactoryModLoader
      --pattern "wwise-cli_linux_amd64" --output ~/.local/bin/wwise-cli
    chmod +x ~/.local/bin/wwise-cli
    ```
-2. Выполните интеграцию Wwise в проект `FactoryGame.uproject`:
+2. Скачайте Wwise SDK и выполните интеграцию Wwise в проект `FactoryGame.uproject` (требуется бесплатный аккаунт Audiokinetic):
    ```bash
+   export WWISE_EMAIL="your_email@example.com"
+   export WWISE_PASSWORD="your_password"
+
+   wwise-cli download \
+     --sdk-version "2023.1.14.8770" \
+     --filter Packages=SDK \
+     --filter DeploymentPlatforms=Windows_vc160 \
+     --filter DeploymentPlatforms=Windows_vc170 \
+     --filter DeploymentPlatforms=Linux
+
    wwise-cli integrate-ue \
-     --integration-version "2025.1.6.9117" \
+     --integration-version "2023.1.14.3555" \
      --project "$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject"
+   ```
+3. Примените патчи аудиосистемы Coffee Stain Studios:
+   ```bash
+   bash "$HOME/Projects/SatisfactoryModLoader/Mods/WwisePatches/applyPatches.sh" "$HOME/Projects/SatisfactoryModLoader"
    ```
 
 ---
 
-## 6. Настройка среды разработки (IDE)
+## 6. Настройка среды разработки (IDE) и патчи UBT
 
-### Вариант А: VS Code (рекомендуемый для Linux)
+### 6.1 Необходимые патчи движка для Linux / IDE
+Перед генерацией проектных файлов примените три исправления в движке `UnrealEngineCSS`:
+1. **Скрипты сборки UBT:** скопируйте `BuildUBT.sh` и `DotnetDepends.sh` в `~/UnrealEngineCSS/Engine/Build/BatchFiles/` и дайте права на выполнение:
+   ```bash
+   gh api repos/satisfactorymodding/UnrealEngine/contents/Engine/Build/BatchFiles/BuildUBT.sh?ref=5.6.1-CSS --jq ".content" | base64 -d > ~/UnrealEngineCSS/Engine/Build/BatchFiles/BuildUBT.sh
+   gh api repos/satisfactorymodding/UnrealEngine/contents/Engine/Build/BatchFiles/DotnetDepends.sh?ref=5.6.1-CSS --jq ".content" | base64 -d > ~/UnrealEngineCSS/Engine/Build/BatchFiles/DotnetDepends.sh
+   chmod +x ~/UnrealEngineCSS/Engine/Build/BatchFiles/BuildUBT.sh ~/UnrealEngineCSS/Engine/Build/BatchFiles/DotnetDepends.sh
+   ```
+2. **Удаление LiveLinkHub:** удалите несовместимую с Linux утилиту LiveLinkHub:
+   ```bash
+   rm -rf ~/UnrealEngineCSS/Engine/Source/Programs/LiveLinkHub
+   ```
+3. **Отключение блокировки PCH в `UEBuildTarget.cs`:** закомментируйте строки 2474–2482 в файле `~/UnrealEngineCSS/Engine/Source/Programs/UnrealBuildTool/Configuration/UEBuildTarget.cs` (блок создания мьютекса `UnrealBuildTool_CreateCompileEnvironmentForProjectFiles` и вызов `CreateSharedPCHInstances`).
+4. **Пересборка UBT:**
+   ```bash
+   cd ~/UnrealEngineCSS/Engine/Build/BatchFiles && ./BuildUBT.sh "" FORCE
+   ```
+
+### 6.2 Вариант А: VS Code (рекомендуемый для Linux)
 1. Сгенерируйте файл `.code-workspace` с помощью UBT:
    ```bash
    ~/UnrealEngineCSS/Engine/Build/BatchFiles/Linux/GenerateProjectFiles.sh \
