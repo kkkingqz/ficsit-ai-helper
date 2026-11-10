@@ -11,7 +11,8 @@ lang: ru-RU
 Этот документ — инструкция для команды по подготовке рабочего места для разработки мода **FICSIT AI** на базе Satisfactory Mod Loader (SML) 3.12 для Satisfactory 1.2 (ADR-033).
 
 > [!IMPORTANT]
-> **Целевая платформа игроков — Windows, платформа команды — Linux (ADR-033).**  
+> **Целевая платформа игроков — Windows, платформа команды — Linux (ADR-033).**
+>
 > Нативного Linux-клиента у Satisfactory нет. Мод под Win64 собирается инструментарием Microsoft Visual C++ (MSVC) под Wine, а игра и тестирование повседневных сборок запускаются под **Proton**. Сборка движка из исходников **запрещена** (ADR-033, KICKOFF): используется готовый архив редактора под Linux от Coffee Stain Studios.
 
 ---
@@ -28,6 +29,7 @@ lang: ru-RU
 
 Для работы скриптов распаковки, `msvc-wine` и сборки требуются:
 - `git` — система контроля версий;
+- `gh` — доступ к релизам и скриптам GitHub. Для приватного форка редактора проверьте `gh auth status` после привязки аккаунта;
 - `msitools` (в частности утилита `msiextract`) — для распаковки `.msi`-пакетов Microsoft;
 - `tar` и `zstd` — для распаковки архивов редактора движка;
 - `dos2unix` и `patch` — для нормализации окончаний строк и применения патчей Wwise в SML;
@@ -41,15 +43,15 @@ sudo apt install -y git msitools tar zstd dos2unix patch python3 wine
 ```
 
 ### Альтернатива через Nix (без sudo и изменения системных пакетов)
-Если вы работаете в среде с Nix или без прав суперпользователя:
+Если вы работаете в среде с Nix или без прав суперпользователя, откройте оболочку с пакетами. Из этой же оболочки запускайте установку обёрток MSVC, редактор и UAT, чтобы они унаследовали Wine:
 ```bash
 nix --extra-experimental-features "nix-command flakes" shell \
-  nixpkgs#msitools nixpkgs#wineWow64Packages.stable nixpkgs#dos2unix nixpkgs#patch
+  nixpkgs#msitools nixpkgs#wineWow64Packages.stable nixpkgs#tar nixpkgs#zstd \
+  nixpkgs#dos2unix nixpkgs#patch nixpkgs#python3
 ```
 
 > [!NOTE]
-> Если вы работаете в изолированном окружении (песочнице, Flatpak-контейнере IDE), вызывайте системные инструменты хоста через явные пути `/usr/bin/git`, `/usr/bin/gh` (например, `flatpak-spawn --host /usr/bin/git`).
-
+> На машине команды используйте `/usr/bin/git`: одноимённая обёртка из `~/.local/bin` может перехватить вызов. В Flatpak запускайте системные инструменты на хосте, например `flatpak-spawn --host /usr/bin/git`.
 
 ---
 
@@ -59,7 +61,7 @@ Unreal Engine при сборке целей `Win64` на Linux вызывает
 
 ### 3.1 Клонирование репозитория
 ```bash
-git clone --branch ue-patches https://github.com/mircearoata/msvc-wine.git ~/msvc-wine
+/usr/bin/git clone --branch ue-patches https://github.com/mircearoata/msvc-wine.git ~/msvc-wine
 cd ~/msvc-wine
 ```
 
@@ -83,7 +85,7 @@ cd ~/msvc-wine
 ### 3.4 Переменная окружения `UE_WINE_MSVC`
 UnrealBuildTool (UBT) находит тулчейн MSVC по переменной `UE_WINE_MSVC`.
 
-Добавьте в `~/.profile` или `~/.bashrc` (либо `/etc/environment`):
+Добавьте в `~/.profile` или `~/.bashrc`:
 ```bash
 export UE_WINE_MSVC="$HOME/msvc"
 ```
@@ -132,7 +134,7 @@ cat UnrealEngine-CSS-Editor-Linux.tar.zst.* | zstd -d | tar -xf -
 
 ### 5.1 Клонирование Starter Project
 ```bash
-git clone --branch v3.12.0 --depth 1 \
+/usr/bin/git clone --branch v3.12.0 --depth 1 \
   https://github.com/satisfactorymodding/SatisfactoryModLoader.git \
   ~/Projects/SatisfactoryModLoader
 cd ~/Projects/SatisfactoryModLoader
@@ -223,29 +225,25 @@ cd ~/Projects/SatisfactoryModLoader
 ## 7. Сборка мода через Alpakit Win64 под Wine
 
 ### 7.1 Важные требования к окружению перед сборкой
-1. **Wine в `$PATH`:** убедитесь, что `wine` (64-bit / WoW64) доступен в `$PATH` процесса (проверить: `command -v wine && wine --version`).
-   **Внимание:** если `wine` отсутствует в `$PATH`, вызовы компилятора ресурсов `rc.exe` внутри обёртки MSVC молча зависают на чтении FIFO!
-   - **Системный Wine (apt / Ubuntu):** бинарник обычно находится в `/usr/bin/wine` и доступен по умолчанию.
-   - **Wine в Nix:** путь к бинарнику в `/nix/store/` содержит хэш конкретной ревизии `nixpkgs` вашей системы. Чтобы получить путь к бинарникам автоматически, можно определить его через `which` или Nix CLI:
-     ```bash
-     # Вариант А: если wine уже активен в nix-shell
-     WINE_BIN_DIR="$(dirname "$(which wine)")"
-     export PATH="$WINE_BIN_DIR:$PATH"
+В терминале запуска редактора или UAT выполните:
 
-     # Вариант Б: вывод пути через nix build
-     export PATH="$(nix build --no-link --print-out-paths 'nixpkgs#wineWow64Packages.stable')/bin:$PATH"
+```bash
+wine_bin="$(command -v wine64 || command -v wine)" && "$wine_bin" --version
+export UE_WINE_MSVC="$HOME/msvc"
+test -x "$UE_WINE_MSVC/bin/x64/cl" && test -x "$UE_WINE_MSVC/bin/x64/rc.exe"
+findmnt -T /tmp -o TARGET,OPTIONS
 
-     # Либо создайте симлинк в ~/.local/bin:
-     mkdir -p ~/.local/bin
-     ln -sf "$(which wine)" ~/.local/bin/wine
-     export PATH="$HOME/.local/bin:$PATH"
-     ```
-2. **Переменная MSVC:** `export UE_WINE_MSVC="$HOME/msvc"`.
-3. **Лимит открытых файлов (ulimit):** при упаковке ассетов утилита Zen пытается выставить бесконечный лимит `nofile`, что на Linux вызывает ошибку без явного задания:
-   ```bash
-   ulimit -n 1048576
-   ```
-4. **Раздел `/tmp`:** должен быть смонтирован с правом исполнения (`exec`): `sudo mount -o remount,exec /tmp`.
+max_open_files="$(ulimit -Hn)"
+if [ "$max_open_files" = unlimited ] || [ "$max_open_files" -gt 1048576 ]; then
+  max_open_files=1048576
+fi
+ulimit -Sn "$max_open_files"
+```
+
+- Если первая команда не выводит версию Wine, восстановите `PATH` до запуска сборки. Для Nix заново войдите в оболочку из §2. Без Wine обёртки `rc.exe` могут ждать FIFO, а счётчик действий UBT останется на нуле.
+- Если проверка MSVC завершилась ошибкой, вернитесь к установке обёрток из §3.3.
+- Если у файловой системы `/tmp` есть `noexec`, укажите в `TMPDIR` существующий временный каталог на файловой системе с разрешённым выполнением. Если инструмент требует именно `/tmp`, согласуйте параметры монтирования с администратором.
+- Мягкий лимит `nofile` поднимается в пределах жёсткого. При ошибке Zen проверьте `ulimit -Sn` и `ulimit -Hn` в той же оболочке.
 
 ### 7.2 Сборка через редактор (Alpakit UI)
 1. Запустите редактор из терминала с настроенным `$PATH` и `$UE_WINE_MSVC`:
@@ -253,15 +251,15 @@ cd ~/Projects/SatisfactoryModLoader
    ~/UnrealEngineCSS/Engine/Binaries/Linux/UnrealEditor \
      ~/Projects/SatisfactoryModLoader/FactoryGame.uproject
    ```
-2. В меню плагина **Alpakit** выберите целевой мод (`FicsitAI`).
+2. Для P‑1 откройте **Alpakit Dev → Create Mod**, выберите **Blueprint Only**, создайте `BlankMod` и выберите его в списке модов. Для рабочего мода выберите его собственный Mod Reference. [Создание мода в Alpakit](https://docs.ficsit.app/satisfactory-modding/latest/Development/BeginnersGuide/SimpleMod/gameworldmodule.html)
 3. Целевая платформа упаковки: **Windows / Win64**.
 4. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
-5. Результат сборки помещается в `Saved/Alpakit/<ModReference>/`.
+5. Проверьте путь к итоговому архиву в выводе UAT. Для P‑1 это `Saved/ArchivedPlugins/BlankMod/BlankMod-Windows.zip`.
 
 ### 7.3 Сборка и упаковка из командной строки (UAT)
 
 #### Создание тестового пустого мода BlankMod (для проверки упаковки)
-Если вы хотите проверить упаковку чистого изолированного мода, создайте скелет:
+Если `Mods/BlankMod/BlankMod.uplugin` ещё не создан в редакторе, создайте скелет:
 ```bash
 mkdir -p "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/Content"
 cat << 'EOF' > "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/BlankMod.uplugin"
@@ -291,14 +289,10 @@ EOF
 ```
 
 #### Запуск сборки через RunUAT.sh
-Задайте имя целевого мода в переменной `MOD_NAME` (например, `BlankMod` или `SML`):
-```bash
-MOD_NAME="BlankMod"
-export UE_WINE_MSVC="$HOME/msvc"
-ulimit -n 1048576 2>/dev/null || true
+В той же оболочке, где прошли проверки §7.1, задайте имя целевого мода, например `BlankMod` или `SML`:
 
-# Убедитесь, что wine доступен в $PATH
-command -v wine && wine --version
+```bash
+MOD_NAME=BlankMod
 
 "$HOME/UnrealEngineCSS/Engine/Build/BatchFiles/RunUAT.sh" \
   -ScriptsForProject="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
@@ -309,29 +303,23 @@ command -v wine && wine --version
   -platform=Win64 -nocompileeditor -installed
 ```
 
-Результат упаковки будет сохранён в каталоге `$HOME/Projects/SatisfactoryModLoader/Saved/ArchivedPlugins/$MOD_NAME/` (архивы `$MOD_NAME.zip` и `$MOD_NAME-Windows.zip`, содержащие упакованные файлы `.pak`, `.ucas`, `.utoc`).
+Успешный запуск заканчивается строкой `AutomationTool exiting with ExitCode=0`. Архивы `$MOD_NAME.zip` и `$MOD_NAME-Windows.zip` с файлами `.pak`, `.ucas` и `.utoc` лежат в `Saved/ArchivedPlugins/$MOD_NAME/`. Если лог останавливается на `Building … action(s) started`, проверьте Wine в оболочке запуска UAT по §7.1.
 
 ---
 
 ## 8. Проверка мода в игре под Proton
 
-1. Убедитесь, что установлена игра **Satisfactory 1.2** в Steam под Proton.
-2. Скопируйте упакованный мод в каталог модов игры:
-   ```bash
-   ~/.steam/steam/steamapps/common/Satisfactory/FactoryGame/Mods/
-   ```
-   *(либо используйте Satisfactory Mod Manager — SMM)*.
-3. Запустите игру.
-4. В главном меню убедитесь, что:
-   - В меню модов отображается ваш мод.
-   - Игра загружается в сохранение без ошибок и сбоев.
+1. Установите **Satisfactory 1.2** в Steam, включите Proton и откройте расположение файлов игры через Steam. Для Flatpak Steam путь библиотеки может отличаться.
+2. Установите совместимый **SML 3.12** для этой копии игры. Для Linux основной путь — [Satisfactory Mod Manager](https://docs.ficsit.app/satisfactory-modding/latest/ForUsers/SatisfactoryModManager.html). Проверьте соответствие SML номеру сборки игры.
+3. Распакуйте `BlankMod-Windows.zip` в `FactoryGame/Mods/BlankMod/` так, чтобы получился файл `FactoryGame/Mods/BlankMod/BlankMod.uplugin`. Вложенный второй каталог `BlankMod` не нужен. [Структура каталога модов](https://docs.ficsit.app/satisfactory-modding/latest/ManualInstallDirections.html)
+4. Запустите игру из Steam под Proton. Убедитесь, что `BlankMod` отображается в меню модов и игра загружает тестовое сохранение. Если мод не появился, проверьте версию SML и сообщения загрузки `BlankMod` в журнале игры.
 
 ---
 
 ## 9. Критерий завершения задачи P-1
 
 Задача P-1 считается закрытой, когда:
-- [ ] Инструкция в PR #36: ревью передано Gs по решению King (Co-28, Gs-9, замечания Gs-10 устранены).
+- [ ] Инструкция проверена Gs по PR #36, включая прогон под Proton (Co-28).
 - [x] MSVC 17.8 и SDK 10.0.22621 развёрнуты через `msvc-wine` у Gf (`~/msvc`).
 - [x] Пустой тестовый мод и C++ модули SML собираются через Alpakit Win64 под Wine (проверено: 594 actions C++ SML и `BlankMod` упакованы в `.pak`, `.ucas`, `.utoc`, `.zip`).
 - [ ] Мод успешно загружается в Satisfactory под Proton **у всех трёх разработчиков мода: Gf, Co и Gs**.
