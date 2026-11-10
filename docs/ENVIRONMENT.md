@@ -1,0 +1,193 @@
+---
+title: "FICSIT AI — окружение разработки мода под Linux (ADR-033)"
+subtitle: "Пошаговое руководство по развёртыванию SML 3.12, MSVC under Wine и Alpakit"
+author: "Gf, разработчик UE / терминал и хост"
+date: "10.11.2026"
+lang: ru-RU
+---
+
+# Окружение разработки мода под Linux
+
+Этот документ — инструкция для команды по подготовке рабочего места для разработки мода **FICSIT AI** на базе Satisfactory Mod Loader (SML) 3.12 для Satisfactory 1.2 (ADR-033).
+
+> [!IMPORTANT]
+> **Целевая платформа игроков — Windows, платформа команды — Linux (ADR-033).**  
+> Нативного Linux-клиента у Satisfactory нет. Мод под Win64 собирается инструментарием Microsoft Visual C++ (MSVC) под Wine, а игра и тестирование повседневных сборок запускаются под **Proton**. Сборка движка из исходников **запрещена** (ADR-033, KICKOFF): используется готовый архив редактора под Linux от Coffee Stain Studios.
+
+---
+
+## 1. Системные требования и место на диске
+
+- **ОС:** Linux x86_64 (проверено на Ubuntu 26.04 LTS и NixOS).
+- **Свободное место:** не менее **40–50 ГБ** (редактор CSS, компилятор MSVC, Windows SDK, starter project и кэши сборки).
+- **Wine:** версия 9.x / 10.x / 11.x (Wine 64-bit / WoW64).
+
+---
+
+## 2. Необходимые системные пакеты
+
+Для работы скриптов распаковки, `msvc-wine` и сборки требуются:
+- `git` — система контроля версий;
+- `msitools` (в частности утилита `msiextract`) — для распаковки `.msi`-пакетов Microsoft;
+- `tar` и `zstd` — для распаковки архивов редактора движка;
+- `dos2unix` — для нормализации окончаний строк в патчах Wwise;
+- `python3` — для запуска загрузчика `vsdownload.py`;
+- `wine` — для исполнения компилятора MSVC под Linux.
+
+### Установка в Ubuntu / Debian
+```bash
+sudo apt update
+sudo apt install -y git msitools tar zstd dos2unix python3 wine
+```
+
+### Альтернатива через Nix (без sudo и изменения системных пакетов)
+Если вы работаете в среде с Nix или без прав суперпользователя:
+```bash
+nix --extra-experimental-features "nix-command flakes" shell \
+  nixpkgs#msitools nixpkgs#wineWow64Packages.stable nixpkgs#dos2unix
+```
+
+---
+
+## 3. Установка MSVC и Windows SDK через `msvc-wine`
+
+Unreal Engine при сборке целей `Win64` на Linux вызывает MSVC через Wine. Для этого используется специализированная ветка `ue-patches` проекта `msvc-wine`.
+
+### 3.1 Клонирование репозитория
+```bash
+git clone --branch ue-patches https://github.com/mircearoata/msvc-wine.git ~/msvc-wine
+cd ~/msvc-wine
+```
+
+### 3.2 Загрузка MSVC 17.8 и Windows SDK 10.0.22621
+Загрузка строго фиксированных версий, совместимых с SML 3.12:
+```bash
+./vsdownload.py --accept-license \
+  --dest "$HOME/msvc" \
+  --msvc-version "17.8" \
+  --sdk-version "10.0.22621" \
+  --channel "release.ltsc.17.8"
+```
+
+### 3.3 Установка скриптов-обёрток под Wine
+После завершения загрузки и распаковки примените обёртки Wine к каталогу установки:
+```bash
+./install.sh "$HOME/msvc"
+```
+
+### 3.4 Переменная окружения `UE_WINE_MSVC`
+UnrealBuildTool (UBT) находит тулчейн MSVC по переменной `UE_WINE_MSVC`.
+
+Добавьте в `~/.profile` или `~/.bashrc` (либо `/etc/environment`):
+```bash
+export UE_WINE_MSVC="$HOME/msvc"
+```
+И примените в текущей сессии:
+```bash
+export UE_WINE_MSVC="$HOME/msvc"
+```
+
+> [!NOTE]
+> Как только шаг 3 завершён и MSVC встал под Wine, **сообщите Co** (согласно `KICKOFF.md`): от этого зависит проверка модулей `WebSockets` и `HTTP` и транспорт канала в S2.
+
+---
+
+## 4. Загрузка и регистрация редактора Unreal Engine
+
+Редактор Coffee Stain Studios (CSS) для Linux берётся готовым архивом.
+
+> [!WARNING]
+> **Не собирайте движок из исходников.** Сборка занимает 2–3 часа и десятки гигабайт, тогда как готовый бинарный архив уже собран разработчиками игры.
+
+### 4.1 Загрузка архива
+Скачайте все части сплит-архива `UnrealEngine-CSS-Editor-Linux.tar.zst.*` из официального релиза (части `Debug` скачивать **не нужно**).
+
+### 4.2 Распаковка
+Поместите части архива в выбранный каталог (например, `~/UnrealEngineCSS`) и выполните распаковку:
+```bash
+mkdir -p ~/UnrealEngineCSS
+cd ~/UnrealEngineCSS
+cat UnrealEngine-CSS-Editor-Linux.tar.zst.* | zstd -d | tar -xf -
+```
+
+### 4.3 Регистрация движка в системе
+Чтобы инструменты SML и проекты `.uproject` ассоциировались с установленным редактором:
+```bash
+~/UnrealEngineCSS/Engine/Binaries/Linux/UnrealVersionSelector -register -unattended
+```
+
+---
+
+## 5. Стартовый проект SML 3.12 и Wwise
+
+### 5.1 Клонирование Starter Project
+```bash
+git clone https://github.com/SatisfactoryModLoader/StarterProject.git ~/Projects/SatisfactoryStarterProject
+cd ~/Projects/SatisfactoryStarterProject
+```
+
+### 5.2 Интеграция Wwise
+Для генерации аудиобанков и интеграции Wwise SDK используется утилита `wwise-cli`:
+```bash
+./wwise-cli integrate-ue --project "FactoryGame.uproject"
+./wwise-cli generate-soundbanks
+```
+
+---
+
+## 6. Настройка среды разработки (IDE)
+
+### Вариант А: VS Code (рекомендуемый для Linux)
+1. Сгенерируйте файл `.code-workspace` с помощью UBT:
+   ```bash
+   ~/UnrealEngineCSS/Engine/Build/BatchFiles/Linux/GenerateProjectFiles.sh \
+     -project="$HOME/Projects/SatisfactoryStarterProject/FactoryGame.uproject" \
+     -game -engine -vscode
+   ```
+2. Открывайте в VS Code **только** сгенерированный файл `.code-workspace` (а не каталог).
+3. **Патч OmniSharp (.NET):** в настройках workspace добавьте путь к .NET CLI движка:
+   ```json
+   "omnisharp.dotNetCliPaths": [
+     "~/UnrealEngineCSS/Engine/Binaries/ThirdParty/DotNet/8.0.300/linux"
+   ]
+   ```
+4. **IntelliSense:** сгенерируйте базу команд компиляции Clang (`compile_commands.json`), запустив задачу генерации проекта с флагом `-Mode=GenerateClangDatabase`.
+5. **Сборка редактора:** `Ctrl + Shift + P` → `Tasks: Run Task` → `FactoryEditor Linux Development Build`.
+
+### Вариант Б: JetBrains Rider
+1. Откройте `FactoryGame.uproject`.
+2. Выберите конфигурацию: `Development` | `Editor` | `Linux`.
+
+---
+
+## 7. Сборка мода через Alpakit Win64 под Wine
+
+1. В стартовом проекте в меню плагина **Alpakit** выберите целевой мод.
+2. Целевая платформа упаковки: **Windows / Win64**.
+3. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
+4. Результат сборки помещается в `Saved/Alpakit/<ModReference>/`.
+
+---
+
+## 8. Проверка мода в игре под Proton
+
+1. Убедитесь, что установлена игра **Satisfactory 1.2** в Steam под Proton.
+2. Скопируйте упакованный мод в каталог модов игры:
+   ```bash
+   ~/.steam/steam/steamapps/common/Satisfactory/FactoryGame/Mods/
+   ```
+   *(либо используйте Satisfactory Mod Manager — SMM)*.
+3. Запустите игру.
+4. В главном меню убедитесь, что:
+   - В меню модов отображается ваш мод.
+   - Игра загружается в сохранение без ошибок и сбоев.
+
+---
+
+## 9. Критерий завершения задачи P-1
+
+Задача P-1 считается закрытой, когда:
+- [x] Инструкция составлена и прошла ревью Co.
+- [ ] MSVC 17.8 и SDK 10.0.22621 развёрнуты через `msvc-wine`.
+- [ ] Пустой тестовый мод собирается через Alpakit Win64 под Wine.
+- [ ] Мод успешно загружается в Satisfactory под Proton **у всех трёх разработчиков мода: Gf, Co и Gs**.
