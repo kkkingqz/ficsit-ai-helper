@@ -1,0 +1,160 @@
+#!/usr/bin/env bash
+# Запуск сайдкара локально без Docker: sf-mcp, ff-server и адаптер — только на петле.
+#
+# P-3 (#4). Это ещё не лаунчер поставки (S5-lite): здесь нет портативного Node,
+# архива и первого запуска с вопросами. Это воспроизводимый запуск на машине
+# разработки, из которого лаунчер потом вырастет.
+#
+#   foreman-local.sh start|stop|status|urls|migrate
+#
+# Окружение:
+#   FOREMAN_SRC   клон Foreman на зафиксированном коммите (по умолчанию ~/Projects/foreman-src)
+#   FICSITAI_DATA данные сайдкара: база, саквояж саveов, токен, логи, pid
+#                 (по умолчанию ~/.local/share/ficsitai/foreman)
+#   LLM_API_KEY   ключ провайдера; без него чат ответит ошибкой, всё остальное работает
+#   LLM_PROVIDER  anthropic (по умолчанию) или openai
+#   LLM_BASE_URL  адрес OpenAI-совместимого провайдера
+set -euo pipefail
+
+FOREMAN_SRC="${FOREMAN_SRC:-$HOME/Projects/foreman-src}"
+FICSITAI_DATA="${FICSITAI_DATA:-$HOME/.local/share/ficsitai/foreman}"
+ADAPTER_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../adapter" && pwd)"
+
+SF_MCP_PORT="${SF_MCP_PORT:-8723}"
+FF_SERVER_PORT="${FF_SERVER_PORT:-8724}"
+ADAPTER_PORT="${ADAPTER_PORT:-8730}"
+HOST_LOOPBACK=127.0.0.1
+
+RUN_DIR="$FICSITAI_DATA/run"
+LOG_DIR="$FICSITAI_DATA/logs"
+TOKEN_FILE="$FICSITAI_DATA/adapter.token"
+
+# Node 22: берём системный, если он есть, иначе разовый nix shell (профиль не меняем).
+node_prefix() {
+  if command -v node >/dev/null 2>&1; then
+    local major
+    major="$(node --version | sed -E 's/^v([0-9]+).*/\1/')"
+    if [ "$major" -ge 22 ]; then return 0; fi
+  fi
+  if command -v nix >/dev/null 2>&1; then
+    printf '%s' "nix shell nixpkgs#nodejs_22 --command"
+    return 0
+  fi
+  echo "нужен Node 22 или nix; поставь Node 22 или задай PATH" >&2
+  exit 1
+}
+
+run_node() { # run_node <рабочий каталог> <команда…>
+  local dir="$1"; shift
+  local prefix; prefix="$(node_prefix)"
+  # shellcheck disable=SC2086
+  (cd "$dir" && exec ${prefix} "$@")
+}
+
+start_bg() { # start_bg <имя> <рабочий каталог> <команда…>
+  local name="$1" dir="$2"; shift 2
+  local prefix; prefix="$(node_prefix)"
+  mkdir -p "$RUN_DIR" "$LOG_DIR"
+  if [ -f "$RUN_DIR/$name.pid" ] && kill -0 "$(cat "$RUN_DIR/$name.pid")" 2>/dev/null; then
+    echo "$name уже запущен (pid $(cat "$RUN_DIR/$name.pid"))"
+    return 0
+  fi
+  # shellcheck disable=SC2086
+  # </dev/null и отдельная сессия: иначе процесс держит открытым конвейер вызывающего,
+  # и запуск из скрипта с пайпом (например, в tail) не возвращает управление.
+  (cd "$dir" && setsid nohup ${prefix} "$@" >>"$LOG_DIR/$name.log" 2>&1 </dev/null & echo $! >"$RUN_DIR/$name.pid")
+  echo "$name запущен (pid $(cat "$RUN_DIR/$name.pid")), лог $LOG_DIR/$name.log"
+}
+
+ensure_token() {
+  mkdir -p "$FICSITAI_DATA"
+  if [ ! -s "$TOKEN_FILE" ]; then
+    # Токен адаптера: 32 байта энтропии в hex. Файл только для владельца.
+    (umask 077; od -An -tx1 -N32 /dev/urandom | tr -d ' \n' >"$TOKEN_FILE")
+    echo "сгенерирован токен адаптера: $TOKEN_FILE"
+  fi
+  chmod 600 "$TOKEN_FILE"
+  ADAPTER_TOKEN="$(cat "$TOKEN_FILE")"
+  export ADAPTER_TOKEN
+}
+
+common_env() {
+  ensure_token
+  mkdir -p "$FICSITAI_DATA/saves"
+  export SAVE_DATA_DIR="$FICSITAI_DATA/saves"
+  export DATABASE_URL="file:$FICSITAI_DATA/foreman.db"
+  # sf-mcp по умолчанию слушает 0.0.0.0 и в режиме stdio не слушает вовсе.
+  export MCP_TRANSPORT=http
+  export MCP_HTTP_HOST="$HOST_LOOPBACK"
+  export MCP_HTTP_PORT="$SF_MCP_PORT"
+  # ff-server по умолчанию слушает 0.0.0.0.
+  export HOST="$HOST_LOOPBACK"
+  export PORT="$FF_SERVER_PORT"
+  # Единственный MCP_URL Foreman — наш адаптер, а не sf-mcp напрямую (S2).
+  export MCP_URL="http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=$ADAPTER_TOKEN"
+  export ADAPTER_HOST="$HOST_LOOPBACK"
+  export ADAPTER_PORT
+  export SF_MCP_URL="http://$HOST_LOOPBACK:$SF_MCP_PORT/mcp"
+  export FOREMAN_BASE_URL="http://$HOST_LOOPBACK:$FF_SERVER_PORT"
+}
+
+cmd_migrate() {
+  common_env
+  echo "применяю схему к $DATABASE_URL"
+  run_node "$FOREMAN_SRC" npm run db:deploy -w @foreman/ff-server
+}
+
+cmd_start() {
+  common_env
+  [ -d "$FOREMAN_SRC" ] || { echo "нет клона Foreman: $FOREMAN_SRC (коммит — foreman.pin.json)" >&2; exit 1; }
+  [ -d "$ADAPTER_SRC/node_modules" ] || run_node "$ADAPTER_SRC" npm install --no-audit --no-fund
+  start_bg sf-mcp "$FOREMAN_SRC" npm run start:mcp
+  start_bg ff-server "$FOREMAN_SRC" npm run start:server
+  start_bg adapter "$ADAPTER_SRC" npm run dev
+  echo
+  cmd_urls
+}
+
+cmd_stop() {
+  for name in adapter ff-server sf-mcp; do
+    local pid_file="$RUN_DIR/$name.pid"
+    [ -f "$pid_file" ] || continue
+    local pid; pid="$(cat "$pid_file")"
+    if kill -0 "$pid" 2>/dev/null; then
+      kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null || true
+      echo "$name остановлен (pid $pid)"
+    fi
+    rm -f "$pid_file"
+  done
+}
+
+cmd_status() {
+  for name in sf-mcp ff-server adapter; do
+    local pid_file="$RUN_DIR/$name.pid" state="не запущен"
+    if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
+      state="работает (pid $(cat "$pid_file"))"
+    fi
+    printf '%-10s %s\n' "$name" "$state"
+  done
+  echo
+  echo "слушатели (должны быть только 127.0.0.1):"
+  ss -ltnp 2>/dev/null | awk -v p1="$SF_MCP_PORT" -v p2="$FF_SERVER_PORT" -v p3="$ADAPTER_PORT" \
+    'NR==1 || $4 ~ ":"p1"$" || $4 ~ ":"p2"$" || $4 ~ ":"p3"$"'
+}
+
+cmd_urls() {
+  ensure_token
+  echo "sf-mcp     http://$HOST_LOOPBACK:$SF_MCP_PORT/health   (MCP: /mcp, без аутентификации — только петля)"
+  echo "ff-server  http://$HOST_LOOPBACK:$FF_SERVER_PORT"
+  echo "адаптер    http://$HOST_LOOPBACK:$ADAPTER_PORT/health"
+  echo "MCP_URL    http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=<в $TOKEN_FILE>"
+}
+
+case "${1:-}" in
+  start) cmd_start ;;
+  stop) cmd_stop ;;
+  status) cmd_status ;;
+  urls) cmd_urls ;;
+  migrate) cmd_migrate ;;
+  *) sed -n '1,16p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 1 ;;
+esac

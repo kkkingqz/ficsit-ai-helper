@@ -1,0 +1,27 @@
+{
+  "$comment": "Зафиксированный коммит FICSIT Foreman (ADR-012: не форкаем и не патчим; R-17: обновление — отдельной задачей). Правит Co2, обновление согласуется с Co.",
+  "repository": "https://github.com/StuartMeeks/ficsit-foreman",
+  "commit": "08bebe16f3f459170479f5ded3b040087cf43593",
+  "commitDate": "2026-11-09",
+  "commitSubject": "chore(deps): bump @hono/node-server from 1.19.17 to 2.1.6 (#332)",
+  "pinnedAt": "2026-11-10",
+  "pinnedBy": "Co2",
+  "license": "Apache-2.0",
+  "runtime": {
+    "node": ">=22",
+    "npm": ">=10",
+    "nodeVerified": "22.23.4",
+    "npmVerified": "10.9.9"
+  },
+  "packages": {
+    "ff-server": "Express-бэкенд: прокси LLM (SSE), аккаунты Better Auth, playthrough, work orders, шлюз MCP",
+    "sf-mcp": "MCP-сервер игровых данных и сохранений; в нашей схеме скрыт от модели белым списком адаптера"
+  },
+  "defaultPorts": {
+    "sf-mcp": 8723,
+    "ff-server": 8724,
+    "ff-client": 8725
+  },
+  "localCheckout": "~/Projects/foreman-src",
+  "updatePolicy": "Коммит меняется только отдельной задачей: прогнать тесты адаптера с fake-LLM, сверить env и API чата, записать новый коммит здесь (R-17)."
+}
