@@ -34,9 +34,11 @@
 
 Каталоги по разделу 10 плана; защита `main` на зелёный CI.
 
-- [ ] Каталоги `mod/`, `sidecar/`, `web/`, `third_party/`, `fixtures/`, `tests/`, `tools/`
-- [ ] Шаблон задачи
+- [x] Каталоги `mod/`, `sidecar/`, `web/`, `third_party/`, `fixtures/`, `tests/`, `tools/`
+- [x] Шаблон задачи
 - [ ] Защита `main`: обязательный CI
+
+*Отметка Co2 10.11.2026:* первые два пункта в `main`. Третий **отложен решением King 09.11.2026**: на бесплатном плане приватного репозитория GitHub отвечает `403 Upgrade to GitHub Pro or make this repository public`, и `contracts.yml` в требуемые проверки не попадает — он отфильтрован по `docs/contracts/**`. Условия включения записаны в `CONTRIBUTING.md`, задача [#3](https://github.com/kkkingqz/ficsit-ai-helper/issues/3) из-за этого пункта остаётся открытой.
 
 ### [P-3 · Foreman локально без Docker](https://github.com/kkkingqz/ficsit-ai-helper/issues/4) · #4
 
@@ -44,13 +46,15 @@
 
 `ff-server` и `sf-mcp` из зафиксированного коммита на Node 22 и SQLite, без Docker; каркас адаптера.
 
-- [ ] Зафиксировать коммит Foreman
-- [ ] Запуск `ff-server` и `sf-mcp` на Node 22, `DATABASE_URL` на файл SQLite
-- [ ] `HOST=127.0.0.1` и `MCP_HTTP_HOST=127.0.0.1` — по умолчанию оба слушают `0.0.0.0`
-- [ ] Ответ в чате Foreman от LLM-провайдера
-- [ ] Каркас адаптера (Node/TS)
+- [x] Зафиксировать коммит Foreman
+- [x] Запуск `ff-server` и `sf-mcp` на Node 22, `DATABASE_URL` на файл SQLite
+- [x] `HOST=127.0.0.1` и `MCP_HTTP_HOST=127.0.0.1` — по умолчанию оба слушают `0.0.0.0`
+- [x] Ответ в чате Foreman от LLM-провайдера
+- [x] Каркас адаптера (Node/TS)
 
-Готово, когда: foreman отвечает в чате, оба процесса слушают только `127.0.0.1`
+Готово, когда: foreman отвечает в чате, оба процесса слушают только `127.0.0.1` — **выполнено 10.11.2026**
+
+*Отметка Co2 10.11.2026:* поставка — [PR #35](https://github.com/kkkingqz/ficsit-ai-helper/pull/35), ревью Gs ([Gs-11](questions/Gs.md)), пять замечаний исправлены, head `01594b8`; ждёт повторной проверки и слияния. По ходу нашлись две провайдерские поломки, закрытые нормализатором (ADR-034, R-29), и подтвердилось, что адаптер может быть единственным `MCP_URL` Foreman без upstream-PR. В чек-листе задачи #4 Co добавил шестой пункт — `MCP_TRANSPORT=http`, без которого `sf-mcp` не слушает порт вовсе; здесь этой строки нет.
 
 ### [S2 · Адаптер и канал к моду](https://github.com/kkkingqz/ficsit-ai-helper/issues/10) · #10
 
@@ -58,7 +62,7 @@
 
 Адаптер как единственный `MCP_URL` Foreman (Co2) и исходящий канал мода к адаптеру (Co).
 
-- [ ] Адаптер: Node 22 + MCP TypeScript SDK на `127.0.0.1`, токен в query `MCP_URL`
+- [x] Адаптер: Node 22 + MCP TypeScript SDK на `127.0.0.1`, токен в query `MCP_URL` — каркас поставлен в P-3 ([#35](https://github.com/kkkingqz/ficsit-ai-helper/pull/35)), Foreman принял его как единственный `MCP_URL`
 - [ ] Автоматический вход в Foreman: локальный аккаунт, сессия Better Auth
 - [ ] `saveId` → playthrough; удаление `savePath`
 - [ ] API чата для мода поверх `POST /api/playthroughs/:id/chat` (SSE): поток, отмена, история
