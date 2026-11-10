@@ -198,38 +198,50 @@
   <text class="tt" x="720" y="642">BALANCE</text>
   <text class="tt" x="800" y="642">TREND</text>
   <rect class="sep" x="216" y="654" width="628" height="1"/>
-  <text class="t" x="218" y="690">Iron ore</text>
-  <text class="t" x="450" y="690">90</text>
-  <text class="t" x="590" y="690">76</text>
-  <text class="val2" x="720" y="690" style="fill:#46C46B">+14</text>
-  <path d="M796.0 679.2 L797.6 678.1 L799.2 678.3 L800.8 679.3 L802.3 679.2 L803.9 679.5 L805.5 679.5 L807.1 679.5 L808.7 680.8 L810.3 681.1 L811.9 679.9 L813.4 680.6 L815.0 680.1 L816.6 681.3 L818.2 680.6 L819.8 680.2 L821.4 681.1 L823.0 680.1 L824.6 680.3 L826.1 682.0 L827.7 682.4 L829.3 681.9 L830.9 681.7 L832.5 683.0 L834.1 683.6 L835.7 683.5 L837.2 684.4 L838.8 684.2 L840.4 683.8 L842.0 683.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
-  <rect class="sep" x="216" y="712" width="628" height="1"/>
-  <text class="t" x="218" y="746">Copper ore</text>
-  <text class="t" x="450" y="746">60</text>
-  <text class="t" x="590" y="746">58</text>
-  <text class="val2" x="720" y="746" style="fill:#46C46B">+2</text>
-  <path d="M796.0 735.1 L797.6 735.4 L799.2 737.1 L800.8 737.2 L802.3 736.1 L803.9 736.3 L805.5 736.5 L807.1 737.1 L808.7 736.6 L810.3 736.6 L811.9 736.8 L813.4 737.6 L815.0 737.4 L816.6 737.7 L818.2 737.5 L819.8 737.4 L821.4 737.8 L823.0 738.8 L824.6 739.3 L826.1 739.9 L827.7 740.4 L829.3 740.4 L830.9 739.6 L832.5 739.7 L834.1 739.3 L835.7 738.0 L837.2 738.2 L838.8 737.6 L840.4 737.6 L842.0 737.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
-  <rect class="sep" x="216" y="768" width="628" height="1"/>
-  <text class="t" x="218" y="802">Limestone</text>
-  <text class="t" x="450" y="802">60</text>
-  <text class="t" x="590" y="802">64</text>
-  <text class="val2" x="720" y="802" style="fill:#F5871F">-4</text>
-  <path d="M796.0 793.4 L797.6 792.9 L799.2 793.2 L800.8 792.9 L802.3 792.9 L803.9 794.0 L805.5 794.3 L807.1 793.2 L808.7 794.4 L810.3 794.8 L811.9 793.9 L813.4 795.1 L815.0 794.8 L816.6 795.5 L818.2 795.4 L819.8 796.1 L821.4 795.2 L823.0 794.6 L824.6 794.8 L826.1 794.0 L827.7 793.6 L829.3 794.1 L830.9 792.4 L832.5 792.2 L834.1 792.3 L835.7 792.4 L837.2 790.8 L838.8 791.3 L840.4 790.9 L842.0 790.6" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
-  <rect class="sep" x="216" y="824" width="628" height="1"/>
-  <text class="t" x="218" y="858">Raw quartz</text>
-  <text class="t" x="450" y="858">30</text>
-  <text class="t" x="590" y="858">22</text>
-  <text class="val2" x="720" y="858" style="fill:#46C46B">+8</text>
-  <path d="M796.0 850.1 L797.6 850.6 L799.2 850.4 L800.8 851.1 L802.3 851.5 L803.9 851.3 L805.5 850.6 L807.1 851.0 L808.7 851.1 L810.3 851.9 L811.9 851.2 L813.4 851.3 L815.0 851.1 L816.6 850.7 L818.2 850.0 L819.8 848.4 L821.4 848.0 L823.0 847.6 L824.6 847.2 L826.1 847.9 L827.7 847.5 L829.3 846.9 L830.9 846.7 L832.5 846.5 L834.1 846.6 L835.7 848.1 L837.2 847.4 L838.8 847.5 L840.4 847.8 L842.0 848.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
-  <rect class="sep" x="216" y="880" width="628" height="1"/>
-  <text class="t" x="218" y="914">Coal</text>
-  <text class="t" x="450" y="914">30</text>
-  <text class="t" x="590" y="914">30</text>
-  <text class="val2" x="720" y="914" style="fill:#8FA9BF">0</text>
-  <path d="M796.0 907.1 L797.6 907.0 L799.2 906.9 L800.8 906.6 L802.3 906.7 L803.9 906.0 L805.5 907.1 L807.1 905.8 L808.7 904.5 L810.3 904.5 L811.9 903.6 L813.4 904.4 L815.0 903.5 L816.6 903.5 L818.2 902.9 L819.8 902.8 L821.4 903.7 L823.0 903.5 L824.6 903.6 L826.1 902.7 L827.7 903.2 L829.3 904.3 L830.9 903.4 L832.5 904.6 L834.1 903.9 L835.7 904.7 L837.2 904.9 L838.8 903.5 L840.4 904.5 L842.0 904.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
-  <rect class="sep" x="216" y="936" width="628" height="1"/>
-  <text class="tt" x="218" y="958">Values in items/min. Balance is production minus consumption —</text>
-  <text class="tt" x="218" y="978">no shortage or surplus labels in v1.0</text>
+  <text class="t" x="218" y="684">Iron ore</text>
+  <text class="t" x="450" y="684">90</text>
+  <text class="t" x="590" y="684">76</text>
+  <text class="val2" x="720" y="684" style="fill:#46C46B">+14</text>
+  <path d="M796.0 674.4 L797.6 673.3 L799.2 673.5 L800.8 674.5 L802.3 674.3 L803.9 674.6 L805.5 674.6 L807.1 674.6 L808.7 675.8 L810.3 676.1 L811.9 675.0 L813.4 675.6 L815.0 675.2 L816.6 676.3 L818.2 675.7 L819.8 675.3 L821.4 676.1 L823.0 675.1 L824.6 675.4 L826.1 677.0 L827.7 677.3 L829.3 676.8 L830.9 676.6 L832.5 677.8 L834.1 678.4 L835.7 678.3 L837.2 679.1 L838.8 678.9 L840.4 678.6 L842.0 678.3" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="700" width="628" height="1"/>
+  <text class="t" x="218" y="728">Copper ore</text>
+  <text class="t" x="450" y="728">60</text>
+  <text class="t" x="590" y="728">58</text>
+  <text class="val2" x="720" y="728" style="fill:#46C46B">+2</text>
+  <path d="M796.0 718.2 L797.6 718.5 L799.2 720.1 L800.8 720.2 L802.3 719.2 L803.9 719.4 L805.5 719.5 L807.1 720.1 L808.7 719.6 L810.3 719.7 L811.9 719.8 L813.4 720.5 L815.0 720.3 L816.6 720.6 L818.2 720.4 L819.8 720.4 L821.4 720.8 L823.0 721.7 L824.6 722.1 L826.1 722.6 L827.7 723.1 L829.3 723.2 L830.9 722.4 L832.5 722.5 L834.1 722.1 L835.7 720.9 L837.2 721.1 L838.8 720.5 L840.4 720.6 L842.0 720.4" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="744" width="628" height="1"/>
+  <text class="t" x="218" y="772">Limestone</text>
+  <text class="t" x="450" y="772">60</text>
+  <text class="t" x="590" y="772">64</text>
+  <text class="val2" x="720" y="772" style="fill:#F5871F">-4</text>
+  <path d="M796.0 764.3 L797.6 763.9 L799.2 764.2 L800.8 763.9 L802.3 763.9 L803.9 764.9 L805.5 765.2 L807.1 764.2 L808.7 765.3 L810.3 765.7 L811.9 764.8 L813.4 765.9 L815.0 765.6 L816.6 766.3 L818.2 766.2 L819.8 766.9 L821.4 766.0 L823.0 765.5 L824.6 765.7 L826.1 764.9 L827.7 764.6 L829.3 765.0 L830.9 763.5 L832.5 763.3 L834.1 763.3 L835.7 763.4 L837.2 762.0 L838.8 762.4 L840.4 762.0 L842.0 761.8" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="788" width="628" height="1"/>
+  <text class="t" x="218" y="816">Raw quartz</text>
+  <text class="t" x="450" y="816">30</text>
+  <text class="t" x="590" y="816">22</text>
+  <text class="val2" x="720" y="816" style="fill:#46C46B">+8</text>
+  <path d="M796.0 809.0 L797.6 809.4 L799.2 809.3 L800.8 809.9 L802.3 810.3 L803.9 810.1 L805.5 809.5 L807.1 809.8 L808.7 809.9 L810.3 810.7 L811.9 810.0 L813.4 810.1 L815.0 809.9 L816.6 809.6 L818.2 809.0 L819.8 807.4 L821.4 807.1 L823.0 806.7 L824.6 806.3 L826.1 807.0 L827.7 806.6 L829.3 806.0 L830.9 805.9 L832.5 805.7 L834.1 805.8 L835.7 807.2 L837.2 806.5 L838.8 806.6 L840.4 806.9 L842.0 807.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="832" width="628" height="1"/>
+  <text class="t" x="218" y="860">Coal</text>
+  <text class="t" x="450" y="860">30</text>
+  <text class="t" x="590" y="860">30</text>
+  <text class="val2" x="720" y="860" style="fill:#8FA9BF">0</text>
+  <path d="M796.0 853.9 L797.6 853.9 L799.2 853.8 L800.8 853.4 L802.3 853.5 L803.9 852.9 L805.5 853.9 L807.1 852.8 L808.7 851.6 L810.3 851.5 L811.9 850.7 L813.4 851.4 L815.0 850.6 L816.6 850.7 L818.2 850.1 L819.8 850.0 L821.4 850.8 L823.0 850.6 L824.6 850.7 L826.1 849.9 L827.7 850.3 L829.3 851.4 L830.9 850.6 L832.5 851.6 L834.1 851.0 L835.7 851.7 L837.2 851.9 L838.8 850.6 L840.4 851.6 L842.0 851.6" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="876" width="628" height="1"/>
+  <text class="t" x="218" y="904">Water</text>
+  <text class="t" x="450" y="904">120 m3</text>
+  <text class="t" x="590" y="904">110 m3</text>
+  <text class="val2" x="720" y="904" style="fill:#46C46B">+10</text>
+  <path d="M796.0 896.5 L797.6 895.9 L799.2 896.0 L800.8 895.8 L802.3 895.7 L803.9 894.4 L805.5 894.3 L807.1 893.7 L808.7 894.1 L810.3 893.5 L811.9 894.4 L813.4 893.7 L815.0 894.0 L816.6 894.7 L818.2 894.7 L819.8 894.7 L821.4 895.6 L823.0 895.1 L824.6 894.8 L826.1 895.7 L827.7 894.9 L829.3 895.0 L830.9 894.8 L832.5 895.6 L834.1 896.0 L835.7 895.1 L837.2 895.3 L838.8 896.1 L840.4 897.0 L842.0 897.2" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="920" width="628" height="1"/>
+  <text class="t" x="218" y="948">Crude oil</text>
+  <text class="t" x="450" y="948">60 m3</text>
+  <text class="t" x="590" y="948">60 m3</text>
+  <text class="val2" x="720" y="948" style="fill:#8FA9BF">0</text>
+  <path d="M796.0 938.3 L797.6 938.4 L799.2 937.6 L800.8 938.5 L802.3 937.9 L803.9 938.3 L805.5 939.0 L807.1 938.6 L808.7 939.5 L810.3 939.2 L811.9 939.9 L813.4 940.0 L815.0 939.6 L816.6 939.0 L818.2 940.1 L819.8 939.9 L821.4 939.3 L823.0 938.9 L824.6 939.5 L826.1 940.0 L827.7 939.3 L829.3 941.0 L830.9 940.1 L832.5 941.3 L834.1 941.9 L835.7 942.3 L837.2 942.3 L838.8 941.8 L840.4 942.9 L842.0 942.4" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="964" width="628" height="1"/>
+  <text class="tt" x="218" y="976">Items in items/min, fluids in m3/min. Balance is production minus</text>
+  <text class="tt" x="218" y="994">consumption — no shortage or surplus labels in v1.0</text>
   <rect class="panel" x="880" y="580" width="660" height="424"/>
   <polygon class="accent" points="896,594 892,610 899,610 903,594"/>
   <polygon class="accent" points="908,594 904,610 911,610 915,594"/>
@@ -239,42 +251,56 @@
   <text class="tt" x="1280" y="642">CHANGE</text>
   <text class="tt" x="1400" y="642">FILL</text>
   <rect class="sep" x="896" y="654" width="628" height="1"/>
-  <text class="t" x="898" y="690">Iron ore</text>
-  <text class="t" x="1140" y="690">456 000</text>
-  <text class="t" x="1280" y="690" style="fill:#46C46B">+14/min</text>
-  <rect class="" x="1400" y="676" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
-  <rect class="" x="1400" y="676" width="68.4" height="14" rx="2" fill="#2FB8DE"/>
-  <text class="t" x="1522" y="690" text-anchor="end">76%</text>
-  <rect class="sep" x="896" y="712" width="628" height="1"/>
-  <text class="t" x="898" y="746">Copper ore</text>
-  <text class="t" x="1140" y="746">312 000</text>
-  <text class="t" x="1280" y="746" style="fill:#46C46B">+2/min</text>
-  <rect class="" x="1400" y="732" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
-  <rect class="" x="1400" y="732" width="55.8" height="14" rx="2" fill="#2FB8DE"/>
-  <text class="t" x="1522" y="746" text-anchor="end">62%</text>
-  <rect class="sep" x="896" y="768" width="628" height="1"/>
-  <text class="t" x="898" y="802">Limestone</text>
-  <text class="t" x="1140" y="802">198 000</text>
-  <text class="t" x="1280" y="802" style="fill:#F5871F">-4/min</text>
-  <rect class="" x="1400" y="788" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
-  <rect class="" x="1400" y="788" width="39.6" height="14" rx="2" fill="#2FB8DE"/>
-  <text class="t" x="1522" y="802" text-anchor="end">44%</text>
-  <rect class="sep" x="896" y="824" width="628" height="1"/>
-  <text class="t" x="898" y="858">Iron ingot</text>
-  <text class="t" x="1140" y="858">1 980 000</text>
-  <text class="t" x="1280" y="858" style="fill:#46C46B">+30/min</text>
-  <rect class="" x="1400" y="844" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
-  <rect class="" x="1400" y="844" width="89.1" height="14" rx="2" fill="#2FB8DE"/>
-  <text class="t" x="1522" y="858" text-anchor="end">99%</text>
-  <rect class="sep" x="896" y="880" width="628" height="1"/>
-  <text class="t" x="898" y="914">Wire</text>
-  <text class="t" x="1140" y="914">480 000</text>
-  <text class="t" x="1280" y="914" style="fill:#46C46B">+20/min</text>
-  <rect class="" x="1400" y="900" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
-  <rect class="" x="1400" y="900" width="72.0" height="14" rx="2" fill="#2FB8DE"/>
-  <text class="t" x="1522" y="914" text-anchor="end">80%</text>
-  <rect class="sep" x="896" y="936" width="628" height="1"/>
-  <text class="tt" x="898" y="978">Storage fill comes from containers bound to a line</text>
+  <text class="t" x="898" y="684">Iron ore</text>
+  <text class="t" x="1140" y="684">456 000</text>
+  <text class="t" x="1280" y="684" style="fill:#46C46B">+14/min</text>
+  <rect class="" x="1400" y="671" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="671" width="63.84" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="684" text-anchor="end">76%</text>
+  <rect class="sep" x="896" y="700" width="628" height="1"/>
+  <text class="t" x="898" y="728">Copper ore</text>
+  <text class="t" x="1140" y="728">312 000</text>
+  <text class="t" x="1280" y="728" style="fill:#46C46B">+2/min</text>
+  <rect class="" x="1400" y="715" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="715" width="52.08" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="728" text-anchor="end">62%</text>
+  <rect class="sep" x="896" y="744" width="628" height="1"/>
+  <text class="t" x="898" y="772">Limestone</text>
+  <text class="t" x="1140" y="772">198 000</text>
+  <text class="t" x="1280" y="772" style="fill:#F5871F">-4/min</text>
+  <rect class="" x="1400" y="759" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="759" width="36.96" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="772" text-anchor="end">44%</text>
+  <rect class="sep" x="896" y="788" width="628" height="1"/>
+  <text class="t" x="898" y="816">Iron ingot</text>
+  <text class="t" x="1140" y="816">1 980 000</text>
+  <text class="t" x="1280" y="816" style="fill:#46C46B">+30/min</text>
+  <rect class="" x="1400" y="803" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="803" width="83.16" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="816" text-anchor="end">99%</text>
+  <rect class="sep" x="896" y="832" width="628" height="1"/>
+  <text class="t" x="898" y="860">Wire</text>
+  <text class="t" x="1140" y="860">480 000</text>
+  <text class="t" x="1280" y="860" style="fill:#46C46B">+20/min</text>
+  <rect class="" x="1400" y="847" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="847" width="67.2" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="860" text-anchor="end">80%</text>
+  <rect class="sep" x="896" y="876" width="628" height="1"/>
+  <text class="t" x="898" y="904">Crude oil</text>
+  <text class="t" x="1140" y="904">1 200 m3</text>
+  <text class="t" x="1280" y="904" style="fill:#8FA9BF">0 m3/min</text>
+  <rect class="" x="1400" y="891" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="891" width="25.2" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="904" text-anchor="end">30%</text>
+  <rect class="sep" x="896" y="920" width="628" height="1"/>
+  <text class="t" x="898" y="948">Water</text>
+  <text class="t" x="1140" y="948">2 400 m3</text>
+  <text class="t" x="1280" y="948" style="fill:#46C46B">+10 m3/min</text>
+  <rect class="" x="1400" y="935" width="84" height="13" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="935" width="46.2" height="13" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="948" text-anchor="end">55%</text>
+  <rect class="sep" x="896" y="964" width="628" height="1"/>
+  <text class="tt" x="898" y="990">Fill comes from containers and fluid buffers bound to a line</text>
   <rect class="panel" x="1560" y="136" width="340" height="424"/>
   <polygon class="accent" points="1576,150 1572,166 1579,166 1583,150"/>
   <polygon class="accent" points="1588,150 1584,166 1591,166 1595,150"/>

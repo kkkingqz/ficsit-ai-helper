@@ -99,7 +99,7 @@
   <polygon class="accent" points="216,98 212,114 219,114 223,98"/>
   <polygon class="accent" points="228,98 224,114 231,114 235,98"/>
   <text class="cap" x="246" y="112">CONVERSATION</text>
-  <text class="tt" x="1334" y="111" text-anchor="end">HISTORY: this session · 14 messages</text>
+  <text class="tt" x="1334" y="111" text-anchor="end">HISTORY: from Foreman · playthrough of this save</text>
   <rect class="inner" x="220" y="142" width="1110" height="80" rx="4"/>
   <rect class="" x="220" y="142" width="4" height="80" fill="#9CC4DB"/>
   <text class="cap" x="240" y="170" font-size="14" style="fill:#9CC4DB">OPERATOR</text>
@@ -136,8 +136,11 @@
   <text class="t" x="444" y="744">20 → 30 items/min</text>
   <text class="tm" x="260" y="764">Wire needed</text>
   <text class="t" x="444" y="764">90 → 120 items/min</text>
-  <rect class="" x="240" y="786" width="10" height="18" fill="#F5871F"/>
-  <text class="ts" x="260" y="800">Streaming…  press Esc to stop the answer, Esc again to leave</text>
+  <rect class="" x="240" y="788" width="10" height="18" fill="#F5871F"/>
+  <text class="ts" x="260" y="802">Streaming…</text>
+  <rect class="" x="350" y="782" width="86" height="30" rx="3" fill="#122A40" stroke="#F5871F" stroke-width="2"/>
+  <text class="ts" x="393" y="802" text-anchor="middle" style="fill:#F5871F">STOP</text>
+  <text class="ts" x="452" y="802">or Esc — the answer so far stays, your text stays</text>
   <rect class="slot" x="220" y="854" width="1110" height="56" rx="4"/>
   <text class="tm" x="244" y="889">Ask the assistant…</text>
   <text class="tt" x="1200" y="889" text-anchor="end">0 / 2000</text>

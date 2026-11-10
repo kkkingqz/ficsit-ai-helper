@@ -156,18 +156,21 @@
   <path d="M1317.0 286 A78 78 0 0 1 1472.4 276.2" fill="none" stroke="#46C46B" stroke-width="18"/>
   <text class="val" x="1395.0" y="270" text-anchor="middle" font-size="40">96%</text>
   <text class="ts" x="1395.0" y="296" text-anchor="middle">STABILITY</text>
-  <text class="tm" x="1266" y="386">Headroom</text>
-  <text class="val2" x="1524" y="386" text-anchor="end">300 MW · 20%</text>
-  <rect class="sep" x="1266" y="400" width="258" height="1"/>
-  <text class="tm" x="1266" y="422">Session peak</text>
-  <text class="val2" x="1524" y="422" text-anchor="end">1.45 GW</text>
-  <rect class="sep" x="1266" y="436" width="258" height="1"/>
-  <text class="tm" x="1266" y="458">Limit breaches</text>
-  <text class="val2" x="1524" y="458" text-anchor="end">0</text>
-  <rect class="sep" x="1266" y="472" width="258" height="1"/>
-  <text class="tm" x="1266" y="494">Uptime</text>
-  <text class="val2" x="1524" y="494" text-anchor="end">124 h 37 min</text>
-  <rect class="sep" x="1266" y="508" width="258" height="1"/>
+  <text class="tm" x="1266" y="376">Fuse</text>
+  <text class="val2" x="1524" y="376" text-anchor="end" style="fill:#46C46B">OK</text>
+  <rect class="sep" x="1266" y="388" width="258" height="1"/>
+  <text class="tm" x="1266" y="408">Headroom</text>
+  <text class="val2" x="1524" y="408" text-anchor="end">300 MW · 20%</text>
+  <rect class="sep" x="1266" y="420" width="258" height="1"/>
+  <text class="tm" x="1266" y="440">Session peak</text>
+  <text class="val2" x="1524" y="440" text-anchor="end">1.45 GW</text>
+  <rect class="sep" x="1266" y="452" width="258" height="1"/>
+  <text class="tm" x="1266" y="472">Limit breaches</text>
+  <text class="val2" x="1524" y="472" text-anchor="end">0</text>
+  <rect class="sep" x="1266" y="484" width="258" height="1"/>
+  <text class="tm" x="1266" y="504">Uptime</text>
+  <text class="val2" x="1524" y="504" text-anchor="end">124 h 37 min</text>
+  <rect class="sep" x="1266" y="516" width="258" height="1"/>
   <rect class="panel" x="200.0" y="556" width="258.0" height="86"/>
   <text class="ts" x="218.0" y="586">CAPACITY</text>
   <text class="val" x="218.0" y="620">1.50 GW</text>
@@ -220,17 +223,17 @@
   <text class="cap" x="926" y="690">FUEL AND BATTERIES</text>
   <text class="t" x="898" y="762">Coal</text>
   <text class="t" x="1180" y="762">7 200 items</text>
-  <text class="tm" x="1350" y="762">12 h 50 min</text>
+  <text class="tm" x="1518" y="762" text-anchor="end">12 h 50 min left</text>
   <rect class="" x="898" y="776" width="620" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
   <rect class="" x="898" y="776" width="508.4" height="14" rx="2" fill="#2FB8DE"/>
   <text class="t" x="898" y="848">Fuel</text>
   <text class="t" x="1180" y="848">3 600 m3</text>
-  <text class="tm" x="1350" y="848">6 h 40 min</text>
+  <text class="tm" x="1518" y="848" text-anchor="end">6 h 40 min left</text>
   <rect class="" x="898" y="862" width="620" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
   <rect class="" x="898" y="862" width="341.0" height="14" rx="2" fill="#2FB8DE"/>
-  <text class="t" x="898" y="934">Battery charge</text>
+  <text class="t" x="898" y="934">Battery charge  40%</text>
   <text class="t" x="1180" y="934">2 400 MWh</text>
-  <text class="tm" x="1350" y="934">1 h 13 min</text>
+  <text class="tm" x="1518" y="934" text-anchor="end">to empty 1 h 13 min</text>
   <rect class="" x="898" y="948" width="620" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
   <rect class="" x="898" y="948" width="248.0" height="14" rx="2" fill="#2FB8DE"/>
   <text class="tt" x="898" y="984">Time left is computed from the current balance, not predicted</text>
