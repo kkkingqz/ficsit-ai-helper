@@ -14,7 +14,7 @@ SOURCE = Path(__file__).resolve().parent
 UPLOT_URL = "https://registry.npmjs.org/uplot/-/uplot-1.6.32.tgz"
 UPLOT_SHA256 = "4b8a8191e425658e3ea8c8c1314b0fc679c861ee3a1af2b20c7b16ba50b5133d"
 UPLOT_FILES = ("LICENSE", "dist/uPlot.min.css", "dist/uPlot.iife.min.js")
-PAGE_FILES = ("load.html", "load.css", "load.js")
+PAGE_FILES = ("load.html", "load.css", "load.js", "scroll-panel.css")
 
 
 def pack(destination, archive):

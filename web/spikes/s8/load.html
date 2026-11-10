@@ -8,6 +8,7 @@
   <title>FICSIT AI · S8</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="third_party/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="scroll-panel.css">
   <link rel="stylesheet" href="load.css">
   <script defer src="third_party/uplot/uPlot.iife.min.js"></script>
   <script defer src="load.js"></script>
@@ -35,11 +36,13 @@
 
     <div class="details">
       <section class="charts" id="charts" aria-label="Telemetry charts"></section>
-      <section class="panel equipment" aria-labelledby="equipment-title">
+      <section class="panel scroll-panel">
         <h2 id="equipment-title" data-copy="equipment"></h2>
-        <table id="generator-table">
-          <thead><tr id="columns"></tr></thead>
-        </table>
+        <div class="scroll-panel__body" role="region" aria-labelledby="equipment-title" tabindex="0">
+          <table id="generator-table">
+            <thead class="scroll-panel__sticky"><tr id="columns"></tr></thead>
+          </table>
+        </div>
       </section>
     </div>
   </main>
