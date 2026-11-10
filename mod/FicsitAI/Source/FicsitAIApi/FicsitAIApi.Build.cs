@@ -8,8 +8,7 @@ public class FicsitAIApi : ModuleRules
 
         PublicDependencyModuleNames.AddRange(new string[] {
             "Core",
-            "CoreUObject",
-            "InputCore"
+            "CoreUObject"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {
