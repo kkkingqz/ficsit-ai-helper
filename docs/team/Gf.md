@@ -65,7 +65,7 @@ GitHub Actions для всего, что собирается без движк�
 - [x] Состояние «нет питания» по E ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
 - [x] `AModSubsystem` + `IFGSaveInterface`: `saveId` переживает сохранение, переименование файла и ротацию автосохранений ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
 - [x] `RequiredOnRemote`, `NetMode` при загрузке, событие входа удалённого игрока — в паре с Co ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
-- [ ] Действие Enhanced Input видно в штатном меню переназначения клавиш
+- [x] Действие Enhanced Input видно в штатном меню переназначения клавиш (`UFicsitAIInputMappingContext` с `PlayerMappableKeySettings`, [PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40))
 
 Готово, когда: условие S1 из ARCHITECTURE §13 выполнено или принят fallback (опрос игроков; свой экран клавиш)
 
