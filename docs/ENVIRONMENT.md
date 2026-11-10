@@ -30,21 +30,21 @@ lang: ru-RU
 - `git` — система контроля версий;
 - `msitools` (в частности утилита `msiextract`) — для распаковки `.msi`-пакетов Microsoft;
 - `tar` и `zstd` — для распаковки архивов редактора движка;
-- `dos2unix` — для нормализации окончаний строк в патчах Wwise;
+- `dos2unix` и `patch` — для нормализации окончаний строк и применения патчей Wwise в SML;
 - `python3` — для запуска загрузчика `vsdownload.py`;
 - `wine` — для исполнения компилятора MSVC под Linux.
 
 ### Установка в Ubuntu / Debian
 ```bash
 sudo apt update
-sudo apt install -y git msitools tar zstd dos2unix python3 wine
+sudo apt install -y git msitools tar zstd dos2unix patch python3 wine
 ```
 
 ### Альтернатива через Nix (без sudo и изменения системных пакетов)
 Если вы работаете в среде с Nix или без прав суперпользователя:
 ```bash
 nix --extra-experimental-features "nix-command flakes" shell \
-  nixpkgs#msitools nixpkgs#wineWow64Packages.stable nixpkgs#dos2unix
+  nixpkgs#msitools nixpkgs#wineWow64Packages.stable nixpkgs#dos2unix nixpkgs#patch
 ```
 
 ---
@@ -74,6 +74,7 @@ cd ~/msvc-wine
 ```bash
 ./install.sh "$HOME/msvc"
 ```
+Скрипт соберёт вспомогательные утилиты `msvctricks.exe` и `process_sourcedependencies.exe` и настроит структуру компилятора.
 
 ### 3.4 Переменная окружения `UE_WINE_MSVC`
 UnrealBuildTool (UBT) находит тулчейн MSVC по переменной `UE_WINE_MSVC`.
@@ -99,8 +100,11 @@ export UE_WINE_MSVC="$HOME/msvc"
 > [!WARNING]
 > **Не собирайте движок из исходников.** Сборка занимает 2–3 часа и десятки гигабайт, тогда как готовый бинарный архив уже собран разработчиками игры.
 
-### 4.1 Загрузка архива
-Скачайте все части сплит-архива `UnrealEngine-CSS-Editor-Linux.tar.zst.*` из официального релиза (части `Debug` скачивать **не нужно**).
+### 4.1 Доступ и загрузка архива
+Архив распространяется через приватный форк Unreal Engine от разработчиков игры:
+`https://github.com/satisfactorymoddingUE/UnrealEngine/releases` (требуется привязка GitHub-аккаунта через `linker.ficsit.app/link`).
+
+Скачайте все части сплит-архива `UnrealEngine-CSS-Editor-Linux.tar.zst.*` (части `Debug` скачивать **не нужно**).
 
 ### 4.2 Распаковка
 Поместите части архива в выбранный каталог (например, `~/UnrealEngineCSS`) и выполните распаковку:
@@ -120,18 +124,37 @@ cat UnrealEngine-CSS-Editor-Linux.tar.zst.* | zstd -d | tar -xf -
 
 ## 5. Стартовый проект SML 3.12 и Wwise
 
+Рабочая среда разработки модов поставляется единым проектом `SatisfactoryModLoader` (репозиторий выполняет роль как загрузчика модов, так и Starter Project для Unreal Engine).
+
 ### 5.1 Клонирование Starter Project
 ```bash
-git clone https://github.com/SatisfactoryModLoader/StarterProject.git ~/Projects/SatisfactoryStarterProject
-cd ~/Projects/SatisfactoryStarterProject
+git clone --branch v3.12.0 --depth 1 \
+  https://github.com/satisfactorymodding/SatisfactoryModLoader.git \
+  ~/Projects/SatisfactoryModLoader
+cd ~/Projects/SatisfactoryModLoader
 ```
 
-### 5.2 Интеграция Wwise
-Для генерации аудиобанков и интеграции Wwise SDK используется утилита `wwise-cli`:
-```bash
-./wwise-cli integrate-ue --project "FactoryGame.uproject"
-./wwise-cli generate-soundbanks
-```
+В состав проекта входят:
+- `FactoryGame.uproject` (EngineAssociation `5.6.1-CSS`);
+- `Mods/SML` и `Mods/SMLEditor`;
+- `Mods/Alpakit` — плагин для сборки и упаковки модов;
+- `Mods/WwisePatches` — автоматические патчи аудиодвижка Wwise под Linux (`applyPatches.sh`).
+
+### 5.2 Установка `wwise-cli` и интеграция Wwise SDK
+Для работы аудиосистемы требуется интеграция Wwise SDK (версия `2025.1.6.9117`).
+
+1. Скачайте бинарник `wwise-cli` из релизов:
+   ```bash
+   gh release download v0.2.4 --repo mircearoata/wwise-cli \
+     --pattern "wwise-cli_linux_amd64" --output ~/.local/bin/wwise-cli
+   chmod +x ~/.local/bin/wwise-cli
+   ```
+2. Выполните интеграцию Wwise в проект `FactoryGame.uproject`:
+   ```bash
+   wwise-cli integrate-ue \
+     --integration-version "2025.1.6.9117" \
+     --project "$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject"
+   ```
 
 ---
 
@@ -141,7 +164,7 @@ cd ~/Projects/SatisfactoryStarterProject
 1. Сгенерируйте файл `.code-workspace` с помощью UBT:
    ```bash
    ~/UnrealEngineCSS/Engine/Build/BatchFiles/Linux/GenerateProjectFiles.sh \
-     -project="$HOME/Projects/SatisfactoryStarterProject/FactoryGame.uproject" \
+     -project="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
      -game -engine -vscode
    ```
 2. Открывайте в VS Code **только** сгенерированный файл `.code-workspace` (а не каталог).
@@ -162,7 +185,7 @@ cd ~/Projects/SatisfactoryStarterProject
 
 ## 7. Сборка мода через Alpakit Win64 под Wine
 
-1. В стартовом проекте в меню плагина **Alpakit** выберите целевой мод.
+1. В стартовом проекте в меню плагина **Alpakit** выберите целевой мод (`FicsitAI`).
 2. Целевая платформа упаковки: **Windows / Win64**.
 3. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
 4. Результат сборки помещается в `Saved/Alpakit/<ModReference>/`.
@@ -187,7 +210,7 @@ cd ~/Projects/SatisfactoryStarterProject
 ## 9. Критерий завершения задачи P-1
 
 Задача P-1 считается закрытой, когда:
-- [x] Инструкция составлена и прошла ревью Co.
-- [ ] MSVC 17.8 и SDK 10.0.22621 развёрнуты через `msvc-wine`.
+- [x] Инструкция составлена и прошла ревью Co (PR #36).
+- [x] MSVC 17.8 и SDK 10.0.22621 развёрнуты через `msvc-wine` у Gf (`~/msvc`).
 - [ ] Пустой тестовый мод собирается через Alpakit Win64 под Wine.
 - [ ] Мод успешно загружается в Satisfactory под Proton **у всех трёх разработчиков мода: Gf, Co и Gs**.
