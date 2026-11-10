@@ -6,7 +6,7 @@
 
 /**
  * Игровой модуль мира FICSIT AI.
- * Регистрирует подсистему AFicsitAISubsystem при запуске мира.
+ * Регистрирует подсистему AFicsitAISubsystem, схемы и контент терминала через UModContentRegistry.
  */
 UCLASS()
 class FICSITAICORE_API UFicsitAIWorldModule : public UGameWorldModule
@@ -15,4 +15,6 @@ class FICSITAICORE_API UFicsitAIWorldModule : public UGameWorldModule
 
 public:
     UFicsitAIWorldModule();
+
+    virtual void DispatchLifecycleEvent(ELifecyclePhase Phase) override;
 };
