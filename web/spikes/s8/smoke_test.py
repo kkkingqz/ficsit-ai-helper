@@ -98,15 +98,19 @@ if (viewport) {
   viewport.focus({ preventScroll: true });
   viewport.scrollTop = viewport.scrollHeight;
   const bounds = viewport.getBoundingClientRect();
+  const style = getComputedStyle(viewport);
   document.body.dataset.scrollTest = String(
     viewport.tabIndex === 0 && document.activeElement === viewport && viewport.scrollTop > 0 &&
     bounds.bottom <= innerHeight && Math.abs(header.getBoundingClientRect().top - bounds.top) < 2 &&
     title.getBoundingClientRect().top === titleTop && window.scrollY === pageTop);
+  document.body.dataset.scrollbarTheme = String(style.scrollbarWidth === "thin" &&
+    style.scrollbarColor === "rgb(100, 130, 156) rgb(10, 23, 36)");
 }
 ''', encoding="utf-8")
     for size in ("1280,720", "1010,540"):
         actual = browser_dom(chrome, profile, size, probe.as_uri())
         assert 'data-scroll-test="true"' in actual, f"{size}: длинный список не прокручивается внутри панели"
+        assert 'data-scrollbar-theme="true"' in actual, f"{size}: полоса прокрутки не использует палитру D-2"
         print(f"{size}: панель получает фокус и прокручивается, заголовки остаются на месте")
 
 

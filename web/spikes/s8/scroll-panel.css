@@ -12,6 +12,8 @@
   min-inline-size: 0;
   overflow: auto;
   overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stroke-strong, GrayText) var(--bg-base, Canvas);
   scrollbar-gutter: stable;
 }
 
