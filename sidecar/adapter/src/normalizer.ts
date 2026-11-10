@@ -221,6 +221,10 @@ export function createNormalizerApp(upstreamBaseUrl: string, log: Logger) {
       if (restoredSignatures > 0) headers["content-length"] = String(body.length);
     }
 
+    // Строка до обращения к провайдеру: если он подвиснет, в логе останется
+    // хотя бы попытка. Тел по-прежнему нет — только метод и путь (§12).
+    log.debug(`→ провайдер ${req.method} ${new URL(target).pathname}`);
+
     let upstream: globalThis.Response;
     try {
       upstream = await fetch(target, {
