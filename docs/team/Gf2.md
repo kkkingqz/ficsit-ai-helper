@@ -66,6 +66,18 @@ GitHub Actions для всего, что собирается без движк�
 - [x] Чек-лист проверок на чистой Windows для пилотного тестера ([`windows-pilot-checklist.md`](../../tests/test-plan/windows-pilot-checklist.md))
 - [x] Шаблоны отчётов о проверке для ворот W, G1, G2 ([`gate-report-templates.md`](../../tests/test-plan/gate-report-templates.md))
 
+### [P-8 · Проверки в игре без ручного прогона](https://github.com/kkkingqz/ficsit-ai-helper/issues/39) · #39
+
+**Неделя:** 2–3 · **Оценка для Gf2:** 3 ч·д · **Вместе с:** Gf
+
+Запуск игры под Proton одной командой, прохождение сценариев (S1, S3, S8) и сбор логов, JSONL и скриншотов в отчёт для King.
+
+- [x] Проверена загрузка сохранения из командной строки: опция `?loadgame=<SaveName>` в URL карты уровня (`AFGGameMode::LoadGameOption`)
+- [x] Скрипт запуска игры под Proton с аргументами и таймаутом ([`tools/run-game-tests.sh`](../../tools/run-game-tests.sh))
+- [x] Разбор JSONL и генерация отчёта Markdown ([`tools/parse-test-results.py`](../../tools/parse-test-results.py))
+- [ ] Прогон сценария S1 после реализации диагностического режима Gf
+- [ ] Прогон на четырёх тестовых сохранениях P-5
+
 ### [S3 · Каталог, телеметрия, линии](https://github.com/kkkingqz/ficsit-ai-helper/issues/11) · #11
 
 **Неделя:** 2–4 · **Оценка для Gf2:** 1 ч·д · **Вместе с:** Gs, Gf
@@ -120,7 +132,8 @@ GitHub Actions для всего, что собирается без движк�
 
 V-09 и V-10: CI зелёный, бюджет GameThread измерен.
 
-- [ ] fake-LLM: сценарии tool-вызовов; тесты адаптера; инварианты
+- [x] fake-LLM: сценарии normal, tool-вызовов и воспроизведения провайдерской поломки Gemini (ADR-034, Co-23) в [`tests/fake-llm/`](../../tests/fake-llm/README.md)
+- [ ] fake-LLM: тесты адаптера; инварианты
 - [ ] Автотесты веб-экранов на Fixture в браузере
 
 ### [V-10 · Запуск сайдкара модом и архив сайдкара](https://github.com/kkkingqz/ficsit-ai-helper/issues/27) · #27

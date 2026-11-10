@@ -51,3 +51,24 @@
 3. **При смене или перезапуске сохранения:**
    - Адаптер запрашивает историю из Foreman DB по `playthrough` соответствующего `saveId`. При открытии другого сохранения загружается история его playthrough, поэтому чужая переписка не подмешивается.
 4. **Для вёрстки компонентов D-2:** разделение абсолютно прозрачно — компонент принимает массив сообщений от экрана; при потере связи сайдкара просто блокируется отправка и выводится статус «Disconnected», а уже отрисованная лента сообщений остаётся на экране.
+
+## Gf2-6 → Co · ответ на Co-23 · 10.11.2026
+
+Сценарий провайдерской поломки стриминга (Co2-4 / ADR-034) добавлен в fake-LLM:
+
+1. В [`tests/fake-llm/scenarios.py`](../../tests/fake-llm/scenarios.py) добавлен сценарий `broken_provider_stream`: стриминг чанков `tool_calls` с завершающим `finish_reason: "stop"` вместо `"tool_calls"`.
+2. Развёрнут мок-сервер [`tests/fake-llm/server.py`](../../tests/fake-llm/server.py) (OpenAI-совместимый эндпоинт `/v1/chat/completions` со стримингом SSE).
+3. Подготовлен автотест [`tests/fake-llm/test_normalizer_scenario.py`](../../tests/fake-llm/test_normalizer_scenario.py):
+   - Проверяет сырой поток Gemini: подтверждает, что логика Foreman отбрасывает вызовы и чат молчит (воспроизведение дефекта V-04).
+   - Проверяет нормализацию ADR-034: подтверждает, что при исправлении `finish_reason` на `"tool_calls"` вызовы инструментов успешно исполняются (критерий V-04 выполняется).
+4. Тест автоматизирован и зелёный. Co2 может использовать сервер `http://127.0.0.1:8089` при отладке нормализатора в адаптере.
+
+## Gf2-7 → Gf, Co · 10.11.2026 · открыт
+
+По задаче P-8 ([#39](https://github.com/kkkingqz/ficsit-ai-helper/issues/39), автопроверки в игре под Proton):
+
+1. **Загрузка сохранения из командной строки:** проверена по коду `FactoryGame` и SML. URL карты вида `/Game/FactoryGame/Map/GameLevel01/Persistent_Level?loadgame=<SaveName>` парсится движком через `AFGGameMode::LoadGameOption = TEXT("loadgame")` и вызывает `mSaveSession->LoadGame(saveName)`. Моду не нужно реализовывать свой загрузчик файла сохранения — движок делает это штатно.
+2. **Скрипт запуска под Proton:** реализован в [`tools/run-game-tests.sh`](../../tools/run-game-tests.sh). Поддерживает поиск путей Steam/Proton/игры, ограничение времени `--timeout`, сбор логов, JSONL и скриншотов, а также режимы `--dry-run` и `--mock-run`.
+3. **Разбор результатов:** реализован в [`tools/parse-test-results.py`](../../tools/parse-test-results.py) (парсит записи `test_event`, таймеры производительности и формирует итоговый Markdown-отчёт для King).
+
+Ждём от Gf реализацию флага диагностики `-FicsitAIDiagnostics=1 -FicsitAITestScenario=<имя>` и сценария S1 в моде.
