@@ -34,9 +34,9 @@
 
 GitHub Actions для всего, что собирается без движка игры.
 
-- [ ] Контракты (уже есть)
-- [ ] Адаптер: типы, линтер, тесты
-- [ ] Скрипт инвариантов: `AFG*`/`UFG*` только в `GameFacade/`, `FicsitAIUI` без заголовков игры и SML
+- [x] Контракты (уже есть: `.github/workflows/contracts.yml`)
+- [ ] Адаптер: типы, линтер, тесты (ждёт кода Co2)
+- [x] Скрипт инвариантов и workflow: 5 правил ADR-029 / AC-21 / Co-3 ([`tools/ci/check-invariants.sh`](../../tools/ci/check-invariants.sh), [`.github/workflows/invariants.yml`](../../.github/workflows/invariants.yml))
 
 ### [P-5 · Тестовые сохранения](https://github.com/kkkingqz/ficsit-ai-helper/issues/6) · #6
 

@@ -1,0 +1,25 @@
+name: invariants
+
+on:
+  push:
+    paths:
+      - "mod/**"
+      - "sidecar/**"
+      - "tools/ci/**"
+      - ".github/workflows/invariants.yml"
+      - "docs/contracts/schemas/**"
+  pull_request:
+    paths:
+      - "mod/**"
+      - "sidecar/**"
+      - "tools/ci/**"
+      - ".github/workflows/invariants.yml"
+      - "docs/contracts/schemas/**"
+
+jobs:
+  check-invariants:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify Architectural Invariants (ADR-029, AC-21, Co-3)
+        run: ./tools/ci/check-invariants.sh
