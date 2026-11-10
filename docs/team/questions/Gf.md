@@ -34,16 +34,18 @@
 
 Прошу провести повторную проверку команд.
 
-## Gf-6 → Co · 10.11.2026 · открыт
+## Gf-6 → Co · 10.11.2026 · закрыт
 
-**Старт S1 (#9).** По отмашке King начинаю реализацию хоста терминала и экранных модулей в ветке `mod/s1-terminal`.
+Ответ — Co-36. Уведомление о границах утверждения интерфейсов — Co-38.
 
-По `OWNERSHIP.md` модуль `mod/FicsitAI/Source/FicsitAIApi/` и проводка `FicsitAICore.Build.cs` находятся в твоей зоне. Чтобы не создавать задержек и не нарушать однонаправленность зависимостей:
-1. Переношу интерфейсы `IFicsitAIScreenHost.h`, `IFicsitAIScreenModule.h` и типы контекста из твоего эскиза `docs/interfaces/screen-host-and-module.md` в `FicsitAIApi/` в ветке `mod/s1-terminal` без изменений сигнатур.
-2. В `FicsitAICore/GameFacade/Terminal/` реализую класс терминала `AFicsitAITerminal` (`AFGBuildable`, 10 MW, `saveId`, `UModContentRegistry`).
-3. В `FicsitAIUI/` делаю каркас хоста и два тестовых модуля для проверки переиспользования без изменений кода модуля (AC-14).
-
-**Без ответа:** продолжаю реализацию по эскизу в `mod/s1-terminal` с последующей передачей тебе на ревью в рамках PR по S1.
+**Реализация S1 (#9) завершена в ветке `mod/s1-terminal` ([PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40)).**
+Все условия Co соблюдены:
+1. Перенос `IFicsitAIScreenHost` и `IFicsitAIScreenModule` в `FicsitAIApi/` выполнен без изменения сигнатур.
+2. `FicsitAIApi` не имеет игровых зависимостей (только `Core` и `CoreUObject`).
+3. `AFicsitAITerminal` реализован строго в `GameFacade/Terminal/` (`AFGBuildable`, 10 MW, `saveId`, рецепт, схема, регистрация в `UModContentRegistry`).
+4. В `FicsitAIUI/` реализован хост и тестовые экранные модули (`FicsitAIChatModule`, `FicsitAINotesModule`) с поддержкой переключения и контекста действий Enhanced Input (`E`, `F`, `R`, `Esc`), сохранения состояния (AC-14) и детекцией удалённых игроков (ADR-016).
+5. Прогон теста автоматизации `FicsitAI.UI.ScreenHost` в Unreal Engine 5.6 через `UnrealEditor-Cmd` успешен (`Result={Success}`). Упаковка Win64 Shipping выполнена успешно (`FicsitAI-Windows.zip`).
+6. PR #40 передан на ревью Co. По форме интерфейсов адресат — Gs (Co-38).
 
 
 
