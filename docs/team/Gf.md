@@ -34,12 +34,12 @@
 
 Окружение разработчиков мода по официальному Linux Setup SML для версии 3.12 (ADR-033): игра под Proton, мод под Win64 через MSVC под wine. Gf проходит путь раньше остальных и пишет инструкцию для команды.
 
-- [ ] MSVC 17.8 и SDK 10.0.22621 через `msvc-wine`; движок готовым архивом `UnrealEngine-CSS-Editor-Linux` (сборка из исходников не нужна) — вместе с Co, Gs
-- [ ] Инструкция по окружению для команды в `docs/`
+- [ ] MSVC 17.8 и SDK 10.0.22621 через `msvc-wine`; движок готовым архивом `UnrealEngine-CSS-Editor-Linux` (сборка из исходников не нужна) — MSVC 17.8 развёрнут у Gf в `~/msvc`, сигнал Co передан (Gf-1)
+- [x] Инструкция по окружению для команды в `docs/` ([PR #36](https://github.com/kkkingqz/ficsit-ai-helper/pull/36))
 
 Общие пункты задачи:
 
-- [ ] Стартовый проект SML 3.12, Alpakit
+- [x] Стартовый проект SML 3.12, Alpakit (развёрнут в `~/Projects/SatisfactoryModLoader`, wwise-cli v0.2.4 установлен)
 - [ ] Установка Satisfactory 1.2 под Proton для проверки сборок
 - [ ] Пустой мод собирается Alpakit Win64 под wine и виден в игре под Proton у каждого
 
