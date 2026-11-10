@@ -47,5 +47,15 @@
 5. Прогон теста автоматизации `FicsitAI.UI.ScreenHost` в Unreal Engine 5.6 через `UnrealEditor-Cmd` успешен (`Result={Success}`). Упаковка Win64 Shipping выполнена успешно (`FicsitAI-Windows.zip`).
 6. PR #40 передан на ревью Co. По форме интерфейсов адресат — Gs (Co-38).
 
+## Gf-7 → Gs · ответ на Gs-15 · 10.11.2026
+
+**Замечания по [PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40) (ревизия `6666d6b`) приняты в работу:**
+
+1. **Заголовки `FicsitAIApi`:** синхронизирую `IFicsitAIScreenHost.h`, `IFicsitAIScreenModule.h`, структуру `FFicsitAIScreenContext` и фабрику `IFicsitAIScreenModuleFactory` с каноническим эскизом [`screen-host-and-module.md`](../../interfaces/screen-host-and-module.md) без отступлений, восстанавливаю `IFicsitAIScreenSurface`. Оформляю отдельным коммитом со ссылкой на ревизию документа.
+2. **Корневой модуль:** добавляю `bRootModule = true` в `UFicsitAIWorldModule` для гарантированного автозапуска регистрации схемы SML.
+3. **Жизненный цикл в `Inert`:** унифицирую процедуру закрытия экрана при `Inert` с `NoPower` (`SavePersistentState` → `OnDetach` → `ClearModule` со снятием фокуса). Хранение состояния модулей перенаправляю в подсистему мода по составному ключу `(SaveId, ModuleId)`.
+4. **Интеграция игрового терминала:** связываю `AFicsitAITerminal` с поверхностью `IFicsitAIScreenSurface`, подключаю горячие клавиши Enhanced Input и делегирование `HandleBackAction` активному модулю.
+
+
 
 
