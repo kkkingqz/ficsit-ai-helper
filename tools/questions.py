@@ -175,7 +175,13 @@ def main():
         if not is_target and not args.all:
             continue
 
-        if q["status"] == "закрыт" and not args.all:
+        if q["status"] == "закрыт":
+            if args.all:
+                print(
+                    f"  [ЗАКРЫТ] {q['id']} → {', '.join(q['recipients'])} ({q['file']}:{q['line']})"
+                )
+                if q["desc"]:
+                    print(f"    Контекст: {q['desc']}")
             continue
 
         if q["has_answer"]:
