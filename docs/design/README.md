@@ -4,8 +4,9 @@ UX-поставки Co3 по задаче [D-1 (#33)](https://github.com/kkkingq
 
 | Документ | Что это | Состояние |
 |---|---|---|
-| [D-1-frame.md](D-1-frame.md) | Каркас терминала: меню, полосы, состояния, ввод, токены для D-2 | неделя 1 — на ревью |
-| `D-1-screens.md` | «Статистика» и «Чат с ИИ» | неделя 2 |
+| [D-1-frame.md](D-1-frame.md) | Каркас терминала: меню, полосы, состояния, ввод, токены для D-2 | неделя 1 — сдан |
+| [D-1-screens.md](D-1-screens.md) | «Статистика» (энергия и ресурсы) и «Чат с ИИ» | неделя 2 — сдан |
+| [asset-command-center-check.md](asset-command-center-check.md) | Проверка надписей и локализации в ассете `art/command-center` | 10.11.2026 — закрыт |
 | `D-1-states.md` | Полный набор состояний: сайдкар не подключён, пустые данные | неделя 3 |
 
 Макеты — SVG в [`wireframes/`](wireframes): текстовый формат, читается в diff и открывается на GitHub без конвертации.
@@ -14,6 +15,9 @@ UX-поставки Co3 по задаче [D-1 (#33)](https://github.com/kkkingq
 |---|---|
 | [`wireframes/frame.svg`](wireframes/frame.svg) | Каркас целиком с размерами зон, 1920 × 1080 при масштабе 100 % |
 | [`wireframes/frame-states.svg`](wireframes/frame-states.svg) | «Нет питания», «инертен», деградация полос статуса и клавиш |
+| [`wireframes/statistics-energy.svg`](wireframes/statistics-energy.svg) | «Статистика», вкладка ENERGY |
+| [`wireframes/statistics-resources.svg`](wireframes/statistics-resources.svg) | «Статистика», вкладка RESOURCES, данные устарели |
+| [`wireframes/chat.svg`](wireframes/chat.svg) | «Чат с ИИ»: поток, отмена, карточки, шаблоны |
 
 ## Правила этих документов
 

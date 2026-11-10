@@ -1,0 +1,284 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" font-family="DejaVu Sans, Verdana, sans-serif">
+  <title>FICSIT AI — Statistics / Energy report (D-1)</title>
+  <defs>
+  <style>
+    .bg{fill:#0A1724}
+    .surface{fill:#0E2032}
+    .rail{fill:#0C1C2C}
+    .panel{fill:#0E2032;stroke:#1E3D59;stroke-width:2}
+    .inner{fill:#0A1724;stroke:#1E3D59;stroke-width:1.5}
+    .slot{fill:#122A40;stroke:#1E3D59;stroke-width:2}
+    .sep{fill:#1E3D59}
+    .accent{fill:#F5871F}
+    .t{fill:#E6F0F7;font-size:17px}
+    .tm{fill:#8FA9BF;font-size:15px}
+    .ts{fill:#8FA9BF;font-size:13px;letter-spacing:1px}
+    .tt{fill:#6F8CA3;font-size:12px;letter-spacing:1px}
+    .cap{fill:#E6F0F7;font-size:15px;letter-spacing:2px;font-weight:bold}
+    .val{fill:#E6F0F7;font-size:22px;font-weight:bold}
+    .val2{fill:#E6F0F7;font-size:17px;font-weight:bold}
+    .ok{fill:#46C46B;font-size:16px;font-weight:bold}
+    .cy{fill:#2FB8DE;font-size:15px}
+    .ann{fill:#9CC4DB;font-size:14px}
+    .annb{fill:#F5871F;font-size:14px;font-weight:bold}
+    .icon{fill:none;stroke:#9CC4DB;stroke-width:2.2}
+    .grid{stroke:#16304A;stroke-width:1}
+  </style>
+</defs>
+  <rect class="bg" x="0" y="0" width="1920" height="1080"/>
+  <rect class="surface" x="0" y="0" width="1920" height="64"/>
+  <rect class="sep" x="0" y="62" width="1920" height="2"/>
+  <text class="cap" x="24" y="29">FICSIT</text>
+  <text class="ts" x="24" y="48">FACTORY OS</text>
+  <rect class="sep" x="178" y="12" width="2" height="40"/>
+  <polygon class="accent" points="200,14 196,50 204,50 208,14"/>
+  <polygon class="accent" points="214,14 210,50 218,50 222,14"/>
+  <text class="cap" x="238" y="40" font-size="22">STATISTICS</text>
+  <rect class="sep" x="820" y="12" width="2" height="40"/>
+  <circle cx="848" cy="25" r="6" fill="#46C46B"/>
+  <text class="ts" x="864" y="29">TELEMETRY</text>
+  <text class="ok" x="864" y="50" style="fill:#46C46B">LIVE</text>
+  <circle cx="1006" cy="25" r="6" fill="#46C46B"/>
+  <text class="ts" x="1022" y="29">SIDECAR</text>
+  <text class="ok" x="1022" y="50" style="fill:#46C46B">LINKED</text>
+  <rect class="sep" x="1130" y="12" width="2" height="40"/>
+  <path class="icon" d="M1160 16 l-10 16 h8 l-4 14 12 -18 h-8 z"/>
+  <text class="ts" x="1182" y="26">POWER</text>
+  <text class="val2" x="1182" y="48">1.20 / 1.50 GW</text>
+  <rect class="" x="1356" y="36" width="96" height="10" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1356" y="36" width="77" height="10" rx="2" fill="#F5871F"/>
+  <text class="tt" x="1356" y="28">80%</text>
+  <rect class="sep" x="1478" y="12" width="2" height="40"/>
+  <rect class="icon" x="1504" y="20" width="6" height="22"/>
+  <rect class="icon" x="1514" y="14" width="6" height="28"/>
+  <rect class="icon" x="1524" y="26" width="6" height="16"/>
+  <text class="ts" x="1546" y="26">ACTIVE LINES</text>
+  <text class="val2" x="1546" y="48">12 / 12</text>
+  <rect class="sep" x="1682" y="12" width="2" height="40"/>
+  <path class="icon" d="M1708 28 l12 -7 12 7 -12 7 z M1708 28 v10 l12 7 12 -7 v-10"/>
+  <text class="ts" x="1748" y="26">LOAD</text>
+  <text class="val2" x="1748" y="48">86%</text>
+  <rect class="rail" x="0" y="64" width="180" height="960"/>
+  <rect class="sep" x="178" y="64" width="2" height="960"/>
+  <rect x="78" y="98" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="92" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="102" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="136" text-anchor="middle">OVERVIEW</text>
+  <rect x="78" y="174" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="168" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="178" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="212" text-anchor="middle">PLANNER</text>
+  <rect x="78" y="250" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="244" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="254" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="288" text-anchor="middle">PRODUCTION</text>
+  <rect class="" x="0" y="300" width="180" height="76" fill="#F5871F"/>
+  <rect class="" x="0" y="300" width="5" height="76" fill="#FFF1E0"/>
+  <rect x="78" y="326" width="6" height="14" fill="none" stroke="#0A1724" stroke-width="2.2"/><rect x="88" y="320" width="6" height="20" fill="none" stroke="#0A1724" stroke-width="2.2"/><rect x="98" y="330" width="6" height="10" fill="none" stroke="#0A1724" stroke-width="2.2"/>
+  <text class="ts" x="90" y="364" text-anchor="middle" style="fill:#0A1724" font-weight="bold">STATISTICS</text>
+  <rect x="78" y="402" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="396" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="406" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="440" text-anchor="middle">CHAT</text>
+  <rect x="78" y="478" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="472" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="482" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="516" text-anchor="middle">WORK ORDERS</text>
+  <rect x="78" y="554" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="548" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="558" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="592" text-anchor="middle">NOTES</text>
+  <rect x="78" y="630" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="624" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="634" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="668" text-anchor="middle">LINES</text>
+  <rect x="78" y="706" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="700" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="710" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="744" text-anchor="middle">SCREENS</text>
+  <rect x="78" y="782" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="776" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="786" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="820" text-anchor="middle">SETTINGS</text>
+  <rect class="" x="12" y="856" width="156" height="52" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tt" x="90" y="878" text-anchor="middle">LOGISTICS — v1.5,</text>
+  <text class="tt" x="90" y="896" text-anchor="middle">пункт скрыт</text>
+  <rect class="surface" x="0" y="1024" width="1920" height="56"/>
+  <rect class="sep" x="0" y="1024" width="1920" height="2"/>
+  <rect class="slot" x="24" y="1038" width="34" height="28" rx="4"/>
+  <text class="t" x="41.0" y="1058" text-anchor="middle">R</text>
+  <text class="tm" x="68" y="1058">REFRESH</text>
+  <rect class="slot" x="144.5" y="1038" width="34" height="28" rx="4"/>
+  <text class="t" x="161.5" y="1058" text-anchor="middle">F</text>
+  <text class="tm" x="188.5" y="1058">FOCUS</text>
+  <rect class="slot" x="246.0" y="1038" width="34" height="28" rx="4"/>
+  <text class="t" x="263.0" y="1058" text-anchor="middle">C</text>
+  <text class="tm" x="290.0" y="1058">EXPORT CSV</text>
+  <rect class="slot" x="395.0" y="1038" width="52" height="28" rx="4"/>
+  <text class="t" x="421.0" y="1058" text-anchor="middle">Esc</text>
+  <text class="tm" x="457.0" y="1058">BACK</text>
+  <rect class="" x="1656" y="1034" width="240" height="36" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tt" x="1776" y="1057" text-anchor="middle">RESERVED · alerts (не v1.0)</text>
+  <rect class="" x="200" y="88" width="150" height="34" fill="#F5871F" rx="3"/>
+  <text class="ts" x="275.0" y="111" text-anchor="middle" font-weight="bold" style="fill:#0A1724">ENERGY</text>
+  <rect class="slot" x="358" y="88" width="150" height="34" rx="3"/>
+  <text class="ts" x="433.0" y="111" text-anchor="middle">RESOURCES</text>
+  <rect class="slot" x="1180" y="90" width="264" height="30" rx="3"/>
+  <text class="ts" x="1224.0" y="110" text-anchor="middle">5 MIN</text>
+  <rect class="" x="1268" y="90" width="88" height="30" fill="#1E4A6B" rx="3"/>
+  <text class="ts" x="1312.0" y="110" text-anchor="middle" font-weight="bold" style="fill:#E6F0F7">15 MIN</text>
+  <rect class="sep" x="1268" y="95" width="1" height="20"/>
+  <text class="ts" x="1400.0" y="110" text-anchor="middle">60 MIN</text>
+  <rect class="sep" x="1356" y="95" width="1" height="20"/>
+  <circle cx="1470" cy="105" r="5" fill="#46C46B"/>
+  <text class="ts" x="1484" y="110">UPDATED 2 s AGO</text>
+  <rect class="slot" x="1740" y="90" width="160" height="30" rx="3"/>
+  <text class="ts" x="1756" y="110">EXPORT CSV</text>
+  <rect class="" x="1864" y="95" width="24" height="20" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="ts" x="1876" y="110" text-anchor="middle">C</text>
+  <rect class="panel" x="200" y="136" width="1030" height="400"/>
+  <polygon class="accent" points="216,150 212,166 219,166 223,150"/>
+  <polygon class="accent" points="228,150 224,166 231,166 235,150"/>
+  <text class="cap" x="246" y="164">POWER — PRODUCTION AND CONSUMPTION</text>
+  <text class="tt" x="1214" y="163" text-anchor="end">METRIC: power.production + power.consumption  ▾</text>
+  <line class="grid" x1="288" y1="194.0" x2="1188" y2="194.0"/>
+  <text class="tt" x="276" y="199.0" text-anchor="end">2.0 GW</text>
+  <line class="grid" x1="288" y1="262.0" x2="1188" y2="262.0"/>
+  <text class="tt" x="276" y="267.0" text-anchor="end">1.5 GW</text>
+  <line class="grid" x1="288" y1="330.0" x2="1188" y2="330.0"/>
+  <text class="tt" x="276" y="335.0" text-anchor="end">1.0 GW</text>
+  <line class="grid" x1="288" y1="398.0" x2="1188" y2="398.0"/>
+  <text class="tt" x="276" y="403.0" text-anchor="end">0.5 GW</text>
+  <line class="grid" x1="288" y1="466.0" x2="1188" y2="466.0"/>
+  <text class="tt" x="276" y="471.0" text-anchor="end">0 GW</text>
+  <line x1="288" y1="262.0" x2="1188" y2="262.0" stroke="#E8C33C" stroke-width="2" stroke-dasharray="10 7"/>
+  <text class="tt" x="296" y="252.0">GRID LIMIT 1.50 GW</text>
+  <path d="M288.0 260.7 L298.1 260.9 L308.2 259.6 L318.3 261.0 L328.4 260.0 L338.6 260.7 L348.7 261.8 L358.8 261.1 L368.9 262.6 L379.0 262.0 L389.1 263.2 L399.2 263.3 L409.3 262.7 L419.5 261.8 L429.6 263.5 L439.7 263.2 L449.8 262.3 L459.9 261.6 L470.0 262.6 L480.1 263.3 L490.2 262.2 L500.4 264.9 L510.5 263.5 L520.6 265.4 L530.7 266.3 L540.8 267.0 L550.9 267.0 L561.0 266.2 L571.1 268.0 L581.3 267.2 L591.4 266.9 L601.5 267.3 L611.6 266.5 L621.7 267.1 L631.8 266.5 L641.9 265.4 L652.0 263.6 L662.2 263.5 L672.3 263.1 L682.4 262.0 L692.5 261.9 L702.6 262.0 L712.7 260.7 L722.8 260.9 L732.9 262.0 L743.1 261.3 L753.2 261.5 L763.3 260.8 L773.4 261.2 L783.5 262.2 L793.6 260.5 L803.7 262.4 L813.8 261.5 L824.0 260.5 L834.1 261.8 L844.2 260.9 L854.3 261.9 L864.4 260.4 L874.5 260.4 L884.6 261.2 L894.7 261.0 L904.9 262.9 L915.0 262.7 L925.1 263.7 L935.2 264.5 L945.3 265.5 L955.4 265.2 L965.5 265.5 L975.6 267.0 L985.8 266.8 L995.9 268.2 L1006.0 266.6 L1016.1 266.4 L1026.2 265.2 L1036.3 265.1 L1046.4 265.9 L1056.5 265.2 L1066.7 264.0 L1076.8 265.2 L1086.9 263.8 L1097.0 264.3 L1107.1 264.3 L1117.2 264.3 L1127.3 262.6 L1137.4 264.1 L1147.6 263.8 L1157.7 263.3 L1167.8 262.0 L1177.9 263.7 L1188.0 262.4 L1188 466 L288 466 Z" fill="#2FB8DE" opacity="0.18"/>
+  <path d="M288.0 260.7 L298.1 260.9 L308.2 259.6 L318.3 261.0 L328.4 260.0 L338.6 260.7 L348.7 261.8 L358.8 261.1 L368.9 262.6 L379.0 262.0 L389.1 263.2 L399.2 263.3 L409.3 262.7 L419.5 261.8 L429.6 263.5 L439.7 263.2 L449.8 262.3 L459.9 261.6 L470.0 262.6 L480.1 263.3 L490.2 262.2 L500.4 264.9 L510.5 263.5 L520.6 265.4 L530.7 266.3 L540.8 267.0 L550.9 267.0 L561.0 266.2 L571.1 268.0 L581.3 267.2 L591.4 266.9 L601.5 267.3 L611.6 266.5 L621.7 267.1 L631.8 266.5 L641.9 265.4 L652.0 263.6 L662.2 263.5 L672.3 263.1 L682.4 262.0 L692.5 261.9 L702.6 262.0 L712.7 260.7 L722.8 260.9 L732.9 262.0 L743.1 261.3 L753.2 261.5 L763.3 260.8 L773.4 261.2 L783.5 262.2 L793.6 260.5 L803.7 262.4 L813.8 261.5 L824.0 260.5 L834.1 261.8 L844.2 260.9 L854.3 261.9 L864.4 260.4 L874.5 260.4 L884.6 261.2 L894.7 261.0 L904.9 262.9 L915.0 262.7 L925.1 263.7 L935.2 264.5 L945.3 265.5 L955.4 265.2 L965.5 265.5 L975.6 267.0 L985.8 266.8 L995.9 268.2 L1006.0 266.6 L1016.1 266.4 L1026.2 265.2 L1036.3 265.1 L1046.4 265.9 L1056.5 265.2 L1066.7 264.0 L1076.8 265.2 L1086.9 263.8 L1097.0 264.3 L1107.1 264.3 L1117.2 264.3 L1127.3 262.6 L1137.4 264.1 L1147.6 263.8 L1157.7 263.3 L1167.8 262.0 L1177.9 263.7 L1188.0 262.4" fill="none" stroke="#2FB8DE" stroke-width="2.4"/>
+  <path d="M288.0 304.9 L298.1 304.0 L308.2 304.5 L318.3 303.9 L328.4 304.0 L338.6 306.0 L348.7 306.5 L358.8 304.5 L368.9 306.8 L379.0 307.6 L389.1 305.9 L399.2 308.1 L409.3 307.5 L419.5 308.9 L429.6 308.6 L439.7 310.1 L449.8 308.3 L459.9 307.2 L470.0 307.5 L480.1 306.0 L490.2 305.3 L500.4 306.2 L510.5 303.1 L520.6 302.7 L530.7 302.8 L540.8 303.0 L550.9 300.0 L561.0 301.0 L571.1 300.1 L581.3 299.7 L591.4 300.4 L601.5 300.0 L611.6 301.8 L621.7 300.8 L631.8 302.1 L641.9 300.7 L652.0 300.9 L662.2 303.3 L672.3 303.0 L682.4 302.7 L692.5 300.3 L702.6 301.8 L712.7 301.3 L722.8 302.4 L732.9 302.1 L743.1 303.0 L753.2 303.8 L763.3 303.8 L773.4 304.7 L783.5 304.6 L793.6 306.2 L803.7 306.3 L813.8 307.2 L824.0 307.4 L834.1 308.7 L844.2 310.3 L854.3 308.1 L864.4 307.4 L874.5 307.1 L884.6 303.0 L894.7 297.4 L904.9 293.8 L915.0 286.7 L925.1 282.4 L935.2 278.3 L945.3 274.1 L955.4 266.9 L965.5 270.8 L975.6 277.8 L985.8 280.1 L995.9 285.7 L1006.0 290.9 L1016.1 294.8 L1026.2 297.6 L1036.3 301.4 L1046.4 303.6 L1056.5 301.5 L1066.7 302.7 L1076.8 300.2 L1086.9 300.9 L1097.0 298.9 L1107.1 298.4 L1117.2 299.8 L1127.3 298.4 L1137.4 300.8 L1147.6 302.1 L1157.7 301.2 L1167.8 303.9 L1177.9 304.3 L1188.0 304.7" fill="none" stroke="#F5871F" stroke-width="2.4"/>
+  <text class="tt" x="288.0" y="488">-15 min</text>
+  <text class="tt" x="588.0" y="488" text-anchor="middle">-10</text>
+  <text class="tt" x="888.0" y="488" text-anchor="middle">-5</text>
+  <text class="tt" x="1188.0" y="488" text-anchor="middle">now</text>
+  <rect class="inner" x="304" y="392" width="212" height="58" rx="3"/>
+  <line x1="316" y1="418" x2="344" y2="418" stroke="#2FB8DE" stroke-width="3"/>
+  <text class="ts" x="354" y="423">Production  1.50 GW</text>
+  <line x1="316" y1="444" x2="344" y2="444" stroke="#F5871F" stroke-width="3"/>
+  <text class="ts" x="354" y="449">Consumption  1.20 GW</text>
+  <text class="tt" x="216" y="522">Session data only — 24 h history arrives in v1.1</text>
+  <rect class="panel" x="1250" y="136" width="290" height="400"/>
+  <polygon class="accent" points="1266,150 1262,166 1269,166 1273,150"/>
+  <polygon class="accent" points="1278,150 1274,166 1281,166 1285,150"/>
+  <text class="cap" x="1296" y="164">GRID</text>
+  <path d="M1317.0 286 a78 78 0 0 1 156 0" fill="none" stroke="#16304A" stroke-width="18"/>
+  <path d="M1317.0 286 A78 78 0 0 1 1472.4 276.2" fill="none" stroke="#46C46B" stroke-width="18"/>
+  <text class="val" x="1395.0" y="270" text-anchor="middle" font-size="40">96%</text>
+  <text class="ts" x="1395.0" y="296" text-anchor="middle">STABILITY</text>
+  <text class="tm" x="1266" y="386">Headroom</text>
+  <text class="val2" x="1524" y="386" text-anchor="end">300 MW · 20%</text>
+  <rect class="sep" x="1266" y="400" width="258" height="1"/>
+  <text class="tm" x="1266" y="422">Session peak</text>
+  <text class="val2" x="1524" y="422" text-anchor="end">1.45 GW</text>
+  <rect class="sep" x="1266" y="436" width="258" height="1"/>
+  <text class="tm" x="1266" y="458">Limit breaches</text>
+  <text class="val2" x="1524" y="458" text-anchor="end">0</text>
+  <rect class="sep" x="1266" y="472" width="258" height="1"/>
+  <text class="tm" x="1266" y="494">Uptime</text>
+  <text class="val2" x="1524" y="494" text-anchor="end">124 h 37 min</text>
+  <rect class="sep" x="1266" y="508" width="258" height="1"/>
+  <rect class="panel" x="200.0" y="556" width="258.0" height="86"/>
+  <text class="ts" x="218.0" y="586">CAPACITY</text>
+  <text class="val" x="218.0" y="620">1.50 GW</text>
+  <rect class="panel" x="468.0" y="556" width="258.0" height="86"/>
+  <text class="ts" x="486.0" y="586">CONSUMPTION</text>
+  <text class="val" x="486.0" y="620">1.20 GW</text>
+  <rect class="panel" x="736.0" y="556" width="258.0" height="86"/>
+  <text class="ts" x="754.0" y="586">HEADROOM</text>
+  <text class="val" x="754.0" y="620">300 MW</text>
+  <rect class="panel" x="1004.0" y="556" width="258.0" height="86"/>
+  <text class="ts" x="1022.0" y="586">SESSION PEAK</text>
+  <text class="val" x="1022.0" y="620">1.45 GW</text>
+  <rect class="panel" x="1272.0" y="556" width="258.0" height="86"/>
+  <text class="ts" x="1290.0" y="586">GENERATORS</text>
+  <text class="val" x="1290.0" y="620">18 / 18</text>
+  <rect class="panel" x="200" y="662" width="660" height="342"/>
+  <polygon class="accent" points="216,676 212,692 219,692 223,676"/>
+  <polygon class="accent" points="228,676 224,692 231,692 235,676"/>
+  <text class="cap" x="246" y="690">GENERATORS BY TYPE</text>
+  <text class="tt" x="218" y="724">TYPE</text>
+  <text class="tt" x="450" y="724">RUNNING</text>
+  <text class="tt" x="590" y="724">OUTPUT</text>
+  <text class="tt" x="730" y="724">LOAD</text>
+  <rect class="sep" x="216" y="736" width="628" height="1"/>
+  <text class="t" x="218" y="774">Coal generators</text>
+  <text class="t" x="450" y="774">12 / 12</text>
+  <text class="t" x="590" y="774">900 MW</text>
+  <rect class="" x="730" y="760" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="730" y="760" width="82.8" height="14" rx="2" fill="#46C46B"/>
+  <text class="t" x="842" y="774" text-anchor="end">92%</text>
+  <rect class="sep" x="216" y="796" width="628" height="1"/>
+  <text class="t" x="218" y="828">Fuel generators</text>
+  <text class="t" x="450" y="828">2 / 2</text>
+  <text class="t" x="590" y="828">500 MW</text>
+  <rect class="" x="730" y="814" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="730" y="814" width="74.7" height="14" rx="2" fill="#F5871F"/>
+  <text class="t" x="842" y="828" text-anchor="end">83%</text>
+  <rect class="sep" x="216" y="850" width="628" height="1"/>
+  <text class="t" x="218" y="882">Biomass burners</text>
+  <text class="t" x="450" y="882">4 / 4</text>
+  <text class="t" x="590" y="882">100 MW</text>
+  <rect class="" x="730" y="868" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="730" y="868" width="60.300000000000004" height="14" rx="2" fill="#F5871F"/>
+  <text class="t" x="842" y="882" text-anchor="end">67%</text>
+  <rect class="sep" x="216" y="904" width="628" height="1"/>
+  <text class="tt" x="218" y="984">Totals: 18 generators · 1.50 GW capacity</text>
+  <rect class="panel" x="880" y="662" width="660" height="342"/>
+  <polygon class="accent" points="896,676 892,692 899,692 903,676"/>
+  <polygon class="accent" points="908,676 904,692 911,692 915,676"/>
+  <text class="cap" x="926" y="690">FUEL AND BATTERIES</text>
+  <text class="t" x="898" y="762">Coal</text>
+  <text class="t" x="1180" y="762">7 200 items</text>
+  <text class="tm" x="1350" y="762">12 h 50 min</text>
+  <rect class="" x="898" y="776" width="620" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="898" y="776" width="508.4" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="898" y="848">Fuel</text>
+  <text class="t" x="1180" y="848">3 600 m3</text>
+  <text class="tm" x="1350" y="848">6 h 40 min</text>
+  <rect class="" x="898" y="862" width="620" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="898" y="862" width="341.0" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="898" y="934">Battery charge</text>
+  <text class="t" x="1180" y="934">2 400 MWh</text>
+  <text class="tm" x="1350" y="934">1 h 13 min</text>
+  <rect class="" x="898" y="948" width="620" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="898" y="948" width="248.0" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="tt" x="898" y="984">Time left is computed from the current balance, not predicted</text>
+  <rect class="panel" x="1560" y="136" width="340" height="400"/>
+  <polygon class="accent" points="1576,150 1572,166 1579,166 1583,150"/>
+  <polygon class="accent" points="1588,150 1584,166 1591,166 1595,150"/>
+  <text class="cap" x="1606" y="164">SELECTED</text>
+  <text class="val" x="1578" y="198" font-size="19">Coal generators</text>
+  <text class="tm" x="1578" y="236">Status</text>
+  <text class="val2" x="1882" y="236" text-anchor="end">Running</text>
+  <rect class="sep" x="1578" y="252" width="304" height="1"/>
+  <text class="tm" x="1578" y="278">Output</text>
+  <text class="val2" x="1882" y="278" text-anchor="end">900 MW</text>
+  <rect class="sep" x="1578" y="294" width="304" height="1"/>
+  <text class="tm" x="1578" y="320">Machines</text>
+  <text class="val2" x="1882" y="320" text-anchor="end">12</text>
+  <rect class="sep" x="1578" y="336" width="304" height="1"/>
+  <text class="tm" x="1578" y="362">Fuel</text>
+  <text class="val2" x="1882" y="362" text-anchor="end">Coal</text>
+  <rect class="sep" x="1578" y="378" width="304" height="1"/>
+  <text class="tm" x="1578" y="404">Clock</text>
+  <text class="val2" x="1882" y="404" text-anchor="end">100%</text>
+  <rect class="sep" x="1578" y="420" width="304" height="1"/>
+  <text class="tm" x="1578" y="446">Efficiency</text>
+  <text class="val2" x="1882" y="446" text-anchor="end">93%</text>
+  <rect class="sep" x="1578" y="462" width="304" height="1"/>
+  <text class="tt" x="1578" y="510">Machine settings are read-only</text>
+  <rect class="panel" x="1560" y="556" width="340" height="448"/>
+  <polygon class="accent" points="1576,570 1572,586 1579,586 1583,570"/>
+  <polygon class="accent" points="1588,570 1584,586 1591,586 1595,570"/>
+  <text class="cap" x="1606" y="584">METRICS</text>
+  <rect class="slot" x="1576" y="602" width="308" height="32" rx="3"/>
+  <text class="ts" x="1590" y="624">Search metrics…</text>
+  <rect class="" x="1578" y="650" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <path d="M1582 659 l4 4 8 -10" fill="none" stroke="#F5871F" stroke-width="2.4"/>
+  <text class="t" x="1608" y="664">power.production</text>
+  <rect class="" x="1578" y="694" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <path d="M1582 703 l4 4 8 -10" fill="none" stroke="#F5871F" stroke-width="2.4"/>
+  <text class="t" x="1608" y="708">power.consumption</text>
+  <rect class="" x="1578" y="738" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="t" x="1608" y="752">power.headroom</text>
+  <rect class="" x="1578" y="782" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="t" x="1608" y="796">grid.stability</text>
+  <rect class="" x="1578" y="826" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="t" x="1608" y="840">fuel.coal.stock</text>
+  <rect class="" x="1578" y="870" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="t" x="1608" y="884">battery.charge</text>
+  <rect class="" x="1578" y="914" width="18" height="18" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="t" x="1608" y="928">line.*.output</text>
+  <text class="tt" x="1578" y="984">Catalog comes from list_metrics</text>
+</svg>

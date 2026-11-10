@@ -1,0 +1,322 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" font-family="DejaVu Sans, Verdana, sans-serif">
+  <title>FICSIT AI — Statistics / Resources report (D-1)</title>
+  <defs>
+  <style>
+    .bg{fill:#0A1724}
+    .surface{fill:#0E2032}
+    .rail{fill:#0C1C2C}
+    .panel{fill:#0E2032;stroke:#1E3D59;stroke-width:2}
+    .inner{fill:#0A1724;stroke:#1E3D59;stroke-width:1.5}
+    .slot{fill:#122A40;stroke:#1E3D59;stroke-width:2}
+    .sep{fill:#1E3D59}
+    .accent{fill:#F5871F}
+    .t{fill:#E6F0F7;font-size:17px}
+    .tm{fill:#8FA9BF;font-size:15px}
+    .ts{fill:#8FA9BF;font-size:13px;letter-spacing:1px}
+    .tt{fill:#6F8CA3;font-size:12px;letter-spacing:1px}
+    .cap{fill:#E6F0F7;font-size:15px;letter-spacing:2px;font-weight:bold}
+    .val{fill:#E6F0F7;font-size:22px;font-weight:bold}
+    .val2{fill:#E6F0F7;font-size:17px;font-weight:bold}
+    .ok{fill:#46C46B;font-size:16px;font-weight:bold}
+    .cy{fill:#2FB8DE;font-size:15px}
+    .ann{fill:#9CC4DB;font-size:14px}
+    .annb{fill:#F5871F;font-size:14px;font-weight:bold}
+    .icon{fill:none;stroke:#9CC4DB;stroke-width:2.2}
+    .grid{stroke:#16304A;stroke-width:1}
+  </style>
+</defs>
+  <rect class="bg" x="0" y="0" width="1920" height="1080"/>
+  <rect class="surface" x="0" y="0" width="1920" height="64"/>
+  <rect class="sep" x="0" y="62" width="1920" height="2"/>
+  <text class="cap" x="24" y="29">FICSIT</text>
+  <text class="ts" x="24" y="48">FACTORY OS</text>
+  <rect class="sep" x="178" y="12" width="2" height="40"/>
+  <polygon class="accent" points="200,14 196,50 204,50 208,14"/>
+  <polygon class="accent" points="214,14 210,50 218,50 222,14"/>
+  <text class="cap" x="238" y="40" font-size="22">STATISTICS</text>
+  <rect class="sep" x="820" y="12" width="2" height="40"/>
+  <circle cx="848" cy="25" r="6" fill="#46C46B"/>
+  <text class="ts" x="864" y="29">TELEMETRY</text>
+  <text class="ok" x="864" y="50" style="fill:#46C46B">LIVE</text>
+  <circle cx="1006" cy="25" r="6" fill="#46C46B"/>
+  <text class="ts" x="1022" y="29">SIDECAR</text>
+  <text class="ok" x="1022" y="50" style="fill:#46C46B">LINKED</text>
+  <rect class="sep" x="1130" y="12" width="2" height="40"/>
+  <path class="icon" d="M1160 16 l-10 16 h8 l-4 14 12 -18 h-8 z"/>
+  <text class="ts" x="1182" y="26">POWER</text>
+  <text class="val2" x="1182" y="48">1.20 / 1.50 GW</text>
+  <rect class="" x="1356" y="36" width="96" height="10" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1356" y="36" width="77" height="10" rx="2" fill="#F5871F"/>
+  <text class="tt" x="1356" y="28">80%</text>
+  <rect class="sep" x="1478" y="12" width="2" height="40"/>
+  <rect class="icon" x="1504" y="20" width="6" height="22"/>
+  <rect class="icon" x="1514" y="14" width="6" height="28"/>
+  <rect class="icon" x="1524" y="26" width="6" height="16"/>
+  <text class="ts" x="1546" y="26">ACTIVE LINES</text>
+  <text class="val2" x="1546" y="48">12 / 12</text>
+  <rect class="sep" x="1682" y="12" width="2" height="40"/>
+  <path class="icon" d="M1708 28 l12 -7 12 7 -12 7 z M1708 28 v10 l12 7 12 -7 v-10"/>
+  <text class="ts" x="1748" y="26">LOAD</text>
+  <text class="val2" x="1748" y="48">86%</text>
+  <rect class="rail" x="0" y="64" width="180" height="960"/>
+  <rect class="sep" x="178" y="64" width="2" height="960"/>
+  <rect x="78" y="98" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="92" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="102" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="136" text-anchor="middle">OVERVIEW</text>
+  <rect x="78" y="174" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="168" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="178" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="212" text-anchor="middle">PLANNER</text>
+  <rect x="78" y="250" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="244" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="254" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="288" text-anchor="middle">PRODUCTION</text>
+  <rect class="" x="0" y="300" width="180" height="76" fill="#F5871F"/>
+  <rect class="" x="0" y="300" width="5" height="76" fill="#FFF1E0"/>
+  <rect x="78" y="326" width="6" height="14" fill="none" stroke="#0A1724" stroke-width="2.2"/><rect x="88" y="320" width="6" height="20" fill="none" stroke="#0A1724" stroke-width="2.2"/><rect x="98" y="330" width="6" height="10" fill="none" stroke="#0A1724" stroke-width="2.2"/>
+  <text class="ts" x="90" y="364" text-anchor="middle" style="fill:#0A1724" font-weight="bold">STATISTICS</text>
+  <rect x="78" y="402" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="396" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="406" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="440" text-anchor="middle">CHAT</text>
+  <rect x="78" y="478" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="472" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="482" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="516" text-anchor="middle">WORK ORDERS</text>
+  <rect x="78" y="554" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="548" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="558" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="592" text-anchor="middle">NOTES</text>
+  <rect x="78" y="630" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="624" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="634" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="668" text-anchor="middle">LINES</text>
+  <rect x="78" y="706" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="700" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="710" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="744" text-anchor="middle">SCREENS</text>
+  <rect x="78" y="782" width="6" height="14" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="88" y="776" width="6" height="20" fill="none" stroke="#9CC4DB" stroke-width="2.2"/><rect x="98" y="786" width="6" height="10" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <text class="ts" x="90" y="820" text-anchor="middle">SETTINGS</text>
+  <rect class="" x="12" y="856" width="156" height="52" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tt" x="90" y="878" text-anchor="middle">LOGISTICS — v1.5,</text>
+  <text class="tt" x="90" y="896" text-anchor="middle">пункт скрыт</text>
+  <rect class="surface" x="0" y="1024" width="1920" height="56"/>
+  <rect class="sep" x="0" y="1024" width="1920" height="2"/>
+  <rect class="slot" x="24" y="1038" width="34" height="28" rx="4"/>
+  <text class="t" x="41.0" y="1058" text-anchor="middle">R</text>
+  <text class="tm" x="68" y="1058">REFRESH</text>
+  <rect class="slot" x="144.5" y="1038" width="34" height="28" rx="4"/>
+  <text class="t" x="161.5" y="1058" text-anchor="middle">F</text>
+  <text class="tm" x="188.5" y="1058">FOCUS</text>
+  <rect class="slot" x="246.0" y="1038" width="34" height="28" rx="4"/>
+  <text class="t" x="263.0" y="1058" text-anchor="middle">C</text>
+  <text class="tm" x="290.0" y="1058">EXPORT CSV</text>
+  <rect class="slot" x="395.0" y="1038" width="52" height="28" rx="4"/>
+  <text class="t" x="421.0" y="1058" text-anchor="middle">Esc</text>
+  <text class="tm" x="457.0" y="1058">BACK</text>
+  <rect class="" x="1656" y="1034" width="240" height="36" fill="none" stroke="#1E3D59" stroke-width="2" stroke-dasharray="6 5"/>
+  <text class="tt" x="1776" y="1057" text-anchor="middle">RESERVED · alerts (не v1.0)</text>
+  <rect class="slot" x="200" y="88" width="150" height="34" rx="3"/>
+  <text class="ts" x="275.0" y="111" text-anchor="middle">ENERGY</text>
+  <rect class="" x="358" y="88" width="150" height="34" fill="#F5871F" rx="3"/>
+  <text class="ts" x="433.0" y="111" text-anchor="middle" font-weight="bold" style="fill:#0A1724">RESOURCES</text>
+  <rect class="slot" x="1180" y="90" width="264" height="30" rx="3"/>
+  <text class="ts" x="1224.0" y="110" text-anchor="middle">5 MIN</text>
+  <rect class="" x="1268" y="90" width="88" height="30" fill="#1E4A6B" rx="3"/>
+  <text class="ts" x="1312.0" y="110" text-anchor="middle" font-weight="bold" style="fill:#E6F0F7">15 MIN</text>
+  <rect class="sep" x="1268" y="95" width="1" height="20"/>
+  <text class="ts" x="1400.0" y="110" text-anchor="middle">60 MIN</text>
+  <rect class="sep" x="1356" y="95" width="1" height="20"/>
+  <circle cx="1470" cy="105" r="5" fill="#E8C33C"/>
+  <text class="ts" x="1484" y="110" style="fill:#E8C33C">UPDATED 48 s AGO</text>
+  <rect class="slot" x="1740" y="90" width="160" height="30" rx="3"/>
+  <text class="ts" x="1756" y="110">EXPORT CSV</text>
+  <rect class="" x="1864" y="95" width="24" height="20" rx="3" fill="#122A40" stroke="#1E3D59"/>
+  <text class="ts" x="1876" y="110" text-anchor="middle">C</text>
+  <rect class="panel" x="200" y="136" width="330" height="86"/>
+  <text class="ts" x="218" y="166">ORES</text>
+  <text class="val" x="218" y="200">270 / 230</text>
+  <text class="tt" x="512" y="200" text-anchor="end">items/min</text>
+  <path d="M380.0 162.6 L383.3 163.0 L386.7 165.1 L390.0 165.2 L393.3 163.8 L396.7 164.1 L400.0 164.3 L403.3 165.1 L406.7 164.5 L410.0 164.5 L413.3 164.7 L416.7 165.7 L420.0 165.4 L423.3 165.9 L426.7 165.6 L430.0 165.5 L433.3 166.0 L436.7 167.3 L440.0 167.9 L443.3 168.6 L446.7 169.2 L450.0 169.3 L453.3 168.3 L456.7 168.4 L460.0 167.8 L463.3 166.3 L466.7 166.4 L470.0 165.7 L473.3 165.8 L476.7 165.6 L480.0 164.4 L483.3 164.4 L486.7 163.3 L490.0 162.1 L493.3 162.6 L496.7 163.6 L500.0 162.2 L503.3 162.6 L506.7 162.8 L510.0 162.6" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="panel" x="540" y="136" width="330" height="86"/>
+  <text class="ts" x="558" y="166">INGOTS</text>
+  <text class="val" x="558" y="200">440 / 410</text>
+  <text class="tt" x="852" y="200" text-anchor="end">items/min</text>
+  <path d="M720.0 165.5 L723.3 164.9 L726.7 165.3 L730.0 164.8 L733.3 164.9 L736.7 166.2 L740.0 166.6 L743.3 165.2 L746.7 166.8 L750.0 167.3 L753.3 166.1 L756.7 167.6 L760.0 167.2 L763.3 168.2 L766.7 168.0 L770.0 168.9 L773.3 167.8 L776.7 167.0 L780.0 167.3 L783.3 166.3 L786.7 165.8 L790.0 166.4 L793.3 164.3 L796.7 164.0 L800.0 164.1 L803.3 164.2 L806.7 162.2 L810.0 162.9 L813.3 162.3 L816.7 162.0 L820.0 162.5 L823.3 162.2 L826.7 163.5 L830.0 162.8 L833.3 163.6 L836.7 162.7 L840.0 162.8 L843.3 164.4 L846.7 164.3 L850.0 164.0" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="panel" x="880" y="136" width="330" height="86"/>
+  <text class="ts" x="898" y="166">PARTS</text>
+  <text class="val" x="898" y="200">1 320 / 1 220</text>
+  <text class="tt" x="1192" y="200" text-anchor="end">items/min</text>
+  <path d="M1060.0 166.4 L1063.3 167.0 L1066.7 166.7 L1070.0 167.6 L1073.3 168.2 L1076.7 167.8 L1080.0 167.1 L1083.3 167.5 L1086.7 167.6 L1090.0 168.6 L1093.3 167.8 L1096.7 167.9 L1100.0 167.6 L1103.3 167.2 L1106.7 166.3 L1110.0 164.2 L1113.3 163.8 L1116.7 163.2 L1120.0 162.7 L1123.3 163.6 L1126.7 163.1 L1130.0 162.3 L1133.3 162.1 L1136.7 161.9 L1140.0 162.0 L1143.3 163.8 L1146.7 163.0 L1150.0 163.1 L1153.3 163.6 L1156.7 164.3 L1160.0 163.8 L1163.3 164.5 L1166.7 162.8 L1170.0 162.9 L1173.3 163.5 L1176.7 164.0 L1180.0 162.8 L1183.3 163.6 L1186.7 163.2 L1190.0 163.6" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="panel" x="1220" y="136" width="330" height="86"/>
+  <text class="ts" x="1238" y="166">STORED</text>
+  <text class="val" x="1238" y="200">2 480 320</text>
+  <text class="tt" x="1532" y="200" text-anchor="end">items</text>
+  <path d="M1400.0 167.7 L1403.3 167.5 L1406.7 167.4 L1410.0 167.0 L1413.3 167.1 L1416.7 166.3 L1420.0 167.6 L1423.3 166.1 L1426.7 164.4 L1430.0 164.4 L1433.3 163.2 L1436.7 164.2 L1440.0 163.1 L1443.3 163.2 L1446.7 162.4 L1450.0 162.2 L1453.3 163.4 L1456.7 163.1 L1460.0 163.2 L1463.3 162.1 L1466.7 162.7 L1470.0 164.2 L1473.3 163.1 L1476.7 164.5 L1480.0 163.6 L1483.3 164.6 L1486.7 164.9 L1490.0 163.1 L1493.3 164.4 L1496.7 164.4 L1500.0 162.9 L1503.3 163.3 L1506.7 164.8 L1510.0 163.8 L1513.3 165.1 L1516.7 165.3 L1520.0 166.8 L1523.3 165.9 L1526.7 166.9 L1530.0 166.8" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="panel" x="200" y="240" width="660" height="320"/>
+  <polygon class="accent" points="216,254 212,270 219,270 223,254"/>
+  <polygon class="accent" points="228,254 224,270 231,270 235,254"/>
+  <text class="cap" x="246" y="268">EXTRACTION</text>
+  <text class="tt" x="844" y="267" text-anchor="end">ore.*.extraction  ▾</text>
+  <line class="grid" x1="276" y1="296.0" x2="836" y2="296.0"/>
+  <text class="tt" x="266" y="301.0" text-anchor="end">120</text>
+  <line class="grid" x1="276" y1="366.0" x2="836" y2="366.0"/>
+  <text class="tt" x="266" y="371.0" text-anchor="end">80</text>
+  <line class="grid" x1="276" y1="436.0" x2="836" y2="436.0"/>
+  <text class="tt" x="266" y="441.0" text-anchor="end">40</text>
+  <line class="grid" x1="276" y1="506.0" x2="836" y2="506.0"/>
+  <text class="tt" x="266" y="511.0" text-anchor="end">0</text>
+  <path d="M276.0 332.2 L285.5 328.5 L295.0 329.3 L304.5 332.6 L314.0 332.1 L323.5 333.2 L332.9 333.0 L342.4 333.1 L351.9 337.4 L361.4 338.3 L370.9 334.4 L380.4 336.7 L389.9 335.1 L399.4 339.1 L408.9 336.8 L418.4 335.5 L427.9 338.3 L437.4 335.0 L446.8 335.9 L456.3 341.4 L465.8 342.5 L475.3 341.0 L484.8 340.2 L494.3 344.3 L503.8 346.4 L513.3 346.2 L522.8 348.9 L532.3 348.2 L541.8 347.0 L551.3 346.2 L560.7 346.7 L570.2 345.6 L579.7 344.2 L589.2 341.4 L598.7 340.7 L608.2 340.5 L617.7 334.8 L627.2 335.1 L636.7 333.7 L646.2 335.5 L655.7 330.9 L665.2 331.5 L674.6 335.4 L684.1 334.5 L693.6 332.8 L703.1 333.1 L712.6 332.0 L722.1 334.8 L731.6 332.5 L741.1 333.1 L750.6 334.7 L760.1 332.8 L769.6 330.9 L779.1 330.8 L788.5 332.4 L798.0 332.1 L807.5 335.4 L817.0 335.0 L826.5 333.0 L836.0 336.3 L836 506 L276 506 Z" fill="#2FB8DE" opacity="0.18"/>
+  <path d="M276.0 332.2 L285.5 328.5 L295.0 329.3 L304.5 332.6 L314.0 332.1 L323.5 333.2 L332.9 333.0 L342.4 333.1 L351.9 337.4 L361.4 338.3 L370.9 334.4 L380.4 336.7 L389.9 335.1 L399.4 339.1 L408.9 336.8 L418.4 335.5 L427.9 338.3 L437.4 335.0 L446.8 335.9 L456.3 341.4 L465.8 342.5 L475.3 341.0 L484.8 340.2 L494.3 344.3 L503.8 346.4 L513.3 346.2 L522.8 348.9 L532.3 348.2 L541.8 347.0 L551.3 346.2 L560.7 346.7 L570.2 345.6 L579.7 344.2 L589.2 341.4 L598.7 340.7 L608.2 340.5 L617.7 334.8 L627.2 335.1 L636.7 333.7 L646.2 335.5 L655.7 330.9 L665.2 331.5 L674.6 335.4 L684.1 334.5 L693.6 332.8 L703.1 333.1 L712.6 332.0 L722.1 334.8 L731.6 332.5 L741.1 333.1 L750.6 334.7 L760.1 332.8 L769.6 330.9 L779.1 330.8 L788.5 332.4 L798.0 332.1 L807.5 335.4 L817.0 335.0 L826.5 333.0 L836.0 336.3" fill="none" stroke="#2FB8DE" stroke-width="2.2"/>
+  <path d="M276.0 399.9 L285.5 400.9 L295.0 400.5 L304.5 402.0 L314.0 402.9 L323.5 402.4 L332.9 401.0 L342.4 401.8 L351.9 402.0 L361.4 403.7 L370.9 402.2 L380.4 402.5 L389.9 402.0 L399.4 401.3 L408.9 399.8 L418.4 396.1 L427.9 395.4 L437.4 394.4 L446.8 393.6 L456.3 395.1 L465.8 394.2 L475.3 392.9 L484.8 392.5 L494.3 392.2 L503.8 392.4 L513.3 395.5 L522.8 394.1 L532.3 394.2 L541.8 395.0 L551.3 396.3 L560.7 395.4 L570.2 396.7 L579.7 393.7 L589.2 393.8 L598.7 394.9 L608.2 395.7 L617.7 393.7 L627.2 395.1 L636.7 394.5 L646.2 395.2 L655.7 397.1 L665.2 398.3 L674.6 398.7 L684.1 400.3 L693.6 402.2 L703.1 402.6 L712.6 401.5 L722.1 404.7 L731.6 405.0 L741.1 403.0 L750.6 403.9 L760.1 402.5 L769.6 402.0 L779.1 401.6 L788.5 398.4 L798.0 400.3 L807.5 398.7 L817.0 398.6 L826.5 396.4 L836.0 397.2 L836 506 L276 506 Z" fill="#F5871F" opacity="0.18"/>
+  <path d="M276.0 399.9 L285.5 400.9 L295.0 400.5 L304.5 402.0 L314.0 402.9 L323.5 402.4 L332.9 401.0 L342.4 401.8 L351.9 402.0 L361.4 403.7 L370.9 402.2 L380.4 402.5 L389.9 402.0 L399.4 401.3 L408.9 399.8 L418.4 396.1 L427.9 395.4 L437.4 394.4 L446.8 393.6 L456.3 395.1 L465.8 394.2 L475.3 392.9 L484.8 392.5 L494.3 392.2 L503.8 392.4 L513.3 395.5 L522.8 394.1 L532.3 394.2 L541.8 395.0 L551.3 396.3 L560.7 395.4 L570.2 396.7 L579.7 393.7 L589.2 393.8 L598.7 394.9 L608.2 395.7 L617.7 393.7 L627.2 395.1 L636.7 394.5 L646.2 395.2 L655.7 397.1 L665.2 398.3 L674.6 398.7 L684.1 400.3 L693.6 402.2 L703.1 402.6 L712.6 401.5 L722.1 404.7 L731.6 405.0 L741.1 403.0 L750.6 403.9 L760.1 402.5 L769.6 402.0 L779.1 401.6 L788.5 398.4 L798.0 400.3 L807.5 398.7 L817.0 398.6 L826.5 396.4 L836.0 397.2" fill="none" stroke="#F5871F" stroke-width="2.2"/>
+  <path d="M276.0 405.3 L285.5 404.4 L295.0 404.4 L304.5 404.2 L314.0 404.0 L323.5 401.6 L332.9 401.6 L342.4 400.4 L351.9 401.3 L361.4 400.2 L370.9 401.6 L380.4 400.5 L389.9 401.0 L399.4 402.2 L408.9 402.2 L418.4 402.2 L427.9 403.7 L437.4 403.0 L446.8 402.5 L456.3 403.9 L465.8 402.5 L475.3 402.8 L484.8 402.4 L494.3 403.8 L503.8 404.6 L513.3 402.9 L522.8 403.3 L532.3 404.7 L541.8 406.2 L551.3 406.6 L560.7 406.1 L570.2 407.7 L579.7 406.6 L589.2 408.1 L598.7 409.5 L608.2 408.5 L617.7 409.3 L627.2 407.6 L636.7 407.3 L646.2 407.8 L655.7 406.8 L665.2 405.9 L674.6 404.9 L684.1 403.7 L693.6 405.5 L703.1 404.0 L712.6 402.9 L722.1 403.4 L731.6 402.4 L741.1 403.7 L750.6 401.6 L760.1 402.6 L769.6 403.7 L779.1 402.4 L788.5 403.3 L798.0 403.6 L807.5 402.7 L817.0 403.4 L826.5 403.0 L836.0 401.0 L836 506 L276 506 Z" fill="#9CC4DB" opacity="0.18"/>
+  <path d="M276.0 405.3 L285.5 404.4 L295.0 404.4 L304.5 404.2 L314.0 404.0 L323.5 401.6 L332.9 401.6 L342.4 400.4 L351.9 401.3 L361.4 400.2 L370.9 401.6 L380.4 400.5 L389.9 401.0 L399.4 402.2 L408.9 402.2 L418.4 402.2 L427.9 403.7 L437.4 403.0 L446.8 402.5 L456.3 403.9 L465.8 402.5 L475.3 402.8 L484.8 402.4 L494.3 403.8 L503.8 404.6 L513.3 402.9 L522.8 403.3 L532.3 404.7 L541.8 406.2 L551.3 406.6 L560.7 406.1 L570.2 407.7 L579.7 406.6 L589.2 408.1 L598.7 409.5 L608.2 408.5 L617.7 409.3 L627.2 407.6 L636.7 407.3 L646.2 407.8 L655.7 406.8 L665.2 405.9 L674.6 404.9 L684.1 403.7 L693.6 405.5 L703.1 404.0 L712.6 402.9 L722.1 403.4 L731.6 402.4 L741.1 403.7 L750.6 401.6 L760.1 402.6 L769.6 403.7 L779.1 402.4 L788.5 403.3 L798.0 403.6 L807.5 402.7 L817.0 403.4 L826.5 403.0 L836.0 401.0" fill="none" stroke="#9CC4DB" stroke-width="2.2"/>
+  <path d="M276.0 453.4 L285.5 453.6 L295.0 454.0 L304.5 452.8 L314.0 454.3 L323.5 453.5 L332.9 452.9 L342.4 454.5 L351.9 453.9 L361.4 454.1 L370.9 455.5 L380.4 455.3 L389.9 455.1 L399.4 455.8 L408.9 455.6 L418.4 456.8 L427.9 456.8 L437.4 457.0 L446.8 456.1 L456.3 455.1 L465.8 455.3 L475.3 454.5 L484.8 454.6 L494.3 453.4 L503.8 454.0 L513.3 453.2 L522.8 452.1 L532.3 451.6 L541.8 451.9 L551.3 452.4 L560.7 452.0 L570.2 452.2 L579.7 452.2 L589.2 451.4 L598.7 452.6 L608.2 451.5 L617.7 451.6 L627.2 453.1 L636.7 452.5 L646.2 452.3 L655.7 453.0 L665.2 452.2 L674.6 451.3 L684.1 452.7 L693.6 451.9 L703.1 452.8 L712.6 452.2 L722.1 452.0 L731.6 453.6 L741.1 454.4 L750.6 454.8 L760.1 454.5 L769.6 455.9 L779.1 456.3 L788.5 455.9 L798.0 455.5 L807.5 456.5 L817.0 456.6 L826.5 456.1 L836.0 456.8 L836 506 L276 506 Z" fill="#46C46B" opacity="0.18"/>
+  <path d="M276.0 453.4 L285.5 453.6 L295.0 454.0 L304.5 452.8 L314.0 454.3 L323.5 453.5 L332.9 452.9 L342.4 454.5 L351.9 453.9 L361.4 454.1 L370.9 455.5 L380.4 455.3 L389.9 455.1 L399.4 455.8 L408.9 455.6 L418.4 456.8 L427.9 456.8 L437.4 457.0 L446.8 456.1 L456.3 455.1 L465.8 455.3 L475.3 454.5 L484.8 454.6 L494.3 453.4 L503.8 454.0 L513.3 453.2 L522.8 452.1 L532.3 451.6 L541.8 451.9 L551.3 452.4 L560.7 452.0 L570.2 452.2 L579.7 452.2 L589.2 451.4 L598.7 452.6 L608.2 451.5 L617.7 451.6 L627.2 453.1 L636.7 452.5 L646.2 452.3 L655.7 453.0 L665.2 452.2 L674.6 451.3 L684.1 452.7 L693.6 451.9 L703.1 452.8 L712.6 452.2 L722.1 452.0 L731.6 453.6 L741.1 454.4 L750.6 454.8 L760.1 454.5 L769.6 455.9 L779.1 456.3 L788.5 455.9 L798.0 455.5 L807.5 456.5 L817.0 456.6 L826.5 456.1 L836.0 456.8" fill="none" stroke="#46C46B" stroke-width="2.2"/>
+  <text class="tt" x="276.0" y="526">-15 min</text>
+  <text class="tt" x="462.66666666666663" y="526" text-anchor="middle">-10</text>
+  <text class="tt" x="649.3333333333333" y="526" text-anchor="middle">-5</text>
+  <text class="tt" x="836.0" y="526" text-anchor="middle">now</text>
+  <text class="tt" x="216" y="546">items/min · iron, copper, limestone, quartz</text>
+  <rect class="panel" x="880" y="240" width="660" height="320"/>
+  <polygon class="accent" points="896,254 892,270 899,270 903,254"/>
+  <polygon class="accent" points="908,254 904,270 911,270 915,254"/>
+  <text class="cap" x="926" y="268">CONSUMPTION</text>
+  <text class="tt" x="1524" y="267" text-anchor="end">item.*.consumption  ▾</text>
+  <line class="grid" x1="956" y1="296.0" x2="1516" y2="296.0"/>
+  <text class="tt" x="946" y="301.0" text-anchor="end">1800</text>
+  <line class="grid" x1="956" y1="366.0" x2="1516" y2="366.0"/>
+  <text class="tt" x="946" y="371.0" text-anchor="end">1200</text>
+  <line class="grid" x1="956" y1="436.0" x2="1516" y2="436.0"/>
+  <text class="tt" x="946" y="441.0" text-anchor="end">600</text>
+  <line class="grid" x1="956" y1="506.0" x2="1516" y2="506.0"/>
+  <text class="tt" x="946" y="511.0" text-anchor="end">0</text>
+  <path d="M956.0 364.2 L965.5 364.9 L975.0 368.5 L984.5 368.7 L994.0 366.4 L1003.5 366.9 L1012.9 367.2 L1022.4 368.5 L1031.9 367.5 L1041.4 367.5 L1050.9 367.8 L1060.4 369.6 L1069.9 369.1 L1079.4 369.8 L1088.9 369.4 L1098.4 369.2 L1107.9 370.1 L1117.4 372.3 L1126.8 373.3 L1136.3 374.5 L1145.8 375.6 L1155.3 375.7 L1164.8 374.0 L1174.3 374.1 L1183.8 373.2 L1193.3 370.5 L1202.8 370.8 L1212.3 369.6 L1221.8 369.6 L1231.3 369.3 L1240.7 367.4 L1250.2 367.3 L1259.7 365.4 L1269.2 363.3 L1278.7 364.3 L1288.2 366.0 L1297.7 363.6 L1307.2 364.1 L1316.7 364.6 L1326.2 364.2 L1335.7 364.9 L1345.2 364.9 L1354.6 366.4 L1364.1 364.1 L1373.6 364.0 L1383.1 366.6 L1392.6 364.3 L1402.1 364.3 L1411.6 365.2 L1421.1 365.1 L1430.6 365.5 L1440.1 364.5 L1449.6 366.7 L1459.1 366.4 L1468.5 369.1 L1478.0 368.3 L1487.5 369.3 L1497.0 371.9 L1506.5 372.4 L1516.0 371.9 L1516 506 L956 506 Z" fill="#2FB8DE" opacity="0.18"/>
+  <path d="M956.0 364.2 L965.5 364.9 L975.0 368.5 L984.5 368.7 L994.0 366.4 L1003.5 366.9 L1012.9 367.2 L1022.4 368.5 L1031.9 367.5 L1041.4 367.5 L1050.9 367.8 L1060.4 369.6 L1069.9 369.1 L1079.4 369.8 L1088.9 369.4 L1098.4 369.2 L1107.9 370.1 L1117.4 372.3 L1126.8 373.3 L1136.3 374.5 L1145.8 375.6 L1155.3 375.7 L1164.8 374.0 L1174.3 374.1 L1183.8 373.2 L1193.3 370.5 L1202.8 370.8 L1212.3 369.6 L1221.8 369.6 L1231.3 369.3 L1240.7 367.4 L1250.2 367.3 L1259.7 365.4 L1269.2 363.3 L1278.7 364.3 L1288.2 366.0 L1297.7 363.6 L1307.2 364.1 L1316.7 364.6 L1326.2 364.2 L1335.7 364.9 L1345.2 364.9 L1354.6 366.4 L1364.1 364.1 L1373.6 364.0 L1383.1 366.6 L1392.6 364.3 L1402.1 364.3 L1411.6 365.2 L1421.1 365.1 L1430.6 365.5 L1440.1 364.5 L1449.6 366.7 L1459.1 366.4 L1468.5 369.1 L1478.0 368.3 L1487.5 369.3 L1497.0 371.9 L1506.5 372.4 L1516.0 371.9" fill="none" stroke="#2FB8DE" stroke-width="2.2"/>
+  <path d="M956.0 420.4 L965.5 420.2 L975.0 420.1 L984.5 419.6 L994.0 419.7 L1003.5 418.8 L1012.9 420.3 L1022.4 418.5 L1031.9 416.7 L1041.4 416.6 L1050.9 415.3 L1060.4 416.5 L1069.9 415.1 L1079.4 415.2 L1088.9 414.3 L1098.4 414.1 L1107.9 415.5 L1117.4 415.2 L1126.8 415.3 L1136.3 414.1 L1145.8 414.7 L1155.3 416.4 L1164.8 415.1 L1174.3 416.8 L1183.8 415.8 L1193.3 416.9 L1202.8 417.2 L1212.3 415.1 L1221.8 416.6 L1231.3 416.7 L1240.7 415.0 L1250.2 415.4 L1259.7 417.1 L1269.2 415.9 L1278.7 417.4 L1288.2 417.7 L1297.7 419.4 L1307.2 418.4 L1316.7 419.6 L1326.2 419.4 L1335.7 420.0 L1345.2 421.7 L1354.6 421.6 L1364.1 422.0 L1373.6 421.8 L1383.1 421.6 L1392.6 420.5 L1402.1 419.2 L1411.6 419.9 L1421.1 417.7 L1430.6 417.9 L1440.1 417.4 L1449.6 415.8 L1459.1 416.3 L1468.5 416.5 L1478.0 416.0 L1487.5 415.4 L1497.0 417.0 L1506.5 414.9 L1516.0 417.1 L1516 506 L956 506 Z" fill="#F5871F" opacity="0.18"/>
+  <path d="M956.0 420.4 L965.5 420.2 L975.0 420.1 L984.5 419.6 L994.0 419.7 L1003.5 418.8 L1012.9 420.3 L1022.4 418.5 L1031.9 416.7 L1041.4 416.6 L1050.9 415.3 L1060.4 416.5 L1069.9 415.1 L1079.4 415.2 L1088.9 414.3 L1098.4 414.1 L1107.9 415.5 L1117.4 415.2 L1126.8 415.3 L1136.3 414.1 L1145.8 414.7 L1155.3 416.4 L1164.8 415.1 L1174.3 416.8 L1183.8 415.8 L1193.3 416.9 L1202.8 417.2 L1212.3 415.1 L1221.8 416.6 L1231.3 416.7 L1240.7 415.0 L1250.2 415.4 L1259.7 417.1 L1269.2 415.9 L1278.7 417.4 L1288.2 417.7 L1297.7 419.4 L1307.2 418.4 L1316.7 419.6 L1326.2 419.4 L1335.7 420.0 L1345.2 421.7 L1354.6 421.6 L1364.1 422.0 L1373.6 421.8 L1383.1 421.6 L1392.6 420.5 L1402.1 419.2 L1411.6 419.9 L1421.1 417.7 L1430.6 417.9 L1440.1 417.4 L1449.6 415.8 L1459.1 416.3 L1468.5 416.5 L1478.0 416.0 L1487.5 415.4 L1497.0 417.0 L1506.5 414.9 L1516.0 417.1" fill="none" stroke="#F5871F" stroke-width="2.2"/>
+  <path d="M956.0 459.2 L965.5 458.2 L975.0 460.0 L984.5 459.2 L994.0 460.5 L1003.5 460.4 L1012.9 459.2 L1022.4 460.6 L1031.9 459.9 L1041.4 460.2 L1050.9 460.3 L1060.4 460.3 L1069.9 460.9 L1079.4 459.9 L1088.9 461.5 L1098.4 461.5 L1107.9 462.3 L1117.4 462.3 L1126.8 462.4 L1136.3 461.9 L1145.8 463.2 L1155.3 463.9 L1164.8 463.8 L1174.3 462.5 L1183.8 464.0 L1193.3 462.8 L1202.8 462.9 L1212.3 461.9 L1221.8 462.0 L1231.3 460.8 L1240.7 460.6 L1250.2 459.9 L1259.7 459.0 L1269.2 459.2 L1278.7 459.7 L1288.2 459.7 L1297.7 458.0 L1307.2 458.8 L1316.7 459.4 L1326.2 458.2 L1335.7 459.0 L1345.2 458.8 L1354.6 458.6 L1364.1 459.6 L1373.6 459.5 L1383.1 458.5 L1392.6 459.7 L1402.1 458.5 L1411.6 459.6 L1421.1 458.5 L1430.6 458.4 L1440.1 458.1 L1449.6 458.5 L1459.1 459.3 L1468.5 460.2 L1478.0 460.8 L1487.5 460.6 L1497.0 461.2 L1506.5 462.5 L1516.0 461.6 L1516 506 L956 506 Z" fill="#46C46B" opacity="0.18"/>
+  <path d="M956.0 459.2 L965.5 458.2 L975.0 460.0 L984.5 459.2 L994.0 460.5 L1003.5 460.4 L1012.9 459.2 L1022.4 460.6 L1031.9 459.9 L1041.4 460.2 L1050.9 460.3 L1060.4 460.3 L1069.9 460.9 L1079.4 459.9 L1088.9 461.5 L1098.4 461.5 L1107.9 462.3 L1117.4 462.3 L1126.8 462.4 L1136.3 461.9 L1145.8 463.2 L1155.3 463.9 L1164.8 463.8 L1174.3 462.5 L1183.8 464.0 L1193.3 462.8 L1202.8 462.9 L1212.3 461.9 L1221.8 462.0 L1231.3 460.8 L1240.7 460.6 L1250.2 459.9 L1259.7 459.0 L1269.2 459.2 L1278.7 459.7 L1288.2 459.7 L1297.7 458.0 L1307.2 458.8 L1316.7 459.4 L1326.2 458.2 L1335.7 459.0 L1345.2 458.8 L1354.6 458.6 L1364.1 459.6 L1373.6 459.5 L1383.1 458.5 L1392.6 459.7 L1402.1 458.5 L1411.6 459.6 L1421.1 458.5 L1430.6 458.4 L1440.1 458.1 L1449.6 458.5 L1459.1 459.3 L1468.5 460.2 L1478.0 460.8 L1487.5 460.6 L1497.0 461.2 L1506.5 462.5 L1516.0 461.6" fill="none" stroke="#46C46B" stroke-width="2.2"/>
+  <text class="tt" x="956.0" y="526">-15 min</text>
+  <text class="tt" x="1142.6666666666667" y="526" text-anchor="middle">-10</text>
+  <text class="tt" x="1329.3333333333333" y="526" text-anchor="middle">-5</text>
+  <text class="tt" x="1516.0" y="526" text-anchor="middle">now</text>
+  <text class="tt" x="896" y="546">items/min · parts, ingots, intermediates</text>
+  <rect class="panel" x="200" y="580" width="660" height="424"/>
+  <polygon class="accent" points="216,594 212,610 219,610 223,594"/>
+  <polygon class="accent" points="228,594 224,610 231,610 235,594"/>
+  <text class="cap" x="246" y="608">BALANCE</text>
+  <text class="tt" x="218" y="642">RESOURCE</text>
+  <text class="tt" x="450" y="642">PRODUCED</text>
+  <text class="tt" x="590" y="642">CONSUMED</text>
+  <text class="tt" x="720" y="642">BALANCE</text>
+  <text class="tt" x="800" y="642">TREND</text>
+  <rect class="sep" x="216" y="654" width="628" height="1"/>
+  <text class="t" x="218" y="690">Iron ore</text>
+  <text class="t" x="450" y="690">90</text>
+  <text class="t" x="590" y="690">76</text>
+  <text class="val2" x="720" y="690" style="fill:#46C46B">+14</text>
+  <path d="M796.0 679.2 L797.6 678.1 L799.2 678.3 L800.8 679.3 L802.3 679.2 L803.9 679.5 L805.5 679.5 L807.1 679.5 L808.7 680.8 L810.3 681.1 L811.9 679.9 L813.4 680.6 L815.0 680.1 L816.6 681.3 L818.2 680.6 L819.8 680.2 L821.4 681.1 L823.0 680.1 L824.6 680.3 L826.1 682.0 L827.7 682.4 L829.3 681.9 L830.9 681.7 L832.5 683.0 L834.1 683.6 L835.7 683.5 L837.2 684.4 L838.8 684.2 L840.4 683.8 L842.0 683.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="712" width="628" height="1"/>
+  <text class="t" x="218" y="746">Copper ore</text>
+  <text class="t" x="450" y="746">60</text>
+  <text class="t" x="590" y="746">58</text>
+  <text class="val2" x="720" y="746" style="fill:#46C46B">+2</text>
+  <path d="M796.0 735.1 L797.6 735.4 L799.2 737.1 L800.8 737.2 L802.3 736.1 L803.9 736.3 L805.5 736.5 L807.1 737.1 L808.7 736.6 L810.3 736.6 L811.9 736.8 L813.4 737.6 L815.0 737.4 L816.6 737.7 L818.2 737.5 L819.8 737.4 L821.4 737.8 L823.0 738.8 L824.6 739.3 L826.1 739.9 L827.7 740.4 L829.3 740.4 L830.9 739.6 L832.5 739.7 L834.1 739.3 L835.7 738.0 L837.2 738.2 L838.8 737.6 L840.4 737.6 L842.0 737.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="768" width="628" height="1"/>
+  <text class="t" x="218" y="802">Limestone</text>
+  <text class="t" x="450" y="802">60</text>
+  <text class="t" x="590" y="802">64</text>
+  <text class="val2" x="720" y="802" style="fill:#F5871F">-4</text>
+  <path d="M796.0 793.4 L797.6 792.9 L799.2 793.2 L800.8 792.9 L802.3 792.9 L803.9 794.0 L805.5 794.3 L807.1 793.2 L808.7 794.4 L810.3 794.8 L811.9 793.9 L813.4 795.1 L815.0 794.8 L816.6 795.5 L818.2 795.4 L819.8 796.1 L821.4 795.2 L823.0 794.6 L824.6 794.8 L826.1 794.0 L827.7 793.6 L829.3 794.1 L830.9 792.4 L832.5 792.2 L834.1 792.3 L835.7 792.4 L837.2 790.8 L838.8 791.3 L840.4 790.9 L842.0 790.6" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="824" width="628" height="1"/>
+  <text class="t" x="218" y="858">Raw quartz</text>
+  <text class="t" x="450" y="858">30</text>
+  <text class="t" x="590" y="858">22</text>
+  <text class="val2" x="720" y="858" style="fill:#46C46B">+8</text>
+  <path d="M796.0 850.1 L797.6 850.6 L799.2 850.4 L800.8 851.1 L802.3 851.5 L803.9 851.3 L805.5 850.6 L807.1 851.0 L808.7 851.1 L810.3 851.9 L811.9 851.2 L813.4 851.3 L815.0 851.1 L816.6 850.7 L818.2 850.0 L819.8 848.4 L821.4 848.0 L823.0 847.6 L824.6 847.2 L826.1 847.9 L827.7 847.5 L829.3 846.9 L830.9 846.7 L832.5 846.5 L834.1 846.6 L835.7 848.1 L837.2 847.4 L838.8 847.5 L840.4 847.8 L842.0 848.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="880" width="628" height="1"/>
+  <text class="t" x="218" y="914">Coal</text>
+  <text class="t" x="450" y="914">30</text>
+  <text class="t" x="590" y="914">30</text>
+  <text class="val2" x="720" y="914" style="fill:#8FA9BF">0</text>
+  <path d="M796.0 907.1 L797.6 907.0 L799.2 906.9 L800.8 906.6 L802.3 906.7 L803.9 906.0 L805.5 907.1 L807.1 905.8 L808.7 904.5 L810.3 904.5 L811.9 903.6 L813.4 904.4 L815.0 903.5 L816.6 903.5 L818.2 902.9 L819.8 902.8 L821.4 903.7 L823.0 903.5 L824.6 903.6 L826.1 902.7 L827.7 903.2 L829.3 904.3 L830.9 903.4 L832.5 904.6 L834.1 903.9 L835.7 904.7 L837.2 904.9 L838.8 903.5 L840.4 904.5 L842.0 904.5" fill="none" stroke="#2FB8DE" stroke-width="1.8"/>
+  <rect class="sep" x="216" y="936" width="628" height="1"/>
+  <text class="tt" x="218" y="958">Values in items/min. Balance is production minus consumption —</text>
+  <text class="tt" x="218" y="978">no shortage or surplus labels in v1.0</text>
+  <rect class="panel" x="880" y="580" width="660" height="424"/>
+  <polygon class="accent" points="896,594 892,610 899,610 903,594"/>
+  <polygon class="accent" points="908,594 904,610 911,610 915,594"/>
+  <text class="cap" x="926" y="608">STOCKS</text>
+  <text class="tt" x="898" y="642">ITEM</text>
+  <text class="tt" x="1140" y="642">STOCK</text>
+  <text class="tt" x="1280" y="642">CHANGE</text>
+  <text class="tt" x="1400" y="642">FILL</text>
+  <rect class="sep" x="896" y="654" width="628" height="1"/>
+  <text class="t" x="898" y="690">Iron ore</text>
+  <text class="t" x="1140" y="690">456 000</text>
+  <text class="t" x="1280" y="690" style="fill:#46C46B">+14/min</text>
+  <rect class="" x="1400" y="676" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="676" width="68.4" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="690" text-anchor="end">76%</text>
+  <rect class="sep" x="896" y="712" width="628" height="1"/>
+  <text class="t" x="898" y="746">Copper ore</text>
+  <text class="t" x="1140" y="746">312 000</text>
+  <text class="t" x="1280" y="746" style="fill:#46C46B">+2/min</text>
+  <rect class="" x="1400" y="732" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="732" width="55.8" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="746" text-anchor="end">62%</text>
+  <rect class="sep" x="896" y="768" width="628" height="1"/>
+  <text class="t" x="898" y="802">Limestone</text>
+  <text class="t" x="1140" y="802">198 000</text>
+  <text class="t" x="1280" y="802" style="fill:#F5871F">-4/min</text>
+  <rect class="" x="1400" y="788" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="788" width="39.6" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="802" text-anchor="end">44%</text>
+  <rect class="sep" x="896" y="824" width="628" height="1"/>
+  <text class="t" x="898" y="858">Iron ingot</text>
+  <text class="t" x="1140" y="858">1 980 000</text>
+  <text class="t" x="1280" y="858" style="fill:#46C46B">+30/min</text>
+  <rect class="" x="1400" y="844" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="844" width="89.1" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="858" text-anchor="end">99%</text>
+  <rect class="sep" x="896" y="880" width="628" height="1"/>
+  <text class="t" x="898" y="914">Wire</text>
+  <text class="t" x="1140" y="914">480 000</text>
+  <text class="t" x="1280" y="914" style="fill:#46C46B">+20/min</text>
+  <rect class="" x="1400" y="900" width="90" height="14" rx="2" fill="#122A40" stroke="#1E3D59"/>
+  <rect class="" x="1400" y="900" width="72.0" height="14" rx="2" fill="#2FB8DE"/>
+  <text class="t" x="1522" y="914" text-anchor="end">80%</text>
+  <rect class="sep" x="896" y="936" width="628" height="1"/>
+  <text class="tt" x="898" y="978">Storage fill comes from containers bound to a line</text>
+  <rect class="panel" x="1560" y="136" width="340" height="424"/>
+  <polygon class="accent" points="1576,150 1572,166 1579,166 1583,150"/>
+  <polygon class="accent" points="1588,150 1584,166 1591,166 1595,150"/>
+  <text class="cap" x="1606" y="164">SELECTED</text>
+  <text class="val" x="1578" y="198" font-size="19">Iron ore</text>
+  <text class="tm" x="1578" y="236">Category</text>
+  <text class="val2" x="1882" y="236" text-anchor="end">Ore</text>
+  <rect class="sep" x="1578" y="250" width="304" height="1"/>
+  <text class="tm" x="1578" y="274">Unit</text>
+  <text class="val2" x="1882" y="274" text-anchor="end">items</text>
+  <rect class="sep" x="1578" y="288" width="304" height="1"/>
+  <text class="tm" x="1578" y="312">Stock</text>
+  <text class="val2" x="1882" y="312" text-anchor="end">456 000</text>
+  <rect class="sep" x="1578" y="326" width="304" height="1"/>
+  <text class="tm" x="1578" y="350">Storage fill</text>
+  <text class="val2" x="1882" y="350" text-anchor="end">76%</text>
+  <rect class="sep" x="1578" y="364" width="304" height="1"/>
+  <text class="tm" x="1578" y="388">Extraction</text>
+  <text class="val2" x="1882" y="388" text-anchor="end">90 /min</text>
+  <rect class="sep" x="1578" y="402" width="304" height="1"/>
+  <text class="tm" x="1578" y="426">Consumption</text>
+  <text class="val2" x="1882" y="426" text-anchor="end">76 /min</text>
+  <rect class="sep" x="1578" y="440" width="304" height="1"/>
+  <text class="tm" x="1578" y="464">Balance</text>
+  <text class="val2" x="1882" y="464" text-anchor="end">+14 /min</text>
+  <rect class="sep" x="1578" y="478" width="304" height="1"/>
+  <text class="tm" x="1578" y="502">Cover</text>
+  <text class="val2" x="1882" y="502" text-anchor="end">~ 8 h 40 min</text>
+  <rect class="sep" x="1578" y="516" width="304" height="1"/>
+  <rect class="panel" x="1560" y="580" width="340" height="424"/>
+  <polygon class="accent" points="1576,594 1572,610 1579,610 1583,594"/>
+  <polygon class="accent" points="1588,594 1584,610 1591,610 1595,594"/>
+  <text class="cap" x="1606" y="608">STOCK TREND</text>
+  <text class="tt" x="1884" y="607" text-anchor="end">456 000</text>
+  <line class="grid" x1="1590" y1="650.0" x2="1870" y2="650.0"/>
+  <line class="grid" x1="1590" y1="726.6666666666666" x2="1870" y2="726.6666666666666"/>
+  <line class="grid" x1="1590" y1="803.3333333333334" x2="1870" y2="803.3333333333334"/>
+  <line class="grid" x1="1590" y1="880.0" x2="1870" y2="880.0"/>
+  <path d="M1590.0 742.4 L1594.7 742.7 L1599.5 740.6 L1604.2 744.8 L1609.0 744.3 L1613.7 742.9 L1618.5 745.0 L1623.2 740.5 L1628.0 737.3 L1632.7 733.4 L1637.5 736.4 L1642.2 732.0 L1646.9 731.3 L1651.7 723.2 L1656.4 722.4 L1661.2 726.5 L1665.9 718.0 L1670.7 717.9 L1675.4 720.7 L1680.2 721.6 L1684.9 726.2 L1689.7 728.3 L1694.4 725.1 L1699.2 729.8 L1703.9 729.3 L1708.6 729.3 L1713.4 731.3 L1718.1 727.7 L1722.9 727.8 L1727.6 724.3 L1732.4 726.9 L1737.1 726.0 L1741.9 727.6 L1746.6 727.0 L1751.4 729.9 L1756.1 732.9 L1760.8 728.9 L1765.6 731.1 L1770.3 734.6 L1775.1 738.0 L1779.8 743.4 L1784.6 745.9 L1789.3 746.8 L1794.1 749.4 L1798.8 743.9 L1803.6 746.5 L1808.3 741.8 L1813.1 744.1 L1817.8 737.5 L1822.5 736.3 L1827.3 740.9 L1832.0 737.0 L1836.8 729.2 L1841.5 731.0 L1846.3 725.5 L1851.0 729.3 L1855.8 731.3 L1860.5 726.4 L1865.3 725.2 L1870.0 729.4 L1870 880 L1590 880 Z" fill="#2FB8DE" opacity="0.18"/>
+  <path d="M1590.0 742.4 L1594.7 742.7 L1599.5 740.6 L1604.2 744.8 L1609.0 744.3 L1613.7 742.9 L1618.5 745.0 L1623.2 740.5 L1628.0 737.3 L1632.7 733.4 L1637.5 736.4 L1642.2 732.0 L1646.9 731.3 L1651.7 723.2 L1656.4 722.4 L1661.2 726.5 L1665.9 718.0 L1670.7 717.9 L1675.4 720.7 L1680.2 721.6 L1684.9 726.2 L1689.7 728.3 L1694.4 725.1 L1699.2 729.8 L1703.9 729.3 L1708.6 729.3 L1713.4 731.3 L1718.1 727.7 L1722.9 727.8 L1727.6 724.3 L1732.4 726.9 L1737.1 726.0 L1741.9 727.6 L1746.6 727.0 L1751.4 729.9 L1756.1 732.9 L1760.8 728.9 L1765.6 731.1 L1770.3 734.6 L1775.1 738.0 L1779.8 743.4 L1784.6 745.9 L1789.3 746.8 L1794.1 749.4 L1798.8 743.9 L1803.6 746.5 L1808.3 741.8 L1813.1 744.1 L1817.8 737.5 L1822.5 736.3 L1827.3 740.9 L1832.0 737.0 L1836.8 729.2 L1841.5 731.0 L1846.3 725.5 L1851.0 729.3 L1855.8 731.3 L1860.5 726.4 L1865.3 725.2 L1870.0 729.4" fill="none" stroke="#2FB8DE" stroke-width="2.4"/>
+  <text class="tt" x="1590" y="902">-15 min</text>
+  <text class="tt" x="1870" y="902" text-anchor="end">now</text>
+  <text class="tt" x="1578" y="940">Freshness per panel: this one is 48 s old,</text>
+  <text class="tt" x="1578" y="960">so its values are dimmed in the tiles above</text>
+</svg>
