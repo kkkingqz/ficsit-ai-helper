@@ -54,12 +54,25 @@ run_node() { # run_node <рабочий каталог> <команда…>
   (cd "$dir" && exec ${prefix} "$@")
 }
 
-start_bg() { # start_bg <имя> <рабочий каталог> <команда…>
-  local name="$1" dir="$2"; shift 2
+# Записанный pid — не признак работы: $! даёт голову цепочки обёрток (nix, npm),
+# а node живёт внучатым процессом и умирает отдельно. 10.11.2026 адаптер лежал
+# полтора часа, пока status показывал «работает» по живому pid обёртки. Признак
+# работы — слушатель на порту, он же и есть работа службы.
+wait_for_port() { # wait_for_port <порт> <секунд>
+  local port="$1" deadline; deadline=$(( $(date +%s) + ${2:-40} ))
+  while [ "$(date +%s)" -lt "$deadline" ]; do
+    [ -n "$(listeners_on "$port")" ] && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
+start_bg() { # start_bg <имя> <порт> <рабочий каталог> <команда…>
+  local name="$1" port="$2" dir="$3"; shift 3
   local prefix; prefix="$(node_prefix)"
   mkdir -p "$RUN_DIR" "$LOG_DIR"
-  if [ -f "$RUN_DIR/$name.pid" ] && kill -0 "$(cat "$RUN_DIR/$name.pid")" 2>/dev/null; then
-    echo "$name уже запущен (pid $(cat "$RUN_DIR/$name.pid"))"
+  if [ -n "$(listeners_on "$port")" ]; then
+    echo "$name уже слушает порт $port (pid $(listeners_on "$port" | tr "\n" " "))"
     return 0
   fi
   # shellcheck disable=SC2086
@@ -71,7 +84,12 @@ start_bg() { # start_bg <имя> <рабочий каталог> <команда
   # обёрток, и node живёт внучатым процессом. Убийство одного pid его не трогает,
   # а порт остаётся занятым — на этом уже попались (P-3, 10.11.2026).
   ps -o pgid= -p "$pid" 2>/dev/null | tr -d " " >"$RUN_DIR/$name.pgid" || true
-  echo "$name запущен (pid $pid, группа $(cat "$RUN_DIR/$name.pgid" 2>/dev/null)), лог $LOG_DIR/$name.log"
+  if ! wait_for_port "$port" 40; then
+    echo "$name не поднялся за 40 с: порт $port никто не слушает. Последние строки $LOG_DIR/$name.log:" >&2
+    tail -5 "$LOG_DIR/$name.log" >&2 || true
+    return 1
+  fi
+  echo "$name запущен (pid $pid, группа $(cat "$RUN_DIR/$name.pgid" 2>/dev/null)), слушает $port, лог $LOG_DIR/$name.log"
 }
 
 ensure_token() {
@@ -195,17 +213,17 @@ cmd_start() {
       exit 1
     fi
   done
-  start_bg sf-mcp "$FOREMAN_SRC" npm run start:mcp
-  start_bg ff-server "$FOREMAN_SRC" npm run start:server
+  start_bg sf-mcp "$SF_MCP_PORT" "$FOREMAN_SRC" npm run start:mcp
+  start_bg ff-server "$FF_SERVER_PORT" "$FOREMAN_SRC" npm run start:server
   # Адаптер поднимается собранным, а не под tsx watch: наблюдатель переподнимает
   # процесс на каждую правку файла, и при нескольких поколениях они дрались за
   # порт 8730 — выжившее поколение отвечало со старой конфигурацией (10.11.2026).
   # Режим разработки включается осознанно: ADAPTER_MODE=dev.
   if [ "${ADAPTER_MODE:-build}" = "dev" ]; then
-    start_bg adapter "$ADAPTER_SRC" npm run dev
+    start_bg adapter "$ADAPTER_PORT" "$ADAPTER_SRC" npm run dev
   else
     run_node "$ADAPTER_SRC" npm run build > /dev/null
-    start_bg adapter "$ADAPTER_SRC" npm run start
+    start_bg adapter "$ADAPTER_PORT" "$ADAPTER_SRC" npm run start
   fi
   echo
   cmd_urls
@@ -245,18 +263,43 @@ listeners_on() { # listeners_on <порт> → pid процессов, слуш�
   ss -ltnpH "sport = :$1" 2>/dev/null | grep -o "pid=[0-9]*" | cut -d= -f2 | sort -u || true
 }
 
+status_of() { # status_of <имя> <порт> → 0, если служба слушает
+  local name="$1" port="$2" pid_file="$RUN_DIR/$1.pid" listening recorded=""
+  listening="$(listeners_on "$port" | tr "\n" " ")"
+  [ -f "$pid_file" ] && recorded="$(cat "$pid_file")"
+  if [ -n "$listening" ]; then
+    printf '%-10s работает (порт %s, pid %s)\n' "$name" "$port" "${listening% }"
+    return 0
+  fi
+  if [ -n "$recorded" ] && kill -0 "$recorded" 2>/dev/null; then
+    printf '%-10s НЕ РАБОТАЕТ: pid %s жив, но порт %s никто не слушает — смотри %s\n' \
+      "$name" "$recorded" "$port" "$LOG_DIR/$name.log"
+    return 1
+  fi
+  printf '%-10s не запущен\n' "$name"
+  return 1
+}
+
 cmd_status() {
-  for name in sf-mcp ff-server adapter; do
-    local pid_file="$RUN_DIR/$name.pid" state="не запущен"
-    if [ -f "$pid_file" ] && kill -0 "$(cat "$pid_file")" 2>/dev/null; then
-      state="работает (pid $(cat "$pid_file"))"
+  local bad=0
+  status_of sf-mcp "$SF_MCP_PORT" || bad=1
+  status_of ff-server "$FF_SERVER_PORT" || bad=1
+  status_of adapter "$ADAPTER_PORT" || bad=1
+  if [ "${FICSITAI_NORMALIZER:-on}" != "off" ]; then
+    if [ -n "$(listeners_on "$NORMALIZER_PORT")" ]; then
+      printf '%-10s работает (порт %s, в процессе адаптера)\n' "нормализатор" "$NORMALIZER_PORT"
+    else
+      printf '%-10s не слушает порт %s\n' "нормализатор" "$NORMALIZER_PORT"
+      bad=1
     fi
-    printf '%-10s %s\n' "$name" "$state"
-  done
+  fi
   echo
   echo "слушатели (должны быть только 127.0.0.1):"
   ss -ltnp 2>/dev/null | awk -v p1="$SF_MCP_PORT" -v p2="$FF_SERVER_PORT" -v p3="$ADAPTER_PORT" -v p4="$NORMALIZER_PORT" \
     'NR==1 || $4 ~ ":"p1"$" || $4 ~ ":"p2"$" || $4 ~ ":"p3"$" || $4 ~ ":"p4"$"'
+  # Ненулевой код, когда что-то лежит: иначе проверка в чек-листе Gf2 зелёная
+  # при мёртвой службе.
+  return "$bad"
 }
 
 cmd_urls() {
