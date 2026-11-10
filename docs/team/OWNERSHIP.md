@@ -48,8 +48,9 @@ lang: ru-RU
 
 | Путь | Кто | Что разделить |
 |---|---|---|
-| `mod/FicsitAI/Source/FicsitAICore/GameFacade/` | Gf и Gs | Gf — терминал, хост, сборщики по его списку; Gs — каталог, индекс построек, каркас телеметрии |
+| `mod/FicsitAI/Source/FicsitAICore/GameFacade/` | Gf и Gs | **Разделено 10.11.2026 по Gs-6:** `Catalog/`, `BuildingIndex/`, `Telemetry/Sampling/`, `Telemetry/PowerNetworks/` — Gs; подкаталог терминала и сборщики генераторов, батарей, предохранителей и загрузки машин — Gf. Регистрация провайдера и зависимости сборки `FicsitAICore` — Co: это проводка authority-слоя |
 | `mod/FicsitAI/Source/FicsitAIUI/` | Gf и верстальщик экранов | Gf — каркас хоста; экраны — Gs2 с Co2 (веб) или Gs (UMG), по итогам ворот W |
+| `web/README.md` | Co2 | внесён 10.11.2026: в таблице его не было |
 | `web/screens/` | Co2 | логика страниц и фасад API |
 | `web/ui-kit/` | Gs2 | дизайн-система и компоненты |
 | `web/spikes/` | тот, кто ведёт спайк | `spikes/s8/` — Gs2 и Co. Разрешено до ворот W как исключение для спайка: запрет наполнять `web/` касается продуктового кода экранов (решение 10.11.2026 по Gs2-1) |

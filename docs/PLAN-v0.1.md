@@ -191,7 +191,7 @@ lang: ru-RU
 | ID | Задача | Кто | Ч·д |
 |---|---|---|---|
 | V-1 | Каркас терминала на UMG: боковое меню, полосы статуса и клавиш, состояния «нет питания» и «инертен» — по UX D-1 | Gf | 3 |
-| V-2 | Публичный API v0 по замороженному контракту [docs/interfaces/public-api-v0.md](interfaces/public-api-v0.md): запросы метрик и рядов, события `metrics.snapshot` и `mod.inert`, `apiVersion` 0.1.0 (Co); источники Live и Fixture в игре (Gf); фасад для страниц (Co2) | Co, Gf, Co2 | 3 + 2,5 + 1 |
+| V-2 | Публичный API v0 по замороженному контракту [docs/interfaces/public-api-v0.md](interfaces/public-api-v0.md): запросы метрик и рядов, события `metrics.snapshot`, `mod.inert` и `api.status`, `apiVersion` 0.2.0 (Co); источники Live и Fixture в игре (Gf); фасад для страниц (Co2) | Co, Gf, Co2 | 3 + 2,5 + 1 |
 | V-3 | Схемы `list_metrics` и `query_metric` с примерами (Co2); `OperationRegistry` и `Validator` v0 (Co); генерация описаний инструментов в адаптере (Co2); тест паритета и примеры в CI (Gf2) | Co, Co2, Gf2 | 3 + 1,5 + 1,5 |
 | V-4 | Телеметрия v0.1: каркас и состав по G1 (Gs); сборщики ресурсов по предметам, буфер сессии, окна 5/15/60, метки свежести (Gf) | Gs, Gf | 2 + 4 |
 | V-5 | «Статистика»: вёрстка по D-2 (Gs2), данные и выбор метрики и окна — ручной путь для V-04 (Co2) | Gs2, Co2 | 3 + 2 |
