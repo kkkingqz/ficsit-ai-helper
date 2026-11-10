@@ -40,8 +40,9 @@
 Общие пункты задачи:
 
 - [x] Стартовый проект SML 3.12, Alpakit (развёрнут в `~/Projects/SatisfactoryModLoader`, wwise-cli v0.2.4 установлен)
+- [x] Пустой тестовый мод и C++ модули SML собираются Alpakit Win64 под wine (проверено: 594 actions C++ SML и BlankMod упакованы в .zip/.pak/.ucas)
 - [ ] Установка Satisfactory 1.2 под Proton для проверки сборок
-- [ ] Пустой мод собирается Alpakit Win64 под wine и виден в игре под Proton у каждого
+- [ ] Пустой мод виден в игре под Proton у каждого
 
 Готово, когда: У Co, Gs и Gf пустой мод загружается в игре под Proton
 
