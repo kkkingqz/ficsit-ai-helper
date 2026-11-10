@@ -70,12 +70,13 @@ lang: ru-RU
 Копии сделаны через `git worktree`, поэтому объекты общие: каждая стоит около 21 МБ при репозитории в 535 МБ. Если твоей копии нет, её создаёт один раз:
 
 ```bash
-git -C ~/Projects/ficsitai worktree add -b work/<роль> ~/Projects/ficsitai-<роль> origin/main
+/usr/bin/git -C ~/Projects/ficsitai worktree add -b work/<роль> ~/Projects/ficsitai-<роль> origin/main
 ```
 
 **Как работать:**
 
-1. Свежий `main`: `git fetch origin && git rebase origin/main` в своей копии.
+0. **`git` вызывай полным путём `/usr/bin/git`:** симлинк в `~/.local/bin/git` из рантайма Codex перехватывает PATH и роняет любую сетевую операцию (`fatal: remote helper 'https' aborted session`), хотя локальные команды у него работают. Подробности — `AGENTS.md`, раздел 10.
+1. Свежий `main`: `/usr/bin/git fetch origin && /usr/bin/git rebase origin/main` в своей копии.
 2. **Документы** можно отправлять прямо в `main`, пока это fast-forward: `git push origin HEAD:main`. Отказ означает, что кто-то успел раньше — тогда `git fetch origin && git rebase origin/main` и снова.
 3. **Код** идёт через задачную ветку и PR по правилам `CONTRIBUTING.md`: `git switch -c mod/s1-terminal origin/main` в своей же копии, затем PR и ревью.
 4. Одну ветку нельзя держать в двух копиях одновременно — и это хорошо: так ветка не уедет под чужими руками.

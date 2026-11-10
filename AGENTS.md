@@ -48,10 +48,10 @@ King — владелец продукта и единственный чело�
 Копии сделаны через `git worktree`, объекты общие — каждая около 21 МБ при репозитории в 535 МБ. Своей копии нет — создай один раз:
 
 ```bash
-git -C ~/Projects/ficsitai worktree add -b work/<роль> ~/Projects/ficsitai-<роль> origin/main
+/usr/bin/git -C ~/Projects/ficsitai worktree add -b work/<роль> ~/Projects/ficsitai-<роль> origin/main
 ```
 
-**Порядок работы.** Свежий `main` — `git fetch origin && git rebase origin/main` в своей копии. **Документы** уходят прямо в `main`, пока это fast-forward: `git push origin HEAD:main`; отказ значит, что кто-то успел раньше, тогда fetch, rebase и снова. **Код** идёт через задачную ветку и PR по [CONTRIBUTING.md](CONTRIBUTING.md): `git switch -c mod/s1-terminal origin/main` в своей же копии.
+**Порядок работы.** Свежий `main` — `/usr/bin/git fetch origin && /usr/bin/git rebase origin/main` в своей копии. **Документы** уходят прямо в `main`, пока это fast-forward: `/usr/bin/git push origin HEAD:main`; отказ значит, что кто-то успел раньше, тогда fetch, rebase и снова. **Код** идёт через задачную ветку и PR по [CONTRIBUTING.md](CONTRIBUTING.md): `git switch -c mod/s1-terminal origin/main` в своей же копии.
 
 **Коммит подписывается ролью:** строка `Роль: <Роль>` в сообщении. Все коммиты идут от одной git-идентичности, и без этой строки по истории не видно, кто работал.
 
@@ -125,7 +125,8 @@ git -C ~/Projects/ficsitai worktree add -b work/<роль> ~/Projects/ficsitai-<
 - **Целевая платформа игроков — Windows-клиент**, нативного Linux-клиента у игры нет. **Платформа разработки — Linux, игра под Proton** (ADR-033): мод под Win64 собирается MSVC под wine по официальному Linux Setup SML, движок берётся готовым архивом редактора, а не собирается из исходников.
 - **Windows-машины в команде нет.** Всё, что требует настоящей Windows (AC-12, V-08), выполняет пилотный тестер.
 - **CI срабатывает только на изменения в `docs/contracts/**`.** Зелёный CI не подтверждает правки документов — это не признак того, что проверка не прошла. Сам мод в CI этапа 1 не собирается.
-- Если твой инструмент работает в песочнице (у Claude Code на этой машине это Flatpak), `git` и `gh` могут быть недоступны напрямую: проверь хост, например `flatpak-spawn --host git --version`, прежде чем объявить их отсутствующими.
+- Если твой инструмент работает в песочнице (у Claude Code на этой машине это Flatpak), `git` и `gh` могут быть недоступны напрямую: проверь хост, например `flatpak-spawn --host /usr/bin/git --version`, прежде чем объявить их отсутствующими.
+- **`git` вызывай полным путём `/usr/bin/git`.** В `~/.local/bin/git` лежит симлинк на `git` из рантайма Codex (появился 10.11.2026), и он перехватывает PATH. Его бинарь сообщает `--exec-path` как `//libexec/git-core`, то есть не находит собственных хелперов, и любой `fetch` или `push` падает с `git: 'remote-https' is not a git command` и `fatal: remote helper 'https' aborted session`. Локальные операции (`add`, `commit`, `log`) у него работают — ломается только сеть, поэтому ошибка выглядит как проблема доступа к репозиторию, хотя дело в PATH. Второй рабочий вариант, если полный путь неудобен: `GIT_EXEC_PATH=/usr/lib/git-core git …` (проверено).
 
 ## 11. Коротко: чего не делать
 
