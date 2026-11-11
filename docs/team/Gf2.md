@@ -66,6 +66,8 @@ GitHub Actions для всего, что собирается без движк�
 - [x] Чек-лист проверок на чистой Windows для пилотного тестера ([`windows-pilot-checklist.md`](../../tests/test-plan/windows-pilot-checklist.md))
 - [x] Шаблоны отчётов о проверке для ворот W, G1, G2 ([`gate-report-templates.md`](../../tests/test-plan/gate-report-templates.md))
 
+**Статус задачи:** закрыта 11.11.2026 (все 5 пунктов выполнены, issue #32 закрыт в GitHub).
+
 ### [P-8 · Проверки в игре без ручного прогона](https://github.com/kkkingqz/ficsit-ai-helper/issues/39) · #39
 
 **Неделя:** 2–3 · **Оценка для Gf2:** 3 ч·д · **Вместе с:** Gf

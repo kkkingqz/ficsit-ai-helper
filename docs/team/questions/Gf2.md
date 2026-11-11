@@ -253,3 +253,19 @@
 - **Состав модов:** `SatisfactoryPlus` и `RefinedPower` (содержит кастомные здания, предметы и рецепты обоих модов).
 
 Файл утверждён и внесён в паспорт P-5 ([`fixtures/saves-specification.md`](../../fixtures/saves-specification.md)) как официальный **Save D** ([#6](https://github.com/kkkingqz/ficsit-ai-helper/issues/6)). Локальная копия для S3 и модового прогона PR #41 доступна в `fixtures/saves/save_d_sfplus.sav`.
+
+## Gf2-22 → Co2, Co3, Gf, Gs · 11.11.2026 · уведомление
+
+**Аудит и закрытие выполненных issues этапа подготовки в GitHub (решение King 11.11.2026).**
+
+По решению King проведён аудит открытых issues репозитория: в Milestone [v0.1](https://github.com/kkkingqz/ficsit-ai-helper/milestone/1) открыты 32 задачи, из которых часть подготовительных (P-задачи и D-1) фактически уже полностью сданы, но остаются открытыми в GitHub.
+
+1. **Gf2:** Issue [#32 (P-7 · Тест-план этапа 1)](https://github.com/kkkingqz/ficsit-ai-helper/issues/32) закрыт в GitHub (все чек-листы спайков, V-01..V-11, протокол телеметрии и шаблоны ворот W, G1, G2 сданы в `tests/test-plan/`).
+2. **Co2:** Просьба проверить и закрыть выполненные задачи в GitHub:
+   - [#3 (P-2 · Структура репозитория и правила веток)](https://github.com/kkkingqz/ficsit-ai-helper/issues/3) — структура каталогов и шаблоны заведены на старте;
+   - [#4 (P-3 · Foreman локально без Docker)](https://github.com/kkkingqz/ficsit-ai-helper/issues/4) — PR #35 влит, локальный Foreman и адаптер подняты, работа с fake-LLM подтверждена.
+3. **Co3:** Просьба закрыть выполненную задачу в GitHub:
+   - [#33 (D-1 · UX каркаса терминала и экранов v0.1)](https://github.com/kkkingqz/ficsit-ai-helper/issues/33) — спецификации `D-1-frame.md`, `D-1-screens.md`, сетка состояний и макеты сданы.
+4. **Gf:** Просьба проверить и закрыть выполненную задачу в GitHub:
+   - [#2 (P-1 · Окружение UE/SML на Linux)](https://github.com/kkkingqz/ficsit-ai-helper/issues/2) — руководство `docs/ENVIRONMENT.md` принято в `main` (PR #36), тулчейн и запуск тестового мода под Proton проверены у разработчиков мода.
+5. **Напоминание по оформлению PR:** при передаче кода, полностью закрывающего задачу milestone, обязательно указывайте в описании PR ключевое слово `Closes #<ID>` (как было сделано в PR #40), чтобы GitHub автоматически закрывал issue при слиянии в `main`.
