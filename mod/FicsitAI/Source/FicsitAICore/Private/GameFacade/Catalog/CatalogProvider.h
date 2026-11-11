@@ -36,16 +36,17 @@ struct FRecipeAmount
 
 struct FRecipe
 {
-    FName ClassName;
-    FString ClassPath;
+    FClassId Id;
     FText DisplayName;
     FName OwnerMod;
     bool bIsVanilla = false;
     bool bIsAlternate = false;
     bool bUnlocked = false;
     double DurationSeconds = 0.0;
+    // Nominal recipe defaults. Session cost settings and construction material variants are separate.
     TArray<FRecipeAmount> Ingredients;
     TArray<FRecipeAmount> Products;
+    // Includes producer classes such as the build gun and workbench, which need not be in Buildings.
     TArray<FClassId> ProducedIn;
 };
 
@@ -70,6 +71,8 @@ struct FBuilding
 
 struct FSnapshot
 {
+    // Session setting when the game state is available. The game applies it only to eligible recipes.
+    TOptional<float> PartsCostMultiplier;
     TArray<FRecipe> Recipes;
     TArray<FItem> Items;
     TArray<FBuilding> Buildings;

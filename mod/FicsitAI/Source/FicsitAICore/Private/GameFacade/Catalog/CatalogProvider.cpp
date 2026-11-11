@@ -2,6 +2,7 @@
 
 #include "Buildables/FGBuildableFactory.h"
 #include "Engine/World.h"
+#include "FGGameState.h"
 #include "FGRecipe.h"
 #include "FGRecipeManager.h"
 #include "FGSchematic.h"
@@ -162,6 +163,10 @@ bool TryReadCatalog(UWorld* World, FSnapshot& OutSnapshot)
     const TSet<UClass*> Alternates = ReadAlternateRecipes(*Registry);
     const TArray<FGameObjectRegistration> Registrations = Registry->GetRegisteredRecipes();
     FSnapshot Snapshot;
+    if (const AFGGameState* GameState = World->GetGameState<AFGGameState>())
+    {
+        Snapshot.PartsCostMultiplier = GameState->GetPartsCostMultiplier();
+    }
     Snapshot.Recipes.Reserve(Registrations.Num());
 
     for (const FGameObjectRegistration& Registration : Registrations)
@@ -172,17 +177,17 @@ bool TryReadCatalog(UWorld* World, FSnapshot& OutSnapshot)
             continue;
         }
 
+        const UFGRecipe& Defaults = *RecipeClass->GetDefaultObject<UFGRecipe>();
         FRecipe& Recipe = Snapshot.Recipes.AddDefaulted_GetRef();
-        Recipe.ClassName = RecipeClass->GetFName();
-        Recipe.ClassPath = RecipeClass->GetPathName();
+        Recipe.Id = ReadClassId(*RecipeClass);
         Recipe.DisplayName = UFGRecipe::GetRecipeName(RecipeClass);
         Recipe.OwnerMod = Registration.OwnedByModReference;
         Recipe.bIsVanilla = Registry->IsRecipeVanilla(RecipeClass);
         Recipe.bIsAlternate = Alternates.Contains(RecipeClass);
         Recipe.bUnlocked = RecipeManager->IsRecipeAvailable(RecipeClass);
-        Recipe.DurationSeconds = UFGRecipe::GetManufacturingDuration(RecipeClass);
-        Recipe.Ingredients = ReadAmounts(UFGRecipe::GetIngredients(World, RecipeClass), Recipe.DurationSeconds);
-        Recipe.Products = ReadAmounts(UFGRecipe::GetProducts(RecipeClass), Recipe.DurationSeconds);
+        Recipe.DurationSeconds = Defaults.GetManufacturingDuration();
+        Recipe.Ingredients = ReadAmounts(Defaults.GetIngredients(), Recipe.DurationSeconds);
+        Recipe.Products = ReadAmounts(Defaults.GetProducts(), Recipe.DurationSeconds);
 
         for (const TSubclassOf<UObject>& Producer : UFGRecipe::GetProducedIn(RecipeClass))
         {
