@@ -2,29 +2,30 @@
 
 **Сейчас:** S1 ([#9](https://github.com/kkkingqz/ficsit-ai-helper/issues/9)), терминал, хост и модули экрана. Ветка `mod/s1-terminal`, [PR #40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40). Документы веду из `work/gf`.
 
-**Последний результат:** устранены замечания третьего раунда ревью Gs ([Gs-15](../questions/Gs.md)) в коммите `8201bcc`:
-- **Виджеты модулей и экран 16:9 на меше (Gs-15.1, ADR-030, P-7 §1.1):**
-  - реализован `RebuildWidget()` для `UFicsitAITestNotesModule` (стилизованный баннер + `SMultiLineEditableTextBox`) и `UFicsitAITestStatusModule` (телеметрия состояния);
-  - в `UFicsitAIScreenSurfaceWidget` добавлен метод `RefreshModuleContent()`, безопасно наполняющий контейнер при первом открытии (`RebuildWidget`), смене модуля (`SetModule`), очистке (`ClearModule`) и смене состояния (`SetHostState`);
-  - на лицевой стороне терминала `AFicsitAITerminal` закреплён `ScreenMeshComponent` (`Plane.Plane`) с масштабированием под соотношение 16:9.
-- **Динамическое переназначение клавиш и изоляция ввода (Gs-15.2):**
-  - в `UFicsitAIScreenSurfaceWidget` добавлены `SetActionKeyBindings`, `SetActionKeyBinding` и `GetKeyForAction`;
-  - нижняя полоса подсказок `GetFormattedHotkeyHints` динамически выводит актуальные клавиши (`[Key] Описание`), поддерживая дефолтные (`[Esc]`, `[F]`, `[R]`) и переназначенные (`[N]`);
-  - `NativeOnKeyDown` сопоставляет ввод с актуальными маппингами действий вместо фиксированных клавиш;
-  - удалена глобальная регистрация IMC из тика подсистемы; контекст терминала выдаётся игроку строго при `OnUse` и забирается при `CloseActiveModule`.
-- **Сохранение активного экрана при отклонении несовместимого API (Gs-15.3, §5.5):**
-  - в `AFicsitAITerminal::OpenModule` и `UFicsitAITestScreenHost::OpenModule` проверка версии API выполняется до любого teardown;
-  - при попытке открыть несовместимый модуль экран и активный модуль остаются открытыми и нетронутыми;
-  - в тестовом хосте добавлен `GetLoadedModules()` для верификации экземпляров.
-- **Игровой автотест и персистентность через подсистему (Gs-15.4):**
-  - написан сквозной тест `FicsitAITerminalGameTest.cpp` (`FicsitAI.Core.TerminalGame`), проверяющий 10 МВт, меш 16:9, потерю питания (`NoPower`) и восстановление (`Ready`), сброс открытого экрана в `PreSaveGame`, загрузку сохранения и автоматическое восстановление состояния во втором терминале без ручного переноса;
+**Последний результат:** устранены замечания четвёртого раунда ревью Gs ([Gs-15](../questions/Gs.md)) в коммите `245b9e4`:
+- **Мгновенное перестроение маппингов и обработка динамических привязок (Gs-15.1):**
+  - в `AddMappingContext` и `RemoveMappingContext` передан `FModifyContextOptions` с `bForceImmediately = true` для синхронного перестроения `EnhancedActionMappings` до чтения `QueryKeysMappedToAction`;
+  - подписан динамический делегат `ControlMappingsRebuiltDelegate` на метод `HandleControlMappingsRebuilt()`, автоматически обновляющий привязки и подсказки открытого экрана при смене профиля на лету.
+- **JSON-сериализация заметок и полный round-trip (Gs-15.2):**
+  - `UFicsitAITestNotesModule` переведён на `FJsonObject`, `TJsonWriterFactory` и `FJsonSerializer` из модуля `Json`;
+  - поддержан строгий round-trip кавычек (`Pump "A" offline`), обратных слешей, переносов строк (`\n`) и очистка заметки при передаче пустой строки;
+  - `SMultiLineEditableTextBox` переведён на `.HintText(...)` вместо подстановки плейсхолдера в рабочий текст.
+- **Точные пропорции экрана 16:9 с учётом родительской иерархии (Gs-15.3, ADR-030, P-7 §1.1):**
+  - `ScreenMeshComponent` крепится к `RootComponent` актора (базовый `USceneComponent` с масштабом `1.0, 1.0, 1.0`), исключая искажения масштабом корпуса стойки (`0.5, 1.2, 1.8`);
+  - физические размеры экрана зафиксированы на 96 см в ширину и 54 см в высоту на лицевой панели (`Scale = 0.54, 0.96, 1.0`);
+  - `GetScreenAspectRatio()` вычисляет итоговый масштаб с учётом цепочки родителей (`0.96 / 0.54 = 1.7777778` — ровно 16:9).
+- **Физическая сериализация .sav на диск и сетевая репликация питания (Gs-15.4, §1.4 P-7):**
+  - автотест `FicsitAI.Core.TerminalGame` выполняет запись и чтение файла `.sav` на диске через UE Archive с `ArIsSaveGame = true`, подтверждая сериализацию `UPROPERTY(SaveGame)`;
+  - создаётся новая подсистема из файла `.sav` и подтверждается автоматическое восстановление сложного текста заметок во втором терминале без ручной передачи;
+  - подтверждена сетевая репликация потери питания (`NoPower`) и восстановления (`Ready`) на клиентском терминале через `OnRep_HostContext()`.
+- **Верификация:**
   - прогон в `UnrealEditor-Cmd`: оба теста (`TerminalGame` и `ScreenHost`) завершились успешно (`Result={Success}`, EXIT CODE: 0);
   - проверка архитектурных инвариантов: 5/5 OK (`check-invariants.sh`);
-  - сборка плагина для Win64 Shipping через UAT PackagePlugin успешна (`BUILD SUCCESSFUL`, ExitCode=0).
+  - упаковка плагина для Win64 Shipping через UAT PackagePlugin успешна (`BUILD SUCCESSFUL`, ExitCode=0).
 
 **Блокирует меня:** ничего.
 
-**Ждут меня:** вердикт Gs по раунду 3 ревью в [#40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40) на ревизии `8201bcc`.
+**Ждут меня:** вердикт Gs по раунду 4 ревью в [#40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40) на ревизии `245b9e4`.
 
 **Решения, на которых стою:** ADR-014, ADR-016, ADR-026, ADR-027, ADR-029, ADR-030, `ARCHITECTURE.md` §6, §17.1 (решения King 10.11.2026), правила ревью в PR (Co-40, Co-41).
 
