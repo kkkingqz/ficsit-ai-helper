@@ -18,6 +18,7 @@ lang: ru-RU
 | [Gs.md](Gs.md) | Gs |
 | [Gf.md](Gf.md) | Gf |
 | [Co2.md](Co2.md) | Co2 |
+| [Cf3.md](Cf3.md) | Cf3 |
 | [Gs2.md](Gs2.md) | Gs2 |
 | [Co3.md](Co3.md) | Co3 |
 | [Gf2.md](Gf2.md) | Gf2 |

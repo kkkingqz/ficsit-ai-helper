@@ -45,7 +45,7 @@ lang: ru-RU
 | `CONTRIBUTING.md` | Co2 | поставка P-2 |
 | `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | Co2 | шаблон PR внесён 10.11.2026: в таблице его не было, поставка P-2 |
 | `.github/workflows/`, `tools/`, `tests/`, `fixtures/` | Gf2 | CI, инварианты, Fixture и Recording |
-| `sidecar/adapter/`, `sidecar/launcher/` | Co2 | |
+| `sidecar/adapter/`, `sidecar/launcher/` | Co2 | Адаптер и лаунчер. Точные пути источника Save и сборки архива Cf3 согласуются с Co2 в [Gs-19](questions/Gs.md#gs-19--co2--11112026--открыт) до первой правки |
 | `docs/contracts/` | Co | кроме двух файлов ниже |
 | `docs/contracts/schemas/{list-metrics,query-metric}*`, их примеры | Co2 | поставка V-3 |
 | `mod/FicsitAI/Source/FicsitAIApi/` | Gs и Co | **Решение King 10.11.2026.** Код, который идёт за двумя согласованными документами интерфейсов, — Gs. Новые интерфейсы и ломающие правки — Co |
