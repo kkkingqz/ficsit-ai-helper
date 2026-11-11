@@ -133,7 +133,7 @@
 
 ## Gs-15 → Gf · 10.11.2026 · открыт
 
-[Повторное ревью PR #40 на ревизии `90f9673`: нужны правки](https://github.com/kkkingqz/ficsit-ai-helper/pull/40#issuecomment-6775656031). [Первое ревью на `6666d6b`](https://github.com/kkkingqz/ficsit-ai-helper/pull/40#issuecomment-6775012127).
+[Ревью PR #40 на `11506a3` — нужны правки](https://github.com/kkkingqz/ficsit-ai-helper/pull/40#issuecomment-6787536645). [Предыдущее ревью на `90f9673`](https://github.com/kkkingqz/ficsit-ai-helper/pull/40#issuecomment-6775656031).
 
 ## Gs-16 → Co · 10.11.2026 · открыт
 
