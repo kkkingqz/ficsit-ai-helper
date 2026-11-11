@@ -373,20 +373,25 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         return;
     }
 
-    // При открытии терминала активируем контекст Enhanced Input с bForceImmediately = true (Gs-15 раунды 3 и 4)
+    // При открытии терминала подтверждаем контекст Enhanced Input (SML Manual Registration, priority 200)
     TMap<FName, FKey> CurrentBindings;
-    if (ULocalPlayer* LP = PC->GetLocalPlayer())
+    const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
+    if (IMC)
     {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+        if (AFGPlayerController* FGPC = Cast<AFGPlayerController>(PC))
         {
-            const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
-            if (IMC)
+            (void)FGPC->BindMappingContext(const_cast<UFicsitAIInputMappingContext*>(IMC), 200, this);
+        }
+
+        if (ULocalPlayer* LP = PC->GetLocalPlayer())
+        {
+            if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
             {
                 FModifyContextOptions Options;
                 Options.bForceImmediately = true;
                 if (!Subsystem->HasMappingContext(IMC))
                 {
-                    Subsystem->AddMappingContext(IMC, 100, Options);
+                    Subsystem->AddMappingContext(IMC, 200, Options);
                 }
 
                 Subsystem->ControlMappingsRebuiltDelegate.AddUniqueDynamic(this, &AFicsitAITerminal::HandleControlMappingsRebuilt);
@@ -549,19 +554,12 @@ void AFicsitAITerminal::CloseActiveModule()
         {
             UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
 
-            // Удаляем Enhanced Input контекст терминала при закрытии (Gs-15 раунды 3 и 4)
+            // Отписываемся от делегата перестроения маппингов виджета
             if (ULocalPlayer* LP = PC->GetLocalPlayer())
             {
                 if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
                 {
                     Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
-                    const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
-                    if (IMC && Subsystem->HasMappingContext(IMC))
-                    {
-                        FModifyContextOptions Options;
-                        Options.bForceImmediately = true;
-                        Subsystem->RemoveMappingContext(IMC, Options);
-                    }
                 }
             }
         }

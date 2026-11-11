@@ -5,6 +5,9 @@
 #include "Serialization/MemoryReader.h"
 #include "GameFacade/Terminal/FicsitAITerminal.h"
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
+#include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
+#include "Surface/FicsitAIScreenSurfaceWidget.h"
+#include "PlayerMappableKeySettings.h"
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
 #include "Modules/FicsitAITestIncompatibleModule.h"
@@ -61,6 +64,38 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalClient->SetHostContextForClient(TerminalA->GetScreenContext());
     TerminalClient->OnRep_HostContext();
     TestEqual(TEXT("Клиент реплицирует Ready от сервера"), TerminalClient->GetScreenContext().HostState, EFicsitAIHostState::Ready);
+
+    // 2.2 Проверка Enhanced Input до открытия терминала (P-7 §1.3–1.4, Gs-15 раунд 5)
+    const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
+    TestNotNull(TEXT("IMC существует"), IMC);
+    if (IMC)
+    {
+        TestEqual(TEXT("Приоритет меню контекста равен 200 (SML стандарт)"), IMC->mMenuPriority, 200.0f);
+        TestNotNull(TEXT("ActionOpenTerminal задан"), IMC->ActionOpenTerminal.Get());
+        TestNotNull(TEXT("ActionNotes задан"), IMC->ActionNotes.Get());
+        TestNotNull(TEXT("ActionStatus задан"), IMC->ActionStatus.Get());
+        TestNotNull(TEXT("ActionBack задан"), IMC->ActionBack.Get());
+
+        TestNotNull(TEXT("ActionOpenTerminal имеет MappableKeySettings"), IMC->ActionOpenTerminal->GetPlayerMappableKeySettings().Get());
+        TestNotNull(TEXT("ActionNotes имеет MappableKeySettings"), IMC->ActionNotes->GetPlayerMappableKeySettings().Get());
+        TestNotNull(TEXT("ActionStatus имеет MappableKeySettings"), IMC->ActionStatus->GetPlayerMappableKeySettings().Get());
+        TestNotNull(TEXT("ActionBack имеет MappableKeySettings"), IMC->ActionBack->GetPlayerMappableKeySettings().Get());
+
+        TestEqual(TEXT("Имя привязки OpenTerminal корректно"), IMC->ActionOpenTerminal->GetPlayerMappableKeySettings()->Name, FName(TEXT("FicsitAI.OpenTerminal")));
+        TestEqual(TEXT("Имя привязки Notes корректно"), IMC->ActionNotes->GetPlayerMappableKeySettings()->Name, FName(TEXT("FicsitAI.Notes")));
+    }
+
+    // Проверка отображения переназначенной клавиши Notes и Open с первого открытия (Gs-15 раунд 5)
+    UFicsitAIScreenSurfaceWidget* TestWidget = NewObject<UFicsitAIScreenSurfaceWidget>();
+    TMap<FName, FKey> ReboundBindings;
+    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::T);
+    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_Notes")), EKeys::N);
+    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_Status")), EKeys::R);
+    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_Back")), EKeys::Escape);
+    TestWidget->SetActionKeyBindings(ReboundBindings);
+
+    TestEqual(TEXT("GetKeyForAction для Notes возвращает переназначенную N с первого открытия"), TestWidget->GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes"))), EKeys::N);
+    TestEqual(TEXT("GetKeyForAction для OpenTerminal возвращает переназначенную T с первого открытия"), TestWidget->GetKeyForAction(FName(TEXT("IA_FicsitAI_OpenTerminal"))), EKeys::T);
 
     // 3. Первое открытие терминала A и редактирование заметок (AC-14, Gs-15 раунд 4)
     TestTrue(TEXT("TerminalA открывает Notes"), TerminalA->OpenModule(FName(TEXT("Notes"))));

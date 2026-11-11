@@ -21,7 +21,23 @@ public:
     AFicsitAISubsystem();
 
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaSeconds) override;
+
+    /** Регистрация контекста Enhanced Input для игрока до открытия терминала */
+    void RegisterInputContextForPlayer(class APlayerController* PC);
+
+    /** Обработчик инициализации ввода игрока (AFGCharacterPlayer::OnPlayerInputInitialized) */
+    void HandlePlayerInputInitialized(class AFGCharacterPlayer* PlayerChar, class UInputComponent* InInputComponent);
+
+    /** Обработчик действия открытия/закрытия терминала IA_FicsitAI_OpenTerminal */
+    UFUNCTION()
+    void HandleActionOpenTerminal();
+
+    /** Запуск сценариев автоматической диагностики в игре (P-8, S1) */
+    void ExecuteDiagnosticsStep(float DeltaSeconds);
+    void RecordTestEvent(const FString& TestName, bool bPass, float DurationMs, const FString& Details);
+    void FlushDiagnosticsRecording();
 
     // IFGSaveInterface
     virtual void PreSaveGame_Implementation(int32 SaveVersion, int32 GameVersion) override;
@@ -85,4 +101,10 @@ protected:
 
     UPROPERTY()
     TArray<TWeakObjectPtr<class AFicsitAITerminal>> RegisteredTerminals;
+
+    bool bInputContextRegistered = false;
+    int32 DiagnosticsStep = 0;
+    float DiagnosticsTimer = 0.0f;
+    TArray<FString> DiagnosticsJsonEvents;
+    bool bDiagnosticsCompleted = false;
 };

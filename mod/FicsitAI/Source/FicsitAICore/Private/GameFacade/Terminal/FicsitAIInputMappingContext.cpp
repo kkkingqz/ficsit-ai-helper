@@ -5,7 +5,7 @@
 UFicsitAIInputMappingContext::UFicsitAIInputMappingContext()
 {
     mDisplayName = NSLOCTEXT("FicsitAI", "InputContextName", "FICSIT AI");
-    mMenuPriority = 100.0f;
+    mMenuPriority = 200.0f;
 
     // 1. Открытие терминала / Взаимодействие (E)
     ActionOpenTerminal = CreateDefaultSubobject<UFicsitAIInputAction>(TEXT("IA_FicsitAI_OpenTerminal"));
