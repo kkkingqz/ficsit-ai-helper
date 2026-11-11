@@ -44,21 +44,23 @@ fa_require_role() {
 # Очередь вместо отказа. -x — один владелец (сборка, замер, копия игры роли), -s — можно вместе с другими.
 # Если блокировку получить не удалось, команда не выполняется.
 fa_with_lock() {
-    local name="$1" mode="$2"; shift 2
-    local lock="$FA_LOCK_DIR/$name.lock" holder="$FA_LOCK_DIR/$name.holder" fd rc
+    # Имена локальных переменных с префиксом: команда — часто вложенная функция вызывающего, и она видит
+    # локальные переменные этой функции раньше своих (динамическая область видимости bash).
+    local _lk_name="$1" _lk_mode="$2"; shift 2
+    local _lk_file="$FA_LOCK_DIR/$_lk_name.lock" _lk_holder="$FA_LOCK_DIR/$_lk_name.holder" _lk_fd _lk_rc
     [[ -n "$FA_ROLE" ]] || fa_die "fa_with_lock вызван до fa_require_role"
     mkdir -p "$FA_LOCK_DIR" || fa_die "не создаётся каталог блокировок $FA_LOCK_DIR"
     chmod 1777 "$FA_LOCK_DIR" 2>/dev/null || true
-    exec {fd}>>"$lock" || fa_die "не открывается файл блокировки $lock"
-    if ! flock -n "$mode" "$fd"; then
-        fa_say "очередь '$name' занята: $(cat "$holder" 2>/dev/null || echo 'владелец неизвестен'). Жду."
-        flock "$mode" "$fd" || { exec {fd}>&-; fa_die "блокировку '$name' получить не удалось, команда не выполнена"; }
+    exec {_lk_fd}>>"$_lk_file" || fa_die "не открывается файл блокировки $_lk_file"
+    if ! flock -n "$_lk_mode" "$_lk_fd"; then
+        fa_say "очередь '$_lk_name' занята: $(cat "$_lk_holder" 2>/dev/null || echo 'владелец неизвестен'). Жду."
+        flock "$_lk_mode" "$_lk_fd" || { exec {_lk_fd}>&-; fa_die "блокировку '$_lk_name' получить не удалось, команда не выполнена"; }
     fi
-    [[ "$mode" == "-x" ]] && echo "$FA_ROLE с $(date '+%H:%M:%S'), pid $$: $*" | cut -c1-160 > "$holder"
-    "$@"; rc=$?
-    [[ "$mode" == "-x" ]] && rm -f "$holder"
-    flock -u "$fd"; exec {fd}>&-
-    return $rc
+    [[ "$_lk_mode" == "-x" ]] && echo "$FA_ROLE с $(date '+%H:%M:%S'), pid $$: $*" | cut -c1-160 > "$_lk_holder"
+    "$@"; _lk_rc=$?
+    [[ "$_lk_mode" == "-x" ]] && rm -f "$_lk_holder"
+    flock -u "$_lk_fd"; exec {_lk_fd}>&-
+    return $_lk_rc
 }
 
 # Проверки окружения сборки из docs/ENVIRONMENT.md §7.1.
@@ -66,7 +68,7 @@ fa_check_build_env() {
     command -v wine64 >/dev/null || command -v wine >/dev/null || fa_die "wine не найден в PATH (ENVIRONMENT.md §7.1)"
     export UE_WINE_MSVC="${UE_WINE_MSVC:-$HOME/msvc}"
     [[ -x "$UE_WINE_MSVC/bin/x64/cl" && -x "$UE_WINE_MSVC/bin/x64/rc.exe" ]] || fa_die "обёртки MSVC не найдены в $UE_WINE_MSVC"
-    [[ -x "$FA_ENGINE/Engine/Build/BatchFiles/RunUAT.sh" ]] || fa_die "движок не найден в $FA_ENGINE"
+    [[ -x "$FA_ENGINE/Engine/Build/BatchFiles/RunUAT.sh" && -x "$FA_ENGINE/Engine/Build/BatchFiles/Linux/Build.sh" ]] || fa_die "движок не найден в $FA_ENGINE"
     local max; max="$(ulimit -Hn)"
     if [[ "$max" == unlimited || "$max" -gt 1048576 ]]; then max=1048576; fi
     ulimit -Sn "$max"
@@ -96,7 +98,8 @@ fa_sync_mod_source() {
 }
 
 # fa_build_mod <ModName> <проект SML> <каталог результата> <sync: 0|1> [шаблон для сохранения]...
-# Сборка Win64 Shipping и упаковка через UAT. Подготовка исходников, UAT, проверка свежести архива и его
+# Сборка редактора Linux (нужен для cook), затем Win64 Shipping и упаковка через UAT. Подготовка исходников,
+# обе сборки, проверка свежести архива и его
 # копирование в каталог результата идут под одной блокировкой: пока она держится, никто другой через
 # эти скрипты не меняет ни исходники в проекте SML, ни архив.
 # Результат: FA_BUILD_EXIT (0 — успех), FA_BUILD_STAGE (где остановилось), FA_BUILD_ORIGIN,
@@ -125,6 +128,17 @@ fa_build_mod() {
         fi
         if [[ ! -f "$project/Mods/$mod/$mod.uplugin" ]]; then
             FA_BUILD_STAGE="подготовка исходников: нет $mod.uplugin в проекте SML"; FA_BUILD_EXIT=4; return 4
+        fi
+        # Cook идёт в редакторе Linux и грузит модули мода. UAT с -nocompileeditor их не собирает,
+        # поэтому редактор пересобирается здесь же: инкрементально, секунды, если исходники не менялись.
+        if [[ "${FICSITAI_SKIP_EDITOR:-0}" != 1 ]]; then
+            "$FA_ENGINE/Engine/Build/BatchFiles/Linux/Build.sh" FactoryEditor Linux Development \
+                -project="$uproject" -waitmutex > "$out/build-$mod-editor.log" 2>&1
+            FA_BUILD_EXIT=$?
+            if [[ $FA_BUILD_EXIT -ne 0 ]]; then
+                FA_BUILD_LOG="$out/build-$mod-editor.log"
+                FA_BUILD_STAGE="сборка редактора Linux для cook: UBT вернул $FA_BUILD_EXIT"; return "$FA_BUILD_EXIT"
+            fi
         fi
         started="$(mktemp)" || { FA_BUILD_STAGE="подготовка: mktemp"; FA_BUILD_EXIT=4; return 4; }
         for attempt in 1 2 3 4 5 6 7 8; do

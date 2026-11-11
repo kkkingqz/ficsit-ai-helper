@@ -14,7 +14,7 @@ pass=0; fail=0
 check() { if [[ "$2" == "$3" ]]; then pass=$((pass+1)); echo "  ok    $1"; else fail=$((fail+1)); echo "  FAIL  $1: ожидалось '$3', получено '$2'"; fi; }
 
 # --- заглушки -------------------------------------------------------------------------------------
-mkdir -p "$T/bin" "$T/msvc/bin/x64" "$T/engine/Engine/Build/BatchFiles" "$T/proj/Mods" "$T/repo/tools" "$T/repo/mod/TestMod/Source"
+mkdir -p "$T/bin" "$T/msvc/bin/x64" "$T/engine/Engine/Build/BatchFiles/Linux" "$T/proj/Mods" "$T/repo/tools" "$T/repo/mod/TestMod/Source"
 cp -r "$HERE" "$T/repo/tools/host"
 echo '{}' > "$T/repo/mod/TestMod/TestMod.uplugin"; echo 'int a;' > "$T/repo/mod/TestMod/Source/a.cpp"
 touch "$T/proj/FactoryGame.uproject"
@@ -35,6 +35,9 @@ mkdir -p "$proj/Saved/ArchivedPlugins/$mod" && cd "$proj/Mods/$mod" && rm -f "$p
 exit 8
 STUB
 chmod +x "$T/engine/Engine/Build/BatchFiles/RunUAT.sh"
+# Сборка редактора: по STUB_EDITOR — ok или fail (код 6).
+printf '#!/bin/sh\n[ "${STUB_EDITOR:-ok}" = fail ] && { echo "error: stub editor"; exit 6; }\nexit 0\n' > "$T/engine/Engine/Build/BatchFiles/Linux/Build.sh"
+chmod +x "$T/engine/Engine/Build/BatchFiles/Linux/Build.sh"
 # Flatpak: пишет журнал игры по STUB_GAME — menu, hang (до меню не дошла), fatal; печатает RUN_EXIT.
 cat > "$T/bin/flatpak" <<'STUB'
 #!/usr/bin/env bash
@@ -75,6 +78,8 @@ run() { "$@" > "$T/out.txt" 2>&1; echo $?; }
 echo "1. Протокол"
 check "успешный прогон возвращает 0" "$(run "$V" "${ARGS[@]}")" 0
 check "исходники взяты из репозитория" "$(grep -c 'исходники — репозиторий' "$T/out.txt")" 1
+check "ошибка сборки редактора отклоняется" "$(STUB_EDITOR=fail run "$V" "${ARGS[@]}")" 1
+check "причина названа в протоколе" "$(grep -c 'сборка редактора Linux для cook' "$T/out.txt")" 1
 check "ошибка UAT отклоняется" "$(STUB_UAT=fail run "$V" "${ARGS[@]}")" 1
 check "старый архив при коде UAT 0 отклоняется" "$(STUB_UAT=stale run "$V" "${ARGS[@]}")" 1
 check "зависание до главного меню отклоняется" "$(STUB_GAME=hang run "$V" "${ARGS[@]}")" 1
@@ -108,6 +113,18 @@ check "первый запуск увидел свой мод" "$(grep -o 'MODS_
 check "журнал первого запуска — про его мод" "$(grep -c 'Display: ModA: ' "$T/r1/FactoryGame.log")" 1
 check "второй запуск увидел свой мод" "$(grep -o 'MODS_AT_LAUNCH=.*' "$T/r2/launch.log")" "MODS_AT_LAUNCH=ModB"
 check "второй ждал блокировку роли" "$(grep -c "очередь 'role-test' занята" "$T/r2.txt")" 1
+
+echo "4а. Запуски разных ролей: обычные идут вместе, замер — один"
+( STUB_GAME_SLEEP=2 "$R" --mod "$T/ModA-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r3" > "$T/r3.txt" 2>&1 ) &
+sleep 0.7
+STUB_SAVED="${STUB_SAVED/ficsitai-test/ficsitai-other}" STUB_MODS="${STUB_MODS/ficsitai-test/ficsitai-other}" FICSITAI_ROLE=other \
+    "$R" --mod "$T/ModB-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r4" > "$T/r4.txt" 2>&1; wait
+check "обычный запуск другой роли не ждёт" "$(grep -c "очередь 'game' занята" "$T/r4.txt")" 0
+( STUB_GAME_SLEEP=2 "$R" --exclusive --mod "$T/ModA-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r5" > "$T/r5.txt" 2>&1 ) &
+sleep 0.7
+STUB_SAVED="${STUB_SAVED/ficsitai-test/ficsitai-other}" STUB_MODS="${STUB_MODS/ficsitai-test/ficsitai-other}" FICSITAI_ROLE=other \
+    "$R" --mod "$T/ModB-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r6" > "$T/r6.txt" 2>&1; wait
+check "при замере другая роль ждёт" "$(grep -c "очередь 'game' занята" "$T/r6.txt")" 1
 
 echo "5. Блокировка и роль (замечание 5)"
 W="$T/repo/tools/host/with-lock.sh"
