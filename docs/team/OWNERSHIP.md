@@ -45,7 +45,9 @@ lang: ru-RU
 | `CONTRIBUTING.md` | Co2 | поставка P-2 |
 | `.github/ISSUE_TEMPLATE/`, `.github/pull_request_template.md` | Co2 | шаблон PR внесён 10.11.2026: в таблице его не было, поставка P-2 |
 | `.github/workflows/`, `tools/`, `tests/`, `fixtures/` | Gf2 | CI, инварианты, Fixture и Recording |
-| `sidecar/adapter/`, `sidecar/launcher/` | Co2 | Адаптер и лаунчер. Точные пути источника Save и сборки архива Cf3 согласуются с Co2 в [Gs-19](questions/Gs.md#gs-19--co2--11112026--открыт) до первой правки |
+| `sidecar/adapter/`, `sidecar/launcher/` | Co2 | Адаптер и лаунчер |
+| `sidecar/package/` | Cf3 | Сборка архива. Читает `sidecar/launcher/foreman.pin.json` и `sidecar/adapter/dist/`. Состав процессов поставки согласован в [Co2-18](questions/Co2.md#co2-18--gs-cf3--ответ-на-gs-19--11112026) |
+| `sidecar/save-source/` | Cf3 | Библиотека источника Save. Входы `SAVE_DATA_DIR` и `saveId`. Зависимость в адаптер добавляет Co2 |
 | `docs/contracts/` | Co | кроме двух файлов ниже |
 | `docs/contracts/schemas/{list-metrics,query-metric}*`, их примеры | Co2 | поставка V-3 |
 | `mod/FicsitAI/Source/FicsitAIApi/` | Gs и Co | **Решение King 10.11.2026.** Код, который идёт за двумя согласованными документами интерфейсов, — Gs. Новые интерфейсы и ломающие правки — Co |
@@ -63,7 +65,8 @@ lang: ru-RU
 | `mod/FicsitAI/Source/FicsitAICore/GameFacade/` | Gf и Gs | **Разделено 10.11.2026 по Gs-6:** `Catalog/`, `BuildingIndex/`, `Telemetry/Sampling/`, `Telemetry/PowerNetworks/` — Gs; подкаталог терминала и сборщики генераторов, батарей, предохранителей и загрузки машин — Gf. Регистрация провайдера и зависимости сборки `FicsitAICore` — Co: это проводка authority-слоя |
 | `mod/FicsitAI/Source/FicsitAIUI/` | Gf и верстальщик экранов | Gf — каркас хоста; экраны — Gs2 с Co2 (веб) или Gs (UMG), по итогам ворот W |
 | `web/README.md` | Co2 | внесён 10.11.2026: в таблице его не было |
-| `web/screens/` | Co2 | логика страниц и фасад API |
+| `web/screens/api/`, `web/screens/chat/` | Co2 | Фасад API и логика чата для веб-варианта ADR-032 |
+| `web/screens/statistics/`, `web/screens/cards/` | Cf3 | Данные «Статистики» и карточек через фасад Co2, для веб-варианта ADR-032 после ворот W |
 | `web/ui-kit/` | Gs2 | дизайн-система и компоненты |
 | `web/spikes/` | тот, кто ведёт спайк | `spikes/s8/` — Gs2 и Co. Разрешено до ворот W как исключение для спайка: запрет наполнять `web/` касается продуктового кода экранов (решение 10.11.2026 по Gs2-1) |
 
