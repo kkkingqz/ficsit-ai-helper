@@ -44,9 +44,22 @@ AFicsitAITerminal::AFicsitAITerminal()
         TerminalMeshComponent->SetRelativeScale3D(FVector(0.5f, 1.2f, 1.8f));
     }
 
+    // Плоская поверхность экрана на лицевой стороне меша с пропорциями 16:9 (ADR-030, P-7 §1.1)
+    ScreenMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ScreenMesh"));
+    ScreenMeshComponent->SetupAttachment(RootComponent);
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> ScreenPlaneFinder(TEXT("/Engine/BasicShapes/Plane.Plane"));
+    if (ScreenPlaneFinder.Succeeded())
+    {
+        ScreenMeshComponent->SetStaticMesh(ScreenPlaneFinder.Object);
+        ScreenMeshComponent->SetRelativeLocation(FVector(26.0f, 0.0f, 20.0f));
+        ScreenMeshComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
+        ScreenMeshComponent->SetRelativeScale3D(FVector(0.55f, 0.98f, 1.0f)); // 16:9 соотношение
+    }
+
+    TargetPowerConsumption = 10.0f;
     PowerInfoComponent = CreateDefaultSubobject<UFGPowerInfoComponent>(TEXT("PowerInfo"));
     // Потребление 10 MW (ADR-001, AC-01)
-    PowerInfoComponent->SetTargetConsumption(10.0f);
+    PowerInfoComponent->SetTargetConsumption(TargetPowerConsumption);
 
     PowerConnectionComponent = CreateDefaultSubobject<UFGPowerConnectionComponent>(TEXT("PowerConnection"));
     PowerConnectionComponent->SetupAttachment(RootComponent);
@@ -54,10 +67,26 @@ AFicsitAITerminal::AFicsitAITerminal()
     PowerConnectionComponent->SetPowerInfo(PowerInfoComponent);
 }
 
-void AFicsitAITerminal::BeginPlay()
+AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 {
-    Super::BeginPlay();
+    if (CustomSubsystem)
+    {
+        return CustomSubsystem;
+    }
+    return AFicsitAISubsystem::Get(const_cast<AFicsitAITerminal*>(this));
+}
 
+void AFicsitAITerminal::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (AFicsitAISubsystem* Subsystem = GetSubsystem())
+    {
+        Subsystem->UnregisterTerminal(this);
+    }
+    Super::EndPlay(EndPlayReason);
+}
+
+void AFicsitAITerminal::InitializeHost()
+{
     HostContext.HostId = FName(TEXT("AITerminal"));
     HostContext.Layout = EFicsitAIScreenLayout::Slots3;
     HostContext.SizePx = FIntPoint(1920, 1080);
@@ -65,6 +94,7 @@ void AFicsitAITerminal::BeginPlay()
     HostContext.bWorldSurface = false;
     HostContext.Host.SetObject(this);
     HostContext.Host.SetInterface(Cast<IFicsitAIScreenHost>(this));
+    HostContext.HostState = EFicsitAIHostState::Ready;
 
     // Фабрика модулей по умолчанию (Notes, Status)
     if (!ModuleFactory)
@@ -72,17 +102,24 @@ void AFicsitAITerminal::BeginPlay()
         ModuleFactory = NewObject<UFicsitAIScreenModuleFactoryImpl>(this);
     }
 
+    if (AFicsitAISubsystem* Subsystem = GetSubsystem())
+    {
+        Subsystem->RegisterTerminal(this);
+        HostContext.SaveId = Subsystem->GetSaveId();
+        if (Subsystem->IsInertMode())
+        {
+            HostContext.HostState = EFicsitAIHostState::Inert;
+        }
+    }
+}
+
+void AFicsitAITerminal::BeginPlay()
+{
+    Super::BeginPlay();
+    InitializeHost();
+
     if (HasAuthority())
     {
-        AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this);
-        if (Subsystem)
-        {
-            HostContext.SaveId = Subsystem->GetSaveId();
-            if (Subsystem->IsInertMode())
-            {
-                HostContext.HostState = EFicsitAIHostState::Inert;
-            }
-        }
         UpdateHostState();
     }
 }
@@ -128,6 +165,10 @@ void AFicsitAITerminal::OnRep_HostContext()
 
 bool AFicsitAITerminal::HasPower() const
 {
+    if (bPowerOverride.IsSet())
+    {
+        return bPowerOverride.GetValue();
+    }
     return PowerInfoComponent && PowerInfoComponent->HasPower();
 }
 
@@ -138,7 +179,7 @@ void AFicsitAITerminal::FlushActiveModuleState()
         const FString State = ActiveModuleInstance->SavePersistentState();
         if (!State.IsEmpty())
         {
-            if (AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this))
+            if (AFicsitAISubsystem* Subsystem = GetSubsystem())
             {
                 Subsystem->SaveModuleState(HostContext.SaveId, ActiveModuleId, State);
             }
@@ -173,7 +214,7 @@ void AFicsitAITerminal::TeardownActiveModule()
 
 void AFicsitAITerminal::UpdateHostState()
 {
-    AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this);
+    AFicsitAISubsystem* Subsystem = GetSubsystem();
     const bool bInert = Subsystem && Subsystem->IsInertMode();
 
     if (bInert)
@@ -240,19 +281,6 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         return;
     }
 
-    // Регистрируем Enhanced Input контекст для игрока (Gs-15.2)
-    if (ULocalPlayer* LP = PC->GetLocalPlayer())
-    {
-        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-        {
-            const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
-            if (IMC && !Subsystem->HasMappingContext(IMC))
-            {
-                Subsystem->AddMappingContext(IMC, 100);
-            }
-        }
-    }
-
     // Если экран уже открыт для этого игрока, повторное нажатие E закрывает его
     if (UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(PC))
     {
@@ -260,10 +288,50 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         return;
     }
 
+    // При открытии терминала активируем контекст Enhanced Input и опрашиваем актуальные клавиши (Gs-15 раунд 3)
+    TMap<FName, FKey> CurrentBindings;
+    if (ULocalPlayer* LP = PC->GetLocalPlayer())
+    {
+        if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+        {
+            const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
+            if (IMC)
+            {
+                if (!Subsystem->HasMappingContext(IMC))
+                {
+                    Subsystem->AddMappingContext(IMC, 100);
+                }
+
+                auto QueryActionKey = [&](const UInputAction* Action, FName ActionId, FKey FallbackKey)
+                {
+                    if (Action)
+                    {
+                        TArray<FKey> Keys = Subsystem->QueryKeysMappedToAction(Action);
+                        if (Keys.Num() > 0 && Keys[0].IsValid())
+                        {
+                            CurrentBindings.Add(ActionId, Keys[0]);
+                            return;
+                        }
+                    }
+                    CurrentBindings.Add(ActionId, FallbackKey);
+                };
+
+                QueryActionKey(IMC->ActionBack, FName(TEXT("IA_FicsitAI_Back")), EKeys::Escape);
+                QueryActionKey(IMC->ActionOpenTerminal, FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::E);
+                QueryActionKey(IMC->ActionNotes, FName(TEXT("IA_FicsitAI_Notes")), EKeys::F);
+                QueryActionKey(IMC->ActionStatus, FName(TEXT("IA_FicsitAI_Status")), EKeys::R);
+            }
+        }
+    }
+
     if (HostContext.HostState == EFicsitAIHostState::NoPower)
     {
         UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал без питания (10 MW требуется). Экран гаснет (AC-01, §6.1)."));
         UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, EFicsitAIHostState::NoPower, nullptr);
+        if (Widget)
+        {
+            Widget->SetActionKeyBindings(CurrentBindings);
+        }
         SetScreenSurface(Widget);
         return;
     }
@@ -272,6 +340,10 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
     {
         UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал в инертном режиме (мультиплеерная сессия). Экран недоступен."));
         UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, EFicsitAIHostState::Inert, nullptr);
+        if (Widget)
+        {
+            Widget->SetActionKeyBindings(CurrentBindings);
+        }
         SetScreenSurface(Widget);
         return;
     }
@@ -283,6 +355,10 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
     }
 
     UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, HostContext.HostState, ActiveModuleInstance);
+    if (Widget)
+    {
+        Widget->SetActionKeyBindings(CurrentBindings);
+    }
     SetScreenSurface(Widget);
 }
 
@@ -307,6 +383,11 @@ TArray<FName> AFicsitAITerminal::GetAvailableModules() const
 
 bool AFicsitAITerminal::OpenModule(FName ModuleId)
 {
+    if (HostContext.HostId.IsNone() || !ModuleFactory)
+    {
+        InitializeHost();
+    }
+
     if (HasAuthority())
     {
         UpdateHostState();
@@ -322,13 +403,7 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
         return true;
     }
 
-    // Отсоединяем текущий активный модуль с сохранением состояния (AC-14)
-    if (ActiveModuleInstance)
-    {
-        TeardownActiveModule();
-    }
-
-    // Ищем в кэше или запрашиваем у фабрики
+    // 1. Ищем в кэше или запрашиваем у фабрики ДО отсоединения текущего модуля
     TScriptInterface<IFicsitAIScreenModule> TargetModule;
     if (TScriptInterface<IFicsitAIScreenModule>* Cached = CachedModules.Find(ModuleId))
     {
@@ -349,12 +424,18 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
         return false;
     }
 
-    // Проверка совместимости версии API (§5.5, Gs-15.4) ДО вызова OnAttach
+    // 2. Проверка совместимости версии API (§5.5, Gs-15.4) ДО любого teardown
     const FString RequiredApi = TargetModule->GetRequiredApiVersion();
     if (!CheckApiCompatibility(RequiredApi, TEXT("0.3.0")))
     {
-        UE_LOG(LogFicsitAITerminal, Warning, TEXT("Модуль %s требует несовместимую версию API (%s, поддерживается 0.x). Открытие отклонено до OnAttach."), *ModuleId.ToString(), *RequiredApi);
+        UE_LOG(LogFicsitAITerminal, Warning, TEXT("Модуль %s требует несовместимую версию API (%s, поддерживается 0.x). Открытие отклонено, текущий экран сохранён."), *ModuleId.ToString(), *RequiredApi);
         return false;
+    }
+
+    // 3. Отсоединяем текущий активный модуль с сохранением состояния только после успешной проверки (AC-14)
+    if (ActiveModuleInstance)
+    {
+        TeardownActiveModule();
     }
 
     ActiveModuleId = ModuleId;
@@ -365,7 +446,7 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
     ActiveModuleInstance->OnAttach(HostContext);
 
     // Восстанавливаем сохранённое состояние модуля из подсистемы по (SaveId, ModuleId)
-    if (AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(this))
+    if (AFicsitAISubsystem* Subsystem = GetSubsystem())
     {
         const FString SavedState = Subsystem->GetModuleState(HostContext.SaveId, ModuleId);
         if (!SavedState.IsEmpty())
@@ -396,6 +477,19 @@ void AFicsitAITerminal::CloseActiveModule()
         if (APlayerController* PC = World->GetFirstPlayerController())
         {
             UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
+
+            // Удаляем Enhanced Input контекст терминала при закрытии (Gs-15 раунд 3)
+            if (ULocalPlayer* LP = PC->GetLocalPlayer())
+            {
+                if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+                {
+                    const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
+                    if (IMC && Subsystem->HasMappingContext(IMC))
+                    {
+                        Subsystem->RemoveMappingContext(IMC);
+                    }
+                }
+            }
         }
     }
     SetScreenSurface(nullptr);

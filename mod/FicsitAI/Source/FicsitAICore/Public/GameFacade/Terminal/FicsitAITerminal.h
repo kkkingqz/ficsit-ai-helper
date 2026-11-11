@@ -25,7 +25,25 @@ public:
     AFicsitAITerminal();
 
     virtual void BeginPlay() override;
+    virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     virtual void Tick(float DeltaSeconds) override;
+
+    /** Инициализация хост-контекста и фабрики модулей (вызывается в BeginPlay или явно в тестах) */
+    void InitializeHost();
+
+    /** Обновление состояния питания и готовности терминала */
+    void UpdateHostState();
+
+    /** Потребляемая терминалом мощность в МВт (ADR-001, AC-01, P-7 §1.1) */
+    float GetTargetConsumption() const { return TargetPowerConsumption; }
+
+    /** Переопределение наличия питания (для автотестов и симуляции) */
+    void SetPowerOverride(TOptional<bool> InOverride) { bPowerOverride = InOverride; }
+
+    /** Установить подсистему мода вручную (для тестов) */
+    void SetCustomSubsystem(class AFicsitAISubsystem* InSubsystem) { CustomSubsystem = InSubsystem; }
+
+    class AFicsitAISubsystem* GetSubsystem() const;
 
     // IFGSaveInterface
     virtual void PreSaveGame_Implementation(int32 SaveVersion, int32 GameVersion) override;
@@ -85,6 +103,10 @@ public:
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
     TObjectPtr<UStaticMeshComponent> TerminalMeshComponent;
 
+    /** Плоский меш экрана 16:9 на корпусе терминала (ADR-030, P-7 §1.1) */
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+    TObjectPtr<UStaticMeshComponent> ScreenMeshComponent;
+
 protected:
     UPROPERTY(ReplicatedUsing = OnRep_HostContext)
     FFicsitAIScreenContext HostContext;
@@ -99,14 +121,21 @@ protected:
     TScriptInterface<IFicsitAIScreenModuleFactory> ModuleFactory;
 
     UPROPERTY()
+    TObjectPtr<class AFicsitAISubsystem> CustomSubsystem;
+
+    UPROPERTY()
     TScriptInterface<IFicsitAIScreenSurface> ScreenSurface;
 
     UPROPERTY()
     TMap<FName, TScriptInterface<IFicsitAIScreenModule>> CachedModules;
 
+    UPROPERTY(EditDefaultsOnly, Category = "Power")
+    float TargetPowerConsumption = 10.0f;
+
+    TOptional<bool> bPowerOverride;
+
     UFUNCTION()
     void OnRep_HostContext();
 
-    void UpdateHostState();
     void TeardownActiveModule();
 };

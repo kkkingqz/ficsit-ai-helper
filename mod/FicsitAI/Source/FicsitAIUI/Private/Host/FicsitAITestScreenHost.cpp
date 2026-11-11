@@ -59,24 +59,7 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
         return true;
     }
 
-    // Сохранение и отсоединение текущего модуля (AC-14)
-    if (ActiveModuleInstance)
-    {
-        const FString State = ActiveModuleInstance->SavePersistentState();
-        if (!State.IsEmpty())
-        {
-            ModulePersistentStates.FindOrAdd(ActiveModuleId) = State;
-        }
-        ActiveModuleInstance->OnDetach();
-        if (ScreenSurface)
-        {
-            ScreenSurface->ClearModule();
-        }
-        ActiveModuleInstance = nullptr;
-        ActiveModuleId = NAME_None;
-    }
-
-    // Создание или загрузка из кэша
+    // 1. Создание или загрузка из кэша нового модуля ДО отсоединения текущего
     TScriptInterface<IFicsitAIScreenModule> TargetModule;
     if (TScriptInterface<IFicsitAIScreenModule>* Cached = LoadedModules.Find(ModuleId))
     {
@@ -96,11 +79,28 @@ bool UFicsitAITestScreenHost::OpenModule(FName ModuleId)
         return false;
     }
 
-    // Проверка совместимости версии API (§5.5, Gs-15.4) ДО вызова OnAttach
+    // 2. Проверка совместимости версии API (§5.5, Gs-15.4) ДО любого teardown
     const FString RequiredApi = TargetModule->GetRequiredApiVersion();
     if (!CheckApiCompatibility(RequiredApi, TEXT("0.3.0")))
     {
         return false;
+    }
+
+    // 3. Сохранение и отсоединение текущего модуля только после успешной проверки (AC-14)
+    if (ActiveModuleInstance)
+    {
+        const FString State = ActiveModuleInstance->SavePersistentState();
+        if (!State.IsEmpty())
+        {
+            ModulePersistentStates.FindOrAdd(ActiveModuleId) = State;
+        }
+        ActiveModuleInstance->OnDetach();
+        if (ScreenSurface)
+        {
+            ScreenSurface->ClearModule();
+        }
+        ActiveModuleInstance = nullptr;
+        ActiveModuleId = NAME_None;
     }
 
     ActiveModuleId = ModuleId;

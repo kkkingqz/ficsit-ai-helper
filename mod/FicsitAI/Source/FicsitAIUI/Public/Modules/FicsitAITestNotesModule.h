@@ -43,6 +43,9 @@ public:
 
     void SetInputFocus(bool bFocus) { bHasFocus = bFocus; }
 
+protected:
+    virtual TSharedRef<SWidget> RebuildWidget() override;
+
 private:
     UPROPERTY()
     FFicsitAIScreenContext CurrentContext;
@@ -50,6 +53,7 @@ private:
     UPROPERTY()
     FString NoteContent;
 
+    TSharedPtr<class SMultiLineEditableTextBox> EditableTextBox;
     bool bIsAttached = false;
     bool bHasFocus = false;
 };

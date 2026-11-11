@@ -53,6 +53,17 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
     const TArray<FFicsitAIHotkeyHint>& GetHotkeyHints() const { return CurrentHotkeyHints; }
 
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
+    void SetActionKeyBindings(const TMap<FName, FKey>& InBindings);
+
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
+    void SetActionKeyBinding(FName ActionId, FKey Key);
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    FKey GetKeyForAction(FName ActionId) const;
+
+    void RefreshModuleContent();
+
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
     virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
@@ -75,6 +86,9 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Surface")
     TArray<FFicsitAIHotkeyHint> CurrentHotkeyHints;
+
+    UPROPERTY()
+    TMap<FName, FKey> ActionKeyBindings;
 
     TSharedPtr<class SBox> ModuleContentBox;
     TSharedPtr<class STextBlock> StatusTextBlock;

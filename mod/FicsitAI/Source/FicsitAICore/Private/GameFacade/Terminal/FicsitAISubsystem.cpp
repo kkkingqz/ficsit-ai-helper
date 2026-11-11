@@ -72,24 +72,6 @@ void AFicsitAISubsystem::Tick(float DeltaSeconds)
             {
                 NumPlayers++;
             }
-
-            if (APlayerController* PC = It->Get())
-            {
-                if (PC->IsLocalController())
-                {
-                    if (ULocalPlayer* LP = PC->GetLocalPlayer())
-                    {
-                        if (UEnhancedInputLocalPlayerSubsystem* InputSubsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-                        {
-                            const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
-                            if (IMC && !InputSubsystem->HasMappingContext(IMC))
-                            {
-                                InputSubsystem->AddMappingContext(IMC, 100);
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         if (NumPlayers > 1 || GetNetMode() != NM_Standalone)
@@ -103,8 +85,37 @@ void AFicsitAISubsystem::Tick(float DeltaSeconds)
     }
 }
 
+void AFicsitAISubsystem::RegisterTerminal(AFicsitAITerminal* Terminal)
+{
+    if (Terminal)
+    {
+        RegisteredTerminals.AddUnique(Terminal);
+    }
+}
+
+void AFicsitAISubsystem::UnregisterTerminal(AFicsitAITerminal* Terminal)
+{
+    if (Terminal)
+    {
+        RegisteredTerminals.Remove(Terminal);
+    }
+}
+
 void AFicsitAISubsystem::PreSaveGame_Implementation(int32 SaveVersion, int32 GameVersion)
 {
+    // Сбрасываем состояние зарегистрированных терминалов (работает как в игре, так и в автотестах)
+    for (int32 i = RegisteredTerminals.Num() - 1; i >= 0; --i)
+    {
+        if (RegisteredTerminals[i].IsValid())
+        {
+            RegisteredTerminals[i]->FlushActiveModuleState();
+        }
+        else
+        {
+            RegisteredTerminals.RemoveAt(i);
+        }
+    }
+
     // Сбрасываем актуальное состояние всех активных открытых терминалов мира в подсистему (Gs-15.5)
     if (UWorld* World = GetWorld())
     {

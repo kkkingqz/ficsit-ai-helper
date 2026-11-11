@@ -45,6 +45,7 @@ public:
     TScriptInterface<IFicsitAIScreenSurface> GetScreenSurface() const { return ScreenSurface; }
 
     const TMap<FName, FString>& GetModulePersistentStates() const { return ModulePersistentStates; }
+    const TMap<FName, TScriptInterface<IFicsitAIScreenModule>>& GetLoadedModules() const { return LoadedModules; }
 
 private:
     UPROPERTY()

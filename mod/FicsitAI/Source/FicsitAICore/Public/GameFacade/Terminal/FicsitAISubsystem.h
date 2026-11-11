@@ -39,6 +39,13 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Subsystem")
     const FString& GetSaveId() const { return SaveId; }
 
+    /** Устанавливает SaveId вручную (для тестов) */
+    void SetSaveId(const FString& NewSaveId) { SaveId = NewSaveId; }
+
+    /** Регистрация терминала для принудительного сброса состояния перед сохранением */
+    void RegisterTerminal(class AFicsitAITerminal* Terminal);
+    void UnregisterTerminal(class AFicsitAITerminal* Terminal);
+
     /** Проверяет, активен ли инертный режим (мультиплеер) */
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Subsystem")
     bool IsInertMode() const { return bInertMode; }
@@ -75,4 +82,7 @@ protected:
 
     UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Subsystem")
     FName DiagnosticsScenario = NAME_None;
+
+    UPROPERTY()
+    TArray<TWeakObjectPtr<class AFicsitAITerminal>> RegisteredTerminals;
 };

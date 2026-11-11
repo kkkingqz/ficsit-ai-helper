@@ -32,6 +32,9 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
     bool IsAttached() const { return bIsAttached; }
 
+protected:
+    virtual TSharedRef<SWidget> RebuildWidget() override;
+
 private:
     UPROPERTY()
     FFicsitAIScreenContext CurrentContext;

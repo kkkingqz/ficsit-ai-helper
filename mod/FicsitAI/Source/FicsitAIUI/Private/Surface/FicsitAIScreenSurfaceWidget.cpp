@@ -83,59 +83,99 @@ void UFicsitAIScreenSurfaceWidget::SetHost(TScriptInterface<IFicsitAIScreenHost>
     Host = InHost;
 }
 
+void UFicsitAIScreenSurfaceWidget::SetActionKeyBindings(const TMap<FName, FKey>& InBindings)
+{
+    ActionKeyBindings = InBindings;
+    UpdateLayout();
+}
+
+void UFicsitAIScreenSurfaceWidget::SetActionKeyBinding(FName ActionId, FKey Key)
+{
+    ActionKeyBindings.Add(ActionId, Key);
+    UpdateLayout();
+}
+
+FKey UFicsitAIScreenSurfaceWidget::GetKeyForAction(FName ActionId) const
+{
+    if (const FKey* Found = ActionKeyBindings.Find(ActionId))
+    {
+        return *Found;
+    }
+
+    if (ActionId == FName(TEXT("IA_FicsitAI_Back")))
+    {
+        return EKeys::Escape;
+    }
+    if (ActionId == FName(TEXT("IA_FicsitAI_OpenTerminal")))
+    {
+        return EKeys::E;
+    }
+    if (ActionId == FName(TEXT("IA_FicsitAI_Notes")))
+    {
+        return EKeys::F;
+    }
+    if (ActionId == FName(TEXT("IA_FicsitAI_Status")))
+    {
+        return EKeys::R;
+    }
+
+    return EKeys::Invalid;
+}
+
+void UFicsitAIScreenSurfaceWidget::RefreshModuleContent()
+{
+    if (!ModuleContentBox.IsValid())
+    {
+        return;
+    }
+
+    if (CurrentHostState != EFicsitAIHostState::Ready)
+    {
+        ModuleContentBox->SetContent(
+            SAssignNew(StatusTextBlock, STextBlock)
+            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
+            .Font(FCoreStyle::GetDefaultFontStyle("Bold", 20))
+            .ColorAndOpacity(FLinearColor(0.95f, 0.3f, 0.2f, 1.0f))
+        );
+        return;
+    }
+
+    if (ActiveModule)
+    {
+        if (UUserWidget* ModuleWidget = Cast<UUserWidget>(ActiveModule.GetObject()))
+        {
+            ModuleContentBox->SetContent(ModuleWidget->TakeWidget());
+            return;
+        }
+    }
+
+    ModuleContentBox->SetContent(
+        SAssignNew(StatusTextBlock, STextBlock)
+        .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
+        .Font(FCoreStyle::GetDefaultFontStyle("Regular", 16))
+        .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+    );
+}
+
 void UFicsitAIScreenSurfaceWidget::SetModule(TScriptInterface<IFicsitAIScreenModule> Module)
 {
     ActiveModule = Module;
     UpdateLayout();
-
-    if (ModuleContentBox.IsValid())
-    {
-        if (ActiveModule)
-        {
-            if (UUserWidget* ModuleWidget = Cast<UUserWidget>(ActiveModule.GetObject()))
-            {
-                ModuleContentBox->SetContent(ModuleWidget->TakeWidget());
-            }
-        }
-        else
-        {
-            ModuleContentBox->SetContent(
-                SAssignNew(StatusTextBlock, STextBlock)
-                .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
-                .ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.2f, 1.0f))
-            );
-        }
-    }
+    RefreshModuleContent();
 }
 
 void UFicsitAIScreenSurfaceWidget::ClearModule()
 {
     ActiveModule = nullptr;
     UpdateLayout();
-
-    if (ModuleContentBox.IsValid())
-    {
-        ModuleContentBox->SetContent(
-            SAssignNew(StatusTextBlock, STextBlock)
-            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
-            .ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.2f, 1.0f))
-        );
-    }
+    RefreshModuleContent();
 }
 
 void UFicsitAIScreenSurfaceWidget::SetHostState(EFicsitAIHostState NewState)
 {
     CurrentHostState = NewState;
     UpdateLayout();
-
-    if (CurrentHostState != EFicsitAIHostState::Ready && ModuleContentBox.IsValid())
-    {
-        ModuleContentBox->SetContent(
-            SAssignNew(StatusTextBlock, STextBlock)
-            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
-            .ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.2f, 1.0f))
-        );
-    }
+    RefreshModuleContent();
 }
 
 void UFicsitAIScreenSurfaceWidget::UpdateLayout()
@@ -177,6 +217,19 @@ void UFicsitAIScreenSurfaceWidget::UpdateLayout()
 
 FText UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints() const
 {
+    auto FormatKey = [](const FKey& Key, const FName& ActionId) -> FString
+    {
+        if (Key == EKeys::Escape)
+        {
+            return TEXT("Esc");
+        }
+        if (Key.IsValid())
+        {
+            return Key.GetDisplayName(false).ToString();
+        }
+        return ActionId.ToString();
+    };
+
     FString Result;
     for (int32 i = 0; i < CurrentHotkeyHints.Num(); ++i)
     {
@@ -184,11 +237,18 @@ FText UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints() const
         {
             Result += TEXT("  |  ");
         }
-        Result += FString::Printf(TEXT("[%s] %s"), *CurrentHotkeyHints[i].ActionId.ToString(), *CurrentHotkeyHints[i].Label.ToString());
+        const FName ActionId = CurrentHotkeyHints[i].ActionId;
+        const FKey MappedKey = GetKeyForAction(ActionId);
+        const FString KeyName = FormatKey(MappedKey, ActionId);
+        Result += FString::Printf(TEXT("[%s] %s"), *KeyName, *CurrentHotkeyHints[i].Label.ToString());
     }
     if (Result.IsEmpty())
     {
-        Result = TEXT("[E] Закрыть | [F] Заметки | [R] Статус | [Esc] Назад");
+        const FString KeyOpen = FormatKey(GetKeyForAction(FName(TEXT("IA_FicsitAI_OpenTerminal"))), FName(TEXT("IA_FicsitAI_OpenTerminal")));
+        const FString KeyNotes = FormatKey(GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes"))), FName(TEXT("IA_FicsitAI_Notes")));
+        const FString KeyStatus = FormatKey(GetKeyForAction(FName(TEXT("IA_FicsitAI_Status"))), FName(TEXT("IA_FicsitAI_Status")));
+        const FString KeyBack = FormatKey(GetKeyForAction(FName(TEXT("IA_FicsitAI_Back"))), FName(TEXT("IA_FicsitAI_Back")));
+        Result = FString::Printf(TEXT("[%s] Закрыть | [%s] Заметки | [%s] Статус | [%s] Назад"), *KeyOpen, *KeyNotes, *KeyStatus, *KeyBack);
     }
     return FText::FromString(Result);
 }
@@ -224,8 +284,8 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
                 .Padding(FMargin(0.0f, 10.0f))
                 [
                     SAssignNew(ModuleContentBox, SBox)
-                    .HAlign(HAlign_Center)
-                    .VAlign(VAlign_Center)
+                    .HAlign(HAlign_Fill)
+                    .VAlign(VAlign_Fill)
                     [
                         SAssignNew(StatusTextBlock, STextBlock)
                         .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
@@ -250,6 +310,7 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
         ];
 
     UpdateLayout();
+    RefreshModuleContent();
     return Widget;
 }
 
@@ -257,7 +318,12 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
 {
     const FKey Key = InKeyEvent.GetKey();
 
-    if (Key == EKeys::Escape || Key == EKeys::E)
+    const FKey BackKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Back")));
+    const FKey OpenKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_OpenTerminal")));
+    const FKey NotesKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes")));
+    const FKey StatusKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Status")));
+
+    if ((BackKey.IsValid() && Key == BackKey) || (OpenKey.IsValid() && Key == OpenKey) || Key == EKeys::Escape)
     {
         if (ActiveModule && ActiveModule->HandleBackAction())
         {
@@ -266,15 +332,14 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
         if (Host)
         {
             Host->CloseActiveModule();
-            return FReply::Handled();
         }
         else
         {
             CloseForPlayer(GetOwningPlayer());
-            return FReply::Handled();
         }
+        return FReply::Handled();
     }
-    else if (Key == EKeys::F)
+    else if (NotesKey.IsValid() && Key == NotesKey)
     {
         if (Host)
         {
@@ -282,7 +347,7 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
             return FReply::Handled();
         }
     }
-    else if (Key == EKeys::R)
+    else if (StatusKey.IsValid() && Key == StatusKey)
     {
         if (Host)
         {

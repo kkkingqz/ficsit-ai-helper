@@ -38,7 +38,7 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Поверхность отображает активный модуль"), Surface->GetActiveModule(), Host->GetActiveModuleInstance());
     }
 
-    // 3. Проверка хоткеев и требований модуля Notes
+    // 3. Проверка хоткеев, переназначения клавиш (Gs-15 раунд 3) и требований модуля Notes
     IFicsitAIScreenModule* ModuleInterface = Cast<IFicsitAIScreenModule>(Host->GetActiveModuleInstance().GetObject());
     TestNotNull(TEXT("Интерфейс модуля валиден"), ModuleInterface);
     if (ModuleInterface)
@@ -49,6 +49,27 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
         TArray<FFicsitAIHotkeyHint> NotesHints = ModuleInterface->GetHotkeyHints();
         TestTrue(TEXT("Модуль Notes объявляет хоткеи"), NotesHints.Num() > 0);
         TestEqual(TEXT("Хоткей Notes - IA_FicsitAI_Notes"), NotesHints[0].ActionId, FName(TEXT("IA_FicsitAI_Notes")));
+    }
+
+    if (Surface)
+    {
+        TMap<FName, FKey> DefaultBindings;
+        DefaultBindings.Add(FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::E);
+        DefaultBindings.Add(FName(TEXT("IA_FicsitAI_Notes")), EKeys::F);
+        DefaultBindings.Add(FName(TEXT("IA_FicsitAI_Status")), EKeys::R);
+        DefaultBindings.Add(FName(TEXT("IA_FicsitAI_Back")), EKeys::Escape);
+        Surface->SetActionKeyBindings(DefaultBindings);
+
+        FString HintsStr = Surface->GetFormattedHotkeyHints().ToString();
+        TestTrue(TEXT("Полоса подсказок содержит [F] для Notes по умолчанию"), HintsStr.Contains(TEXT("[F]")));
+        TestTrue(TEXT("Полоса подсказок содержит [Esc] для Back по умолчанию"), HintsStr.Contains(TEXT("[Esc]")));
+
+        // Переназначение клавиши Notes на N
+        Surface->SetActionKeyBinding(FName(TEXT("IA_FicsitAI_Notes")), EKeys::N);
+        FString RemappedHints = Surface->GetFormattedHotkeyHints().ToString();
+        TestTrue(TEXT("После переназначения полоса содержит [N]"), RemappedHints.Contains(TEXT("[N]")));
+        TestFalse(TEXT("После переназначения полоса больше не содержит [F]"), RemappedHints.Contains(TEXT("[F]")));
+        TestEqual(TEXT("GetKeyForAction возвращает клавишу N"), Surface->GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes"))), EKeys::N);
     }
 
     // 4. Запись данных и переключение на модуль Status
@@ -115,13 +136,23 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
     Host->CloseActiveModule();
     TestEqual(TEXT("Модуль закрыт"), Host->GetActiveModuleId(), NAME_None);
 
-    // 11. Негативный тест: отказ в открытии модуля с несовместимой версией API (Gs-15.4, §5.5)
+    // 11. Негативный тест: отказ в открытии модуля с несовместимой версией API (Gs-15 раунд 3)
+    // Открываем рабочий модуль Notes
+    TestTrue(TEXT("Notes открыт перед негативным тестом"), Host->OpenModule(FName(TEXT("Notes"))));
+    TestEqual(TEXT("Notes активен перед негативным тестом"), Host->GetActiveModuleId(), FName(TEXT("Notes")));
+
     TestFalse(TEXT("Открытие модуля с API 2.0.0 отклонено хостом"), Host->OpenModule(FName(TEXT("Incompatible"))));
-    UFicsitAITestIncompatibleModule* IncompModule = Cast<UFicsitAITestIncompatibleModule>(Factory->CreateModule(FName(TEXT("Incompatible")), Host).GetObject());
+    TestEqual(TEXT("При отказе несовместимого модуля Notes остаётся активным (Gs-15 раунд 3)"), Host->GetActiveModuleId(), FName(TEXT("Notes")));
+
+    UFicsitAITestIncompatibleModule* IncompModule = Cast<UFicsitAITestIncompatibleModule>(Host->GetLoadedModules().FindRef(FName(TEXT("Incompatible"))).GetObject());
+    TestNotNull(TEXT("Хост содержит экземпляр Incompatible"), IncompModule);
     if (IncompModule)
     {
         TestFalse(TEXT("OnAttach не вызывался для несовместимого модуля"), IncompModule->IsAttached());
     }
+
+    Host->CloseActiveModule();
+    TestEqual(TEXT("Модуль закрыт после завершения теста"), Host->GetActiveModuleId(), NAME_None);
 
     // 12. Перенос состояния между двумя хостами одного сохранения (Gs-15.5, AC-14)
     UFicsitAITestScreenHost* HostA = NewObject<UFicsitAITestScreenHost>();
