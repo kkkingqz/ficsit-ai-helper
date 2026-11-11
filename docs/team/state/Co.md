@@ -1,4 +1,4 @@
-# Co — состояние на 10.11.2026
+# Co — состояние на 11.11.2026
 
 **Сейчас:** S8, веб-экраны на BLUI ([#8](https://github.com/kkkingqz/ficsit-ai-helper/issues/8)), пункты 1.4–1.7: загрузка плагина в игре под Proton. Документы — прямо в `main` из `work/co`. Сборка идёт вне репозитория: копия проекта SML `~/Projects/SML-co`, скрипты и правки BLUI `~/Projects/ficsitai-deps`.
 
@@ -8,7 +8,7 @@
 
 **Ждут меня:**
 
-- ревью [#38](https://github.com/kkkingqz/ficsit-ai-helper/pull/38) (слой данных SBC, код Gs) — единственное ревью, которое осталось за мной;
+- Gs ждёт проводку каталога в `FicsitAICore` после слияния [#40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40) и [#41](https://github.com/kkkingqz/ficsit-ai-helper/pull/41) (Co-44); по [#38](https://github.com/kkkingqz/ficsit-ai-helper/pull/38) вердикт «нужны правки», жду ответ Gs;
 - [#37](https://github.com/kkkingqz/ficsit-ai-helper/pull/37) — на неделе 2, перед замерами: это вход в S8;
 - Gs2 и Gf2 ждут сборку плагина для прогона страницы (Co-39);
 - Co2 ждёт документ протокола канала S2 к неделе 2 (конверт уже задан в Co-37).
@@ -19,6 +19,6 @@
 
 **Дальше:**
 
-1. Ревью #38.
+1. Техническая оценка предложений King по функциям публичной 2.0. До согласования — вне репозитория.
 2. Поставить плагин в игру, пройти 1.4–1.7 и запрос из мода на `http://127.0.0.1`.
 3. Обработчик ресурсов для `https://ficsitai.invalid/` (пункт 2.1), затем вендоринг в `third_party/blui/`.
