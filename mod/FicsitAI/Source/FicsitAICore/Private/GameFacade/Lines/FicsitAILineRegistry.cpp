@@ -4,6 +4,22 @@
 namespace FicsitAI::Lines
 {
 
+void FFicsitAILineRegistry::DetachBuildingFromPreviousLineLocked(const FString& BuildingId, const FString& TargetLineId)
+{
+    if (const FString* OldLineId = LineIdByBuildingId.Find(BuildingId))
+    {
+        if (*OldLineId != TargetLineId)
+        {
+            if (FProductionLine* OldLine = LinesById.Find(*OldLineId))
+            {
+                OldLine->Members.RemoveAll([&BuildingId](const FBuildingRef& Item) {
+                    return Item.BuildingId == BuildingId;
+                });
+            }
+        }
+    }
+}
+
 bool FFicsitAILineRegistry::RegisterLine(const FProductionLine& Line)
 {
     if (Line.LineId.IsEmpty())
@@ -11,25 +27,43 @@ bool FFicsitAILineRegistry::RegisterLine(const FProductionLine& Line)
         return false;
     }
 
-    FScopeLock Lock(&Mutex);
-
-    // If updating existing line, clear previous reverse mapping
-    if (const FProductionLine* Existing = LinesById.Find(Line.LineId))
-    {
-        for (const FBuildingRef& Member : Existing->Members)
-        {
-            LineIdByBuildingId.Remove(Member.BuildingId);
-        }
-    }
-
-    LinesById.Add(Line.LineId, Line);
-
+    // Sanitize members (filter empty BuildingIds and keep unique references)
+    FProductionLine SanitizedLine = Line;
+    TArray<FBuildingRef> UniqueMembers;
+    UniqueMembers.Reserve(Line.Members.Num());
     for (const FBuildingRef& Member : Line.Members)
     {
         if (!Member.BuildingId.IsEmpty())
         {
-            LineIdByBuildingId.Add(Member.BuildingId, Line.LineId);
+            UniqueMembers.AddUnique(Member);
         }
+    }
+    SanitizedLine.Members = MoveTemp(UniqueMembers);
+
+    FScopeLock Lock(&Mutex);
+
+    // If updating an existing line, clear its previous reverse mappings first
+    if (const FProductionLine* Existing = LinesById.Find(SanitizedLine.LineId))
+    {
+        for (const FBuildingRef& OldMember : Existing->Members)
+        {
+            if (const FString* MappedLineId = LineIdByBuildingId.Find(OldMember.BuildingId))
+            {
+                if (*MappedLineId == SanitizedLine.LineId)
+                {
+                    LineIdByBuildingId.Remove(OldMember.BuildingId);
+                }
+            }
+        }
+    }
+
+    FProductionLine& StoredLine = LinesById.Add(SanitizedLine.LineId, MoveTemp(SanitizedLine));
+
+    // Transfer any buildings reassigned from other lines so forward/reverse indices stay consistent
+    for (const FBuildingRef& Member : StoredLine.Members)
+    {
+        DetachBuildingFromPreviousLineLocked(Member.BuildingId, StoredLine.LineId);
+        LineIdByBuildingId.Add(Member.BuildingId, StoredLine.LineId);
     }
 
     return true;
@@ -44,7 +78,13 @@ bool FFicsitAILineRegistry::UnregisterLine(const FString& LineId)
     {
         for (const FBuildingRef& Member : RemovedLine.Members)
         {
-            LineIdByBuildingId.Remove(Member.BuildingId);
+            if (const FString* MappedLineId = LineIdByBuildingId.Find(Member.BuildingId))
+            {
+                if (*MappedLineId == LineId)
+                {
+                    LineIdByBuildingId.Remove(Member.BuildingId);
+                }
+            }
         }
         return true;
     }
@@ -67,19 +107,7 @@ bool FFicsitAILineRegistry::AddBuildingToLine(const FString& LineId, const FBuil
         return false;
     }
 
-    // If building is already in another line, remove it from that line
-    if (const FString* OldLineId = LineIdByBuildingId.Find(Building.BuildingId))
-    {
-        if (*OldLineId != LineId)
-        {
-            if (FProductionLine* OldLine = LinesById.Find(*OldLineId))
-            {
-                OldLine->Members.RemoveAll([&Building](const FBuildingRef& Item) {
-                    return Item.BuildingId == Building.BuildingId;
-                });
-            }
-        }
-    }
+    DetachBuildingFromPreviousLineLocked(Building.BuildingId, LineId);
 
     Line->Members.AddUnique(Building);
     LineIdByBuildingId.Add(Building.BuildingId, LineId);

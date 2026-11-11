@@ -96,6 +96,62 @@ bool FFicsitAILineTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Осталась 1 линия"), Registry.GetAllLines().Num(), 1);
     }
 
+    // -------------------------------------------------------------------------
+    // 3. Проверка консистентности индексов при двойном RegisterLine и удалении
+    // -------------------------------------------------------------------------
+    {
+        FFicsitAILineRegistry Registry;
+
+        const FBuildingRef S1{ TEXT("Persistent_Level:PersistentLevel.Build_Smelter_C_10"), FName(TEXT("Build_Smelter_C")) };
+        const FBuildingRef S2{ TEXT("Persistent_Level:PersistentLevel.Build_Smelter_C_11"), FName(TEXT("Build_Smelter_C")) };
+        const FBuildingRef S3{ TEXT("Persistent_Level:PersistentLevel.Build_Smelter_C_12"), FName(TEXT("Build_Smelter_C")) };
+
+        FProductionLine LineA;
+        LineA.LineId = TEXT("line_a");
+        LineA.Name = TEXT("Line A");
+        LineA.Members = { S1, S2 };
+        TestTrue(TEXT("Регистрация LineA"), Registry.RegisterLine(LineA));
+
+        // Регистрируем LineB с уже принадлежащей LineA постройкой S1
+        FProductionLine LineB;
+        LineB.LineId = TEXT("line_b");
+        LineB.Name = TEXT("Line B");
+        LineB.Members = { S1, S3 };
+        TestTrue(TEXT("Регистрация LineB с переносом S1"), Registry.RegisterLine(LineB));
+
+        FProductionLine ReadA;
+        TestTrue(TEXT("LineA найдена"), Registry.FindLineById(TEXT("line_a"), ReadA));
+        TestEqual(TEXT("После переноса S1 в LineA осталась только 1 постройка"), ReadA.Members.Num(), 1);
+        if (ReadA.Members.Num() == 1)
+        {
+            TestEqual(TEXT("В LineA остался именно S2"), ReadA.Members[0].BuildingId, S2.BuildingId);
+        }
+
+        FProductionLine Owner;
+        TestTrue(TEXT("Поиск по S1 возвращает LineB"), Registry.FindLineForBuilding(S1.BuildingId, Owner));
+        TestEqual(TEXT("Владелец S1 — line_b"), Owner.LineId, TEXT("line_b"));
+
+        // Удаление LineA не должно затрагивать S1 в LineB
+        TestTrue(TEXT("Удаление LineA"), Registry.UnregisterLine(TEXT("line_a")));
+        TestTrue(TEXT("S1 по-прежнему привязан к LineB после удаления LineA"), Registry.FindLineForBuilding(S1.BuildingId, Owner));
+        TestEqual(TEXT("Владелец S1 после удаления LineA — line_b"), Owner.LineId, TEXT("line_b"));
+        TestFalse(TEXT("S2 отвязан после удаления LineA"), Registry.FindLineForBuilding(S2.BuildingId, Owner));
+
+        // Повторная регистрация LineB с заменой S1 -> S2 (и дубликатом в входе)
+        FProductionLine LineBUpdated;
+        LineBUpdated.LineId = TEXT("line_b");
+        LineBUpdated.Name = TEXT("Line B Updated");
+        LineBUpdated.Members = { S2, S3, S2 };
+        TestTrue(TEXT("Обновление LineB через RegisterLine"), Registry.RegisterLine(LineBUpdated));
+        TestFalse(TEXT("S1 отвязан после обновления состава LineB"), Registry.FindLineForBuilding(S1.BuildingId, Owner));
+        TestTrue(TEXT("S2 привязан к LineB"), Registry.FindLineForBuilding(S2.BuildingId, Owner));
+        TestEqual(TEXT("Владелец S2 — line_b"), Owner.LineId, TEXT("line_b"));
+
+        FProductionLine ReadB;
+        TestTrue(TEXT("LineB найдена"), Registry.FindLineById(TEXT("line_b"), ReadB));
+        TestEqual(TEXT("Дубликат S2 отфильтрован (ровно 2 постройки)"), ReadB.Members.Num(), 2);
+    }
+
     return true;
 }
 

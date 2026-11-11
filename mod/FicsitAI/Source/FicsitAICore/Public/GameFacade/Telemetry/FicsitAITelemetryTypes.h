@@ -12,6 +12,7 @@ namespace FicsitAI::Telemetry
 enum class EFicsitAIGeneratorType : uint8
 {
     Standard,
+    Coal,
     Fuel,
     Biomass,
     GeoThermal,
@@ -20,24 +21,28 @@ enum class EFicsitAIGeneratorType : uint8
 };
 
 /**
- * Snapshot of a single generator building in the world.
+ * Allocation-free POD snapshot of a single generator building.
+ * Building identity (BuildingId) is held by the BuildingIndex caller.
  */
 struct FGeneratorTelemetryItem
 {
-    FString BuildingId;
     FName ClassName = NAME_None;
     EFicsitAIGeneratorType GeneratorType = EFicsitAIGeneratorType::Unknown;
+    int32 CircuitId = -1;
 
     float ProductionCapacityMW = 0.0f;
     float BaseProductionCapacityMW = 0.0f;
     float CurrentProductionMW = 0.0f;
+    float BaseProductionMW = 0.0f;
+    float DynamicProductionMW = 0.0f;
+    float DynamicProductionCapacityMW = 0.0f;
     float LoadPercentage = 0.0f;
 
     bool bIsProducing = false;
     bool bCanStartProduction = false;
     bool bHasPower = false;
 
-    // Fuel generator details (AFGBuildableGeneratorFuel)
+    // Fuel generator details (AFGBuildableGeneratorFuel and subclasses)
     bool bIsFuelGenerator = false;
     bool bHasFuel = false;
     FName CurrentFuelClass = NAME_None;
@@ -47,7 +52,7 @@ struct FGeneratorTelemetryItem
     bool bRequiresSupplemental = false;
     bool bHasSupplemental = false;
     FName SupplementalResourceClass = NAME_None;
-    float SupplementalAmountRatio = 0.0f; // [0.0, 1.0]
+    float SupplementalAmountRatio = 0.0f;   // [0.0, 1.0]
     float SupplementalConsumptionRate = 0.0f; // m^3/s
 
     // Geothermal generator details (AFGBuildableGeneratorGeoThermal)
@@ -57,7 +62,7 @@ struct FGeneratorTelemetryItem
 };
 
 /**
- * Aggregated telemetry across multiple generators.
+ * Aggregated telemetry computed on a worker thread from generator snapshots.
  */
 struct FGeneratorsTelemetryAggregate
 {
@@ -68,8 +73,6 @@ struct FGeneratorsTelemetryAggregate
 
     TMap<FName, int32> CountByClass;
     TMap<FName, float> ProductionByClassMW;
-
-    TArray<FGeneratorTelemetryItem> Items;
 };
 
 /**
@@ -86,11 +89,11 @@ enum class EFicsitAIBatteryStatus : uint8
 };
 
 /**
- * Snapshot of an individual power storage / battery building.
+ * Allocation-free POD snapshot of an individual power storage / battery building.
+ * Building identity (BuildingId) is held by the BuildingIndex caller.
  */
 struct FPowerStorageTelemetryItem
 {
-    FString BuildingId;
     FName ClassName = NAME_None;
     int32 CircuitId = -1;
 
@@ -109,7 +112,7 @@ struct FPowerStorageTelemetryItem
 };
 
 /**
- * Aggregated telemetry across power storage units.
+ * Aggregated telemetry computed on a worker thread from power storage snapshots.
  */
 struct FPowerStorageTelemetryAggregate
 {
@@ -124,20 +127,18 @@ struct FPowerStorageTelemetryAggregate
     float TotalPowerInputMW = 0.0f;
     float TotalPowerOutputMW = 0.0f;
 
-    float EstimatedTimeToEmptySeconds = 0.0f;
-    float EstimatedTimeToFullSeconds = 0.0f;
-
-    TArray<FPowerStorageTelemetryItem> Items;
+    // Unset when not actively discharging/charging (metrics-v0.1.md).
+    TOptional<float> EstimatedTimeToEmptySeconds;
+    TOptional<float> EstimatedTimeToFullSeconds;
 };
 
 /**
- * Snapshot of a circuit switch / breaker.
+ * Allocation-free POD snapshot of a circuit switch / breaker.
+ * Building identity (BuildingId) is held by the BuildingIndex caller.
  */
 struct FCircuitBreakerTelemetryItem
 {
-    FString BuildingId;
     FName ClassName = NAME_None;
-    FString BuildingTag;
 
     bool bIsSwitchOn = false;
     bool bIsConnected = false;
@@ -150,7 +151,7 @@ struct FCircuitBreakerTelemetryItem
 };
 
 /**
- * Aggregated circuit breakers telemetry.
+ * Aggregated circuit breakers telemetry computed on a worker thread.
  */
 struct FCircuitBreakersTelemetryAggregate
 {
@@ -158,61 +159,62 @@ struct FCircuitBreakersTelemetryAggregate
     int32 OnSwitches = 0;
     int32 OffSwitches = 0;
     int32 DisconnectedSwitches = 0;
-
-    TArray<FCircuitBreakerTelemetryItem> Items;
 };
 
 /**
- * Operational classification of factory machines for §8.6 diagnostics.
+ * Production indicator status mirrored from EProductionStatus (§8.2).
  */
-enum class EFicsitAIMachineStatus : uint8
+enum class EFicsitAIProductionIndicator : uint8
 {
-    Producing,       // Active and running normally
-    NoRecipe,        // Machine has no recipe configured
-    NoPower,         // Machine has no power / fuse blown
-    Starved,         // Input buffer empty or insufficient
-    Blocked,         // Output buffer full / conveyor stalled
-    Idle             // Configured and ready but currently idle
+    None,
+    Producing,
+    ProducingWithCrystal,
+    Standby,
+    Error,
+    Unknown
 };
 
 /**
- * Telemetry snapshot for an individual factory machine (smelter, constructor, etc.).
+ * Compact per-machine state snapshot for GameThread sampling (§8.2).
+ * Records observed/derived machine state flags only; FR-23 cause classification belongs in core/.
+ * Building identity (BuildingId) is held by the BuildingIndex caller.
  */
 struct FMachineLoadTelemetryItem
 {
-    FString BuildingId;
     FName ClassName = NAME_None;
     FName CurrentRecipeClass = NAME_None;
 
-    bool bIsConfigured = false;
-    bool bIsProducing = false;
     bool bHasPower = false;
+    bool bIsProducing = false;
+    bool bIsProductionPaused = false;
+    bool bIsStandby = false;
+    bool bIsConfigured = false;
+    EFicsitAIProductionIndicator ProductionIndicator = EFicsitAIProductionIndicator::Unknown;
 
     float Productivity = 0.0f; // [0.0, 1.0]
     float CycleTimeSeconds = 0.0f;
 
-    bool bInputInventoryEmpty = false;
-    bool bOutputInventoryFull = false;
-
-    EFicsitAIMachineStatus DiagnosticStatus = EFicsitAIMachineStatus::Idle;
+    // Derived buffer readiness flags (§8.2, measured in S3; excluded from v0.1 API).
+    // Unset when not evaluated (e.g. unconfigured machine, missing recipe, or null inventory).
+    TOptional<bool> bHasIngredientsForCycle;
+    TOptional<bool> bHasOutputSpaceForCycle;
 };
 
 /**
- * Aggregated machine load metrics across factory buildings.
+ * Aggregated machine load metrics computed on a worker thread from machine state snapshots (§8.2).
  */
 struct FMachineLoadTelemetryAggregate
 {
     int32 TotalMachines = 0;
     int32 ProducingMachines = 0;
-    int32 IdleMachines = 0;
-    int32 StarvedMachines = 0;
-    int32 BlockedMachines = 0;
+    int32 PausedMachines = 0;
     int32 UnpoweredMachines = 0;
+    int32 UnconfiguredMachines = 0;
 
     float AverageProductivity = 0.0f;
 
+    TMap<FName, int32> CountByClass;
     TMap<FName, int32> CountByRecipe;
-    TArray<FMachineLoadTelemetryItem> Items;
 };
 
 } // namespace FicsitAI::Telemetry

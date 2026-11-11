@@ -55,6 +55,8 @@ public:
     void Clear();
 
 private:
+    void DetachBuildingFromPreviousLineLocked(const FString& BuildingId, const FString& TargetLineId);
+
     mutable FCriticalSection Mutex;
     TMap<FString, FProductionLine> LinesById;
     TMap<FString, FString> LineIdByBuildingId;
