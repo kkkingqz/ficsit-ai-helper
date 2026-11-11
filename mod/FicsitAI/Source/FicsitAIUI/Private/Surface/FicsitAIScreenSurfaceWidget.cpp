@@ -15,7 +15,7 @@ UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::OpenForPlayer(APlaye
     }
 
     UFicsitAIScreenSurfaceWidget* Widget = ActivePlayerSurfaceWidget.Get();
-    if (!Widget || !Widget->IsValidLowLevelFast())
+    if (!Widget || Widget->GetOwningPlayer() != PC)
     {
         Widget = CreateWidget<UFicsitAIScreenSurfaceWidget>(PC, UFicsitAIScreenSurfaceWidget::StaticClass());
         ActivePlayerSurfaceWidget = Widget;
@@ -51,16 +51,14 @@ UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::OpenForPlayer(APlaye
 
 void UFicsitAIScreenSurfaceWidget::CloseForPlayer(APlayerController* PC)
 {
-    if (ActivePlayerSurfaceWidget.IsValid())
+    UFicsitAIScreenSurfaceWidget* Widget = ActivePlayerSurfaceWidget.Get();
+    if (!Widget || Widget->GetOwningPlayer() != PC)
     {
-        UFicsitAIScreenSurfaceWidget* Widget = ActivePlayerSurfaceWidget.Get();
-        if (Widget && Widget->IsInViewport())
-        {
-            Widget->RemoveFromParent();
-        }
-        ActivePlayerSurfaceWidget = nullptr;
+        return;
     }
 
+    Widget->RemoveFromParent();
+    ActivePlayerSurfaceWidget.Reset();
     if (PC && PC->IsLocalController())
     {
         PC->SetInputMode(FInputModeGameOnly());
@@ -70,12 +68,8 @@ void UFicsitAIScreenSurfaceWidget::CloseForPlayer(APlayerController* PC)
 
 bool UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(APlayerController* PC)
 {
-    if (!ActivePlayerSurfaceWidget.IsValid())
-    {
-        return false;
-    }
-    UFicsitAIScreenSurfaceWidget* Widget = ActivePlayerSurfaceWidget.Get();
-    return Widget && Widget->IsInViewport();
+    const UFicsitAIScreenSurfaceWidget* Widget = ActivePlayerSurfaceWidget.Get();
+    return PC && Widget && Widget->GetOwningPlayer() == PC && Widget->IsInViewport();
 }
 
 void UFicsitAIScreenSurfaceWidget::SetHost(TScriptInterface<IFicsitAIScreenHost> InHost)
@@ -144,6 +138,8 @@ void UFicsitAIScreenSurfaceWidget::RefreshModuleContent()
     {
         if (UUserWidget* ModuleWidget = Cast<UUserWidget>(ActiveModule.GetObject()))
         {
+            ModuleWidget->SetPlayerContext(GetPlayerContext());
+            ModuleWidget->Initialize();
             ModuleContentBox->SetContent(ModuleWidget->TakeWidget());
             return;
         }
@@ -323,7 +319,16 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
     const FKey NotesKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes")));
     const FKey StatusKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Status")));
 
-    if ((BackKey.IsValid() && Key == BackKey) || (OpenKey.IsValid() && Key == OpenKey) || Key == EKeys::Escape)
+    const bool bCloseKey = Key == EKeys::Escape
+        || (BackKey.IsValid() && Key == BackKey) || (OpenKey.IsValid() && Key == OpenKey);
+    const bool bNotesKey = NotesKey.IsValid() && Key == NotesKey;
+    const bool bStatusKey = StatusKey.IsValid() && Key == StatusKey;
+    if (InKeyEvent.IsRepeat() && (bCloseKey || bNotesKey || bStatusKey))
+    {
+        return FReply::Handled();
+    }
+
+    if (bCloseKey)
     {
         if (ActiveModule && ActiveModule->HandleBackAction())
         {
@@ -339,7 +344,7 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
         }
         return FReply::Handled();
     }
-    else if (NotesKey.IsValid() && Key == NotesKey)
+    else if (bNotesKey)
     {
         if (Host)
         {
@@ -347,7 +352,7 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
             return FReply::Handled();
         }
     }
-    else if (StatusKey.IsValid() && Key == StatusKey)
+    else if (bStatusKey)
     {
         if (Host)
         {

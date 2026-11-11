@@ -34,6 +34,8 @@ void UFicsitAITestScreenHost::InitializeTestHost(const FString& InSaveId, TScrip
     ModuleFactory = InFactory;
 
     UFicsitAIScreenSurfaceWidget* SurfaceWidget = NewObject<UFicsitAIScreenSurfaceWidget>(this);
+    SurfaceWidget->Initialize();
+    SurfaceWidget->SetHost(HostContext.Host);
     ScreenSurface.SetObject(SurfaceWidget);
     ScreenSurface.SetInterface(Cast<IFicsitAIScreenSurface>(SurfaceWidget));
 }

@@ -3,7 +3,7 @@
 	"Version": 1,
 	"VersionName": "0.1.0",
 	"SemVersion": "0.1.0",
-	"GameVersion": ">=491125",
+	"GameVersion": ">=517554",
 	"FriendlyName": "FICSIT AI",
 	"Description": "AI Assistant and Telemetry Terminal for Satisfactory",
 	"Category": "Modding",

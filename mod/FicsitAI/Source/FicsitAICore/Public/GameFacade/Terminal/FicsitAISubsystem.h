@@ -30,7 +30,7 @@ public:
     /** Обработчик инициализации ввода игрока (AFGCharacterPlayer::OnPlayerInputInitialized) */
     void HandlePlayerInputInitialized(class AFGCharacterPlayer* PlayerChar, class UInputComponent* InInputComponent);
 
-    /** Обработчик действия открытия/закрытия терминала IA_FicsitAI_OpenTerminal */
+    /** Открытие терминала под прицелом по переназначаемому действию */
     UFUNCTION()
     void HandleActionOpenTerminal();
 

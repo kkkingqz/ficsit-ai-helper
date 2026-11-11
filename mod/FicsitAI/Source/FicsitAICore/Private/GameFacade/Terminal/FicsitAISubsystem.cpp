@@ -3,6 +3,7 @@
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
 #include "FGCharacterPlayer.h"
 #include "FGPlayerController.h"
+#include "FGUseableInterface.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
@@ -169,52 +170,19 @@ void AFicsitAISubsystem::HandleActionOpenTerminal()
         return;
     }
 
-    // 1. Если экран терминала уже открыт, повторное нажатие хоткея закрывает его
     if (UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(PC))
     {
-        for (int32 i = RegisteredTerminals.Num() - 1; i >= 0; --i)
-        {
-            if (RegisteredTerminals[i].IsValid())
-            {
-                RegisteredTerminals[i]->CloseActiveModule();
-            }
-        }
-        for (TActorIterator<AFicsitAITerminal> It(World); It; ++It)
-        {
-            if (It->IsValidLowLevelFast())
-            {
-                It->CloseActiveModule();
-            }
-        }
         return;
     }
 
-    // 2. Если экран закрыт, проверяем объект под прицелом игрока (GetBestUsableActor / трассировка)
-    AFGCharacterPlayer* Char = Cast<AFGCharacterPlayer>(PC->GetPawn());
-    AFicsitAITerminal* TargetTerminal = Char ? Cast<AFicsitAITerminal>(Char->GetBestUsableActor()) : nullptr;
-
-    if (!TargetTerminal)
+    AFGCharacterPlayer* Character = Cast<AFGCharacterPlayer>(PC->GetPawn());
+    if (Character)
     {
-        // Fallback: трассировка взгляда игрока (500 см)
-        FVector CamLoc;
-        FRotator CamRot;
-        PC->GetPlayerViewPoint(CamLoc, CamRot);
-        FHitResult HitResult;
-        FCollisionQueryParams QueryParams;
-        if (Char)
+        if (AFicsitAITerminal* Terminal = Cast<AFicsitAITerminal>(Character->GetBestUsableActor()))
         {
-            QueryParams.AddIgnoredActor(Char);
+            FUseState UseState;
+            IFGUseableInterface::Execute_OnUse(Terminal, Character, UseState);
         }
-        if (World->LineTraceSingleByChannel(HitResult, CamLoc, CamLoc + CamRot.Vector() * 500.0f, ECC_Visibility, QueryParams))
-        {
-            TargetTerminal = Cast<AFicsitAITerminal>(HitResult.GetActor());
-        }
-    }
-
-    if (TargetTerminal)
-    {
-        FUseState UseState;
-        TargetTerminal->OnUse(Char, UseState);
     }
 }
 

@@ -99,19 +99,7 @@ AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 
 void AFicsitAITerminal::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    if (UWorld* World = GetWorld())
-    {
-        if (APlayerController* PC = World->GetFirstPlayerController())
-        {
-            if (ULocalPlayer* LP = PC->GetLocalPlayer())
-            {
-                if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-                {
-                    Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
-                }
-            }
-        }
-    }
+    CloseActiveModule();
     if (AFicsitAISubsystem* Subsystem = GetSubsystem())
     {
         Subsystem->UnregisterTerminal(this);
@@ -355,22 +343,16 @@ void AFicsitAITerminal::HandleControlMappingsRebuilt()
 
 void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, const FUseState& state)
 {
+    APlayerController* PC = byCharacter ? Cast<APlayerController>(byCharacter->GetController()) : nullptr;
+    if (!PC || !PC->IsLocalController() || UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(PC))
+    {
+        // Штатный Use и действие мода могут получить одно и то же нажатие.
+        return;
+    }
+
     if (HasAuthority())
     {
         UpdateHostState();
-    }
-
-    APlayerController* PC = byCharacter ? Cast<APlayerController>(byCharacter->GetController()) : nullptr;
-    if (!PC || !PC->IsLocalController())
-    {
-        return;
-    }
-
-    // Если экран уже открыт для этого игрока, повторное нажатие E закрывает его
-    if (UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(PC))
-    {
-        CloseActiveModule();
-        return;
     }
 
     // При открытии терминала подтверждаем контекст Enhanced Input (SML Manual Registration, priority 200)
@@ -548,21 +530,17 @@ void AFicsitAITerminal::CloseActiveModule()
         TeardownActiveModule();
     }
 
-    if (UWorld* World = GetWorld())
+    if (UFicsitAIScreenSurfaceWidget* Widget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
     {
-        if (APlayerController* PC = World->GetFirstPlayerController())
+        APlayerController* PC = Widget->GetOwningPlayer();
+        if (ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr)
         {
-            UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
-
-            // Отписываемся от делегата перестроения маппингов виджета
-            if (ULocalPlayer* LP = PC->GetLocalPlayer())
+            if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
             {
-                if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
-                {
-                    Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
-                }
+                Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
             }
         }
+        UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
     }
     SetScreenSurface(nullptr);
 }

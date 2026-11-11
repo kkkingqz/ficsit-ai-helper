@@ -4,6 +4,8 @@
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
 #include "Modules/FicsitAITestIncompatibleModule.h"
+#include "Input/Events.h"
+#include "Widgets/SWidget.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -167,6 +169,25 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
 
     Host->CloseActiveModule();
     TestEqual(TEXT("Модуль закрыт после завершения теста"), Host->GetActiveModuleId(), NAME_None);
+
+    if (Surface)
+    {
+        TestTrue(TEXT("Status opens before testing the interaction key"), Host->OpenModule(TEXT("Status")));
+        const TSharedRef<SWidget> SlateSurface = Surface->TakeWidget();
+        const FInputDeviceId Device = FInputDeviceId::CreateFromInternalId(0);
+        const FKeyEvent HeldUseKey(EKeys::E, FModifierKeysState(), Device, true, 0, 0, 0);
+        TestTrue(TEXT("The surface handles auto-repeat of its interaction key"),
+            SlateSurface->OnKeyDown(FGeometry(), HeldUseKey).IsEventHandled());
+        TestEqual(TEXT("Holding the interaction key keeps the opened module active"),
+            Host->GetActiveModuleId(), FName(TEXT("Status")));
+
+        Surface->SetActionKeyBinding(TEXT("IA_FicsitAI_OpenTerminal"), EKeys::T);
+        const FKeyEvent PressedReboundKey(EKeys::T, FModifierKeysState(), Device, false, 0, 0, 0);
+        TestTrue(TEXT("The surface handles a fresh press of the remapped interaction key"),
+            SlateSurface->OnKeyDown(FGeometry(), PressedReboundKey).IsEventHandled());
+        TestEqual(TEXT("The remapped interaction key closes the module"),
+            Host->GetActiveModuleId(), NAME_None);
+    }
 
     // 12. Перенос состояния между двумя хостами одного сохранения (Gs-15.5, AC-14)
     UFicsitAITestScreenHost* HostA = NewObject<UFicsitAITestScreenHost>();
