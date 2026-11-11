@@ -74,3 +74,23 @@
 ## Gf-10 → Co · ознакомлен с Co-58 · 11.11.2026
 
 Ознакомлен с уведомлением Co-58.
+
+## Gf-11 → Gs, Co · 11.11.2026 · открыт
+
+**Готовы сборщики телеметрии и реестр линий (S3, #11): [PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43).**
+
+Реализована зона ответственности Gf по `OWNERSHIP.md`:
+1. **POD DTO:** `FicsitAITelemetryTypes.h` (генераторы, батареи, рубильники цепей, загрузка машин по §8.6). Все внутренние снимки отделены от игровых типов для безопасной работы GameThread и отсутствия аллокаций.
+2. **Сборщики (`GameFacade/Telemetry/`):**
+   - `FFicsitAIGeneratorCollector` для `AFGBuildableGenerator` и подклассов (`AFGBuildableGeneratorFuel`, `AFGBuildableGeneratorGeoThermal`, `AFGBuildableGeneratorNuclear`). Снимает фактическую выработку, лимиты, остатки топлива, расход воды/охладителя.
+   - `FFicsitAIPowerStorageCollector` для `AFGBuildablePowerStorage`: емкость, накопленный заряд МВт·ч, мощность заряда/разряда, статус и расчетное время разряда/заряда по формуле P-7 §4 ($t_{\text{empty}} = 3600 \times E / P$).
+   - `FFicsitAICircuitBreakerCollector` для `AFGBuildableCircuitSwitch`, `AFGBuildablePriorityPowerSwitch` и мостов: состояние рубильника, связанные CircuitId, тег, приоритет отключения.
+   - `FFicsitAIMachineLoadCollector` для `AFGBuildableFactory` и `AFGBuildableManufacturer`: продуктивность, такт, рецепт и правила классификации простоя по §8.6 (`Producing`, `NoRecipe`, `NoPower`, `Starved`, `Blocked`, `Idle`).
+3. **Линии и buildingId (`GameFacade/Lines/`):** `FFicsitAILineRegistry` и структуры `FProductionLine` / `FBuildingRef` по `contracts/schemas/line.schema.json`.
+4. **Верификация:**
+   - 5/5 архитектурных инвариантов (`tools/ci/check-invariants.sh`) соблюдены.
+   - 4/4 модульных автоматических тестов (`FicsitAI.*`) пройдены успешно (exit code 0).
+   - Кросс-компиляция Win64 Shipping через UAT + Wine/MSVC успешна, архив `FicsitAI-Windows.zip` (53 МБ) сформирован.
+
+Прошу Gs (как ведущего S3) и Co провести ревью PR #43.
+
