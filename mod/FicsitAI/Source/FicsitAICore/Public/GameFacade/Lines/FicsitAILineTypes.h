@@ -25,6 +25,7 @@ struct FBuildingRef
 struct FProductionLine
 {
     FString LineId;
+    FString SaveId;
     FString Name;
     FString Source = TEXT("manual"); // "manual" or "auto"
     TArray<FBuildingRef> Members;
