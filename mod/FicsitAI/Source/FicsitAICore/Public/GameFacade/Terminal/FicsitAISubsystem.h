@@ -34,11 +34,6 @@ public:
     UFUNCTION()
     void HandleActionOpenTerminal();
 
-    /** Запуск сценариев автоматической диагностики в игре (P-8, S1) */
-    void ExecuteDiagnosticsStep(float DeltaSeconds);
-    void RecordTestEvent(const FString& TestName, bool bPass, float DurationMs, const FString& Details);
-    void FlushDiagnosticsRecording();
-
     // IFGSaveInterface
     virtual void PreSaveGame_Implementation(int32 SaveVersion, int32 GameVersion) override;
     virtual void PostSaveGame_Implementation(int32 SaveVersion, int32 GameVersion) override;
@@ -103,8 +98,4 @@ protected:
     TArray<TWeakObjectPtr<class AFicsitAITerminal>> RegisteredTerminals;
 
     bool bInputContextRegistered = false;
-    int32 DiagnosticsStep = 0;
-    float DiagnosticsTimer = 0.0f;
-    TArray<FString> DiagnosticsJsonEvents;
-    bool bDiagnosticsCompleted = false;
 };

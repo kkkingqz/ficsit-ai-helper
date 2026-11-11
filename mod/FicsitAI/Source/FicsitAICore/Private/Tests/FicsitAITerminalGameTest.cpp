@@ -8,6 +8,7 @@
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
 #include "Surface/FicsitAIScreenSurfaceWidget.h"
 #include "PlayerMappableKeySettings.h"
+#include "InputTriggers.h"
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
 #include "Modules/FicsitAITestIncompatibleModule.h"
@@ -65,7 +66,7 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalClient->OnRep_HostContext();
     TestEqual(TEXT("Клиент реплицирует Ready от сервера"), TerminalClient->GetScreenContext().HostState, EFicsitAIHostState::Ready);
 
-    // 2.2 Проверка Enhanced Input до открытия терминала (P-7 §1.3–1.4, Gs-15 раунд 5)
+    // 2.2 Проверка Enhanced Input до открытия терминала (P-7 §1.3–1.4, Gs-15 раунды 5 и 6)
     const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
     TestNotNull(TEXT("IMC существует"), IMC);
     if (IMC)
@@ -76,6 +77,21 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         TestNotNull(TEXT("ActionStatus задан"), IMC->ActionStatus.Get());
         TestNotNull(TEXT("ActionBack задан"), IMC->ActionBack.Get());
 
+        // Проверка отсутствия поглощения ввода при закрытом терминале (Gs-15 раунд 6, замечание 3)
+        TestFalse(TEXT("ActionOpenTerminal не поглощает ввод (bConsumeInput = false)"), IMC->ActionOpenTerminal->bConsumeInput);
+        TestFalse(TEXT("ActionNotes не поглощает ввод (bConsumeInput = false)"), IMC->ActionNotes->bConsumeInput);
+        TestFalse(TEXT("ActionStatus не поглощает ввод (bConsumeInput = false)"), IMC->ActionStatus->bConsumeInput);
+        TestFalse(TEXT("ActionBack не поглощает ввод (bConsumeInput = false)"), IMC->ActionBack->bConsumeInput);
+
+        TestFalse(TEXT("ActionOpenTerminal не блокирует Action/Axis mappings"), IMC->ActionOpenTerminal->bConsumesActionAndAxisMappings);
+        TestFalse(TEXT("ActionNotes не блокирует Action/Axis mappings"), IMC->ActionNotes->bConsumesActionAndAxisMappings);
+        TestFalse(TEXT("ActionStatus не блокирует Action/Axis mappings"), IMC->ActionStatus->bConsumesActionAndAxisMappings);
+        TestFalse(TEXT("ActionBack не блокирует Action/Axis mappings"), IMC->ActionBack->bConsumesActionAndAxisMappings);
+
+        // Проверка наличия триггера нажатия на ActionOpenTerminal (предотвращает повтор по кадрам при удержании)
+        TestTrue(TEXT("ActionOpenTerminal имеет триггеры"), IMC->ActionOpenTerminal->Triggers.Num() > 0);
+        TestTrue(TEXT("Триггер ActionOpenTerminal является UInputTriggerPressed"), IMC->ActionOpenTerminal->Triggers[0]->IsA<UInputTriggerPressed>());
+
         TestNotNull(TEXT("ActionOpenTerminal имеет MappableKeySettings"), IMC->ActionOpenTerminal->GetPlayerMappableKeySettings().Get());
         TestNotNull(TEXT("ActionNotes имеет MappableKeySettings"), IMC->ActionNotes->GetPlayerMappableKeySettings().Get());
         TestNotNull(TEXT("ActionStatus имеет MappableKeySettings"), IMC->ActionStatus->GetPlayerMappableKeySettings().Get());
@@ -85,14 +101,14 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Имя привязки Notes корректно"), IMC->ActionNotes->GetPlayerMappableKeySettings()->Name, FName(TEXT("FicsitAI.Notes")));
     }
 
-    // Проверка отображения переназначенной клавиши Notes и Open с первого открытия (Gs-15 раунд 5)
+    // Проверка отображения клавиш виджетом по умолчанию и при динамическом переназначении (P-7 §1.3–1.4)
     UFicsitAIScreenSurfaceWidget* TestWidget = NewObject<UFicsitAIScreenSurfaceWidget>();
-    TMap<FName, FKey> ReboundBindings;
-    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::T);
-    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_Notes")), EKeys::N);
-    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_Status")), EKeys::R);
-    ReboundBindings.Add(FName(TEXT("IA_FicsitAI_Back")), EKeys::Escape);
-    TestWidget->SetActionKeyBindings(ReboundBindings);
+    TestEqual(TEXT("GetKeyForAction для Notes по умолчанию возвращает F"), TestWidget->GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes"))), EKeys::F);
+    TestEqual(TEXT("GetKeyForAction для OpenTerminal по умолчанию возвращает E"), TestWidget->GetKeyForAction(FName(TEXT("IA_FicsitAI_OpenTerminal"))), EKeys::E);
+
+    // Динамическое переназначение клавиш в настройках (например, Notes -> N, Open -> T)
+    TestWidget->SetActionKeyBinding(FName(TEXT("IA_FicsitAI_Notes")), EKeys::N);
+    TestWidget->SetActionKeyBinding(FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::T);
 
     TestEqual(TEXT("GetKeyForAction для Notes возвращает переназначенную N с первого открытия"), TestWidget->GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes"))), EKeys::N);
     TestEqual(TEXT("GetKeyForAction для OpenTerminal возвращает переназначенную T с первого открытия"), TestWidget->GetKeyForAction(FName(TEXT("IA_FicsitAI_OpenTerminal"))), EKeys::T);

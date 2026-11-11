@@ -1,6 +1,7 @@
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
 #include "PlayerMappableKeySettings.h"
 #include "InputCoreTypes.h"
+#include "InputTriggers.h"
 
 UFicsitAIInputMappingContext::UFicsitAIInputMappingContext()
 {
@@ -11,6 +12,8 @@ UFicsitAIInputMappingContext::UFicsitAIInputMappingContext()
     ActionOpenTerminal = CreateDefaultSubobject<UFicsitAIInputAction>(TEXT("IA_FicsitAI_OpenTerminal"));
     ActionOpenTerminal->ValueType = EInputActionValueType::Boolean;
     ActionOpenTerminal->ActionDescription = NSLOCTEXT("FicsitAI", "ActionOpenTerminalDesc", "Взаимодействие с терминалом FICSIT AI");
+    ActionOpenTerminal->bConsumeInput = false;
+    ActionOpenTerminal->bConsumesActionAndAxisMappings = false;
     {
         UPlayerMappableKeySettings* Settings = CreateDefaultSubobject<UPlayerMappableKeySettings>(TEXT("Mappable_OpenTerminal"));
         Settings->Name = FName(TEXT("FicsitAI.OpenTerminal"));
@@ -19,11 +22,16 @@ UFicsitAIInputMappingContext::UFicsitAIInputMappingContext()
         Settings->IsPlayerMappable = true;
         ActionOpenTerminal->SetMappableKeySettings(Settings);
     }
+    // Триггер одиночного нажатия (UInputTriggerPressed), чтобы удержание не повторяло действие по кадрам (Gs-15 раунд 6)
+    UInputTriggerPressed* OpenPressedTrigger = CreateDefaultSubobject<UInputTriggerPressed>(TEXT("Trigger_OpenTerminal_Pressed"));
+    ActionOpenTerminal->Triggers.Add(OpenPressedTrigger);
 
     // 2. Экран Заметки (F)
     ActionNotes = CreateDefaultSubobject<UFicsitAIInputAction>(TEXT("IA_FicsitAI_Notes"));
     ActionNotes->ValueType = EInputActionValueType::Boolean;
     ActionNotes->ActionDescription = NSLOCTEXT("FicsitAI", "ActionNotesDesc", "Переключение на экран заметок FICSIT AI");
+    ActionNotes->bConsumeInput = false;
+    ActionNotes->bConsumesActionAndAxisMappings = false;
     {
         UPlayerMappableKeySettings* Settings = CreateDefaultSubobject<UPlayerMappableKeySettings>(TEXT("Mappable_Notes"));
         Settings->Name = FName(TEXT("FicsitAI.Notes"));
@@ -37,6 +45,8 @@ UFicsitAIInputMappingContext::UFicsitAIInputMappingContext()
     ActionStatus = CreateDefaultSubobject<UFicsitAIInputAction>(TEXT("IA_FicsitAI_Status"));
     ActionStatus->ValueType = EInputActionValueType::Boolean;
     ActionStatus->ActionDescription = NSLOCTEXT("FicsitAI", "ActionStatusDesc", "Переключение на экран статуса / статистики FICSIT AI");
+    ActionStatus->bConsumeInput = false;
+    ActionStatus->bConsumesActionAndAxisMappings = false;
     {
         UPlayerMappableKeySettings* Settings = CreateDefaultSubobject<UPlayerMappableKeySettings>(TEXT("Mappable_Status"));
         Settings->Name = FName(TEXT("FicsitAI.Status"));
@@ -50,6 +60,8 @@ UFicsitAIInputMappingContext::UFicsitAIInputMappingContext()
     ActionBack = CreateDefaultSubobject<UFicsitAIInputAction>(TEXT("IA_FicsitAI_Back"));
     ActionBack->ValueType = EInputActionValueType::Boolean;
     ActionBack->ActionDescription = NSLOCTEXT("FicsitAI", "ActionBackDesc", "Закрытие интерфейса терминала FICSIT AI");
+    ActionBack->bConsumeInput = false;
+    ActionBack->bConsumesActionAndAxisMappings = false;
     {
         UPlayerMappableKeySettings* Settings = CreateDefaultSubobject<UPlayerMappableKeySettings>(TEXT("Mappable_Back"));
         Settings->Name = FName(TEXT("FicsitAI.Back"));
