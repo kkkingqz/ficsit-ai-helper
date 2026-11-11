@@ -11,4 +11,5 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 [[ $# -ge 3 && "$2" == "--" ]] || { echo "Использование: $(basename "$0") <build|game> -- <команда...>" >&2; exit 2; }
 name="$1"; shift 2
 [[ "$name" == build || "$name" == game ]] || fa_die "очередь '$name' неизвестна: build или game"
+fa_require_role
 fa_with_lock "$name" -x "$@"
