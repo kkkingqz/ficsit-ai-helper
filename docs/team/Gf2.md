@@ -45,13 +45,13 @@ GitHub Actions для всего, что собирается без движк�
 Сохранения с известным состоянием фабрики для S3, S6 и профилирования (MODULES I5). King предоставляет, Gf2 описывает их состав в `fixtures/`.
 
 - [x] Спецификация и требования к составу каждого сохранения ([`fixtures/saves-specification.md`](../../fixtures/saves-specification.md))
-- [x] Описание фактического состава после передачи файлов King: Save B верифицирован (`s8_baseline_yt.sav`)
+- [x] Описание фактического состава после передачи файлов King: Save A (`save_a_starter.sav`), Save B (`s8_baseline_yt.sav`), Save D (`save_d_sfplus.sav`)
 
 Общие пункты задачи:
 
-- [ ] Раннее сохранение (Save A)
+- [x] Раннее сохранение (Save A: `save_a_starter.sav`, 78 построек базовой игры, чистая сборка 379322, SHA-256 `eba4645f...`)
 - [x] Среднее: 1–2 тыс. построек (Save B: `s8_baseline_yt.sav`, 2 106 построек базовой игры, чистая сборка 372858)
-- [ ] Позднее: 5 тыс.+ построек (Save C)
+- [ ] Позднее: 5 тыс.+ построек (Save C: ожидается от King отдельно)
 - [x] Сохранение с модом, добавляющим рецепты (Save D: `save_d_sfplus.sav`, SatisfactoryPlus + RefinedPower, сборка 517554, SHA-256 `76ebe073...`)
 
 ### [P-7 · Тест-план этапа 1](https://github.com/kkkingqz/ficsit-ai-helper/issues/32) · #32

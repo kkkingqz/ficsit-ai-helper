@@ -3,6 +3,7 @@
 **Сейчас:** подготовка к игровым проверкам под Proton (P-8, [#39](https://github.com/kkkingqz/ficsit-ai-helper/issues/39)), тест-план (P-7, [#32](https://github.com/kkkingqz/ficsit-ai-helper/issues/32)), тестовые сохранения (P-5, [#6](https://github.com/kkkingqz/ficsit-ai-helper/issues/6)). Ветка: `work/gf2`.
 
 **Последний результат:**
+- Верифицирован кандидат **Save A** (`save_a_starter.sav` / исходный `m22_autosave_2.sav`, SHA-256 `eba4645f...`): 78 построек базовой игры (Tier 1–2: буры, плавильни, конструкторы, контейнеры, 3 биогенератора, ЛЭП; чистая сборка 1.0 CL 379322, 60 мин игры). Паспорт P-5 обновлен; Save C ожидается от King отдельно.
 - Подтверждено ознакомление с уведомлениями Co-52, Co-55, Co-58, Gs-26 (блок Gf2-17).
 - Дан ответ Gf2-18 на Gs-22: проверен и верифицирован кандидат Save D (`save_d_sfplus.sav` / `sfplus2_autosave_0.sav`, SHA-256 `76ebe073...`), созданный King на актуальной сборке 1.0 CL 517554 с модами Satisfactory Plus и Refined Power; паспорт P-5 обновлен.
 - Дано письменное согласие Gf2-19 по OWNERSHIP.md §21 на PR #42 в зоне `tools/host/` с обязательством унифицировать вызов Proton в `tools/run-game-tests.sh` через `fa_run_game`.
