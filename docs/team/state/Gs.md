@@ -2,16 +2,16 @@
 
 **Сейчас:** S3 ([#11](https://github.com/kkkingqz/ficsit-ai-helper/issues/11)), каталог и телеметрия. Документы в `work/gs`, адаптация рецептов в `mod/s3-catalog-recipes`. Текущая работа команды передана по Co-41.
 
-**Последний результат:** [#41](https://github.com/kkkingqz/ficsit-ai-helper/pull/41) читает единый снимок рецептов, предметов и построек через `TryReadCatalog`. Linux Editor собрал изолированный модуль, отчёт Automation показал 2 успешных теста. Импорт SBC [#38](https://github.com/kkkingqz/ficsit-ai-helper/pull/38) готов к ревью Co.
+**Последний результат:** [#41](https://github.com/kkkingqz/ficsit-ai-helper/pull/41) читает единый снимок рецептов, предметов и построек через `TryReadCatalog`. Linux Editor собрал изолированный модуль, отчёт Automation показал 2 успешных теста. По импорту SBC [#38](https://github.com/kkkingqz/ficsit-ai-helper/pull/38) Co предлагает закрыть PR без слияния (Co-44).
 
-**Блокирует меня:** для интеграции каталога нужна проводка `FicsitAICore` от Co (Gs-16), для полного прогона S3 — сохранения P-5. Жду новые ревизии [#35](https://github.com/kkkingqz/ficsit-ai-helper/pull/35) (Gs-14) и [#40](https://github.com/kkkingqz/ficsit-ai-helper/pull/40) (Gs-15).
+**Блокирует меня:** для полного прогона S3 нужны сохранения P-5. По Co-44 проверка каталога возможна локально поверх #40, постоянная проводка Co идёт после #40 и #41. По [#35](https://github.com/kkkingqz/ficsit-ai-helper/pull/35) готова новая ревизия Co2.
 
-**Ждут меня:** обновление снимка S3 по событиям и `catalogRevision`. По #40 проверена ревизия `11506a3`, вердикт [«нужны правки»](https://github.com/kkkingqz/ficsit-ai-helper/pull/40#issuecomment-6787536645). Co ведёт #37 в рамках S8. Co2 обновляет `CONTRIBUTING.md` и шаблон PR по Co-40 и Co-42.
+**Ждут меня:** обновление снимка S3 по событиям и `catalogRevision`. По #40 проверена ревизия `8201bcc`, вердикт [«нужны правки»](https://github.com/kkkingqz/ficsit-ai-helper/pull/40#issuecomment-6789181811). Co ведёт #37 в рамках S8. Co2 обновляет `CONTRIBUTING.md` и шаблон PR по Co-40 и Co-42.
 
 **Решения, на которых стою:** [архитектура §17.1, ADR-029, ADR-033, ADR-034](../../ARCHITECTURE.md), [AGENTS.md §5–6](../../../AGENTS.md), [зоны владения](../OWNERSHIP.md).
 
 **Дальше**
 
-1. S3: согласовать подключение #41 по Gs-16, затем проверить состав и разблокировки на Save D.
+1. S3: пересобрать #41 поверх #40, проверить состав и разблокировки на Save D.
 2. Повторить ревью #40 и #35 на новых ревизиях.
 3. Проверить обновление правил у Co2.
