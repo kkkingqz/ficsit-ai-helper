@@ -35,7 +35,7 @@ AFicsitAITerminal::AFicsitAITerminal()
     bReplicates = true;
 
     TerminalMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TerminalMesh"));
-    RootComponent = TerminalMeshComponent;
+    TerminalMeshComponent->SetupAttachment(RootComponent);
 
     static ConstructorHelpers::FObjectFinder<UStaticMesh> MeshFinder(TEXT("/Engine/BasicShapes/Cube.Cube"));
     if (MeshFinder.Succeeded())
@@ -45,15 +45,16 @@ AFicsitAITerminal::AFicsitAITerminal()
     }
 
     // Плоская поверхность экрана на лицевой стороне меша с пропорциями 16:9 (ADR-030, P-7 §1.1)
+    // Крепится к RootComponent (масштаб 1:1:1), чтобы не искажаться родительским масштабом корпуса (Gs-15 раунд 4)
     ScreenMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ScreenMesh"));
     ScreenMeshComponent->SetupAttachment(RootComponent);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> ScreenPlaneFinder(TEXT("/Engine/BasicShapes/Plane.Plane"));
     if (ScreenPlaneFinder.Succeeded())
     {
         ScreenMeshComponent->SetStaticMesh(ScreenPlaneFinder.Object);
-        ScreenMeshComponent->SetRelativeLocation(FVector(26.0f, 0.0f, 20.0f));
+        ScreenMeshComponent->SetRelativeLocation(FVector(25.5f, 0.0f, 20.0f));
         ScreenMeshComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-        ScreenMeshComponent->SetRelativeScale3D(FVector(0.55f, 0.98f, 1.0f)); // 16:9 соотношение
+        ScreenMeshComponent->SetRelativeScale3D(FVector(0.54f, 0.96f, 1.0f)); // 96 см / 54 см = ровно 16:9
     }
 
     TargetPowerConsumption = 10.0f;
@@ -67,6 +68,26 @@ AFicsitAITerminal::AFicsitAITerminal()
     PowerConnectionComponent->SetPowerInfo(PowerInfoComponent);
 }
 
+float AFicsitAITerminal::GetScreenAspectRatio() const
+{
+    if (ScreenMeshComponent)
+    {
+        // Вычисляем итоговый масштаб с учётом цепочки родителей (Gs-15 раунд 4)
+        FVector CombinedScale = ScreenMeshComponent->GetRelativeScale3D();
+        const USceneComponent* ParentComp = ScreenMeshComponent->GetAttachParent();
+        while (ParentComp)
+        {
+            CombinedScale *= ParentComp->GetRelativeScale3D();
+            ParentComp = ParentComp->GetAttachParent();
+        }
+        if (CombinedScale.X > 0.0f)
+        {
+            return CombinedScale.Y / CombinedScale.X;
+        }
+    }
+    return 16.0f / 9.0f;
+}
+
 AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 {
     if (CustomSubsystem)
@@ -78,6 +99,19 @@ AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 
 void AFicsitAITerminal::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (UWorld* World = GetWorld())
+    {
+        if (APlayerController* PC = World->GetFirstPlayerController())
+        {
+            if (ULocalPlayer* LP = PC->GetLocalPlayer())
+            {
+                if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+                {
+                    Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
+                }
+            }
+        }
+    }
     if (AFicsitAISubsystem* Subsystem = GetSubsystem())
     {
         Subsystem->UnregisterTerminal(this);
@@ -268,6 +302,57 @@ void AFicsitAITerminal::UpdateHostState()
     }
 }
 
+static TMap<FName, FKey> QueryActionKeyBindings(UEnhancedInputLocalPlayerSubsystem* Subsystem, const UFicsitAIInputMappingContext* IMC)
+{
+    TMap<FName, FKey> Bindings;
+    auto QueryActionKey = [&](const UInputAction* Action, FName ActionId, FKey FallbackKey)
+    {
+        if (Subsystem && Action)
+        {
+            TArray<FKey> Keys = Subsystem->QueryKeysMappedToAction(Action);
+            if (Keys.Num() > 0 && Keys[0].IsValid())
+            {
+                Bindings.Add(ActionId, Keys[0]);
+                return;
+            }
+        }
+        Bindings.Add(ActionId, FallbackKey);
+    };
+
+    if (IMC)
+    {
+        QueryActionKey(IMC->ActionBack, FName(TEXT("IA_FicsitAI_Back")), EKeys::Escape);
+        QueryActionKey(IMC->ActionOpenTerminal, FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::E);
+        QueryActionKey(IMC->ActionNotes, FName(TEXT("IA_FicsitAI_Notes")), EKeys::F);
+        QueryActionKey(IMC->ActionStatus, FName(TEXT("IA_FicsitAI_Status")), EKeys::R);
+    }
+    return Bindings;
+}
+
+void AFicsitAITerminal::HandleControlMappingsRebuilt()
+{
+    if (UWorld* World = GetWorld())
+    {
+        if (APlayerController* PC = World->GetFirstPlayerController())
+        {
+            if (ULocalPlayer* LP = PC->GetLocalPlayer())
+            {
+                if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+                {
+                    const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
+                    if (IMC && ScreenSurface)
+                    {
+                        if (UFicsitAIScreenSurfaceWidget* Widget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+                        {
+                            Widget->SetActionKeyBindings(QueryActionKeyBindings(Subsystem, IMC));
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, const FUseState& state)
 {
     if (HasAuthority())
@@ -288,7 +373,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         return;
     }
 
-    // При открытии терминала активируем контекст Enhanced Input и опрашиваем актуальные клавиши (Gs-15 раунд 3)
+    // При открытии терминала активируем контекст Enhanced Input с bForceImmediately = true (Gs-15 раунды 3 и 4)
     TMap<FName, FKey> CurrentBindings;
     if (ULocalPlayer* LP = PC->GetLocalPlayer())
     {
@@ -297,29 +382,15 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
             const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
             if (IMC)
             {
+                FModifyContextOptions Options;
+                Options.bForceImmediately = true;
                 if (!Subsystem->HasMappingContext(IMC))
                 {
-                    Subsystem->AddMappingContext(IMC, 100);
+                    Subsystem->AddMappingContext(IMC, 100, Options);
                 }
 
-                auto QueryActionKey = [&](const UInputAction* Action, FName ActionId, FKey FallbackKey)
-                {
-                    if (Action)
-                    {
-                        TArray<FKey> Keys = Subsystem->QueryKeysMappedToAction(Action);
-                        if (Keys.Num() > 0 && Keys[0].IsValid())
-                        {
-                            CurrentBindings.Add(ActionId, Keys[0]);
-                            return;
-                        }
-                    }
-                    CurrentBindings.Add(ActionId, FallbackKey);
-                };
-
-                QueryActionKey(IMC->ActionBack, FName(TEXT("IA_FicsitAI_Back")), EKeys::Escape);
-                QueryActionKey(IMC->ActionOpenTerminal, FName(TEXT("IA_FicsitAI_OpenTerminal")), EKeys::E);
-                QueryActionKey(IMC->ActionNotes, FName(TEXT("IA_FicsitAI_Notes")), EKeys::F);
-                QueryActionKey(IMC->ActionStatus, FName(TEXT("IA_FicsitAI_Status")), EKeys::R);
+                Subsystem->ControlMappingsRebuiltDelegate.AddUniqueDynamic(this, &AFicsitAITerminal::HandleControlMappingsRebuilt);
+                CurrentBindings = QueryActionKeyBindings(Subsystem, IMC);
             }
         }
     }
@@ -478,15 +549,18 @@ void AFicsitAITerminal::CloseActiveModule()
         {
             UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
 
-            // Удаляем Enhanced Input контекст терминала при закрытии (Gs-15 раунд 3)
+            // Удаляем Enhanced Input контекст терминала при закрытии (Gs-15 раунды 3 и 4)
             if (ULocalPlayer* LP = PC->GetLocalPlayer())
             {
                 if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
                 {
+                    Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
                     const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
                     if (IMC && Subsystem->HasMappingContext(IMC))
                     {
-                        Subsystem->RemoveMappingContext(IMC);
+                        FModifyContextOptions Options;
+                        Options.bForceImmediately = true;
+                        Subsystem->RemoveMappingContext(IMC, Options);
                     }
                 }
             }

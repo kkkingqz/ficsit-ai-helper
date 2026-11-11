@@ -14,6 +14,8 @@ public class FicsitAIUI : ModuleRules
             "Slate",
             "SlateCore",
             "UMG",
+            "Json",
+            "JsonUtilities",
             "FicsitAIApi"
         });
 

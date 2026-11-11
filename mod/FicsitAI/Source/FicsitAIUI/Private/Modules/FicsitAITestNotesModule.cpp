@@ -4,6 +4,8 @@
 #include "Widgets/SBoxPanel.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/Input/SMultiLineEditableTextBox.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 
 TSharedRef<SWidget> UFicsitAITestNotesModule::RebuildWidget()
 {
@@ -28,7 +30,8 @@ TSharedRef<SWidget> UFicsitAITestNotesModule::RebuildWidget()
                 .Padding(FMargin(12.0f))
                 [
                     SAssignNew(EditableTextBox, SMultiLineEditableTextBox)
-                    .Text_Lambda([this]() { return FText::FromString(NoteContent.IsEmpty() ? TEXT("Factory must grow...") : NoteContent); })
+                    .HintText(NSLOCTEXT("FicsitAI", "NotesPlaceholder", "Factory must grow..."))
+                    .Text_Lambda([this]() { return FText::FromString(NoteContent); })
                     .OnTextChanged_Lambda([this](const FText& InText) { NoteContent = InText.ToString(); })
                     .AutoWrapText(true)
                 ]
@@ -67,19 +70,48 @@ void UFicsitAITestNotesModule::OnDetach()
 
 FString UFicsitAITestNotesModule::SavePersistentState() const
 {
-    return FString::Printf(TEXT("{\"note\":\"%s\"}"), *NoteContent);
+    TSharedPtr<FJsonObject> JsonObj = MakeShared<FJsonObject>();
+    JsonObj->SetStringField(TEXT("note"), NoteContent);
+    FString OutputString;
+    TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
+    FJsonSerializer::Serialize(JsonObj.ToSharedRef(), Writer);
+    return OutputString;
 }
 
 void UFicsitAITestNotesModule::RestorePersistentState(const FString& State)
 {
-    if (State.Contains(TEXT("\"note\":\"")))
+    if (State.IsEmpty())
     {
-        int32 StartIdx = State.Find(TEXT("\"note\":\"")) + 8;
-        int32 EndIdx = State.Find(TEXT("\""), ESearchCase::IgnoreCase, ESearchDir::FromStart, StartIdx);
-        if (EndIdx > StartIdx)
+        NoteContent.Empty();
+        if (EditableTextBox.IsValid())
         {
-            NoteContent = State.Mid(StartIdx, EndIdx - StartIdx);
+            EditableTextBox->SetText(FText::GetEmpty());
         }
+        return;
+    }
+
+    TSharedPtr<FJsonObject> JsonObj;
+    TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(State);
+    if (FJsonSerializer::Deserialize(Reader, JsonObj) && JsonObj.IsValid())
+    {
+        if (JsonObj->HasTypedField<EJson::String>(TEXT("note")))
+        {
+            NoteContent = JsonObj->GetStringField(TEXT("note"));
+        }
+        else
+        {
+            NoteContent.Empty();
+        }
+    }
+    else
+    {
+        // Fallback для плоского текста
+        NoteContent = State;
+    }
+
+    if (EditableTextBox.IsValid())
+    {
+        EditableTextBox->SetText(FText::FromString(NoteContent));
     }
 }
 

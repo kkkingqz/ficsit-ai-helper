@@ -40,6 +40,18 @@ public:
     /** Переопределение наличия питания (для автотестов и симуляции) */
     void SetPowerOverride(TOptional<bool> InOverride) { bPowerOverride = InOverride; }
 
+    /** Соотношение сторон плоской поверхности экрана (ширина / высота) (P-7 §1.1) */
+    float GetScreenAspectRatio() const;
+
+    /** Имитация получения обновлённого состояния хоста по сети */
+    void SetHostContextForClient(const FFicsitAIScreenContext& InContext) { HostContext = InContext; }
+
+    UFUNCTION()
+    void OnRep_HostContext();
+
+    UFUNCTION()
+    void HandleControlMappingsRebuilt();
+
     /** Установить подсистему мода вручную (для тестов) */
     void SetCustomSubsystem(class AFicsitAISubsystem* InSubsystem) { CustomSubsystem = InSubsystem; }
 
@@ -133,9 +145,6 @@ protected:
     float TargetPowerConsumption = 10.0f;
 
     TOptional<bool> bPowerOverride;
-
-    UFUNCTION()
-    void OnRep_HostContext();
 
     void TeardownActiveModule();
 };

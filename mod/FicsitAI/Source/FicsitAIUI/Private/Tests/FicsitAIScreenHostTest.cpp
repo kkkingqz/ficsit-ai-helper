@@ -100,6 +100,20 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
     if (NotesModule)
     {
         TestEqual(TEXT("Текст заметки успешно восстановлен из состояния"), NotesModule->GetNoteContent(), TEXT("Factory must grow"));
+
+        // Проверка round-trip кавычек и спецсимволов (Gs-15 раунд 4, пункт 2)
+        NotesModule->SetNoteContent(TEXT("Pump \"A\" offline"));
+        const FString JsonWithQuotes = NotesModule->SavePersistentState();
+        NotesModule->SetNoteContent(TEXT("Temporary old cached text"));
+        NotesModule->RestorePersistentState(JsonWithQuotes);
+        TestEqual(TEXT("Заметка с кавычками полностью восстановлена"), NotesModule->GetNoteContent(), TEXT("Pump \"A\" offline"));
+
+        // Проверка очистки заметки пустой сохранённой строкой (Gs-15 раунд 4, пункт 2)
+        NotesModule->RestorePersistentState(TEXT(""));
+        TestTrue(TEXT("Пустая сохранённая строка очищает заметку"), NotesModule->GetNoteContent().IsEmpty());
+
+        // Восстанавливаем рабочий текст перед проверкой смены состояний
+        NotesModule->SetNoteContent(TEXT("Factory must grow"));
     }
 
     // 6. Переход в инертный режим (Inert) при открытом модуле (Gs-15.3, ADR-016)
