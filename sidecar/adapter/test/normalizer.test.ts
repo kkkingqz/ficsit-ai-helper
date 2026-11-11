@@ -191,49 +191,54 @@ describe("Gs-14 п. 2 — адрес провайдера собирается �
   });
 });
 
+const silent: Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
+
+interface Listener {
+  port: number;
+  seen: { url: string; key: string | undefined }[];
+  close: () => Promise<void>;
+}
+
+async function listen(handler: (seen: Listener["seen"], req: IncomingMessage, res: ServerResponse) => void): Promise<Listener> {
+  const seen: Listener["seen"] = [];
+  const server = createServer((req, res) => {
+    seen.push({ url: req.url ?? "", key: req.headers["x-goog-api-key"] as string | undefined });
+    handler(seen, req, res);
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address() as AddressInfo;
+  return {
+    port: address.port,
+    seen,
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+async function listenNormalizer(upstreamBaseUrl: string): Promise<Listener> {
+  const server = createNormalizerApp(upstreamBaseUrl, silent).listen(0, "127.0.0.1");
+  await new Promise<void>((resolve) => server.once("listening", () => resolve()));
+  const address = server.address() as AddressInfo;
+  return {
+    port: address.port,
+    seen: [],
+    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+  };
+}
+
+const post = (port: number, path: string): Promise<globalThis.Response> =>
+  fetch(`http://127.0.0.1:${port}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-goog-api-key": "synthetic-key" },
+    body: JSON.stringify({ model: "fake", messages: [{ role: "user", content: "привет" }] }),
+    redirect: "manual",
+  });
+
+const ok = (_seen: Listener["seen"], _req: IncomingMessage, res: ServerResponse): void => {
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end('{"choices":[{"index":0,"finish_reason":"stop","message":{"content":"готово"}}]}');
+};
+
 describe("Gs-14 п. 1 — ключ провайдера не уходит за редиректом", () => {
-  const silent: Logger = { debug: () => {}, info: () => {}, warn: () => {}, error: () => {} };
-
-  interface Listener {
-    port: number;
-    seen: { url: string; key: string | undefined }[];
-    close: () => Promise<void>;
-  }
-
-  async function listen(handler: (seen: Listener["seen"], req: IncomingMessage, res: ServerResponse) => void): Promise<Listener> {
-    const seen: Listener["seen"] = [];
-    const server = createServer((req, res) => {
-      seen.push({ url: req.url ?? "", key: req.headers["x-goog-api-key"] as string | undefined });
-      handler(seen, req, res);
-    });
-    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-    const address = server.address() as AddressInfo;
-    return {
-      port: address.port,
-      seen,
-      close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-    };
-  }
-
-  async function listenNormalizer(upstreamBaseUrl: string): Promise<Listener> {
-    const server = createNormalizerApp(upstreamBaseUrl, silent).listen(0, "127.0.0.1");
-    await new Promise<void>((resolve) => server.once("listening", () => resolve()));
-    const address = server.address() as AddressInfo;
-    return {
-      port: address.port,
-      seen: [],
-      close: () => new Promise<void>((resolve) => server.close(() => resolve())),
-    };
-  }
-
-  const post = (port: number, path: string): Promise<globalThis.Response> =>
-    fetch(`http://127.0.0.1:${port}${path}`, {
-      method: "POST",
-      headers: { "content-type": "application/json", "x-goog-api-key": "synthetic-key" },
-      body: JSON.stringify({ model: "fake", messages: [{ role: "user", content: "привет" }] }),
-      redirect: "manual",
-    });
-
   it("303 на другой порт: второй сервер запроса не видит, клиент получает 502", async () => {
     const harvester = await listen((_seen, _req, res) => {
       res.writeHead(200, { "content-type": "application/json" });
@@ -268,6 +273,40 @@ describe("Gs-14 п. 1 — ключ провайдера не уходит за �
       expect(response.status).toBe(200);
       expect(provider.seen[0]?.url).toBe("/v1/chat/completions?x-goog-api-key=synthetic");
       expect(provider.seen[0]?.key).toBe("synthetic-key");
+    } finally {
+      await Promise.all([normalizer.close(), provider.close()]);
+    }
+  });
+});
+
+describe("Gs-15 — повторяющийся параметр запроса доходит целиком", () => {
+  it("два значения одного имени не сворачиваются в последнее", () => {
+    const target = resolveTarget("http://127.0.0.1:9/v1", "/chat/completions?mode=one&mode=two");
+    expect(target.searchParams.getAll("mode")).toEqual(["one", "two"]);
+  });
+
+  it("то же имя есть в базе: значение базы вытесняется целиком, а не по одному", () => {
+    const target = resolveTarget(
+      "http://127.0.0.1:9/v1?mode=из-базы&region=eu",
+      "/chat/completions?mode=one&mode=two",
+    );
+    expect(target.searchParams.getAll("mode")).toEqual(["one", "two"]);
+    expect(target.searchParams.get("region")).toBe("eu");
+  });
+
+  it("повторы в базе сохраняются, если запрос про это имя молчит", () => {
+    const target = resolveTarget("http://127.0.0.1:9/v1?tag=a&tag=b", "/chat/completions");
+    expect(target.searchParams.getAll("tag")).toEqual(["a", "b"]);
+  });
+
+  it("до провайдера доходят оба значения", async () => {
+    const provider = await listen(ok);
+    const normalizer = await listenNormalizer(`http://127.0.0.1:${provider.port}/v1?mode=из-базы`);
+
+    try {
+      const response = await post(normalizer.port, "/chat/completions?mode=one&mode=two");
+      expect(response.status).toBe(200);
+      expect(provider.seen[0]?.url).toBe("/v1/chat/completions?mode=one&mode=two");
     } finally {
       await Promise.all([normalizer.close(), provider.close()]);
     }

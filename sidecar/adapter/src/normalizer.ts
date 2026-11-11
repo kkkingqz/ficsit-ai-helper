@@ -337,13 +337,18 @@ export function createSseNormalizer(
  *
  * При совпадении имени параметра побеждает запрос: база — это настройка, а
  * запрос приходит от клиента, который знает про конкретный вызов (`alt=sse`).
+ * «Побеждает» значит «вытесняет целиком»: имя из запроса сначала один раз
+ * убирается из базы, потом дописываются **все** значения запроса. Через
+ * `set` на каждую пару повторяющийся параметр терял все значения, кроме
+ * последнего (`?mode=one&mode=two` доходил как `mode=two`, ревью Gs-15).
  */
 export function resolveTarget(upstreamBaseUrl: string, requestUrl: string): URL {
   const base = new URL(upstreamBaseUrl);
   const incoming = new URL(requestUrl, "http://request.invalid");
   const target = new URL(base.toString());
   target.pathname = `${base.pathname.replace(/\/+$/, "")}${incoming.pathname}`;
-  for (const [name, value] of incoming.searchParams) target.searchParams.set(name, value);
+  for (const name of new Set(incoming.searchParams.keys())) target.searchParams.delete(name);
+  for (const [name, value] of incoming.searchParams) target.searchParams.append(name, value);
   return target;
 }
 
