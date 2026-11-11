@@ -40,7 +40,7 @@ enum class EFicsitAIScreenLayout : uint8
     Slots1,       // один слот main
     Slots2,       // main + side
     Slots3,       // main + side + foot
-    HudCompact    // v1.4, HUD при AI Assistant
+    HudCompact    // v1.4, HUD и быстрый интерфейс (ADR-035)
 };
 
 UENUM(BlueprintType)
@@ -59,7 +59,7 @@ struct FFicsitAIScreenContext
     /** Идентификатор сохранения (§10). Ключ всего состояния мода. */
     UPROPERTY(BlueprintReadOnly) FString SaveId;
 
-    /** Кто открыл: AI Terminal, AI Assistant (v1.4), тестовый хост, Screen Lab. */
+    /** Кто открыл: AI Terminal, быстрый интерфейс (v1.4), тестовый хост, Screen Lab. */
     UPROPERTY(BlueprintReadOnly) FName HostId;
 
     /** Пресет раскладки (§5.3). Свободной сетки нет сознательно. */

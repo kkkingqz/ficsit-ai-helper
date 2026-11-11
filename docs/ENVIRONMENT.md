@@ -133,12 +133,19 @@ cat UnrealEngine-CSS-Editor-Linux.tar.zst.* | zstd -d | tar -xf -
 Рабочая среда разработки модов поставляется единым проектом `SatisfactoryModLoader` (репозиторий выполняет роль как загрузчика модов, так и Starter Project для Unreal Engine).
 
 ### 5.1 Клонирование Starter Project
+
+Для сборки под Satisfactory **CL 517554** нужен Starter Project на [коммите SML a7e8550](https://github.com/satisfactorymodding/SatisfactoryModLoader/commit/a7e855031811d39bbdd12fc2563b87ea2d80cb5f). Тег SML `v3.12.0` содержит заголовки CL 491125. На CL 517554 сборка терминала с этими заголовками падает при создании постройки. В игре используется выпущенный SML `v3.12.0`.
+
 ```bash
-/usr/bin/git clone --branch v3.12.0 --depth 1 \
-  https://github.com/satisfactorymodding/SatisfactoryModLoader.git \
-  ~/Projects/SatisfactoryModLoader
+/usr/bin/git init ~/Projects/SatisfactoryModLoader
 cd ~/Projects/SatisfactoryModLoader
+/usr/bin/git remote add origin https://github.com/satisfactorymodding/SatisfactoryModLoader.git
+/usr/bin/git fetch --depth 1 origin a7e855031811d39bbdd12fc2563b87ea2d80cb5f
+/usr/bin/git switch --detach FETCH_HEAD
+/usr/bin/git rev-parse HEAD
 ```
+
+В существующей личной копии Starter Project сохраните локальные правки и выполните `fetch`, `switch` и `rev-parse` из этого блока. Ожидаемый `HEAD` — `a7e855031811d39bbdd12fc2563b87ea2d80cb5f`.
 
 В состав проекта входят:
 - `FactoryGame.uproject` (EngineAssociation `5.6.1-CSS`);
@@ -269,7 +276,7 @@ cat << 'EOF' > "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/BlankMod.uplu
 	"Version": 1,
 	"VersionName": "1.0.0",
 	"SemVersion": "1.0.0",
-	"GameVersion": ">=491125",
+	"GameVersion": ">=517554",
 	"FriendlyName": "Blank Mod",
 	"Description": "Test blank mod for verification",
 	"Category": "Modding",
@@ -311,9 +318,10 @@ MOD_NAME=BlankMod
 ## 8. Проверка мода в игре под Proton
 
 1. Установите **Satisfactory 1.2** в Steam, включите Proton и откройте расположение файлов игры через Steam. Для Flatpak Steam путь библиотеки может отличаться.
-2. Установите совместимый **SML 3.12** для этой копии игры. Для Linux основной путь — [Satisfactory Mod Manager](https://docs.ficsit.app/satisfactory-modding/latest/ForUsers/SatisfactoryModManager.html). Проверьте соответствие SML номеру сборки игры.
-3. Распакуйте `BlankMod-Windows.zip` в `FactoryGame/Mods/BlankMod/` так, чтобы получился файл `FactoryGame/Mods/BlankMod/BlankMod.uplugin`. Вложенный второй каталог `BlankMod` не нужен. [Структура каталога модов](https://docs.ficsit.app/satisfactory-modding/latest/ManualInstallDirections.html)
-4. Запустите игру из Steam под Proton. Убедитесь, что `BlankMod` отображается в меню модов и игра загружает тестовое сохранение. Если мод не появился, проверьте версию SML и сообщения загрузки `BlankMod` в журнале игры.
+2. Создайте личную копию игры для роли. На файловых системах с reflink используйте `cp -a --reflink=auto`, чтобы избежать полного дублирования данных. Держите для неё отдельный префикс Proton (`STEAM_COMPAT_DATA_PATH`) и устанавливайте тестовые моды только в личную копию. Если в неё попал `FactoryGame/Mods` из общей установки, отложите этот каталог перед установкой модов для прогона.
+3. Установите **SML 3.12.0** для личной копии игры CL 517554. Проверьте путь установки и номер сборки игры. Для Linux доступен [Satisfactory Mod Manager](https://docs.ficsit.app/satisfactory-modding/latest/ForUsers/SatisfactoryModManager.html).
+4. Распакуйте `BlankMod-Windows.zip` в `FactoryGame/Mods/BlankMod/` так, чтобы получился файл `FactoryGame/Mods/BlankMod/BlankMod.uplugin`. Вложенный второй каталог `BlankMod` не нужен. [Структура каталога модов](https://docs.ficsit.app/satisfactory-modding/latest/ManualInstallDirections.html)
+5. Запустите под Proton исполняемый файл личной копии с её префиксом. Убедитесь, что `BlankMod` отображается в меню модов и игра загружает тестовое сохранение. При выходе на старте проверьте первую ошибку `LogPluginManager` в журнале игры и сверяйте CL игры с коммитом заголовков по §5.1.
 
 ---
 
