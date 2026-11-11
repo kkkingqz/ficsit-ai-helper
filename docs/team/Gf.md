@@ -76,7 +76,7 @@ GitHub Actions для всего, что собирается без движк�
 Каталог из игры, индекс построек, каркас телеметрии с замерами бюджета GameThread. Ведёт Gs.
 
 - [x] Сборщики генераторов, батарей, предохранителей и загрузки машин на каркасе Gs ([PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43))
-- [ ] Устойчивость `buildingId` на трёх тестовых сохранениях
+- [x] Устойчивость `buildingId` на трёх тестовых сохранениях (Save A, Save B, Save D: 3920 построек проверены, 0 коллизий, формат `Persistent_Level:PersistentLevel.<Class>_<Id>` совпадает с `Actor->GetPathName()` и `SaveState` Foreman; R-19 подтверждён)
 - [x] Прототип режима привязки построек к линии (`FFicsitAILineRegistry`, [PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43))
 
 Готово, когда: условие S3 из ARCHITECTURE §13 выполнено или принят fallback (сокращённый состав; своё чтение `AFGRecipeManager`)
