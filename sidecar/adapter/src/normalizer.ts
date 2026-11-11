@@ -325,6 +325,44 @@ export function createSseNormalizer(
   };
 }
 
+/**
+ * Адрес провайдера: путь базы и путь запроса складываются как пути, а параметры
+ * — как параметры.
+ *
+ * Прежняя склейка строк ломалась, когда в `LLM_UPSTREAM_BASE_URL` была строка
+ * запроса: `…/v1?key=…` + `/chat/completions` давало путь `/v1` и значение
+ * параметра `key=…/chat/completions` (ревью Gs-14, п. 2). Строку запроса в
+ * базовом адресе отклонять нельзя — V-08 обещает любой OpenAI-совместимый
+ * адрес, а некоторые шлюзы передают ключ именно так.
+ *
+ * При совпадении имени параметра побеждает запрос: база — это настройка, а
+ * запрос приходит от клиента, который знает про конкретный вызов (`alt=sse`).
+ */
+export function resolveTarget(upstreamBaseUrl: string, requestUrl: string): URL {
+  const base = new URL(upstreamBaseUrl);
+  const incoming = new URL(requestUrl, "http://request.invalid");
+  const target = new URL(base.toString());
+  target.pathname = `${base.pathname.replace(/\/+$/, "")}${incoming.pathname}`;
+  for (const [name, value] of incoming.searchParams) target.searchParams.set(name, value);
+  return target;
+}
+
+/**
+ * Переходы по `Location` не выполняются вовсе.
+ *
+ * `fetch` по умолчанию идёт за редиректом и **повторяет наши заголовки**, а
+ * среди них ключ провайдера: `303` на `POST` уводил запрос с ключом на другой
+ * порт, и второй сервер его получал (ревью Gs-14, п. 1). Спецификация снимает
+ * при смене origin только `Authorization`, а `x-goog-api-key` и `api-key` —
+ * заголовки провайдера, и про них она не знает.
+ *
+ * Поэтому `redirect: "manual"`, а любой `3xx` с `Location` — отказ `502` с
+ * понятным сообщением: адрес провайдера задаётся локально, и редирект значит,
+ * что настройка указывает не туда. Переход в пределах того же origin тоже не
+ * делаем: это отдельная ветка с повтором тела, а пользы от неё нет.
+ */
+const REDIRECT_REFUSED = "upstream redirect refused: set LLM_UPSTREAM_BASE_URL to the final address";
+
 export function createNormalizerApp(upstreamBaseUrl: string, log: Logger) {
   const signatures = new SignatureStore();
   const app = express();
@@ -332,7 +370,7 @@ export function createNormalizerApp(upstreamBaseUrl: string, log: Logger) {
   app.use(express.raw({ type: () => true, limit: "32mb" }));
 
   app.use(async (req: Request, res: Response) => {
-    const target = `${upstreamBaseUrl.replace(/\/+$/, "")}${req.url}`;
+    const target = resolveTarget(upstreamBaseUrl, req.url);
     const headers: Record<string, string> = { "accept-encoding": "identity" };
     for (const name of FORWARD_HEADERS) {
       const value = req.header(name);
@@ -353,7 +391,7 @@ export function createNormalizerApp(upstreamBaseUrl: string, log: Logger) {
     // Тела не логируем: только метод, путь, код и число правок (§12, ADR-034).
     // Путь — из разобранного адреса, без строки запроса: ключ провайдера ездит
     // именно там (ревью Gs-11, п. 4).
-    const path = new URL(target).pathname;
+    const path = target.pathname;
 
     // Строка до обращения к провайдеру: если он подвиснет, в логе останется
     // хотя бы попытка.
@@ -364,11 +402,30 @@ export function createNormalizerApp(upstreamBaseUrl: string, log: Logger) {
       upstream = await fetch(target, {
         method: req.method,
         headers,
+        redirect: "manual",
         ...(body !== undefined ? { body } : {}),
       });
     } catch (err: unknown) {
       log.error(`провайдер недоступен: ${req.method} ${path}`, err);
       res.status(502).json({ error: { message: "upstream unavailable", type: "normalizer" } });
+      return;
+    }
+
+    // Редирект не выполняем: за ним ушли бы наши заголовки вместе с ключом.
+    if (upstream.status >= 300 && upstream.status < 400 && upstream.headers.has("location")) {
+      const location = upstream.headers.get("location") ?? "";
+      const destination = ((): string => {
+        try {
+          return new URL(location, target).origin;
+        } catch {
+          return "<адрес не разобран>";
+        }
+      })();
+      log.error(
+        `провайдер ответил ${upstream.status} с переходом на ${destination} — не повторяю запрос: ` +
+          "в заголовках ключ провайдера",
+      );
+      res.status(502).json({ error: { message: REDIRECT_REFUSED, type: "normalizer" } });
       return;
     }
 
