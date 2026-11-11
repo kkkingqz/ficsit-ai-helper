@@ -52,7 +52,7 @@ GitHub Actions для всего, что собирается без движк�
 - [ ] Раннее сохранение (Save A)
 - [x] Среднее: 1–2 тыс. построек (Save B: `s8_baseline_yt.sav`, 2 106 построек базовой игры, чистая сборка 372858)
 - [ ] Позднее: 5 тыс.+ построек (Save C)
-- [ ] Сохранение с модом, добавляющим рецепты (Save D)
+- [x] Сохранение с модом, добавляющим рецепты (Save D: `save_d_sfplus.sav`, SatisfactoryPlus + RefinedPower, сборка 517554, SHA-256 `76ebe073...`)
 
 ### [P-7 · Тест-план этапа 1](https://github.com/kkkingqz/ficsit-ai-helper/issues/32) · #32
 
