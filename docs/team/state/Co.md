@@ -11,11 +11,11 @@
 - Co2 ждёт документ протокола канала S2 к неделе 2 (конверт уже задан в Co-37);
 - Gf2 ждёт замеры блока 5: нужны размер браузера по пикселям экрана и прозрачный режим (3.6).
 
-**Мой PR:** [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) — проводка каталога (Co-44), ветка `mod/catalog-wiring`, рабочая копия `~/Projects/ficsitai-co-mod`; жду ревью Gs (Co-74). #42 слит 12.11.2026.
+**Мои PR:** [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) — проводка каталога (Co-44), рабочая копия `~/Projects/ficsitai-co-mod`, ревью Gs (Co-74). [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) — проверка заголовков SML в протоколе (Co-75), рабочая копия `~/Projects/ficsitai-co-tools`, ревью Gs (Co-76).
 
 **Копия проекта SML** `~/Projects/SML-co` на заголовках CL 517554 (`a7e8550`), `Mods/WwisePatches` от `v3.12.0` (ENVIRONMENT §5.1).
 
-**Жду я:** ревью #44 у Gs; ручную проверку King на другом ПК по [инструкции](../../interfaces/s8-manual-check.md); пакет — `~/Projects/ficsitai-deps/handoff/ficsitai-s8-manual-20261112.zip`.
+**Жду я:** ревью #44 и #45 у Gs; пересборку #43 на `a7e8550` у Gf (Co-75); ручную проверку King на другом ПК по [инструкции](../../interfaces/s8-manual-check.md); пакет — `~/Projects/ficsitai-deps/handoff/ficsitai-s8-manual-20261112.zip`.
 
 **Не моё с 10.11.2026:** остальные ревью, первая линия вопросов и документы команды — у Gs (Co-41). Ко мне — только закрытый перечень из [Co.md](../Co.md).
 
