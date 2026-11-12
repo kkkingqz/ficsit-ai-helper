@@ -45,7 +45,7 @@ saved="$STUB_SAVED"; mkdir -p "$saved/Logs"; log="$saved/Logs/FactoryGame.log"
 [[ -n "${STUB_GAME_SLEEP:-}" ]] && sleep "$STUB_GAME_SLEEP"
 mods="$( (ls "$STUB_MODS"; ls "$STUB_MODS/GameFeatures" 2>/dev/null) | grep -v -e '^SML$' -e '^GameFeatures$' | head -1)"
 {
-  echo "LogSatisfactoryModLoader: Display: Version check passed successfully! Game Changelist: 517554"
+  [[ -z "${STUB_NO_CL:-}" ]] && echo "LogSatisfactoryModLoader: Display: Version check passed successfully! Game Changelist: ${STUB_CL:-517554}"
   echo "LogSatisfactoryModLoader: Display: List of loaded mods:"
   [[ -n "$mods" ]] && echo "LogSatisfactoryModLoader: Display: $mods: ${STUB_MOD_VERSION:-0.1.0}"
   echo "LogSatisfactoryModLoader: Display: FactoryGame: 517554.0.0"
@@ -175,22 +175,44 @@ printf '{}' > "$U"
 check "без SemVersion — не пройдено" "$([[ "$(run "$V" "${ARGS[@]}")" != 0 ]] && echo yes || echo no)" yes
 echo '{"SemVersion":"0.1.0"}' > "$U"
 
-echo "4д. Заголовки проекта SML от другой сборки игры (Co-75)"
+echo "4д. Заголовки проекта SML от другой сборки игры (Co-75, ревью #45)"
 check "заголовки CL 491125 при игре CL 517554 — не пройдено" "$(FICSITAI_SML_HEADERS_CL=491125 run "$V" "${ARGS[@]}")" 1
 check "протокол называет обе сборки" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
 check "номер заголовков не определён — не пройдено" "$(FICSITAI_SML_HEADERS_CL= run "$V" "${ARGS[@]}")" 1
-check "причина названа" "$(grep -c 'Номер сборки заголовков проекта SML не определён' "$T/out.txt")" 1
-check "совпадение — пройдено, номер в протоколе" "$(run "$V" "${ARGS[@]}"; grep -c 'заголовки CL 517554 (задан вручную)' "$T/out.txt")" "0
+check "причина названа" "$(grep -c 'нет коммита «Update headers to CL…»' "$T/out.txt")" 1
+check "ручной номер не числом — не пройдено" "$(FICSITAI_SML_HEADERS_CL=CL517554 run "$V" "${ARGS[@]}")" 1
+check "совпадение — пройдено, источник в протоколе" "$(run "$V" "${ARGS[@]}"; grep -c 'заголовки CL 517554 (задан вручную, правки заголовков не проверены: проект не в git)' "$T/out.txt")" "0
 1"
-if command -v /usr/bin/git >/dev/null; then
-    H="$T/hproj"; mkdir -p "$H"
-    hgit() { /usr/bin/git -C "$H" -c user.name=t -c user.email=t@t "$@" >/dev/null 2>&1; }
-    hgit init -q && hgit commit -q --allow-empty -m "Update headers to CL491125" && hgit commit -q --allow-empty -m "Bump version"
-    hcl() { ( FICSITAI_SML_HEADERS_CL= FICSITAI_GIT=/usr/bin/git; source "$T/repo/tools/host/lib.sh"; fa_sml_headers_cl "$H" ); }
-    check "номер из истории: последний коммит заголовков под «Bump version»" "$(hcl)" 491125
-    hgit commit -q --allow-empty -m "Update headers to CL517554"
-    check "более новый коммит заголовков побеждает" "$(hcl)" 517554
-    check "проект без истории — пусто" "$( ( FICSITAI_SML_HEADERS_CL= FICSITAI_GIT=/usr/bin/git; source "$T/repo/tools/host/lib.sh"; fa_sml_headers_cl "$T/proj" ) )" ""
+check "журнал без Game Changelist — не пройдено" "$(STUB_NO_CL=1 run "$V" "${ARGS[@]}")" 1
+check "причина названа" "$(grep -c 'Номер сборки игры не найден в журнале' "$T/out.txt")" 1
+check "Game Changelist 0 — не пройдено" "$(STUB_CL=0 run "$V" "${ARGS[@]}")" 1
+
+GIT="$(command -v git || true)"
+check "git есть на машине (нужен для проверок истории)" "$([[ -n "$GIT" ]] && echo yes || echo no)" yes
+if [[ -n "$GIT" ]]; then
+    # Настоящая история: проект SML — git-репозиторий с заголовком в Source/.
+    P="$T/proj"; pgit() { "$GIT" -C "$P" -c user.name=t -c user.email=t@t "$@" >/dev/null 2>&1; }
+    mkdir -p "$P/Source/FactoryGame/Public" "$P/Mods/WwisePatches" "$P/Mods/SML/Source"
+    echo 'class A { virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"; echo '#' > "$P/Mods/WwisePatches/applyPatches.sh"
+    printf 'Mods/TestMod/\nSaved/\n' > "$P/.gitignore"
+    pgit init -q && pgit add -A && pgit commit -q -m "Update headers to CL491125" && pgit commit -q --allow-empty -m "Bump version"
+    GV() { FICSITAI_GIT="$GIT" FICSITAI_SML_HEADERS_CL="${HCL-}" run "$V" "${ARGS[@]}"; }
+    check "история: CL 491125 под «Bump version», игра 517554 — не пройдено" "$(HCL= GV)" 1
+    check "протокол называет обе сборки" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
+    check "ручной 517554 не перекрывает историю 491125" "$(HCL=517554 GV)" 1
+    check "конфликт назван с обоими номерами" "$(grep -c 'в истории проекта CL 491125, в FICSITAI_SML_HEADERS_CL — CL 517554' "$T/out.txt")" 1
+    pgit commit -q --allow-empty -m "Update headers to CL517554"
+    check "более новый коммит заголовков — пройдено" "$(HCL= GV)" 0
+    check "источник — история проекта" "$(grep -c 'заголовки CL 517554 (история проекта)' "$T/out.txt")" 1
+    check "ручной номер, равный истории, — пройдено" "$(HCL=517554 GV)" 0
+    echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
+    check "заголовок изменён в рабочем дереве — не пройдено" "$(HCL= GV)" 1
+    check "файл назван" "$(grep -c 'изменены в рабочем дереве проекта: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1
+    pgit checkout -- Source; echo 'struct B;' > "$P/Mods/SML/Source/B.h"
+    check "новый файл в заголовках SML — не пройдено" "$(HCL= GV)" 1
+    rm -f "$P/Mods/SML/Source/B.h"; echo '# local' >> "$P/Mods/WwisePatches/applyPatches.sh"
+    check "правка Mods/WwisePatches допустима" "$(HCL= GV)" 0
+    pgit checkout -- Mods; rm -rf "$P/.git" "$P/.gitignore" "$P/Source" "$P/Mods/WwisePatches" "$P/Mods/SML"
 fi
 
 echo "5. Блокировка и роль (замечание 5)"

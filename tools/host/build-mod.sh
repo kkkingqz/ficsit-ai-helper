@@ -28,7 +28,7 @@ if [[ -z "$out" ]]; then fa_new_dir builds ""; out="$FA_NEW_DIR"; fi
 fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"
 echo "BUILD_EXIT=$FA_BUILD_EXIT"
 echo "SOURCE=$FA_BUILD_ORIGIN"
-echo "SML_HEADERS_CL=$(fa_sml_headers_cl "$project")"
+fa_sml_headers "$project"; echo "SML_HEADERS_CL=$FA_HCL"; [[ -n "$FA_HCL_PROBLEM" ]] && echo "SML_HEADERS_PROBLEM=$FA_HCL_PROBLEM"
 echo "LOG=$FA_BUILD_LOG"
 if [[ $FA_BUILD_EXIT -eq 0 ]]; then
     echo "ARCHIVE=$FA_BUILD_ARCHIVE"; echo "SHA256_16=$FA_BUILD_SHA"; echo "SIZE_MB=$FA_BUILD_SIZE_MB"
