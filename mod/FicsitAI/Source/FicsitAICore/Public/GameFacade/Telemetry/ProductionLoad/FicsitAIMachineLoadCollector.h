@@ -3,12 +3,8 @@
 #include "CoreMinimal.h"
 #include "Containers/ArrayView.h"
 #include "GameFacade/Telemetry/FicsitAITelemetryTypes.h"
-#include "Templates/Function.h"
-#include "Templates/SubclassOf.h"
 
 class AFGBuildableFactory;
-class UFGItemDescriptor;
-struct FItemAmount;
 
 namespace FicsitAI::Telemetry
 {
@@ -33,14 +29,6 @@ public:
      * Pure computation over POD snapshots; safe to call on any worker thread.
      */
     static void Aggregate(TArrayView<const FMachineLoadTelemetryItem> Snapshots, FMachineLoadTelemetryAggregate& OutAggregate);
-
-    /**
-     * Verifies whether every ingredient in a recipe cycle (aggregating any duplicate item entries)
-     * is available in sufficient quantity via the supplied count lookup.
-     */
-    static bool CheckIngredientsForCycle(
-        const TArray<FItemAmount>& Ingredients,
-        TFunctionRef<int32(TSubclassOf<UFGItemDescriptor>)> GetAvailableCount);
 };
 
 } // namespace FicsitAI::Telemetry

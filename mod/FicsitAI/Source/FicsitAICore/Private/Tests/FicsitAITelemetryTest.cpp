@@ -11,9 +11,6 @@
 #include "Buildables/FGBuildableGeneratorNuclear.h"
 #include "Buildables/FGBuildablePowerStorage.h"
 #include "Buildables/FGBuildablePriorityPowerSwitch.h"
-#include "ItemAmount.h"
-#include "Resources/FGItemDescriptorBiomass.h"
-#include "Resources/FGResourceDescriptor.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -254,48 +251,6 @@ bool FFicsitAITelemetryTest::RunTest(const FString& Parameters)
         TestEqual(TEXT("Старый рецепт сброшен на фабрике без рецепта"), MachineItem.CurrentRecipeClass, NAME_None);
         TestFalse(TEXT("На не-производственной фабрике буферные признаки не заданы"), MachineItem.bHasIngredientsForCycle.IsSet());
         TestFalse(TEXT("На не-производственной фабрике место выхода не задано"), MachineItem.bHasOutputSpaceForCycle.IsSet());
-
-        // Проверка точной логики наличия всех ингредиентов рецепта (Co-60 #1 / Gs #3)
-        UClass* ItemA = UFGResourceDescriptor::StaticClass();
-        UClass* ItemB = UFGItemDescriptorBiomass::StaticClass();
-
-        // Случай 1: два ингредиента, первого в избытке, второго не хватает (не пустой вход!)
-        {
-            TArray<FItemAmount> TwoIngredients;
-            TwoIngredients.Emplace(ItemA, 4);
-            TwoIngredients.Emplace(ItemB, 3);
-
-            auto CountLookup = [ItemA](TSubclassOf<UFGItemDescriptor> Class) -> int32 {
-                return (Class == ItemA) ? 50 : 2; // ItemB не хватает (2 < 3)
-            };
-            TestFalse(TEXT("Нехватка одного из двух ингредиентов при непустом входе возвращает false"),
-                FFicsitAIMachineLoadCollector::CheckIngredientsForCycle(TwoIngredients, CountLookup));
-        }
-
-        // Случай 2: оба ингредиента присутствуют в достаточном количестве
-        {
-            TArray<FItemAmount> TwoIngredients;
-            TwoIngredients.Emplace(ItemA, 4);
-            TwoIngredients.Emplace(ItemB, 3);
-
-            auto CountLookup = [ItemA](TSubclassOf<UFGItemDescriptor> Class) -> int32 {
-                return (Class == ItemA) ? 4 : 3;
-            };
-            TestTrue(TEXT("Достаточность всех ингредиентов возвращает true"),
-                FFicsitAIMachineLoadCollector::CheckIngredientsForCycle(TwoIngredients, CountLookup));
-        }
-
-        // Случай 3: повторяющийся класс ингредиента в рецепте суммируется (2 + 3 = 5)
-        {
-            TArray<FItemAmount> DuplicateIngredients;
-            DuplicateIngredients.Emplace(ItemA, 2);
-            DuplicateIngredients.Emplace(ItemA, 3);
-
-            TestFalse(TEXT("Повторяющийся ингредиент суммируется (4 < 5)"),
-                FFicsitAIMachineLoadCollector::CheckIngredientsForCycle(DuplicateIngredients, [](TSubclassOf<UFGItemDescriptor>) { return 4; }));
-            TestTrue(TEXT("Повторяющийся ингредиент суммируется (5 >= 5)"),
-                FFicsitAIMachineLoadCollector::CheckIngredientsForCycle(DuplicateIngredients, [](TSubclassOf<UFGItemDescriptor>) { return 5; }));
-        }
 
         // Агрегация снимков загрузки на воркере (без статусов FR-23 и без Items)
         TArray<FMachineLoadTelemetryItem> MachineSnapshots;

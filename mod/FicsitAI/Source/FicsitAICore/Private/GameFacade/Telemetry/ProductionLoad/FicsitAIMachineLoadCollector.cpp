@@ -30,51 +30,22 @@ static EFicsitAIProductionIndicator ConvertProductionIndicator(EProductionStatus
     }
 }
 
-bool FFicsitAIMachineLoadCollector::CheckIngredientsForCycle(
-    const TArray<FItemAmount>& Ingredients,
-    TFunctionRef<int32(TSubclassOf<UFGItemDescriptor>)> GetAvailableCount)
+struct FFicsitAIManufacturerAccess final : public AFGBuildableManufacturer
 {
-    for (int32 i = 0; i < Ingredients.Num(); ++i)
+    static bool CallHasRequiredIngredients(const AFGBuildableManufacturer* Manufacturer)
     {
-        const FItemAmount& Req = Ingredients[i];
-        if (!Req.ItemClass || Req.Amount <= 0)
-        {
-            continue;
-        }
-
-        // Skip if this ItemClass was already verified at an earlier index
-        bool bAlreadyChecked = false;
-        for (int32 j = 0; j < i; ++j)
-        {
-            if (Ingredients[j].ItemClass == Req.ItemClass)
-            {
-                bAlreadyChecked = true;
-                break;
-            }
-        }
-        if (bAlreadyChecked)
-        {
-            continue;
-        }
-
-        // Sum any duplicate ingredient entries for the same descriptor without heap allocations
-        int32 RequiredAmount = Req.Amount;
-        for (int32 j = i + 1; j < Ingredients.Num(); ++j)
-        {
-            if (Ingredients[j].ItemClass == Req.ItemClass && Ingredients[j].Amount > 0)
-            {
-                RequiredAmount += Ingredients[j].Amount;
-            }
-        }
-
-        if (GetAvailableCount(Req.ItemClass) < RequiredAmount)
+        if (!Manufacturer)
         {
             return false;
         }
-    }
 
-    return true;
-}
+        // ISO C++ [class.protected]: member-pointer to protected virtual method preserves
+        // virtual dispatch to the live AFGBuildableManufacturer subclass (respecting
+        // PartsCostMultiplier, slot indices, and overrides) without altering FactoryGame headers.
+        constexpr bool (AFGBuildableManufacturer::*MethodPtr)() const = &FFicsitAIManufacturerAccess::HasRequiredIngredients;
+        return (Manufacturer->*MethodPtr)();
+    }
+};
 
 static bool HasSpaceForCycleOutputs(
     const UFGInventoryComponent& OutputInv,
@@ -156,17 +127,13 @@ bool FFicsitAIMachineLoadCollector::Collect(const AFGBuildableFactory* Factory, 
         {
             Snapshot.CurrentRecipeClass = RecipeClass->GetFName();
 
+            if (Manufacturer->GetInputInventory())
+            {
+                Snapshot.bHasIngredientsForCycle = FFicsitAIManufacturerAccess::CallHasRequiredIngredients(Manufacturer);
+            }
+
             if (const UFGRecipe* RecipeCDO = RecipeClass->GetDefaultObject<UFGRecipe>())
             {
-                if (const UFGInventoryComponent* InputInv = Manufacturer->GetInputInventory())
-                {
-                    Snapshot.bHasIngredientsForCycle = CheckIngredientsForCycle(
-                        RecipeCDO->GetIngredients(),
-                        [InputInv](TSubclassOf<UFGItemDescriptor> ItemClass) -> int32 {
-                            return InputInv->GetNumItems(ItemClass);
-                        });
-                }
-
                 if (const UFGInventoryComponent* OutputInv = Manufacturer->GetOutputInventory())
                 {
                     Snapshot.bHasOutputSpaceForCycle = HasSpaceForCycleOutputs(
