@@ -32,8 +32,6 @@
     { title: "Resources (items/min)", labels: ["Inflow", "Outflow"], max: 200, fields: [4, 5] },
   ];
   const number = new Intl.NumberFormat("en");
-  const colors = getComputedStyle(document.documentElement);
-  const color = (name) => colors.getPropertyValue(`--${name}`).trim();
 
   function element(tag, className, text) {
     const node = document.createElement(tag);
@@ -53,19 +51,48 @@
             inflow, outflow, inflow - outflow, runningCount];
   }
 
-  document.querySelectorAll("[data-copy]").forEach((node) => {
-    node.textContent = copy[node.dataset.copy];
-  });
-
-  const tiles = copy.metrics.map((label, index) => {
+  const params = new URLSearchParams(location.search);
+  const overlay = params.get("overlay") === "1";
+  const metrics = document.getElementById("metrics");
+  const metricIndexes = overlay ? [0, 1, 3] : copy.metrics.keys();
+  const tiles = Array.from(metricIndexes, (index) => {
     const tile = element("article", "metric");
     const reading = element("p", "metric-value");
     const value = element("span", "metric-number");
     reading.append(value);
     if (copy.units[index]) reading.append(" ", element("span", "metric-unit", copy.units[index]));
-    tile.append(element("h2", "metric-label", label), reading, element("p", "metric-status", copy.live));
-    document.getElementById("metrics").append(tile);
-    return value;
+    tile.append(element("h2", "metric-label", copy.metrics[index]), reading,
+                element("p", "metric-status", copy.live));
+    metrics.append(tile);
+    return { index, value };
+  });
+
+  let elapsed = 0;
+
+  function updateMetrics(values) {
+    for (const { index, value } of tiles) {
+      value.textContent = number.format(values[index]);
+    }
+  }
+
+  function sampleEverySecond(update) {
+    setInterval(() => {
+      elapsed += 1;
+      update(snapshot(elapsed));
+    }, 1000);
+  }
+
+  if (overlay) {
+    document.documentElement.classList.add("hud");
+    document.querySelectorAll(".topbar, .details").forEach((node) => node.remove());
+    updateMetrics(snapshot(elapsed));
+    sampleEverySecond(updateMetrics);
+    return;
+  }
+
+  document.documentElement.classList.add("terminal");
+  document.querySelectorAll("[data-copy]").forEach((node) => {
+    node.textContent = copy[node.dataset.copy];
   });
 
   for (const title of copy.columns) {
@@ -102,11 +129,10 @@
     return { groupOutput, activeOutputs };
   });
 
-  let elapsed = 0;
   let history = [];
   const clock = document.getElementById("elapsed");
   const selector = document.getElementById("points");
-  const requested = Number(new URLSearchParams(location.search).get("points"));
+  const requested = Number(params.get("points"));
   const initialWindow = windows.includes(requested) ? requested : windows[0];
   for (const count of windows) {
     const option = element("option", "", copy.samples(count));
@@ -115,6 +141,8 @@
   }
   selector.value = initialWindow;
 
+  const colors = getComputedStyle(document.documentElement);
+  const color = (name) => colors.getPropertyValue(`--${name}`).trim();
   const axis = {
     font: "13px system-ui, sans-serif",
     stroke: color("text-muted"),
@@ -179,9 +207,7 @@
 
   function updateValues(values) {
     clock.textContent = `+${elapsed} s`;
-    for (const [index, tile] of tiles.entries()) {
-      tile.textContent = number.format(values[index]);
-    }
+    updateMetrics(values);
 
     const baseOutput = Math.floor(values[0] / runningCount);
     let extra = values[0] % runningCount;
@@ -207,12 +233,10 @@
   });
 
   updateValues(history.at(-1).values);
-  setInterval(() => {
-    elapsed += 1;
-    const values = snapshot(elapsed);
+  sampleEverySecond((values) => {
     history.shift();
     history.push({ second: elapsed, values });
     updateValues(values);
     for (const { chart, fields } of plots) chart.setData(alignedData(fields));
-  }, 1000);
+  });
 })();

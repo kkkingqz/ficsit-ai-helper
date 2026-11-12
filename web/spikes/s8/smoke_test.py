@@ -114,14 +114,46 @@ if (viewport) {
         print(f"{size}: панель получает фокус и прокручивается, заголовки остаются на месте")
 
 
+
+def check_overlay(chrome, bundle, profile):
+    html = (bundle / "load.html").read_text(encoding="utf-8")
+    probe = bundle / "overlay-test.html"
+    probe.write_text(html.replace("</head>", '<script defer src="overlay-test.js"></script>\n</head>'), encoding="utf-8")
+    (bundle / "overlay-test.js").write_text("""
+const layers = [document.documentElement, document.body, document.querySelector("main")];
+const tiles = [...document.querySelectorAll(".metric")];
+const transparent = (node) => getComputedStyle(node).backgroundColor === "rgba(0, 0, 0, 0)";
+document.body.dataset.overlayBackground = String(
+  layers.every(transparent) && tiles.every((tile) => !transparent(tile)));
+document.body.dataset.overlayInput = String(
+  !document.querySelector("select, button, input, a[href], [tabindex]") &&
+  tiles.every((tile) => getComputedStyle(tile).pointerEvents === "none"));
+""", encoding="utf-8")
+    for size in ("1280,720", "1920,1080"):
+        actual = browser_dom(chrome, profile, size, probe.as_uri() + "?overlay=1")
+        page = Workload(actual)
+        assert (page.charts, page.tiles, page.rows) == (0, 3, 0), f"{size}: HUD должен содержать только три плитки"
+        assert 'data-overlay-background="true"' in actual, f"{size}: фон за плитками не прозрачен"
+        assert 'data-overlay-input="true"' in actual, f"{size}: HUD принимает ввод"
+        readings = re.findall(
+            r'class="metric-label">([^<]+)</h2><p class="metric-value"><span class="metric-number">(\d+)',
+            actual,
+        )
+        assert [label for label, _ in readings] == ["Generation", "Consumption", "Headroom"], readings
+        generation, consumption, headroom = (int(value) for _, value in readings)
+        assert generation > 555 and consumption > 418 and headroom == 720 - consumption, readings
+        print(f"{size}: три плитки HUD обновляются на прозрачной поверхности без элементов ввода")
+
+
 def main():
     chrome = sys.argv[1] if len(sys.argv) > 1 else "google-chrome"
-    with tempfile.TemporaryDirectory(prefix=".s8-smoke-", dir=SOURCE) as temp:
+    with tempfile.TemporaryDirectory(prefix="s8-smoke-") as temp:
         temp = Path(temp)
         bundle = temp / "bundle"
         packer = SOURCE / "pack.py"
         assert packer.is_file(), "Отсутствует сборщик локальной поставки S8"
         subprocess.run([sys.executable, str(packer), str(bundle)], check=True, timeout=30)
+        check_overlay(chrome, bundle, temp / "chrome")
         check_scroll(chrome, bundle, temp / "chrome")
         for size, points, query in (
             ("1280,720", 60, ""),
