@@ -1,5 +1,7 @@
 #include "FicsitAICatalogOwner.h"
 
+#include "GameFacade/Terminal/FicsitAISubsystem.h"
+
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
 #include "Subsystem/SubsystemActorManager.h"
@@ -31,7 +33,15 @@ void AFicsitAICatalogOwner::Tick(float DeltaSeconds)
         return;
     }
 
-    if (RefreshCatalog())
+    const AFicsitAISubsystem* Mod = FindModSubsystem();
+    if (Mod && Mod->IsInertMode())
+    {
+        // Инертный режим до конца сессии не снимается: ждать нечего.
+        UE_LOG(LogFicsitAICatalog, Log, TEXT("FicsitAI: мод в инертном режиме, каталог не читается"));
+        SetActorTickEnabled(false);
+        return;
+    }
+    if (Mod && RefreshCatalog())
     {
         SetActorTickEnabled(false);
         return;
@@ -44,8 +54,31 @@ void AFicsitAICatalogOwner::Tick(float DeltaSeconds)
     }
 }
 
+const AFicsitAISubsystem* AFicsitAICatalogOwner::FindModSubsystem() const
+{
+    const UWorld* World = GetWorld();
+    USubsystemActorManager* Manager = World ? World->GetSubsystem<USubsystemActorManager>() : nullptr;
+    return Manager ? Manager->GetSubsystemActor<AFicsitAISubsystem>() : nullptr;
+}
+
+bool AFicsitAICatalogOwner::IsModActive() const
+{
+    const AFicsitAISubsystem* Mod = FindModSubsystem();
+    return Mod && !Mod->IsInertMode();
+}
+
+const FicsitAI::Catalog::FSnapshot* AFicsitAICatalogOwner::GetSnapshot() const
+{
+    return IsModActive() ? Snapshot.GetPtrOrNull() : nullptr;
+}
+
 bool AFicsitAICatalogOwner::RefreshCatalog()
 {
+    if (!IsModActive())
+    {
+        return false;
+    }
+
     FicsitAI::Catalog::FSnapshot Fresh;
     const double Start = FPlatformTime::Seconds();
     if (!FicsitAI::Catalog::TryReadCatalog(GetWorld(), Fresh))
