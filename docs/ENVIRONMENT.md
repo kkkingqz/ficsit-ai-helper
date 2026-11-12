@@ -263,24 +263,27 @@ ulimit -Sn "$max_open_files"
 - Мягкий лимит `nofile` поднимается в пределах жёсткого. При ошибке Zen проверьте `ulimit -Sn` и `ulimit -Hn` в той же оболочке.
 - При `LNK1104` для существующей библиотеки проверьте длину полного пути. В проверенном MSVC под Wine библиотека не открывалась по пути в 262 символа и открылась по пути в 229 символов. Держите редактор и Starter Project близко к домашнему каталогу, как в примерах выше.
 
-### 7.2 Сборка через редактор (Alpakit UI)
-1. Запустите редактор из терминала с настроенным `$PATH` и `$UE_WINE_MSVC`:
-   ```bash
-   ~/UnrealEngineCSS/Engine/Binaries/Linux/UnrealEditor \
-     ~/Projects/SatisfactoryModLoader/FactoryGame.uproject
-   ```
-2. Для P‑1 откройте **Alpakit Dev → Create Mod**, выберите **Blueprint Only**, создайте `BlankMod` и выберите его в списке модов. Для рабочего мода выберите его собственный Mod Reference. [Создание мода в Alpakit](https://docs.ficsit.app/satisfactory-modding/latest/Development/BeginnersGuide/SimpleMod/gameworldmodule.html)
-3. Целевая платформа упаковки: **Windows / Win64**.
-4. Alpakit и UBT автоматически используют тулчейн `$UE_WINE_MSVC` через Wine для кросс-компиляции C++ модулей в `.dll` и упаковки `.pak` / `.ucas` / `.utoc`.
-5. Проверьте путь к итоговому архиву в выводе UAT. Для P‑1 это `Saved/ArchivedPlugins/BlankMod/BlankMod-Windows.zip`.
+### 7.2 Создание мода в Alpakit
+
+Откройте `FactoryGame.uproject` в личном Starter Project. Для P‑1 выберите **Alpakit Dev → Create Mod → Blueprint Only** и создайте `BlankMod`. [Создание мода в Alpakit](https://docs.ficsit.app/satisfactory-modding/latest/Development/BeginnersGuide/SimpleMod/gameworldmodule.html)
 
 ### 7.3 Сборка и упаковка из командной строки (UAT)
 
-#### Создание тестового пустого мода BlankMod (для проверки упаковки)
-Если `Mods/BlankMod/BlankMod.uplugin` ещё не создан в редакторе, создайте скелет:
+На общей машине запускайте сборку из корня своей рабочей копии FICSIT AI. Настройте личный Starter Project и роль по [инструкции tools/host](../tools/host/README.md#настройка).
+
 ```bash
-mkdir -p "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/Content"
-cat << 'EOF' > "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/BlankMod.uplugin"
+tools/host/build-mod.sh FicsitAI
+```
+
+Скрипт ждёт общую очередь, собирает Linux Editor для cook, упаковывает Win64 Shipping через Alpakit и печатает путь `ARCHIVE=` к архиву этого запуска. Для отдельной сборки редактора, тестов или cook используйте `tools/host/with-lock.sh build -- <команда>`. При ошибке начните с журнала по пути `LOG=` и проверок §7.1.
+
+#### Создание тестового пустого мода BlankMod (для проверки упаковки)
+После настройки `FICSITAI_SML_PROJECT` по [инструкции](../tools/host/README.md#настройка) создайте скелет, если `Mods/BlankMod/BlankMod.uplugin` ещё нет.
+
+```bash
+blankmod_dir="${FICSITAI_SML_PROJECT:?Укажите личный Starter Project}/Mods/BlankMod"
+mkdir -p "$blankmod_dir/Content"
+cat << 'EOF' > "$blankmod_dir/BlankMod.uplugin"
 {
 	"FileVersion": 3,
 	"Version": 1,
@@ -306,32 +309,15 @@ cat << 'EOF' > "$HOME/Projects/SatisfactoryModLoader/Mods/BlankMod/BlankMod.uplu
 EOF
 ```
 
-#### Запуск сборки через RunUAT.sh
-В той же оболочке, где прошли проверки §7.1, задайте имя целевого мода, например `BlankMod` или `SML`:
-
-```bash
-MOD_NAME=BlankMod
-
-"$HOME/UnrealEngineCSS/Engine/Build/BatchFiles/RunUAT.sh" \
-  -ScriptsForProject="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
-  PackagePlugin \
-  -Project="$HOME/Projects/SatisfactoryModLoader/FactoryGame.uproject" \
-  -dlcname="$MOD_NAME" \
-  -merge -build -clientconfig=Shipping \
-  -platform=Win64 -nocompileeditor -installed
-```
-
-Успешный запуск заканчивается строкой `AutomationTool exiting with ExitCode=0`. Архивы `$MOD_NAME.zip` и `$MOD_NAME-Windows.zip` с файлами `.pak`, `.ucas` и `.utoc` лежат в `Saved/ArchivedPlugins/$MOD_NAME/`. Если лог останавливается на `Building … action(s) started`, проверьте Wine в оболочке запуска UAT по §7.1.
+Для упаковки созданного скелета выполните `tools/host/build-mod.sh BlankMod`.
 
 ---
 
 ## 8. Проверка мода в игре под Proton
 
-1. Установите **Satisfactory 1.2** в Steam, включите Proton и откройте расположение файлов игры через Steam. Для Flatpak Steam путь библиотеки может отличаться.
-2. Создайте личную копию игры для роли. На файловых системах с reflink используйте `cp -a --reflink=auto`, чтобы избежать полного дублирования данных. Держите для неё отдельный префикс Proton (`STEAM_COMPAT_DATA_PATH`) и устанавливайте тестовые моды только в личную копию. Если в неё попал `FactoryGame/Mods` из общей установки, отложите этот каталог перед установкой модов для прогона.
-3. Установите **SML 3.12.0** для личной копии игры CL 517554. Проверьте путь установки и номер сборки игры. Для Linux доступен [Satisfactory Mod Manager](https://docs.ficsit.app/satisfactory-modding/latest/ForUsers/SatisfactoryModManager.html).
-4. Распакуйте `BlankMod-Windows.zip` в `FactoryGame/Mods/BlankMod/` так, чтобы получился файл `FactoryGame/Mods/BlankMod/BlankMod.uplugin`. Вложенный второй каталог `BlankMod` не нужен. [Структура каталога модов](https://docs.ficsit.app/satisfactory-modding/latest/ManualInstallDirections.html)
-5. Запустите под Proton исполняемый файл личной копии с её префиксом. Убедитесь, что `BlankMod` отображается в меню модов и игра загружает тестовое сохранение. При выходе на старте проверьте первую ошибку `LogPluginManager` в журнале игры и сверяйте CL игры с коммитом заголовков по §5.1.
+1. Установите Satisfactory в Steam Flatpak и один раз запустите игру под Proton, чтобы создать исходный префикс. Номер сборки игры и коммит заголовков сверяйте по §5.1.
+2. Укажите архив SML через `FICSITAI_SML_ZIP` по [инструкции tools/host](../tools/host/README.md#настройка). Для прогона архива из §7.3 используйте `tools/host/run-game.sh --mod <путь из ARCHIVE>`. Скрипт создаёт личную копию игры и префикс роли, устанавливает моды и печатает путь к журналу. Для замеров добавьте `--exclusive`.
+3. Для PR в мод выполните `tools/host/verify-pr.sh FicsitAI` из проверяемой ревизии и приложите протокол к описанию PR. Для P‑1 можно вызвать `tools/host/verify-pr.sh BlankMod`. Протокол подтверждает загрузку мода до главного меню. Сценарии в мире выполняйте отдельно по [чек-листу P-7](../tests/test-plan/README.md).
 
 ---
 
