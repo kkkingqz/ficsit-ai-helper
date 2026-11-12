@@ -212,11 +212,33 @@ _fa_game_copy_ensure() {
     fi
 }
 
+# Читает архив мода: печатает «<имя>\t<1|0>» — имя единственного дескриптора .uplugin в корне архива
+# и значение корневого поля GameFeature (1 — только при JSON true). Разбор — штатным парсером JSON:
+# поиск подстроки путал вложенные поля и экранированные имена (третье ревью #42).
+_fa_mod_descriptor() {
+    python3 -I - "$1" <<'PYDESC'
+import json, sys, zipfile
+path = sys.argv[1]
+try:
+    with zipfile.ZipFile(path) as z:
+        roots = [n for n in z.namelist() if "/" not in n and n.lower().endswith(".uplugin")]
+        if len(roots) != 1:
+            sys.exit(f"в корне архива {path} должен быть ровно один .uplugin, найдено {len(roots)}")
+        data = json.loads(z.read(roots[0]).decode("utf-8-sig"))
+except (OSError, zipfile.BadZipFile, UnicodeDecodeError, ValueError) as e:
+    sys.exit(f"архив {path} не читается: {e}")
+if not isinstance(data, dict):
+    sys.exit(f"дескриптор {roots[0]} в {path} — не объект JSON")
+print(f"{roots[0][:-len('.uplugin')]}\t{1 if data.get('GameFeature') is True else 0}")
+PYDESC
+}
+
 # Ставит моды в личную копию, заменяя всё, кроме SML. Только под блокировкой роли.
-# Мод с "GameFeature": true в .uplugin ставится в Mods/GameFeatures/<мод>, остальные — в Mods/<мод>:
+# Имя мода берётся из единственного дескриптора .uplugin в корне архива, имя файла архива не важно.
+# Мод с корневым полем "GameFeature": true ставится в Mods/GameFeatures/<мод>, остальные — в Mods/<мод>:
 # так требует SML, иначе игра останавливается на старте (нашёл Gs на наборе модов Save D).
 _fa_install_mods() {
-    local mods="$FA_ROLE_DIR/game/FactoryGame/Mods" zip name target
+    local mods="$FA_ROLE_DIR/game/FactoryGame/Mods" zip name target desc gf
     for name in "$mods"/* "$mods"/GameFeatures/*; do
         [[ -e "$name" ]] || continue
         case "$(basename "$name")" in SML|GameFeatures) continue ;; esac
@@ -224,12 +246,12 @@ _fa_install_mods() {
     done
     for zip in "$@"; do
         [[ -f "$zip" ]] || { fa_say "нет архива $zip"; return 1; }
-        name="$(basename "$zip")"; name="${name%-Windows.zip}"; name="${name%.zip}"
-        unzip -l "$zip" "$name.uplugin" >/dev/null 2>&1 || { fa_say "в архиве $zip нет $name.uplugin в корне"; return 1; }
+        desc="$(_fa_mod_descriptor "$zip" 2>&1)" || { fa_say "$desc"; return 1; }
+        name="${desc%$'\t'*}"; gf="${desc##*$'\t'}"
+        case "$name" in ""|SML|GameFeatures|*[!A-Za-z0-9_-]*) fa_say "недопустимое имя мода '$name' в $zip"; return 1 ;; esac
         target="$mods/$name"
-        if unzip -p "$zip" "$name.uplugin" | tr -d '\r\n\t ' | grep -q '"GameFeature":true'; then
-            target="$mods/GameFeatures/$name"
-        fi
+        [[ "$gf" == 1 ]] && target="$mods/GameFeatures/$name"
+        [[ -e "$target" ]] && { fa_say "мод $name передан дважды"; return 1; }
         mkdir -p "$target" && unzip -q "$zip" -d "$target" || return 1
     done
 }

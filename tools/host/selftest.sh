@@ -146,6 +146,18 @@ check "обычный мод в корне Mods" "$([[ -f "$STUB_MODS/ModA/ModA.
 "$R" --mod "$T/ModB-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r8" > "$T/r8.txt" 2>&1
 check "следующий запуск убирает прежний GameFeature-мод" "$([[ -e "$STUB_MODS/GameFeatures/FeatMod" ]] && echo yes || echo no)" no
 
+echo "4в. Каталог мода — по корневому полю GameFeature и имени дескриптора (третье ревью)"
+mkdir -p "$T/d1" "$T/d2" "$T/d3"
+printf '{"GameFeature":false,"CustomMetadata":{"GameFeature":true}}' > "$T/d1/NestMod.uplugin"
+printf '{"\\u0047ameFeature":true}' > "$T/d2/EscMod.uplugin"
+printf '{}' > "$T/d3/One.uplugin"; printf '{}' > "$T/d3/Two.uplugin"
+( cd "$T/d1" && zip -q ../download.zip NestMod.uplugin ) && ( cd "$T/d2" && zip -q ../EscMod.smod EscMod.uplugin ) && ( cd "$T/d3" && zip -q ../two.zip One.uplugin Two.uplugin )
+"$R" --mod "$T/download.zip" --mod "$T/EscMod.smod" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r9" > "$T/r9.txt" 2>&1
+check "вложенное GameFeature не переносит мод" "$([[ -f "$STUB_MODS/NestMod/NestMod.uplugin" && ! -e "$STUB_MODS/GameFeatures/NestMod" ]] && echo yes || echo no)" yes
+check "экранированное имя поля распознано" "$([[ -f "$STUB_MODS/GameFeatures/EscMod/EscMod.uplugin" && ! -e "$STUB_MODS/EscMod" ]] && echo yes || echo no)" yes
+check "архив с двумя дескрипторами отклонён" "$([[ "$(run "$R" --mod "$T/two.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r10")" != 0 ]] && echo yes || echo no)" yes
+check "причина названа" "$(grep -c 'ровно один .uplugin' "$T/out.txt")" 1
+
 echo "5. Блокировка и роль (замечание 5)"
 W="$T/repo/tools/host/with-lock.sh"
 printf '#!/bin/sh\nexit 1\n' > "$T/bin/flock"; chmod +x "$T/bin/flock"
