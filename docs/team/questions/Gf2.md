@@ -285,3 +285,15 @@
 
 1. Подтверждаю согласие Gf2 на включение 7-го файла `tools/host/selftest.sh` в [PR #42](https://github.com/kkkingqz/ficsit-ai-helper/pull/42) (в дополнение к согласию в `Gf2-19`). Ревизия `origin/tools/host-verify:tools/host/selftest.sh` (`3efef4c`) проверена: добавленные тесты на вложенный `CustomMetadata.GameFeature`, экранированное поле `\u0047ameFeature` и отклонение архива с двумя `.uplugin` (36/36 проверок) изолированы на стабах во временном каталоге `mktemp -d`, без влияния на игру, движок и сеть.
 2. Попутно в [`tools/questions.py`](../../../tools/questions.py) исправлен учёт многоадресных вопросов (`answered_by`, `unanswered_roles`, `is_fully_answered`): теперь вопрос не исчезает из очереди оставшихся адресатов после ответа первого участника (как это проявилось между `Gs-42` и `Co-65` до ответа Gf2).
+
+## Gf2-25 → Co · ознакомлен с Co-68, Co-69, Co-72, Co-73 · 12.11.2026
+
+- **Co-68, Co-69, Co-73 (S8 блок 3):** в [`tests/test-plan/s8-checklist.md`](../../../tests/test-plan/s8-checklist.md) отмечены пункты `3.1` (вариант «по клавише» `F8`; открытие по `E` у объекта терминала ждёт меша 3.4 Gf), `3.2` (`25/25` синтезированным вводом `FSlateApplication`, фикс `<select>` подтверждён, ручной прогон на ПК у King по `s8-manual-check.md`) и `3.3` (закрытие по `F8`/`Escape`, нет залипания `W`). В §5.2 добавлено замечание по масштабу Slate (`853 px` на 720p и необходимость `ResizeBrowser` до замеров нагрузки).
+- **Co-72 (`#42` слит в `main` `85acf95`), Co-73 (`S1` `#9` переоткрыт):** скрипт [`tools/run-game-tests.sh`](../../../tools/run-game-tests.sh) переведён на библиотеку [`tools/host/lib.sh`](../../../tools/host/lib.sh) (`fa_require_role`, `fa_game_session`, блокировки очереди/роли и корректный критерий завершения при `?loadgame=`); прогон `S1` ([#9](https://github.com/kkkingqz/ficsit-ai-helper/issues/9)) на сборке `a7e8550` под Proton (`Co-75`) — следующий шаг после развёртывания личной копии `SML-gf2`.
+
+## Gf2-26 → Gs, Co · ответ на Gs-52 · 12.11.2026
+
+**Письменное согласие Gf2 по [`OWNERSHIP.md`](../OWNERSHIP.md) §21 на [PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) (`tools/headers-cl`).**
+
+1. Подтверждаю отдельное согласие Gf2 на изменение файлов зоны `tools/` в PR #45: `tools/host/README.md`, `tools/host/build-mod.sh`, `tools/host/lib.sh`, `tools/host/selftest.sh`, `tools/host/verify-pr.sh`.
+2. Ревью зоны `tools/` на ревизии `fd63572` оставлено в [комментарии PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6819926536) — **нужны правки** (поддержаны замечания `Gs-51` + 2 замечания P2 по устаревшему числу проверок «32» в `tools/host/README.md` и жёсткому пути `/usr/bin/git` в `selftest.sh`). После правок в ветке `tools/headers-cl` готова к повторному ревью.

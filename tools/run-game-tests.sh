@@ -18,30 +18,30 @@ TIMEOUT_SEC=120
 OUTPUT_DIR=""
 DRY_RUN=false
 MOCK_RUN=false
-GAME_DIR="${SATISFACTORY_GAME_PATH:-}"
-COMPAT_DATA_DIR="${STEAM_COMPAT_DATA_PATH:-}"
-PROTON_BIN="${PROTON_PATH:-}"
-
-SATISFACTORY_APPID="526870"
+EXCLUSIVE=false
+SML_ZIP="${FICSITAI_SML_ZIP:-}"
+MOD_ZIPS=()
 
 usage() {
     cat <<EOF
 Использование: $(basename "$0") [ПАРАМЕТРЫ]
+
+Запускает игру через tools/host/lib.sh (общие блокировки сборки/игры и личная копия роли).
 
 Параметры:
   -s, --save <путь|имя>       Путь к .sav файлу или имя сохранения (P-5)
   -c, --scenario <имя>        Имя сценария проверок (S1, S3, S8, all; по умолчанию: S1)
   -t, --timeout <сек>         Таймаут выполнения в секундах (по умолчанию: 120)
   -o, --output-dir <каталог>  Каталог для сбора артефактов (по умолчанию: tests/runs/<метка>)
-  --game-dir <каталог>        Путь к установленному каталогу Satisfactory
-  --compat-dir <каталог>      Путь к compatdata Proton (где лежит pfx)
-  --proton-bin <путь>         Путь к исполняемому файлу Proton (proton run)
+  --mod <архив>               Архив мода (zip/.smod) для установки в личную копию; можно повторять
+  --sml <архив>               Архив SML-Windows.zip (по умолчанию: \$FICSITAI_SML_ZIP)
+  --exclusive                 Монопольный запуск для замеров (-x вместо общего режима -s)
   --dry-run                   Только проверка путей и сборки параметров без запуска игры
   --mock-run                  Имитация прогона (генерация образцового JSONL и проверка отчёта)
   -h, --help                  Справка
 
 Примеры:
-  $(basename "$0") --save fixtures/saves/SaveA.sav --scenario S1
+  $(basename "$0") --mod build/FicsitAI-Windows.zip --save fixtures/saves/save_a_starter.sav --scenario S1
   $(basename "$0") --dry-run --save SaveA --scenario S1
   $(basename "$0") --mock-run --scenario S1
 EOF
@@ -66,16 +66,20 @@ while [[ $# -gt 0 ]]; do
             OUTPUT_DIR="$2"
             shift 2
             ;;
-        --game-dir)
-            GAME_DIR="$2"
+        --mod)
+            MOD_ZIPS+=("$2")
             shift 2
             ;;
-        --compat-dir)
-            COMPAT_DATA_DIR="$2"
+        --sml)
+            SML_ZIP="$2"
             shift 2
             ;;
-        --proton-bin)
-            PROTON_BIN="$2"
+        --exclusive)
+            EXCLUSIVE=true
+            shift
+            ;;
+        --game-dir|--compat-dir|--proton-bin)
+            echo "ПРЕДУПРЕЖДЕНИЕ: параметр $1 устарел — пути роли и Proton задаются через tools/host/lib.sh" >&2
             shift 2
             ;;
         --dry-run)
@@ -137,78 +141,19 @@ EOF
     exit 0
 fi
 
-# Поиск путей Steam, Proton и Satisfactory
-STEAM_ROOT=""
-for candidate in \
-    "$HOME/.steam/steam" \
-    "$HOME/.local/share/Steam" \
-    "$HOME/.var/app/com.valvesoftware.Steam/.steam/steam" \
-    "$HOME/.var/app/com.valvesoftware.Steam/.local/share/Steam"; do
-    if [[ -d "$candidate" ]]; then
-        STEAM_ROOT="$candidate"
-        break
-    fi
-done
-
-if [[ -z "$GAME_DIR" && -n "$STEAM_ROOT" ]]; then
-    POSSIBLE_GAME="$STEAM_ROOT/steamapps/common/Satisfactory"
-    if [[ -d "$POSSIBLE_GAME" ]]; then
-        GAME_DIR="$POSSIBLE_GAME"
-    fi
+# Подключаем общую библиотеку запуска игры под Proton (tools/host/lib.sh, Co-72 / Gf2-19)
+if [[ -z "${FICSITAI_GIT:-}" && ! -x /usr/bin/git ]]; then
+    export FICSITAI_GIT="$(command -v git || true)"
 fi
+# shellcheck source=host/lib.sh
+source "$REPO_ROOT/tools/host/lib.sh"
+fa_require_role
 
-if [[ -z "$COMPAT_DATA_DIR" && -n "$STEAM_ROOT" ]]; then
-    POSSIBLE_COMPAT="$STEAM_ROOT/steamapps/compatdata/$SATISFACTORY_APPID"
-    if [[ -d "$POSSIBLE_COMPAT" ]]; then
-        COMPAT_DATA_DIR="$POSSIBLE_COMPAT"
-    fi
-fi
-
-if [[ -z "$PROTON_BIN" && -n "$STEAM_ROOT" ]]; then
-    # Ищем установленные версии Proton
-    for p_candidate in \
-        "$STEAM_ROOT/steamapps/common/Proton - Experimental/proton" \
-        "$STEAM_ROOT/steamapps/common/Proton 9.0/proton" \
-        "$STEAM_ROOT/steamapps/common/Proton 8.0/proton" \
-        "$(command -v proton 2>/dev/null || true)"; do
-        if [[ -n "$p_candidate" && -x "$p_candidate" ]]; then
-            PROTON_BIN="$p_candidate"
-            break
-        fi
-    done
-fi
-
-echo "Steam каталог:       ${STEAM_ROOT:-<не обнаружен>}"
-echo "Satisfactory путь:   ${GAME_DIR:-<не обнаружен>}"
-echo "Proton compatdata:   ${COMPAT_DATA_DIR:-<не обнаружен>}"
-echo "Proton исполняемый:  ${PROTON_BIN:-<не обнаружен>}"
-
-# Проверка сохранения
 SAVE_BASE_NAME=""
 if [[ -n "$SAVE_ARG" ]]; then
-    if [[ -f "$SAVE_ARG" ]]; then
-        SAVE_BASE_NAME="$(basename "$SAVE_ARG" .sav)"
-        # Копируем сохранение в pfx, если каталог compatdata найден
-        if [[ -n "$COMPAT_DATA_DIR" && -d "$COMPAT_DATA_DIR/pfx" ]]; then
-            SAVED_GAMES_DIR=""
-            SAVED_GAMES_DIR="$(find "$COMPAT_DATA_DIR/pfx/drive_c/users" -name "SaveGames" -type d 2>/dev/null | head -n 1 || true)"
-            if [[ -n "$SAVED_GAMES_DIR" ]]; then
-                STEAM_ID_DIR="$(find "$SAVED_GAMES_DIR" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1 || true)"
-                if [[ -n "$STEAM_ID_DIR" ]]; then
-                    echo "Копирование сохранения $SAVE_ARG -> $STEAM_ID_DIR/"
-                    cp "$SAVE_ARG" "$STEAM_ID_DIR/"
-                fi
-            fi
-        fi
-    else
-        SAVE_BASE_NAME="$(basename "$SAVE_ARG" .sav)"
-    fi
-    echo "Имя сохранения:      $SAVE_BASE_NAME"
+    SAVE_BASE_NAME="$(basename "$SAVE_ARG" .sav)"
 fi
 
-# Формирование URL карты и аргументов командной строки Satisfactory
-# Согласно проверке архитектуры и исходников AFGGameMode:
-# Map URL опция loadgame обрабатывается движком: AFGGameMode::LoadGameOption = TEXT("loadgame")
 MAP_URL="/Game/FactoryGame/Map/GameLevel01/Persistent_Level"
 if [[ -n "$SAVE_BASE_NAME" ]]; then
     MAP_URL="${MAP_URL}?loadgame=${SAVE_BASE_NAME}"
@@ -218,13 +163,20 @@ GAME_ARGS=(
     "$MAP_URL"
     "-FicsitAIDiagnostics=1"
     "-FicsitAITestScenario=${SCENARIO}"
-    "-Log"
     "-stdout"
-    "-FORCELOGFLUSH"
-    "-NoSplash"
     "-Unattended"
 )
 
+GAME_MODE="-s"
+if [[ "$EXCLUSIVE" == "true" ]]; then
+    GAME_MODE="-x"
+fi
+
+echo "Роль:                $FA_ROLE"
+echo "Каталог роли:        $FA_ROLE_DIR"
+echo "Режим блокировки:    $GAME_MODE"
+echo "Имя сохранения:      ${SAVE_BASE_NAME:-<не задано>}"
+echo "Модов к установке:   ${#MOD_ZIPS[@]}"
 echo "Параметры запуска:   ${GAME_ARGS[*]}"
 
 if [[ "$DRY_RUN" == "true" ]]; then
@@ -232,61 +184,51 @@ if [[ "$DRY_RUN" == "true" ]]; then
     exit 0
 fi
 
-# Проверка наличия обязательных компонентов для реального запуска
-if [[ -z "$GAME_DIR" || ! -d "$GAME_DIR" ]]; then
-    echo "ОШИБКА: Каталог игры Satisfactory не найден. Укажите через --game-dir или проверьте установку Steam." >&2
-    exit 1
-fi
-
-if [[ -z "$PROTON_BIN" || ! -x "$PROTON_BIN" ]]; then
-    echo "ОШИБКА: Исполняемый файл Proton не найден. Укажите через --proton-bin." >&2
-    exit 1
-fi
-
-GAME_EXE="$GAME_DIR/FactoryGameSteam.exe"
-if [[ ! -f "$GAME_EXE" ]]; then
-    GAME_EXE="$GAME_DIR/FactoryGame/Binaries/Win64/FactoryGameSteam-Win64-Shipping.exe"
-fi
-
-if [[ ! -f "$GAME_EXE" ]]; then
-    echo "ОШИБКА: Бинарный файл игры FactoryGameSteam.exe не найден в $GAME_DIR" >&2
-    exit 1
-fi
-
-echo "Запуск игры под Proton..."
-export STEAM_COMPAT_CLIENT_INSTALL_PATH="${STEAM_ROOT}"
-export STEAM_COMPAT_DATA_PATH="${COMPAT_DATA_DIR}"
-
-# Запуск с ограничением по времени (timeout)
-set +e
-timeout --preserve-status --kill-after=10s "${TIMEOUT_SEC}s" \
-    "$PROTON_BIN" run "$GAME_EXE" "${GAME_ARGS[@]}" > "$OUTPUT_DIR/stdout_stderr.log" 2>&1
-RUN_EXIT_CODE=$?
-set -e
-
-echo "Игра завершена с кодом: $RUN_EXIT_CODE"
-
-# Сбор артефактов из Proton prefix
-if [[ -n "$COMPAT_DATA_DIR" && -d "$COMPAT_DATA_DIR/pfx" ]]; then
-    APPDATA_SAVED="$(find "$COMPAT_DATA_DIR/pfx/drive_c/users" -path "*/AppData/Local/FactoryGame/Saved" -type d 2>/dev/null | head -n 1 || true)"
-    if [[ -n "$APPDATA_SAVED" && -d "$APPDATA_SAVED" ]]; then
-        # 1. Лог игры
-        if [[ -f "$APPDATA_SAVED/Logs/FactoryGame.log" ]]; then
-            cp "$APPDATA_SAVED/Logs/FactoryGame.log" "$OUTPUT_DIR/FactoryGame.log"
-            echo "Скопирован FactoryGame.log"
+# Если передан локальный .sav файл, гарантируем префикс роли и копируем сохранение под блокировкой роли.
+if [[ -n "$SAVE_ARG" ]]; then
+    if [[ ! -f "$SAVE_ARG" ]]; then
+        echo "ОШИБКА: файл сохранения не найден: $SAVE_ARG" >&2
+        exit 1
+    fi
+    _gf2_prepare_save() {
+        _fa_game_copy_ensure "$SML_ZIP" || return 1
+        local saved_root="$FA_ROLE_DIR/compat/pfx/drive_c/users/steamuser/AppData/Local/FactoryGame/Saved/SaveGames"
+        local target_dir=""
+        if [[ -d "$saved_root" ]]; then
+            target_dir="$(find "$saved_root" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | head -n 1 || true)"
         fi
-        # 2. Файлы Recording (JSONL)
-        if [[ -d "$APPDATA_SAVED/Recording" ]]; then
-            mkdir -p "$OUTPUT_DIR/Recording"
-            cp -r "$APPDATA_SAVED/Recording/"* "$OUTPUT_DIR/Recording/" 2>/dev/null || true
-            echo "Скопированы файлы Recording (JSONL)"
+        if [[ -z "$target_dir" ]]; then
+            target_dir="$saved_root/common"
+            mkdir -p "$target_dir"
         fi
-        # 3. Скриншоты
-        if [[ -d "$APPDATA_SAVED/Screenshots" ]]; then
-            mkdir -p "$OUTPUT_DIR/Screenshots"
-            cp -r "$APPDATA_SAVED/Screenshots/"* "$OUTPUT_DIR/Screenshots/" 2>/dev/null || true
-            echo "Скопированы скриншоты"
-        fi
+        echo "Копирование сохранения $SAVE_ARG -> $target_dir/"
+        cp "$SAVE_ARG" "$target_dir/"
+    }
+    fa_with_lock "role-$FA_ROLE" -x _gf2_prepare_save || exit 1
+fi
+
+FA_G_MODS=("${MOD_ZIPS[@]}")
+FA_G_ENVS=()
+FA_G_ARGS=("${GAME_ARGS[@]}")
+
+echo "Запуск игры через tools/host/lib.sh (fa_game_session)..."
+fa_game_session "$TIMEOUT_SEC" "$OUTPUT_DIR" "$GAME_MODE" "$SML_ZIP"
+RUN_EXIT_CODE=$FA_RUN_EXIT
+fa_parse_game_log "$FA_RUN_LOG"
+echo "Игра завершена с кодом: $RUN_EXIT_CODE (CL=${FA_LOG_CL:-?}, MENU=$FA_LOG_MENU, FATAL=$FA_LOG_FATAL, PLUGIN_ERR=$FA_LOG_PLUGIN_ERRORS)"
+
+# Сбор артефактов Recording / Screenshots из префикса роли
+APPDATA_SAVED="$FA_ROLE_DIR/compat/pfx/drive_c/users/steamuser/AppData/Local/FactoryGame/Saved"
+if [[ -d "$APPDATA_SAVED" ]]; then
+    if [[ -d "$APPDATA_SAVED/Recording" ]]; then
+        mkdir -p "$OUTPUT_DIR/Recording"
+        cp -r "$APPDATA_SAVED/Recording/"* "$OUTPUT_DIR/Recording/" 2>/dev/null || true
+        echo "Скопированы файлы Recording (JSONL)"
+    fi
+    if [[ -d "$APPDATA_SAVED/Screenshots" ]]; then
+        mkdir -p "$OUTPUT_DIR/Screenshots"
+        cp -r "$APPDATA_SAVED/Screenshots/"* "$OUTPUT_DIR/Screenshots/" 2>/dev/null || true
+        echo "Скопированы скриншоты"
     fi
 fi
 
@@ -301,4 +243,12 @@ echo ""
 echo "=== Сводный отчёт проверки ==="
 cat "$REPORT_FILE"
 
-exit $RUN_EXIT_CODE
+if [[ -n "$SAVE_BASE_NAME" ]]; then
+    # При прямом ?loadgame= движок пропускает MenuScenes/, поэтому проверяем выход по таймеру и отсутствие фатальных ошибок
+    if [[ ( "$FA_RUN_EXIT" != 124 && "$FA_RUN_EXIT" != 0 ) || "$FA_LOG_FATAL" != 0 || "$FA_LOG_PLUGIN_ERRORS" != 0 ]]; then
+        exit 1
+    fi
+elif ! fa_run_ok; then
+    exit 1
+fi
+exit 0

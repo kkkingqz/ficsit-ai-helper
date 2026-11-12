@@ -75,7 +75,7 @@ GitHub Actions для всего, что собирается без движк�
 Запуск игры под Proton одной командой, прохождение сценариев (S1, S3, S8) и сбор логов, JSONL и скриншотов в отчёт для King.
 
 - [x] Проверена загрузка сохранения из командной строки: опция `?loadgame=<SaveName>` в URL карты уровня (`AFGGameMode::LoadGameOption`)
-- [x] Скрипт запуска игры под Proton с аргументами и таймаутом ([`tools/run-game-tests.sh`](../../tools/run-game-tests.sh))
+- [x] Скрипт запуска игры под Proton через [`tools/host/lib.sh`](../../tools/host/lib.sh) (`fa_game_session`, блокировки очереди и личной копии роли) с параметрами и таймаутом ([`tools/run-game-tests.sh`](../../tools/run-game-tests.sh))
 - [x] Разбор JSONL и генерация отчёта Markdown ([`tools/parse-test-results.py`](../../tools/parse-test-results.py))
 - [ ] Прогон сценария S1 после реализации диагностического режима Gf
 - [ ] Прогон на четырёх тестовых сохранениях P-5
