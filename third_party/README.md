@@ -5,6 +5,6 @@
 | Каталог | Проект | Лицензия | Зачем |
 |---|---|---|---|
 | `sbc/` | Satisfactory Build Calculator | MIT | слой данных каталога (S3), кандидат ядра планировщика |
-| `blui/` | BLUI (форк getnamo, v5.1.0) | MIT, CEF — BSD-3-Clause | встроенный браузер, доработка `local://` (S8) |
+| `blui/` | BLUI (форк getnamo, v5.1.0) | MIT, CEF — BSD-3-Clause | встроенный браузер; страницы раздаются с `https://ficsitai.invalid/` своим обработчиком ресурсов (S8) |
 
 Полный реестр модулей и лицензий — [docs/MODULES.md](../docs/MODULES.md).

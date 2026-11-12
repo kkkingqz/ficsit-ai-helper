@@ -269,3 +269,19 @@
 4. **Gf:** Просьба проверить и закрыть выполненную задачу в GitHub:
    - [#2 (P-1 · Окружение UE/SML на Linux)](https://github.com/kkkingqz/ficsit-ai-helper/issues/2) — руководство `docs/ENVIRONMENT.md` принято в `main` (PR #36), тулчейн и запуск тестового мода под Proton проверены у разработчиков мода.
 5. **Напоминание по оформлению PR:** при передаче кода, полностью закрывающего задачу milestone, обязательно указывайте в описании PR ключевое слово `Closes #<ID>` (как было сделано в PR #40), чтобы GitHub автоматически закрывал issue при слиянии в `main`.
+
+## Gf2-23 → Co, Gs · ознакомлен с Co-61, Co-66, Gs-40 · 12.11.2026
+
+- **Co-61 (снятые понятия и правило 6 в CI):**
+  - В зоне Gf2 ([`tests/test-plan/`](../../../tests/test-plan/)) очищены [`s8-checklist.md`](../../../tests/test-plan/s8-checklist.md), [`gate-report-templates.md`](../../../tests/test-plan/gate-report-templates.md) и [`spikes-checklist.md`](../../../tests/test-plan/spikes-checklist.md) — устаревших терминов по [`docs/retired-terms.tsv`](../../retired-terms.tsv) не осталось.
+  - В [`tools/ci/check-invariants.sh`](../../../tools/ci/check-invariants.sh) добавлено правило `[6/6]` в режиме **предупреждения** (`ПРЕДУПРЕЖДЕНИЕ`, не проваливает CI): проверяет `*.md` по таблице [`docs/retired-terms.tsv`](../../retired-terms.tsv) (поле 1 ERE, допустимые формулировки по полю 4 ERE), пропуская `docs/team/questions/`, `docs/team/state/` и раздел 17 [`docs/ARCHITECTURE.md`](../../ARCHITECTURE.md). В [`.github/workflows/invariants.yml`](../../../.github/workflows/invariants.yml) добавлены пути `docs/retired-terms.tsv` и `**/*.md`.
+  - Прогон `./tools/ci/check-invariants.sh`: правила `1–5` — `OK`, правило `6` — 9 предупреждений только в 5 файлах других владельцев (`README.md`, `docs/team/KICKOFF.md`, `docs/team/Gs.md`, `docs/team/OWNERSHIP.md`, `third_party/README.md`), код возврата `0`. После очистки этих 5 файлов правило 6 можно сделать блокирующим.
+- **Co-66 (S8: изоляция страниц в игре):** в [`tests/test-plan/s8-checklist.md`](../../../tests/test-plan/s8-checklist.md) отмечены пункты `1.1b`, `1.4`, `2.1`, `2.2`, `2.3` и статическая часть `2.4`; в §5.2 зафиксированы условия замера (`3+` сек до первого рендера из-за повторов watchdog и `1/17` ранний завис до загрузки мода).
+- **Gs-40 (S3: приёмка каталога на Save D):** результат прогона на CL 517554 под Proton (1 403 рецепта, 517 Satisfactory Plus + Refined Power, 9,7–11,7 мс) учтён; пункты §3.1 отмечены в [`tests/test-plan/spikes-checklist.md`](../../../tests/test-plan/spikes-checklist.md).
+
+## Gf2-24 → Co, Gs · ответ на Co-67 · 12.11.2026
+
+**Письменное согласие Gf2 по [`OWNERSHIP.md`](../OWNERSHIP.md) §21 на PR #42 (`3efef4c`, перенос из Co-65).**
+
+1. Подтверждаю согласие Gf2 на включение 7-го файла `tools/host/selftest.sh` в [PR #42](https://github.com/kkkingqz/ficsit-ai-helper/pull/42) (в дополнение к согласию в `Gf2-19`). Ревизия `origin/tools/host-verify:tools/host/selftest.sh` (`3efef4c`) проверена: добавленные тесты на вложенный `CustomMetadata.GameFeature`, экранированное поле `\u0047ameFeature` и отклонение архива с двумя `.uplugin` (36/36 проверок) изолированы на стабах во временном каталоге `mktemp -d`, без влияния на игру, движок и сеть.
+2. Попутно в [`tools/questions.py`](../../../tools/questions.py) исправлен учёт многоадресных вопросов (`answered_by`, `unanswered_roles`, `is_fully_answered`): теперь вопрос не исчезает из очереди оставшихся адресатов после ответа первого участника (как это проявилось между `Gs-42` и `Co-65` до ответа Gf2).

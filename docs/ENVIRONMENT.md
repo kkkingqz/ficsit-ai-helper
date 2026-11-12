@@ -147,6 +147,16 @@ cd ~/Projects/SatisfactoryModLoader
 
 В существующей личной копии Starter Project сохраните локальные правки и выполните `fetch`, `switch` и `rev-parse` из этого блока. Ожидаемый `HEAD` — `a7e855031811d39bbdd12fc2563b87ea2d80cb5f`.
 
+Если в существующей копии Wwise уже интегрирован и пропатчен набором из `v3.12.0`, после перехода на `a7e8550` оставьте соответствующий каталог `Mods/WwisePatches`. Если в нём есть локальные правки, замените каталог сохранённой копией целиком. Если локальных правок в нём нет, восстановите набор из тега:
+
+```bash
+/usr/bin/git fetch --depth 1 origin tag v3.12.0
+/usr/bin/git restore --source=v3.12.0 --worktree -- Mods/WwisePatches
+/usr/bin/git rev-parse HEAD
+```
+
+`HEAD` остаётся на `a7e8550`. При несовпадении набора с установленным Wwise предсборочный шаг завершается сообщением `Dry run failed for patch '04-CSS-CL503514.patch'`. С набором `v3.12.0` на существующей интеграции проверены сборка Linux Editor и Win64 Shipping, cook и запуск мода на CL 517554.
+
 В состав проекта входят:
 - `FactoryGame.uproject` (EngineAssociation `5.6.1-CSS`);
 - `Mods/SML` и `Mods/SMLEditor`;
