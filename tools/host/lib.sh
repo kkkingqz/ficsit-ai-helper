@@ -212,8 +212,8 @@ _fa_game_copy_ensure() {
     fi
 }
 
-# Читает архив мода: печатает «<имя>\t<1|0>» — имя единственного дескриптора .uplugin в корне архива
-# и значение корневого поля GameFeature (1 — только при JSON true). Разбор — штатным парсером JSON:
+# Читает архив мода: печатает «<имя>\t<1|0>\t<версия>» — имя единственного дескриптора .uplugin в корне архива,
+# значение корневого поля GameFeature (1 — только при JSON true) и SemVersion (её SML пишет в журнал; пусто — не задана). Разбор — штатным парсером JSON:
 # поиск подстроки путал вложенные поля и экранированные имена (третье ревью #42).
 _fa_mod_descriptor() {
     python3 -I - "$1" <<'PYDESC'
@@ -229,7 +229,9 @@ except (OSError, zipfile.BadZipFile, UnicodeDecodeError, ValueError) as e:
     sys.exit(f"архив {path} не читается: {e}")
 if not isinstance(data, dict):
     sys.exit(f"дескриптор {roots[0]} в {path} — не объект JSON")
-print(f"{roots[0][:-len('.uplugin')]}\t{1 if data.get('GameFeature') is True else 0}")
+ver = data.get("SemVersion")
+ver = ver if isinstance(ver, str) and ver.strip() and "\t" not in ver else ""
+print(f"{roots[0][:-len('.uplugin')]}\t{1 if data.get('GameFeature') is True else 0}\t{ver}")
 PYDESC
 }
 
@@ -238,21 +240,29 @@ PYDESC
 # Мод с корневым полем "GameFeature": true ставится в Mods/GameFeatures/<мод>, остальные — в Mods/<мод>:
 # так требует SML, иначе игра останавливается на старте (нашёл Gs на наборе модов Save D).
 _fa_install_mods() {
-    local mods="$FA_ROLE_DIR/game/FactoryGame/Mods" zip name target desc gf
+    local mods="$FA_ROLE_DIR/game/FactoryGame/Mods" zip name target desc gf i
+    local -a names=() gfs=()
+    local -A seen=()
+    # Сначала разбираем все архивы: имя мода должно быть уникальным среди всех переданных, независимо от
+    # каталога установки. Иначе две версии одного мода ложатся в Mods/ и Mods/GameFeatures/, и Unreal
+    # выбирает одну из них молча (четвёртое ревью #42). При отказе прежние моды не трогаются.
+    for zip in "$@"; do
+        [[ -f "$zip" ]] || { fa_say "нет архива $zip"; return 1; }
+        desc="$(_fa_mod_descriptor "$zip" 2>&1)" || { fa_say "$desc"; return 1; }
+        name="${desc%%$'\t'*}"; gf="${desc#*$'\t'}"; gf="${gf%%$'\t'*}"
+        case "$name" in ""|SML|GameFeatures|*[!A-Za-z0-9_-]*) fa_say "недопустимое имя мода '$name' в $zip"; return 1 ;; esac
+        [[ -n "${seen[$name]:-}" ]] && { fa_say "мод $name передан дважды: ${seen[$name]} и $zip"; return 1; }
+        seen[$name]="$zip"; names+=("$name"); gfs+=("$gf")
+    done
     for name in "$mods"/* "$mods"/GameFeatures/*; do
         [[ -e "$name" ]] || continue
         case "$(basename "$name")" in SML|GameFeatures) continue ;; esac
         rm -rf "$name" || return 1
     done
-    for zip in "$@"; do
-        [[ -f "$zip" ]] || { fa_say "нет архива $zip"; return 1; }
-        desc="$(_fa_mod_descriptor "$zip" 2>&1)" || { fa_say "$desc"; return 1; }
-        name="${desc%$'\t'*}"; gf="${desc##*$'\t'}"
-        case "$name" in ""|SML|GameFeatures|*[!A-Za-z0-9_-]*) fa_say "недопустимое имя мода '$name' в $zip"; return 1 ;; esac
-        target="$mods/$name"
-        [[ "$gf" == 1 ]] && target="$mods/GameFeatures/$name"
-        [[ -e "$target" ]] && { fa_say "мод $name передан дважды"; return 1; }
-        mkdir -p "$target" && unzip -q "$zip" -d "$target" || return 1
+    for i in "${!names[@]}"; do
+        target="$mods/${names[$i]}"
+        [[ "${gfs[$i]}" == 1 ]] && target="$mods/GameFeatures/${names[$i]}"
+        mkdir -p "$target" && unzip -q "${@:$((i + 1)):1}" -d "$target" || return 1
     done
 }
 
@@ -310,7 +320,7 @@ fa_parse_game_log() {
     local log="$1"
     FA_LOG_CL="$(grep -o 'Game Changelist: [0-9]*' "$log" | head -1 | grep -o '[0-9]*' || true)"
     FA_LOG_MODS="$(sed -n '/LogSatisfactoryModLoader: Display: List of loaded mods:/,/Discovered .* game instance modules/p' "$log" \
-        | grep -o 'Display: [A-Za-z0-9_]*: [0-9][0-9.]*' | sed 's/Display: //' | grep -v '^FactoryGame:' | paste -sd, - | sed 's/,/, /g' || true)"
+        | grep -o 'Display: [A-Za-z0-9_]*: [0-9][0-9A-Za-z.+-]*' | sed 's/Display: //' | grep -v '^FactoryGame:' | paste -sd, - | sed 's/,/, /g' || true)"
     FA_LOG_FATAL="$(grep -c -E 'Critical error|Fatal error|Unhandled Exception' "$log" || true)"
     FA_LOG_PLUGIN_ERRORS="$(grep -c 'LogPluginManager: Error' "$log" || true)"
     FA_LOG_MENU=no

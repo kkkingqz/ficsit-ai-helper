@@ -28,12 +28,13 @@ done
 [[ -n "$project" ]] || fa_die "не задан проект SML: --project или FICSITAI_SML_PROJECT"
 fa_require_role
 fa_new_dir runs "verify-"; out="$FA_NEW_DIR"
-ok=1; lines=(); zips=()
+ok=1; lines=(); zips=(); declare -A want=()
 
 for mod in "${mods[@]}"; do
     if fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"; then
         lines+=("- Сборка Win64 Shipping, \`$mod\`: успешно; исходники — $FA_BUILD_ORIGIN; архив ${FA_BUILD_SIZE_MB} МБ, sha256 \`${FA_BUILD_SHA}…\`")
         zips+=("$FA_BUILD_ARCHIVE")
+        d="$(_fa_mod_descriptor "$FA_BUILD_ARCHIVE" 2>/dev/null)" && want[$mod]="${d##*$'\t'}"
     else
         ok=0
         first="$(grep -m1 -E 'error [A-Z]+[0-9]+|ERROR:' "$FA_BUILD_LOG" 2>/dev/null | cut -c1-160)"
@@ -52,8 +53,16 @@ if [[ $ok -eq 1 ]]; then
         menu="нет"; [[ "$FA_LOG_MENU" == yes ]] && menu="да"
         lines+=("- Игра: CL ${FA_LOG_CL:-не определён}, Proton, без клиента Steam; загружены: ${FA_LOG_MODS:-ни одного мода}")
         lines+=("- Запуск на $seconds с: главное меню — $menu; дожила до таймера — $alive; критических ошибок — $FA_LOG_FATAL; ошибок загрузки плагинов — $FA_LOG_PLUGIN_ERRORS")
+        # Загружен должен быть именно собранный архив: имя и SemVersion из его дескриптора.
         for mod in "${mods[@]}"; do
-            [[ ", $FA_LOG_MODS," == *", $mod: "* ]] || { ok=0; lines+=("- **\`$mod\` нет в списке загруженных модов SML**"); }
+            if [[ ", $FA_LOG_MODS," != *", $mod: "* ]]; then
+                ok=0; lines+=("- **\`$mod\` нет в списке загруженных модов SML**")
+            elif [[ -z "${want[$mod]:-}" ]]; then
+                ok=0; lines+=("- **У \`$mod\` в дескрипторе нет \`SemVersion\`** — нельзя проверить, что загружена свежая сборка")
+            elif [[ ", $FA_LOG_MODS," != *", $mod: ${want[$mod]},"* ]]; then
+                got="$(grep -o "$mod: [^,]*" <<<"$FA_LOG_MODS" | head -1)"
+                ok=0; lines+=("- **Загружена не та версия \`$mod\`:** в журнале \`$got\`, в собранном архиве \`${want[$mod]}\`")
+            fi
         done
     fi
     fa_run_ok || ok=0

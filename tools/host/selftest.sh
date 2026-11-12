@@ -16,7 +16,7 @@ check() { if [[ "$2" == "$3" ]]; then pass=$((pass+1)); echo "  ok    $1"; else 
 # --- заглушки -------------------------------------------------------------------------------------
 mkdir -p "$T/bin" "$T/msvc/bin/x64" "$T/engine/Engine/Build/BatchFiles/Linux" "$T/proj/Mods" "$T/repo/tools" "$T/repo/mod/TestMod/Source"
 cp -r "$HERE" "$T/repo/tools/host"
-echo '{}' > "$T/repo/mod/TestMod/TestMod.uplugin"; echo 'int a;' > "$T/repo/mod/TestMod/Source/a.cpp"
+echo '{"SemVersion":"0.1.0"}' > "$T/repo/mod/TestMod/TestMod.uplugin"; echo 'int a;' > "$T/repo/mod/TestMod/Source/a.cpp"
 touch "$T/proj/FactoryGame.uproject"
 for f in "$T/bin/wine" "$T/msvc/bin/x64/cl" "$T/msvc/bin/x64/rc.exe"; do printf '#!/bin/sh\nexit 0\n' > "$f"; chmod +x "$f"; done
 # UAT: по STUB_UAT — ok (свежий архив), stale (архив не трогает), fail (код 6). Архив содержит исходники проекта.
@@ -43,11 +43,11 @@ cat > "$T/bin/flatpak" <<'STUB'
 #!/usr/bin/env bash
 saved="$STUB_SAVED"; mkdir -p "$saved/Logs"; log="$saved/Logs/FactoryGame.log"
 [[ -n "${STUB_GAME_SLEEP:-}" ]] && sleep "$STUB_GAME_SLEEP"
-mods="$(ls "$STUB_MODS" | grep -v '^SML$' | head -1)"
+mods="$( (ls "$STUB_MODS"; ls "$STUB_MODS/GameFeatures" 2>/dev/null) | grep -v -e '^SML$' -e '^GameFeatures$' | head -1)"
 {
   echo "LogSatisfactoryModLoader: Display: Version check passed successfully! Game Changelist: 517554"
   echo "LogSatisfactoryModLoader: Display: List of loaded mods:"
-  [[ -n "$mods" ]] && echo "LogSatisfactoryModLoader: Display: $mods: 0.1.0"
+  [[ -n "$mods" ]] && echo "LogSatisfactoryModLoader: Display: $mods: ${STUB_MOD_VERSION:-0.1.0}"
   echo "LogSatisfactoryModLoader: Display: FactoryGame: 517554.0.0"
   echo "LogSatisfactoryModLoader: Display: SML: 3.12.0"
   echo "LogSatisfactoryModLoader: Discovered 1 game instance modules"
@@ -157,6 +157,22 @@ check "вложенное GameFeature не переносит мод" "$([[ -f "
 check "экранированное имя поля распознано" "$([[ -f "$STUB_MODS/GameFeatures/EscMod/EscMod.uplugin" && ! -e "$STUB_MODS/EscMod" ]] && echo yes || echo no)" yes
 check "архив с двумя дескрипторами отклонён" "$([[ "$(run "$R" --mod "$T/two.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r10")" != 0 ]] && echo yes || echo no)" yes
 check "причина названа" "$(grep -c 'ровно один .uplugin' "$T/out.txt")" 1
+
+echo "4г. Две версии одного мода и проверка версии (четвёртое ревью)"
+U="$T/repo/mod/TestMod/TestMod.uplugin"
+mkdir -p "$T/old" && printf '{"SemVersion":"1.0.0"}' > "$T/old/TestMod.uplugin" && ( cd "$T/old" && zip -q "$T/old.zip" TestMod.uplugin )
+printf '{"SemVersion":"2.0.0","GameFeature":true}' > "$U"
+check "старая версия того же мода через --extra-mod отклонена" "$([[ "$(STUB_MOD_VERSION=1.0.0 run "$V" --extra-mod "$T/old.zip" "${ARGS[@]}")" != 0 ]] && echo yes || echo no)" yes
+check "причина — мод передан дважды" "$(grep -c 'TestMod передан дважды' "$T/out.txt")" 1
+check "протокол не пройден" "$(grep -c 'Итог: не пройдено' "$T/out.txt")" 1
+check "ни одна копия не поставлена" "$([[ -e "$STUB_MODS/TestMod" || -e "$STUB_MODS/GameFeatures/TestMod" ]] && echo yes || echo no)" no
+printf '{"SemVersion":"2.0.0"}' > "$U"
+check "загружена другая версия — не пройдено" "$([[ "$(STUB_MOD_VERSION=1.0.0 run "$V" "${ARGS[@]}")" != 0 ]] && echo yes || echo no)" yes
+check "протокол называет версии" "$(grep -c 'Загружена не та версия .TestMod.:.*TestMod: 1.0.0.*2.0.0' "$T/out.txt")" 1
+check "та же версия — пройдено" "$(STUB_MOD_VERSION=2.0.0 run "$V" "${ARGS[@]}")" 0
+printf '{}' > "$U"
+check "без SemVersion — не пройдено" "$([[ "$(run "$V" "${ARGS[@]}")" != 0 ]] && echo yes || echo no)" yes
+echo '{"SemVersion":"0.1.0"}' > "$U"
 
 echo "5. Блокировка и роль (замечание 5)"
 W="$T/repo/tools/host/with-lock.sh"
