@@ -1,4 +1,4 @@
-# Gs — состояние на 11.11.2026
+# Gs — состояние на 12.11.2026
 
 **Сейчас:** S3 ([#11](https://github.com/kkkingqz/ficsit-ai-helper/issues/11)), каталог и телеметрия. Документы в `work/gs`.
 
@@ -6,7 +6,7 @@
 
 **Зависимости:** постоянная проводка каталога и замер за Co (Co-44).
 
-**Ревью:** [#42 на `b70132c`](https://github.com/kkkingqz/ficsit-ai-helper/pull/42#issuecomment-6801287129) — нужны правки. [#43 на `18085d6`](https://github.com/kkkingqz/ficsit-ai-helper/pull/43#issuecomment-6801257567) — нужны правки. Повторить ревью новых ревизий.
+**Ревью:** [#42 на `e1b482f`](https://github.com/kkkingqz/ficsit-ai-helper/pull/42#issuecomment-6815355175) — нужны правки. [#43 на `7e9d690`](https://github.com/kkkingqz/ficsit-ai-helper/pull/43#issuecomment-6815336501) — нужны правки. По Co-65 в ENVIRONMENT §5.1 описан переход с уже пропатченным Wwise.
 
 **Дальше:** `catalogRevision`, обновление каталога по событиям, индекс построек и нарезка сбора по кадрам. Co-61 — убрать дубли плана и снятые понятия из своих документов. После слияния #42 — обновить AGENTS.md §6 и ENVIRONMENT.md §7–8.
 
