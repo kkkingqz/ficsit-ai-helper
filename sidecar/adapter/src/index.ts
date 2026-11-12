@@ -13,6 +13,7 @@ import {
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
+import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
 import { createLogger, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
 import { UpstreamMcp } from "./upstream.js";
@@ -100,6 +101,14 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
 
 export async function createApp(config: Config, log: Logger) {
   const upstream = new UpstreamMcp(config.sfMcpUrl, log);
+  // Аккаунт заводится при первом запуске: у сайдкара один пользователь — мод,
+  // и спрашивать логин у игрока неоткуда (V-08). Пароль остаётся в файле с
+  // правами 600, в логе его нет.
+  const foreman = new ForemanSession(
+    config.foremanBaseUrl,
+    loadOrCreateAccount(config.accountPath),
+    log,
+  );
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -112,6 +121,7 @@ export async function createApp(config: Config, log: Logger) {
       apiVersion: config.apiVersion,
       foremanBaseUrl: config.foremanBaseUrl,
       sfMcpUrl: config.sfMcpUrl,
+      foreman: { signedIn: foreman.authenticated },
       mod: { connected: false, reason: "канал мода появится в S2" },
     });
   });
@@ -148,15 +158,22 @@ export async function createApp(config: Config, log: Logger) {
     log.debug("не-POST на /mcp", { method: req.method });
   });
 
-  return { app };
+  return { app, foreman };
 }
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const log = createLogger(config.logLevel);
-  const { app } = await createApp(config, log);
+  const { app, foreman } = await createApp(config, log);
 
   const httpServer = app.listen(config.port, config.host);
+
+  // Вход не блокирует запуск: лаунчер поднимает ff-server первым, но адаптер
+  // не должен падать, если Foreman отстал или перезапускается. Первый запрос
+  // мода войдёт сам.
+  void foreman.authenticate().catch((err: unknown) => {
+    log.warn("вход в Foreman при запуске не удался — повторю при первом запросе", err);
+  });
 
   httpServer.on("listening", () => {
     const addr = httpServer.address();

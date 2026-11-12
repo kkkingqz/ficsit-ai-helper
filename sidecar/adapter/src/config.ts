@@ -42,8 +42,24 @@ const schema = z.object({
    */
   llmUpstreamBaseUrl: z.string().url().optional(),
   normalizerPort: z.coerce.number().int().min(1).max(65535).default(8731),
+  /**
+   * Файл с учётными данными локального аккаунта Foreman (S2). Создаётся
+   * адаптером при первом запуске с правами 600 и лежит рядом с базой Foreman,
+   * вне репозитория. Путь задаёт лаунчер: сам адаптер каталог данных не
+   * выбирает, иначе их стало бы два.
+   */
+  accountPath: z.string().min(1).default(defaultAccountPath()),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
+
+/** `~/.local/share/ficsitai/foreman/adapter-account.json` по умолчанию XDG. */
+function defaultAccountPath(): string {
+  const base =
+    process.env.XDG_DATA_HOME !== undefined && process.env.XDG_DATA_HOME.length > 0
+      ? process.env.XDG_DATA_HOME
+      : `${process.env.HOME ?? "."}/.local/share`;
+  return `${base}/ficsitai/foreman/adapter-account.json`;
+}
 
 export type Config = z.infer<typeof schema>;
 
@@ -57,6 +73,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     apiVersion: env.FICSITAI_API_VERSION,
     llmUpstreamBaseUrl: env.LLM_UPSTREAM_BASE_URL,
     normalizerPort: env.NORMALIZER_PORT,
+    accountPath: env.FOREMAN_ACCOUNT_PATH,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 
