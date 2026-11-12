@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { Server as HttpServer } from "node:http";
@@ -12,11 +11,14 @@ import {
   ListToolsRequestSchema,
   McpError,
 } from "@modelcontextprotocol/sdk/types.js";
+import { createChatRouter } from "./chat.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
 import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
 import { createLogger, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
+import { tokenMatches } from "./token.js";
 import { UpstreamMcp } from "./upstream.js";
+import { applyWhitelist, hiddenCallRefusal, hiddenToolNames } from "./whitelist.js";
 
 /**
  * Каркас адаптера (P-3, задача #4).
@@ -43,14 +45,6 @@ const SERVER_VERSION = "0.0.1";
  */
 const MOD_TOOL_NAMES = new Set<string>();
 
-function tokenMatches(expected: string, given: unknown): boolean {
-  if (typeof given !== "string") return false;
-  const a = Buffer.from(expected);
-  const b = Buffer.from(given);
-  if (a.length !== b.length) return false;
-  return timingSafeEqual(a, b);
-}
-
 export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
   // Низкоуровневый Server, а не McpServer с сахаром: список инструментов должен
   // приходить из реестра операций (S2, V-3), а не собираться из регистраций в
@@ -62,20 +56,31 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
     { capabilities: { tools: {} } },
   );
 
-  // v0: инструменты игровых данных Foreman проходят насквозь — иначе модель
-  // зовёт их по системному промпту Foreman, и ход обрывается без ответа.
-  // Белый список и свои инструменты из реестра надеваются сверху в S2 и V-3.
+  // Инструменты игровых данных Foreman проходят насквозь, кроме скрытых белым
+  // списком (S2, `whitelist.ts`). Пустой список отдавать нельзя: модель всё
+  // равно зовёт инструменты по системному промпту, Foreman их не находит, и ход
+  // заканчивается без ответа — поэтому промпт и список правятся только вместе.
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const passthrough = (await upstream.listTools()).filter((tool) => !MOD_TOOL_NAMES.has(tool.name));
+    const all = (await upstream.listTools()).filter((tool) => !MOD_TOOL_NAMES.has(tool.name));
+    const passthrough = applyWhitelist(all);
     log.debug(
       `tools/list: инструментов мода ${MOD_TOOL_NAMES.size}, ` +
-        `проброшено из sf-mcp ${passthrough.length}`,
+        `проброшено из sf-mcp ${passthrough.length}, скрыто ${all.length - passthrough.length}`,
     );
     return { tools: passthrough };
   });
 
   server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+
+    // Скрытый инструмент модель по списку не видит, но может позвать по памяти
+    // о чужом промпте. Отказ с причиной лучше тихого проброса: иначе белый
+    // список выглядит соблюдённым, а данные всё равно уходят в ответ.
+    const refusal = hiddenCallRefusal(name);
+    if (refusal !== undefined) {
+      log.warn(`вызов скрытого инструмента «${name}» отклонён`);
+      throw new McpError(ErrorCode.InvalidRequest, refusal);
+    }
 
     // Операции мода идут своим каналом и до `sf-mcp` не доходят.
     if (MOD_TOOL_NAMES.has(name)) {
@@ -122,7 +127,8 @@ export async function createApp(config: Config, log: Logger) {
       foremanBaseUrl: config.foremanBaseUrl,
       sfMcpUrl: config.sfMcpUrl,
       foreman: { signedIn: foreman.authenticated },
-      mod: { connected: false, reason: "канал мода появится в S2" },
+      hiddenTools: hiddenToolNames(),
+      mod: { connected: false, reason: "канал вызова инструментов мода появится вместе с реестром" },
     });
   });
 
@@ -152,6 +158,10 @@ export async function createApp(config: Config, log: Logger) {
       if (!res.headersSent) res.status(500).json({ error: "internal_error" });
     }
   });
+
+  // API чата для мода: поток, отмена, история (S2). Токен здесь в заголовке —
+  // обе стороны канала наши (§13), query-строка остаётся только у Foreman.
+  app.use("/mod/saves", createChatRouter({ foreman, token: config.token, log }));
 
   app.all("/mcp", (req: Request, res: Response) => {
     res.status(405).json({ error: "method_not_allowed", allow: "POST" });
