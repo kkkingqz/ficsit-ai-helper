@@ -64,6 +64,25 @@ public:
 
     void RefreshModuleContent();
 
+    /** Режим поверхности в мире (§6.6, ADR-030): скрывает полосу подсказок клавиш */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
+    void SetWorldSurfaceMode(bool bInWorldSurface);
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    bool IsWorldSurfaceMode() const { return bWorldSurfaceMode; }
+
+    /** Отрисовать текущую композицию в offscreen Render Target (S8 3.4 / S1 / S4). Возвращает true при успешном рендере. */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
+    bool RenderToTarget(class UTextureRenderTarget2D* Target, const FIntPoint& TargetSizePx, float DeltaTime = 0.0f);
+
+    /** Создать offscreen-виджет поверхности экрана в мире с корректным PlayerContext/Initialize */
+    static UFicsitAIScreenSurfaceWidget* CreateForWorldSurface(UObject* Outer);
+
+    /** Создать offscreen Render Target заданного размера 16:9 (nullptr в -NullRHI / без Slate) */
+    static class UTextureRenderTarget2D* CreateWorldRenderTarget(UObject* Outer, const FIntPoint& SizePx);
+
+    virtual void BeginDestroy() override;
+
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
     virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
@@ -87,6 +106,9 @@ protected:
     UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Surface")
     TArray<FFicsitAIHotkeyHint> CurrentHotkeyHints;
 
+    UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Surface")
+    bool bWorldSurfaceMode = false;
+
     UPROPERTY()
     TMap<FName, FKey> ActionKeyBindings;
 
@@ -94,6 +116,10 @@ protected:
     TSharedPtr<class STextBlock> StatusTextBlock;
     TSharedPtr<class STextBlock> HeaderTextBlock;
     TSharedPtr<class STextBlock> FooterTextBlock;
+    TSharedPtr<class SBorder> FooterBorder;
+    TSharedPtr<class SVirtualWindow> WorldVirtualWindow;
+
+    class FWidgetRenderer* WorldWidgetRenderer = nullptr;
 
     void UpdateLayout();
 };

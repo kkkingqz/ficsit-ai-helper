@@ -1,12 +1,14 @@
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
 #include "GameFacade/Terminal/FicsitAITerminal.h"
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
+#include "GameFacade/Terminal/FicsitAIDiagnostics.h"
 #include "FGCharacterPlayer.h"
 #include "FGPlayerController.h"
 #include "FGUseableInterface.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
@@ -19,8 +21,11 @@ DEFINE_LOG_CATEGORY(LogFicsitAISubsystem);
 AFicsitAISubsystem::AFicsitAISubsystem()
 {
     PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;
     ReplicationPolicy = ESubsystemReplicationPolicy::SpawnOnServer;
 }
+
+AFicsitAISubsystem::~AFicsitAISubsystem() = default;
 
 void AFicsitAISubsystem::BeginPlay()
 {
@@ -65,6 +70,39 @@ void AFicsitAISubsystem::BeginPlay()
         UE_LOG(LogFicsitAISubsystem, Log, TEXT("Активирован режим диагностики (сценарий по умолчанию: S1)"));
     }
 
+    // Гарантируем регистрацию тика подсистемы (AFGSubsystem в базовом конструкторе может отключать тик по умолчанию)
+    PrimaryActorTick.SetTickFunctionEnable(true);
+    SetActorTickEnabled(true);
+
+    if (bDiagnosticsActive)
+    {
+        DiagnosticsRunner = MakeUnique<FicsitAI::Diagnostics::FFicsitAIDiagnosticsRunner>();
+        DiagnosticsRunner->Initialize(GetWorld(), DiagnosticsScenario);
+
+        DiagWorldTickHandle = FWorldDelegates::OnWorldPostActorTick.AddWeakLambda(
+            this,
+            [this, bLoggedFirst = false](UWorld* InWorld, ELevelTick TickType, float DeltaSeconds) mutable
+            {
+                if (InWorld != GetWorld() || !bDiagnosticsActive || !DiagnosticsRunner)
+                {
+                    return;
+                }
+                if (!bLoggedFirst)
+                {
+                    bLoggedFirst = true;
+                    UE_LOG(LogFicsitAISubsystem, Display,
+                        TEXT("[Diag] WorldPostActorTick active: tickType=%d dt=%.4f paused=%d subsysTick=%d"),
+                        static_cast<int32>(TickType), DeltaSeconds, InWorld->IsPaused() ? 1 : 0, IsActorTickEnabled() ? 1 : 0);
+                    if (GLog) { GLog->Flush(); }
+                }
+                if (TickType == LEVELTICK_All || TickType == LEVELTICK_TimeOnly)
+                {
+                    DiagnosticsRunner->Tick(InWorld, DeltaSeconds);
+                }
+            }
+        );
+    }
+
     // Подписка на инициализацию ввода игрока (SML Enhanced Input, ADR-027, P-7 §1.3–1.4)
     AFGCharacterPlayer::OnPlayerInputInitialized.AddUObject(this, &AFicsitAISubsystem::HandlePlayerInputInitialized);
 
@@ -90,6 +128,12 @@ void AFicsitAISubsystem::BeginPlay()
 
 void AFicsitAISubsystem::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    if (DiagWorldTickHandle.IsValid())
+    {
+        FWorldDelegates::OnWorldPostActorTick.Remove(DiagWorldTickHandle);
+        DiagWorldTickHandle.Reset();
+    }
+    DiagnosticsRunner.Reset();
     AFGCharacterPlayer::OnPlayerInputInitialized.RemoveAll(this);
     Super::EndPlay(EndPlayReason);
 }

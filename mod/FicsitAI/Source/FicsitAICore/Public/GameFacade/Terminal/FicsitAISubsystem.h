@@ -7,6 +7,8 @@
 
 DECLARE_LOG_CATEGORY_EXTERN(LogFicsitAISubsystem, Log, All);
 
+namespace FicsitAI::Diagnostics { class FFicsitAIDiagnosticsRunner; }
+
 /**
  * Подсистема мода FICSIT AI.
  * Хранит постоянное состояние сессии (SaveId), отслеживает режим мультиплеера
@@ -19,6 +21,7 @@ class FICSITAICORE_API AFicsitAISubsystem : public AModSubsystem, public IFGSave
 
 public:
     AFicsitAISubsystem();
+    virtual ~AFicsitAISubsystem();
 
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -98,4 +101,6 @@ protected:
     TArray<TWeakObjectPtr<class AFicsitAITerminal>> RegisteredTerminals;
 
     bool bInputContextRegistered = false;
+    FDelegateHandle DiagWorldTickHandle;
+    TUniquePtr<FicsitAI::Diagnostics::FFicsitAIDiagnosticsRunner> DiagnosticsRunner;
 };

@@ -1,9 +1,14 @@
 #include "Surface/FicsitAIScreenSurfaceWidget.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Layout/SBox.h"
+#include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/SBoxPanel.h"
 #include "GameFramework/PlayerController.h"
+#include "Engine/TextureRenderTarget2D.h"
+#include "Slate/WidgetRenderer.h"
+#include "Framework/Application/SlateApplication.h"
+#include "RenderDeferredCleanup.h"
 
 static TWeakObjectPtr<UFicsitAIScreenSurfaceWidget> ActivePlayerSurfaceWidget = nullptr;
 
@@ -24,6 +29,7 @@ UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::OpenForPlayer(APlaye
     if (Widget)
     {
         Widget->SetHost(InHost);
+        Widget->SetWorldSurfaceMode(false);
         Widget->SetHostState(InState);
         if (InModule)
         {
@@ -75,6 +81,135 @@ bool UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(APlayerController* PC)
 void UFicsitAIScreenSurfaceWidget::SetHost(TScriptInterface<IFicsitAIScreenHost> InHost)
 {
     Host = InHost;
+}
+
+void UFicsitAIScreenSurfaceWidget::SetWorldSurfaceMode(bool bInWorldSurface)
+{
+    if (bWorldSurfaceMode != bInWorldSurface)
+    {
+        bWorldSurfaceMode = bInWorldSurface;
+        UpdateLayout();
+        RefreshModuleContent();
+    }
+}
+
+UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(UObject* Outer)
+{
+    UWorld* World = Outer ? Outer->GetWorld() : nullptr;
+    UFicsitAIScreenSurfaceWidget* Widget = nullptr;
+    if (World && World->IsGameWorld() && !World->bIsTearingDown)
+    {
+        Widget = CreateWidget<UFicsitAIScreenSurfaceWidget>(World, UFicsitAIScreenSurfaceWidget::StaticClass());
+    }
+    if (!Widget)
+    {
+        Widget = NewObject<UFicsitAIScreenSurfaceWidget>(Outer ? Outer : GetTransientPackage());
+        if (Widget)
+        {
+            Widget->Initialize();
+        }
+    }
+    if (Widget)
+    {
+        Widget->SetWorldSurfaceMode(true);
+    }
+    return Widget;
+}
+
+bool UFicsitAIScreenSurfaceWidget::RenderToTarget(UTextureRenderTarget2D* Target, const FIntPoint& TargetSizePx, float DeltaTime)
+{
+    if (!Target || TargetSizePx.X <= 0 || TargetSizePx.Y <= 0 || GUsingNullRHI || !FSlateApplication::IsInitialized())
+    {
+        return false;
+    }
+
+    FSlateRenderer* SlateRenderer = FSlateApplication::Get().GetRenderer();
+    if (!SlateRenderer)
+    {
+        return false;
+    }
+
+    Initialize();
+
+    FTextureRenderTargetResource* TargetResource = Target->GameThread_GetRenderTargetResource();
+    if (!TargetResource)
+    {
+        Target->UpdateResourceImmediate(true);
+        TargetResource = Target->GameThread_GetRenderTargetResource();
+        if (!TargetResource)
+        {
+            return false;
+        }
+    }
+
+    const FVector2D DrawSize(static_cast<float>(TargetSizePx.X), static_cast<float>(TargetSizePx.Y));
+    const TSharedRef<SWidget> RootSlate = TakeWidget();
+    if (!WorldVirtualWindow.IsValid())
+    {
+        WorldVirtualWindow = SNew(SVirtualWindow).Size(DrawSize);
+        WorldVirtualWindow->SetContent(RootSlate);
+    }
+    WorldVirtualWindow->Resize(DrawSize);
+
+    if (!WorldWidgetRenderer)
+    {
+        WorldWidgetRenderer = new FWidgetRenderer(false, true);
+    }
+
+    WorldWidgetRenderer->DrawWindow(
+        TargetResource,
+        WorldVirtualWindow->GetHittestGrid(),
+        WorldVirtualWindow.ToSharedRef(),
+        1.0f,
+        DrawSize,
+        DeltaTime,
+        false
+    );
+    return true;
+}
+
+UTextureRenderTarget2D* UFicsitAIScreenSurfaceWidget::CreateWorldRenderTarget(UObject* Outer, const FIntPoint& SizePx)
+{
+    if (SizePx.X <= 0 || SizePx.Y <= 0 || GUsingNullRHI || !FSlateApplication::IsInitialized())
+    {
+        return nullptr;
+    }
+
+    FSlateRenderer* SlateRenderer = FSlateApplication::Get().GetRenderer();
+    if (!SlateRenderer)
+    {
+        return nullptr;
+    }
+
+    const EPixelFormat RequestedFormat = SlateRenderer->GetSlateRecommendedColorFormat();
+    UTextureRenderTarget2D* Target = NewObject<UTextureRenderTarget2D>(Outer ? Outer : GetTransientPackage());
+    if (!Target)
+    {
+        return nullptr;
+    }
+
+    Target->Filter = TF_Bilinear;
+    Target->ClearColor = FLinearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    Target->SRGB = true;
+    Target->TargetGamma = 1.0f;
+    Target->InitCustomFormat(SizePx.X, SizePx.Y, RequestedFormat, true);
+    Target->UpdateResourceImmediate(true);
+    return Target;
+}
+
+void UFicsitAIScreenSurfaceWidget::BeginDestroy()
+{
+    if (WorldVirtualWindow.IsValid())
+    {
+        WorldVirtualWindow->SetContent(SNullWidget::NullWidget);
+        WorldVirtualWindow.Reset();
+    }
+    if (WorldWidgetRenderer)
+    {
+        BeginCleanup(WorldWidgetRenderer);
+        WorldWidgetRenderer = nullptr;
+    }
+    Super::BeginDestroy();
 }
 
 void UFicsitAIScreenSurfaceWidget::SetActionKeyBindings(const TMap<FName, FKey>& InBindings)
@@ -138,7 +273,10 @@ void UFicsitAIScreenSurfaceWidget::RefreshModuleContent()
     {
         if (UUserWidget* ModuleWidget = Cast<UUserWidget>(ActiveModule.GetObject()))
         {
-            ModuleWidget->SetPlayerContext(GetPlayerContext());
+            if (GetPlayerContext().IsValid())
+            {
+                ModuleWidget->SetPlayerContext(GetPlayerContext());
+            }
             ModuleWidget->Initialize();
             ModuleContentBox->SetContent(ModuleWidget->TakeWidget());
             return;
@@ -177,6 +315,12 @@ void UFicsitAIScreenSurfaceWidget::SetHostState(EFicsitAIHostState NewState)
 void UFicsitAIScreenSurfaceWidget::UpdateLayout()
 {
     CurrentHotkeyHints.Empty();
+
+    if (FooterBorder.IsValid())
+    {
+        // На экране в мире (§6.6, Co3-2) нижняя полоса подсказок клавиш не отображается
+        FooterBorder->SetVisibility(bWorldSurfaceMode ? EVisibility::Collapsed : EVisibility::Visible);
+    }
 
     if (CurrentHostState == EFicsitAIHostState::NoPower)
     {
@@ -251,55 +395,59 @@ FText UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints() const
 
 TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
 {
-    TSharedRef<SWidget> Widget = SNew(SBorder)
-        .BorderBackgroundColor(FLinearColor(0.02f, 0.02f, 0.03f, 0.95f))
-        .Padding(FMargin(20.0f))
+    TSharedRef<SWidget> Widget = SNew(SScaleBox)
+        .Stretch(EStretch::ScaleToFit)
         [
-            SNew(SBox)
-            .WidthOverride(1920.0f)
-            .HeightOverride(1080.0f)
+            SNew(SBorder)
+            .BorderBackgroundColor(FLinearColor(0.02f, 0.02f, 0.03f, 0.95f))
+            .Padding(FMargin(20.0f))
             [
-                SNew(SVerticalBox)
-                // Верхняя полоса (Header, 64px)
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f))
+                SNew(SBox)
+                .WidthOverride(1920.0f)
+                .HeightOverride(1080.0f)
                 [
-                    SNew(SBorder)
-                    .BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.12f, 1.0f))
-                    .Padding(FMargin(16.0f, 12.0f))
+                    SNew(SVerticalBox)
+                    // Верхняя полоса (Header, 64px)
+                    + SVerticalBox::Slot()
+                    .AutoHeight()
+                    .Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f))
                     [
-                        SAssignNew(HeaderTextBlock, STextBlock)
-                        .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetHeaderTitle)
-                        .ColorAndOpacity(FLinearColor::White)
+                        SNew(SBorder)
+                        .BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.12f, 1.0f))
+                        .Padding(FMargin(16.0f, 12.0f))
+                        [
+                            SAssignNew(HeaderTextBlock, STextBlock)
+                            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetHeaderTitle)
+                            .ColorAndOpacity(FLinearColor::White)
+                        ]
                     ]
-                ]
-                // Основная область модуля (16:9)
-                + SVerticalBox::Slot()
-                .FillHeight(1.0f)
-                .Padding(FMargin(0.0f, 10.0f))
-                [
-                    SAssignNew(ModuleContentBox, SBox)
-                    .HAlign(HAlign_Fill)
-                    .VAlign(VAlign_Fill)
+                    // Основная область модуля (16:9)
+                    + SVerticalBox::Slot()
+                    .FillHeight(1.0f)
+                    .Padding(FMargin(0.0f, 10.0f))
                     [
-                        SAssignNew(StatusTextBlock, STextBlock)
-                        .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
-                        .ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.2f, 1.0f))
+                        SAssignNew(ModuleContentBox, SBox)
+                        .HAlign(HAlign_Fill)
+                        .VAlign(VAlign_Fill)
+                        [
+                            SAssignNew(StatusTextBlock, STextBlock)
+                            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetStatusMessage)
+                            .ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.2f, 1.0f))
+                        ]
                     ]
-                ]
-                // Нижняя полоса клавиш (Footer, 56px)
-                + SVerticalBox::Slot()
-                .AutoHeight()
-                .Padding(FMargin(0.0f, 10.0f, 0.0f, 0.0f))
-                [
-                    SNew(SBorder)
-                    .BorderBackgroundColor(FLinearColor(0.05f, 0.05f, 0.08f, 1.0f))
-                    .Padding(FMargin(16.0f, 8.0f))
+                    // Нижняя полоса клавиш (Footer, 56px; скрывается в bWorldSurfaceMode)
+                    + SVerticalBox::Slot()
+                    .AutoHeight()
+                    .Padding(FMargin(0.0f, 10.0f, 0.0f, 0.0f))
                     [
-                        SAssignNew(FooterTextBlock, STextBlock)
-                        .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints)
-                        .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+                        SAssignNew(FooterBorder, SBorder)
+                        .BorderBackgroundColor(FLinearColor(0.05f, 0.05f, 0.08f, 1.0f))
+                        .Padding(FMargin(16.0f, 8.0f))
+                        [
+                            SAssignNew(FooterTextBlock, STextBlock)
+                            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints)
+                            .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+                        ]
                     ]
                 ]
             ]

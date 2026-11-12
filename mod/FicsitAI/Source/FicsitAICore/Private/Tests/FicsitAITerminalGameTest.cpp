@@ -12,6 +12,8 @@
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
 #include "Modules/FicsitAITestIncompatibleModule.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture2D.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -35,9 +37,51 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("PowerInfoComponent существует"), TerminalA->PowerInfoComponent.Get());
     TestNotNull(TEXT("PowerConnectionComponent существует"), TerminalA->PowerConnectionComponent.Get());
 
-    // Проверка плоской поверхности экрана 16:9 на меше с учётом родителя (ADR-030, P-7 §1.1, Gs-15 раунд 4)
+    // Проверка плоской поверхности экрана 16:9 на меше с учётом родителя (ADR-030, P-7 §1.1, S8 3.4, Gs-15 раунд 4)
     TestNotNull(TEXT("ScreenMeshComponent существует"), TerminalA->ScreenMeshComponent.Get());
     TestTrue(TEXT("Меш экрана имеет соотношение сторон 16:9 с учётом родителя"), FMath::IsNearlyEqual(TerminalA->GetScreenAspectRatio(), 16.0f / 9.0f, 0.01f));
+    if (UStaticMeshComponent* ScreenComp = TerminalA->ScreenMeshComponent.Get())
+    {
+        // Нормаль плоскости экрана (+Z компонента) направлена наружу (+X терминала), +X=лево->право(-Y), +Y=верх->низ(-Z)
+        const FTransform ScreenXform = ScreenComp->GetRelativeTransform();
+        const FVector OutwardNormal = ScreenXform.GetRotation().RotateVector(FVector(0.0f, 0.0f, 1.0f));
+        const FVector RightDir = ScreenXform.GetRotation().RotateVector(FVector(1.0f, 0.0f, 0.0f));
+        const FVector DownDir = ScreenXform.GetRotation().RotateVector(FVector(0.0f, 1.0f, 0.0f));
+        TestTrue(TEXT("Нормаль экрана направлена наружу (+X)"), OutwardNormal.Equals(FVector(1.0f, 0.0f, 0.0f), 0.01f));
+        TestTrue(TEXT("Ось U направлена слева направо (-Y)"), RightDir.Equals(FVector(0.0f, -1.0f, 0.0f), 0.01f));
+        TestTrue(TEXT("Ось V направлена сверху вниз (-Z)"), DownDir.Equals(FVector(0.0f, 0.0f, -1.0f), 0.01f));
+        TestEqual(TEXT("Коллизия экрана отвечает на Visibility trace"), ScreenComp->GetCollisionResponseToChannel(ECC_Visibility), ECR_Block);
+    }
+
+    // Проверка материала экрана в мире, внешней текстуры (S8 3.4), dirty revision и проекции UV попадания
+    TestNotNull(TEXT("WorldScreenMaterial создан на меше экрана"), TerminalA->GetWorldScreenMaterial());
+    {
+        FVector2D HitUV = FVector2D::ZeroVector;
+        // Центр экрана: (25.5, 0.0, 20.0) -> UV=(0.5, 0.5)
+        TestTrue(TEXT("Проекция центра экрана в UV"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, 0.0f, 20.0f), HitUV));
+        TestTrue(TEXT("UV центра близок к (0.5, 0.5)"), HitUV.Equals(FVector2D(0.5f, 0.5f), 0.01f));
+
+        // Левый верхний угол (вид от +X: +Y=48, +Z=20+27=47) -> UV=(0, 0)
+        TestTrue(TEXT("Проекция левого верхнего угла в UV"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, 48.0f, 47.0f), HitUV));
+        TestTrue(TEXT("UV левого верхнего угла равен (0, 0)"), HitUV.Equals(FVector2D(0.0f, 0.0f), 0.01f));
+
+        // Правый нижний угол (вид от +X: -Y=-48, Z=20-27=-7) -> UV=(1, 1)
+        TestTrue(TEXT("Проекция правого нижнего угла в UV"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, -48.0f, -7.0f), HitUV));
+        TestTrue(TEXT("UV правого нижнего угла равен (1, 1)"), HitUV.Equals(FVector2D(1.0f, 1.0f), 0.01f));
+
+        // Точка вне экрана отклоняется
+        TestFalse(TEXT("Точка за границей экрана отклоняется"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, 80.0f, 20.0f), HitUV));
+        TestFalse(TEXT("Точка далеко перед плоскостью отклоняется"), TerminalA->TryProjectWorldHitToScreenUV(FVector(40.0f, 0.0f, 20.0f), HitUV));
+
+        // Внешняя текстура (S8 3.4 / BLUI UTexture)
+        UTexture2D* DummyExternalTex = UTexture2D::CreateTransient(16, 9, PF_B8G8R8A8);
+        const uint64 RevBefore = TerminalA->GetWorldScreenRenderRevision();
+        TerminalA->SetWorldScreenTexture(DummyExternalTex);
+        TestEqual(TEXT("Внешняя текстура подключена к экрану в мире"), TerminalA->GetWorldScreenTexture(), static_cast<UTexture*>(DummyExternalTex));
+        TestTrue(TEXT("SetWorldScreenTexture увеличивает renderRevision"), TerminalA->GetWorldScreenRenderRevision() > RevBefore);
+        TerminalA->SetWorldScreenTexture(nullptr);
+        TestNull(TEXT("Сброс внешней текстуры очищает ExternalScreenTexture"), Cast<UTexture2D>(TerminalA->GetWorldScreenTexture()));
+    }
 
     // 2.1 Проверка потери и восстановления питания через сеть (Authority & Replication) (ADR-027, AC-01, Gs-15 раунд 4)
     AFicsitAITerminal* TerminalClient = NewObject<AFicsitAITerminal>();
@@ -49,6 +93,13 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalA->UpdateHostState();
     TestEqual(TEXT("Сервер при потере питания переходит в NoPower"), TerminalA->GetScreenContext().HostState, EFicsitAIHostState::NoPower);
     TestFalse(TEXT("Обесточенный сервер не открывает модули"), TerminalA->OpenModule(FName(TEXT("Notes"))));
+    TestFalse(TEXT("Обесточенный терминал не рендерит экран в мире (§6.6)"), TerminalA->RenderWorldScreenIfDirty());
+    if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
+    {
+        FLinearColor TintVal = FLinearColor::White;
+        Mat->GetVectorParameterValue(TEXT("TintColorAndOpacity"), TintVal);
+        TestTrue(TEXT("При NoPower экран затемнён в Чёрный"), TintVal.Equals(FLinearColor::Black, 0.01f));
+    }
 
     // Клиент получает реплицированный контекст от сервера
     TerminalClient->SetHostContextForClient(TerminalA->GetScreenContext());
@@ -60,6 +111,12 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalA->SetPowerOverride(true);
     TerminalA->UpdateHostState();
     TestEqual(TEXT("Сервер при подаче питания переходит в Ready"), TerminalA->GetScreenContext().HostState, EFicsitAIHostState::Ready);
+    if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
+    {
+        FLinearColor TintVal = FLinearColor::Black;
+        Mat->GetVectorParameterValue(TEXT("TintColorAndOpacity"), TintVal);
+        TestTrue(TEXT("При Ready экран подсвечен в Белый"), TintVal.Equals(FLinearColor::White, 0.01f));
+    }
 
     // Клиент реплицирует восстановление питания
     TerminalClient->SetHostContextForClient(TerminalA->GetScreenContext());

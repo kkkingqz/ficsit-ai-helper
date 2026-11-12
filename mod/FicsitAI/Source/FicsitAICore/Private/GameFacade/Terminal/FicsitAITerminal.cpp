@@ -8,6 +8,10 @@
 #include "GameFramework/PlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture.h"
+#include "Engine/TextureRenderTarget2D.h"
 
 DEFINE_LOG_CATEGORY(LogFicsitAITerminal);
 
@@ -44,8 +48,8 @@ AFicsitAITerminal::AFicsitAITerminal()
         TerminalMeshComponent->SetRelativeScale3D(FVector(0.5f, 1.2f, 1.8f));
     }
 
-    // Плоская поверхность экрана на лицевой стороне меша с пропорциями 16:9 (ADR-030, P-7 §1.1)
-    // Крепится к RootComponent (масштаб 1:1:1), чтобы не искажаться родительским масштабом корпуса (Gs-15 раунд 4)
+    // Плоская поверхность экрана на лицевой стороне меша с пропорциями 16:9 (ADR-030, P-7 §1.1, S8 3.4)
+    // Локальный +Z Plane направлен наружу (+X терминала), +X (U: 0..1) слева направо (-Y), +Y (V: 0..1) сверху вниз (-Z)
     ScreenMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ScreenMesh"));
     ScreenMeshComponent->SetupAttachment(RootComponent);
     static ConstructorHelpers::FObjectFinder<UStaticMesh> ScreenPlaneFinder(TEXT("/Engine/BasicShapes/Plane.Plane"));
@@ -53,8 +57,28 @@ AFicsitAITerminal::AFicsitAITerminal()
     {
         ScreenMeshComponent->SetStaticMesh(ScreenPlaneFinder.Object);
         ScreenMeshComponent->SetRelativeLocation(FVector(25.5f, 0.0f, 20.0f));
-        ScreenMeshComponent->SetRelativeRotation(FRotator(90.0f, 0.0f, 0.0f));
-        ScreenMeshComponent->SetRelativeScale3D(FVector(0.54f, 0.96f, 1.0f)); // 96 см / 54 см = ровно 16:9
+        ScreenMeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 90.0f));
+        ScreenMeshComponent->SetRelativeScale3D(FVector(0.96f, 0.54f, 1.0f)); // 96 см (U/ширина) x 54 см (V/высота) = ровно 16:9
+    }
+    ScreenMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    ScreenMeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+    ScreenMeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+    ScreenMeshComponent->SetGenerateOverlapEvents(false);
+
+    static ConstructorHelpers::FObjectFinder<UMaterialInterface> ScreenMatFinder(TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Opaque_OneSided"));
+    if (ScreenMatFinder.Succeeded())
+    {
+        ScreenBaseMaterial = ScreenMatFinder.Object;
+        ScreenMeshComponent->SetMaterial(0, ScreenBaseMaterial);
+    }
+    else
+    {
+        static ConstructorHelpers::FObjectFinder<UMaterialInterface> FallbackMatFinder(TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Opaque"));
+        if (FallbackMatFinder.Succeeded())
+        {
+            ScreenBaseMaterial = FallbackMatFinder.Object;
+            ScreenMeshComponent->SetMaterial(0, ScreenBaseMaterial);
+        }
     }
 
     TargetPowerConsumption = 10.0f;
@@ -80,9 +104,9 @@ float AFicsitAITerminal::GetScreenAspectRatio() const
             CombinedScale *= ParentComp->GetRelativeScale3D();
             ParentComp = ParentComp->GetAttachParent();
         }
-        if (CombinedScale.X > 0.0f)
+        if (FMath::Abs(CombinedScale.Y) > KINDA_SMALL_NUMBER)
         {
-            return CombinedScale.Y / CombinedScale.X;
+            return FMath::Abs(CombinedScale.X) / FMath::Abs(CombinedScale.Y);
         }
     }
     return 16.0f / 9.0f;
@@ -133,6 +157,8 @@ void AFicsitAITerminal::InitializeHost()
             HostContext.HostState = EFicsitAIHostState::Inert;
         }
     }
+
+    InitializeWorldScreen();
 }
 
 void AFicsitAITerminal::BeginPlay()
@@ -155,6 +181,8 @@ void AFicsitAITerminal::Tick(float DeltaSeconds)
     {
         UpdateHostState();
     }
+
+    RenderWorldScreenIfDirty();
 }
 
 void AFicsitAITerminal::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -183,6 +211,9 @@ void AFicsitAITerminal::OnRep_HostContext()
             Widget->SetHostState(HostContext.HostState);
         }
     }
+
+    MarkWorldScreenDirty();
+    UpdateWorldScreenMaterialParameters();
 }
 
 bool AFicsitAITerminal::HasPower() const
@@ -231,6 +262,7 @@ void AFicsitAITerminal::TeardownActiveModule()
         ActiveModuleInstance = nullptr;
         ActiveModuleId = NAME_None;
         HostContext.bHasInputFocus = false;
+        MarkWorldScreenDirty();
     }
 }
 
@@ -253,6 +285,8 @@ void AFicsitAITerminal::UpdateHostState()
                 }
             }
             UE_LOG(LogFicsitAITerminal, Warning, TEXT("Терминал переведён в инертный режим (вход удалённого игрока). Экран закрыт."));
+            MarkWorldScreenDirty();
+            UpdateWorldScreenMaterialParameters();
         }
         return;
     }
@@ -271,6 +305,8 @@ void AFicsitAITerminal::UpdateHostState()
                 }
             }
             UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал обесточен (требуется 10 МВт). Экран погашен."));
+            MarkWorldScreenDirty();
+            UpdateWorldScreenMaterialParameters();
         }
     }
     else
@@ -286,6 +322,8 @@ void AFicsitAITerminal::UpdateHostState()
                 }
             }
             UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал запитан (10 МВт). Готов к работе."));
+            MarkWorldScreenDirty();
+            UpdateWorldScreenMaterialParameters();
         }
     }
 }
@@ -518,6 +556,7 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
         ScreenSurface->SetModule(TargetModule);
     }
 
+    MarkWorldScreenDirty();
     UE_LOG(LogFicsitAITerminal, Log, TEXT("Открыт экранный модуль: %s"), *ModuleId.ToString());
     return true;
 }
@@ -557,6 +596,7 @@ void AFicsitAITerminal::RequestInputFocus(bool bWanted)
 void AFicsitAITerminal::NotifyContentChanged()
 {
     FlushActiveModuleState();
+    MarkWorldScreenDirty();
 }
 
 bool AFicsitAITerminal::HandleBackAction()
@@ -578,4 +618,196 @@ void AFicsitAITerminal::SetModuleFactory(TScriptInterface<IFicsitAIScreenModuleF
 void AFicsitAITerminal::SetScreenSurface(TScriptInterface<IFicsitAIScreenSurface> InSurface)
 {
     ScreenSurface = InSurface;
+}
+
+void AFicsitAITerminal::InitializeWorldScreen()
+{
+    if (!ScreenBaseMaterial)
+    {
+        ScreenBaseMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Opaque_OneSided"));
+        if (!ScreenBaseMaterial)
+        {
+            ScreenBaseMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/EngineMaterials/Widget3DPassThrough_Opaque"));
+        }
+    }
+
+    if (ScreenMeshComponent && ScreenBaseMaterial && !WorldScreenMaterial)
+    {
+        WorldScreenMaterial = UMaterialInstanceDynamic::Create(ScreenBaseMaterial, this);
+        if (WorldScreenMaterial)
+        {
+            ScreenMeshComponent->SetMaterial(0, WorldScreenMaterial);
+        }
+    }
+
+    if (!IsRunningDedicatedServer())
+    {
+        if (!WorldScreenRenderTarget)
+        {
+            WorldScreenRenderTarget = UFicsitAIScreenSurfaceWidget::CreateWorldRenderTarget(
+                this,
+                FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx)
+            );
+        }
+
+        if (!WorldSurfaceWidget)
+        {
+            WorldSurfaceWidget = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(this);
+            if (WorldSurfaceWidget)
+            {
+                WorldSurfaceWidget->SetHost(this);
+            }
+        }
+    }
+
+    SyncWorldSurfaceState();
+    UpdateWorldScreenMaterialParameters();
+    MarkWorldScreenDirty();
+}
+
+void AFicsitAITerminal::SyncWorldSurfaceState()
+{
+    if (!WorldSurfaceWidget)
+    {
+        return;
+    }
+
+    WorldSurfaceWidget->SetHost(this);
+    WorldSurfaceWidget->SetWorldSurfaceMode(true);
+    WorldSurfaceWidget->SetHostState(HostContext.HostState);
+
+    if (HostContext.HostState == EFicsitAIHostState::Ready && ActiveModuleInstance && !UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr))
+    {
+        WorldSurfaceWidget->SetModule(ActiveModuleInstance);
+    }
+    else if (!ActiveModuleInstance)
+    {
+        WorldSurfaceWidget->ClearModule();
+    }
+}
+
+void AFicsitAITerminal::UpdateWorldScreenMaterialParameters()
+{
+    if (!WorldScreenMaterial)
+    {
+        return;
+    }
+
+    const bool bPoweredAndReady = (HostContext.HostState == EFicsitAIHostState::Ready);
+    // Обесточенный или инертный терминал экран в мире не подсвечивает и не рендерит (§6.6)
+    WorldScreenMaterial->SetVectorParameterValue(
+        TEXT("TintColorAndOpacity"),
+        bPoweredAndReady ? FLinearColor::White : FLinearColor::Black
+    );
+    WorldScreenMaterial->SetScalarParameterValue(TEXT("OpacityFromTexture"), 1.0f);
+
+    if (UTexture* ActiveTex = GetWorldScreenTexture())
+    {
+        WorldScreenMaterial->SetTextureParameterValue(TEXT("SlateUI"), ActiveTex);
+    }
+}
+
+void AFicsitAITerminal::SetWorldScreenTexture(UTexture* InTexture)
+{
+    ExternalScreenTexture = InTexture;
+    if (!WorldScreenMaterial && ScreenMeshComponent)
+    {
+        InitializeWorldScreen();
+    }
+    MarkWorldScreenDirty();
+    UpdateWorldScreenMaterialParameters();
+}
+
+UTexture* AFicsitAITerminal::GetWorldScreenTexture() const
+{
+    if (ExternalScreenTexture)
+    {
+        return ExternalScreenTexture.Get();
+    }
+    return WorldScreenRenderTarget.Get();
+}
+
+void AFicsitAITerminal::MarkWorldScreenDirty()
+{
+    bWorldScreenDirty = true;
+    ++WorldScreenRenderRevision;
+}
+
+bool AFicsitAITerminal::RenderWorldScreenIfDirty()
+{
+    if (HostContext.HostState != EFicsitAIHostState::Ready)
+    {
+        UpdateWorldScreenMaterialParameters();
+        return false;
+    }
+
+    if (!bWorldScreenDirty)
+    {
+        return false;
+    }
+
+    if (ExternalScreenTexture)
+    {
+        UpdateWorldScreenMaterialParameters();
+        bWorldScreenDirty = false;
+        return true;
+    }
+
+    if (!WorldScreenMaterial || !WorldScreenRenderTarget || !WorldSurfaceWidget)
+    {
+        return false;
+    }
+
+    SyncWorldSurfaceState();
+    const bool bRendered = WorldSurfaceWidget->RenderToTarget(
+        WorldScreenRenderTarget,
+        FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx),
+        0.0f
+    );
+    if (bRendered)
+    {
+        UpdateWorldScreenMaterialParameters();
+        ++WorldScreenDrawCount;
+        bWorldScreenDirty = false;
+    }
+    return bRendered;
+}
+
+bool AFicsitAITerminal::TryProjectWorldHitToScreenUV(const FVector& WorldHitLocation, FVector2D& OutUV) const
+{
+    if (!ScreenMeshComponent)
+    {
+        return false;
+    }
+
+    FTransform ScreenTransform;
+    if (ScreenMeshComponent->IsRegistered())
+    {
+        ScreenTransform = ScreenMeshComponent->GetComponentTransform();
+    }
+    else
+    {
+        ScreenTransform = ScreenMeshComponent->GetRelativeTransform();
+        for (const USceneComponent* Parent = ScreenMeshComponent->GetAttachParent(); Parent; Parent = Parent->GetAttachParent())
+        {
+            ScreenTransform = ScreenTransform * Parent->GetRelativeTransform();
+        }
+    }
+
+    const FVector LocalPos = ScreenTransform.InverseTransformPosition(WorldHitLocation);
+    constexpr float PlaneHalfExtent = 50.0f;
+    constexpr float EdgeEpsilon = 0.05f;
+    constexpr float MaxPlaneOffset = 2.0f;
+
+    if (FMath::Abs(LocalPos.Z) > MaxPlaneOffset ||
+        LocalPos.X < -(PlaneHalfExtent + EdgeEpsilon) || LocalPos.X > (PlaneHalfExtent + EdgeEpsilon) ||
+        LocalPos.Y < -(PlaneHalfExtent + EdgeEpsilon) || LocalPos.Y > (PlaneHalfExtent + EdgeEpsilon))
+    {
+        return false;
+    }
+
+    // /Engine/BasicShapes/Plane: U=(Local.X+50)/100, V=(Local.Y+50)/100
+    OutUV.X = FMath::Clamp((LocalPos.X + PlaneHalfExtent) / (2.0f * PlaneHalfExtent), 0.0f, 1.0f);
+    OutUV.Y = FMath::Clamp((LocalPos.Y + PlaneHalfExtent) / (2.0f * PlaneHalfExtent), 0.0f, 1.0f);
+    return true;
 }
