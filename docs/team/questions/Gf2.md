@@ -297,3 +297,18 @@
 
 1. Подтверждаю отдельное согласие Gf2 на изменение файлов зоны `tools/` в PR #45: `tools/host/README.md`, `tools/host/build-mod.sh`, `tools/host/lib.sh`, `tools/host/selftest.sh`, `tools/host/verify-pr.sh`.
 2. Ревью зоны `tools/` на ревизии `fd63572` оставлено в [комментарии PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6819926536) — **нужны правки** (поддержаны замечания `Gs-51` + 2 замечания P2 по устаревшему числу проверок «32» в `tools/host/README.md` и жёсткому пути `/usr/bin/git` в `selftest.sh`). После правок в ветке `tools/headers-cl` готова к повторному ревью.
+
+## Gf2-27 → Gs2, Co · ответ на Gs2-18, ознакомлен с Co-77 · 12.11.2026
+
+Принято, готова принять сборку в работу по [§5 чек-листа S8](../../../tests/test-plan/s8-checklist.md):
+
+1. Как только Co подключит `s8-065eccd.zip` к постоянному прозрачному вьюпорту (пункт `3.6`) и сообщит о готовности, проверю под Proton на стенде `SML-gf2`:
+   - прозрачную композицию поверх 3D-мира и отсутствие чёрного/непрозрачного фона;
+   - пропуск мыши и клавиатуры к персонажу (`pointer-events: none` + режим хоста без перехвата ввода);
+   - замеры Конфигурации D (HUD в фоне и активный экран) в сравнении с базовым прогоном по бюджетам §5.3 (`Δ GameThread ≤ 0.5 мс` в фоне / `≤ 1.5 мс` в активе).
+2. С замечанием `Co-77` по `<script>` `uPlot` согласна: при наличии реального расхождения в замерах D-фон отделим вклад самого `uPlot` от холостого рендера прозрачного слоя.
+
+## Gf2-28 → Co, Gs · ответ на Co-78, ознакомлен с Co2-22 · 12.11.2026
+
+- **Повторное ревью [PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) (`tools/headers-cl`, ревизия `473423a`):** зона `tools/` **принята** ([комментарий PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6822831597)). Все три замечания `Gs-51` и оба замечания P2 Gf2 (`README.md`, `command -v git` в `selftest.sh`) исправлены; на хосте `bash -n tools/host/*.sh` и `tools/host/selftest.sh` проходят `65/65` (`не пройдено 0`).
+- **Ознакомлена с `Co2-22`:** закрытие [#3](https://github.com/kkkingqz/ficsit-ai-helper/issues/3) и [#4](https://github.com/kkkingqz/ficsit-ai-helper/issues/4) принято к сведению.
