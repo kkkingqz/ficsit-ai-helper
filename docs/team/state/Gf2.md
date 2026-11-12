@@ -4,13 +4,13 @@
 
 ## Вопросы и уведомления
 - **Входящих открытых вопросов нет** (`./tools/questions.py Gf2`: `0` открытых, `0` неуведомлённых).
-- [Gf2-27](../questions/Gf2.md#gf2-27--gs2-co--ответ-на-gs2-18-ознакомлен-с-co-77--12112026): ответ на `Gs2-18` (PR #47 `065eccd`, `?overlay=1`).
-- [Gf2-28](../questions/Gf2.md#gf2-28--co-gs--ответ-на-co-78-ознакомлен-с-co2-22--12112026): повторное ревью зоны `tools/` в [PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) (`473423a`) **принято** ([комментарий](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6822831597), `selftest.sh` `65/65`).
-- [Gf2-29](../questions/Gf2.md#gf2-29--co--ознакомлен-с-co-79--12112026): отметка об ознакомлении с `Co-79` (S8 блок 3). В `s8-checklist.md` закрыты 3.5 и 3.6 (40/40 проверок Co). Сборки `~/Projects/ficsitai-deps/handoff/s8-block3-20261112/` приняты в работу для замеров Конфигурации D.
+- [Gf2-28](../questions/Gf2.md#gf2-28--co-gs--ответ-на-co-78-ознакомлен-с-co2-22--12112026): ревью зоны `tools/` в [PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) (`473423a`) **принято** (`selftest.sh` `65/65`).
+- [Gf2-29](../questions/Gf2.md#gf2-29--co--ознакомлен-с-co-79--12112026): ознакомление с `Co-79` (S8 блок 3). В `s8-checklist.md` закрыты 3.5 и 3.6.
+- [Gf2-30](../questions/Gf2.md#gf2-30--co-gs2--протокол-замеров-s8-блока-5-save-b--12112026): протокол замеров Блока 5 S8 на Save B (`s8_baseline_yt.sav`) под Proton. Бюджеты §5.3 для Конфигураций B ($\Delta = 1.281$ мс $\le 1.5$ мс) и D-фон ($\Delta = 0.009$ мс $\le 0.5$ мс) **соблюдены**; 40/40 проверок пройдены; пункт 6.1 чек-листа закрыт.
 
 ## Стенд и текущие задачи
-- Личный проект `~/Projects/SML-gf2` развёрнут на `a7e8550` (`WwisePatches` `v3.12.0`); сборка `FicsitAI` (`BUILD_EXIT=0`), `6/6` автотестов UE (`EXIT CODE: 0`), проба `Save A` под Proton (`CL=517554`, `FATAL=0`).
-- `tools/run-game-tests.sh` на `tools/host/lib.sh`.
-- **S8 (Ворота W):** переходим к замерам нагрузки по Блоку 5 (`s8-checklist.md`): Конфигурации A, B, C, D на `SML-gf2`.
-- **S1 (#9):** в PR #49 (Gf) добавлен стенд `-FicsitAITestScenario=...`; после слияния и решения редиректа `?loadgame=` в `Map_Menu_1_02` запускаем автономный прогон S1.
+- Личный проект `~/Projects/SML-gf2` развёрнут на `a7e8550` (`WwisePatches` `v3.12.0`); сборка `FicsitAI` (`BUILD_EXIT=0`), `6/6` автотестов UE (`EXIT CODE: 0`), Save A под Proton (`CL=517554`, `FATAL=0`).
+- Созданы инструменты автозамеров: `tools/benchmark-s8.sh` и `tools/parse-s8-benchmark.py`.
+- **S8 (Ворота W):** Конфигурации A, B, D замерены; Конфигурация C ждёт слияния PR #49 и подключения CEF к мешу терминала.
+- **S1 (#9):** ждём слияния PR #49 (стенд сценариев Gf) и решения редиректа `?loadgame=` в `Map_Menu_1_02` для автономного прогона.
 - **Ожидания от King:** `Save C` (P-5 #6) и ручная проверка ввода мыши/клавиатуры на Windows (`s8-manual-check.md`) к воротам W.
