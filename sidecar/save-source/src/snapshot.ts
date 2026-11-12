@@ -407,10 +407,9 @@ function computePowerSnapshot(
     factoryConsumptionMW += consumptionMW;
   }
 
-  const factoryProduction: MetricSample =
-    factoryProductionMW === 0 && factoryHasVariableGenerators
-      ? na
-      : { state: "value", value: roundTo(factoryProductionMW, 1) };
+  const factoryProduction: MetricSample = factoryHasVariableGenerators
+    ? na
+    : { state: "value", value: roundTo(factoryProductionMW, 1) };
 
   return {
     powerNetworks,

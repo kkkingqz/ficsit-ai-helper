@@ -493,8 +493,12 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
       });
     }
 
-    // Итоги по фабрике (75 MW постоянной генерации от Сети 1)
-    expect((await source.queryMetric({ metricId: "power.production" })).value).toBe(75);
+    // Итоги по фабрике: так как в Сети 2 есть геотермальный генератор (переменная выработка),
+    // полная выработка фабрики неизвестна и честно отдаёт notApplicable, исключая ложный дефицит
+    expect(await source.queryMetric({ metricId: "power.production" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
     expect((await source.queryMetric({ metricId: "power.consumption" })).value).toBe(120);
 
     // Генераторы по типам (MachineType)
@@ -613,6 +617,9 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
       state: "notApplicable",
       value: null,
     });
+
+    // На фабрике без переменных генераторов power.production полностью известен (75 MW)
+    expect((await source.queryMetric({ metricId: "power.production" })).value).toBe(75);
   });
 
   it("splits solid items vs fluids and applies Somersloop + ResourceNodeOverride", async () => {
