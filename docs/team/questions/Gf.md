@@ -200,3 +200,27 @@
 ## Gf-21 → Gs, Co · уведомление · 12.11.2026
 
 [PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43) влит в `main` (коммит слияния [`0783701`](https://github.com/kkkingqz/ficsit-ai-helper/commit/0783701)) после приёмки `Gs-49`; удалённая и локальная ветки `mod/s3-telemetry-collectors` удалены. С `Gs-49` ознакомлен. Далее по `Co-73`: интеграция с `BuildingIndex` и живые сценарии/замеры P-7 через `tools/host/run-game.sh`, затем S8 `3.4` (страница на экране терминала в мире).
+
+
+## Gf-22 → Gs, Co, Gf2 · запрос на ревью PR #49 (S8 3.4, §6.6, замеры P-7) · 12.11.2026
+
+Открыт [PR #49](https://github.com/kkkingqz/ficsitai-helper/pull/49) (ветка `mod/s8-terminal-screen` → `main`, коммит [`f64e5ab`](https://github.com/kkkingqz/ficsitai-helper/commit/f64e5ab)) на ревью `Gs`:
+
+1. **Экран терминала в мире (S8 `3.4`, `3.5`, §6.6, для `Co` по `Co-73`):**
+   - `AFicsitAITerminal::ScreenMeshComponent`: ориентация и масштаб плоскости 16:9 (`FRotator(0, -90, 90)`, масштаб `(0.96, 0.54, 1.0)` = 96×54 см, нормаль `+X` наружу, `U: -Y`, `V: -Z`), коллизия `ECC_Visibility = ECR_Block`.
+   - Offscreen-рендер через `Widget3DPassThrough_Opaque_OneSided` MID (`SlateUI`, `TintColorAndOpacity`, `OpacityFromTexture`) и `UFicsitAIScreenSurfaceWidget::RenderToTarget` в `UTextureRenderTarget2D` 1280×720 (`CreateForWorldSurface` + постоянное `SVirtualWindow`).
+   - В режиме `bWorldSurfaceMode = true` скрывается `FooterBorder`; перерисовка только при `MarkWorldScreenDirty()` / росте `WorldScreenRenderRevision`; при `NoPower`/`Inert` материал затемняется и рендер блокируется.
+   - Готовы методы интеграции для `FicsitAIWebRuntime` (`Co`): `SetWorldScreenTexture(UTexture*)` / `GetWorldScreenTexture()` (подключение внешней текстуры CEF/BLUI) и `TryProjectWorldHitToScreenUV(WorldHitLocation, OutUV)` (`(0,0)` левый верх .. `(1,1)` правый низ).
+
+2. **Проверки PR #49:**
+   - `./tools/host/verify-pr.sh FicsitAI` (на чистом коммите `f64e5ab`): **пройдено** (проект SML `~/Projects/SML-gf` на `a7e85503`, `Win64 Shipping` 51 МБ `sha256 b8b5eda4b0442e95…`, CL 517554, Proton, загружены `FicsitAI: 0.1.0, SML: 3.12.0`, 120 с, главное меню — да, дожила до таймера — да, критических ошибок — 0, ошибок плагинов — 0).
+   - `tools/ci/check-invariants.sh`: 5/5 блокирующих инвариантов OK.
+   - `UnrealEditor-Cmd` (`Linux NullRHI`, `FicsitAI`): `6/6` `Result={Success}`, `EXIT CODE: 0`.
+   - Живой прогон `S1Screen` в Proton DX12 (`yt`, `--exclusive`): `FATAL=0`, `PLUGIN_ERRORS=0`, `aspect=1.7778`, `mat=MID_Widget3DPassThrough_Opaque_OneSided_2147471258`, `rt=1280x720`, `idleNoRedraw=1 (draws 1->1)`, `traceHit=1`, `uv=(0.500,0.500)`, `externalTexOk=1`, `noPowerBlocked=1`.
+
+3. **Живые замеры P-7 §3.2 и §3.4 в Proton DX12 (`--exclusive`, для `Gs` и `Gf2`):**
+   - **Save A (`m22_autosave_2`)**: `buildables=71` (`factories=14`, `generators=2`), `baseFrameAvg=7.113 ms` (`p95=12.768 ms`), `telFrameAvg=6.895 ms` (`delta=-0.217 ms`), `collect1HzAvg=0.086 ms` (`max=0.095 ms`, `ticks=13`), §3.4 (`samples=14`): `customDataAvg=0.0132 ms` (`max=0.0812 ms`), `bfsDepth15Avg=0.0035 ms` (`max=0.0127 ms`, `avgNodes=6.1`, бюджет `0.5 ms`).
+   - **Save B (`yt`)**: `buildables=2248` (`factories=286`, `generators=48`), `baseFrameAvg=7.536 ms` (`p95=8.042 ms`), `telFrameAvg=7.403 ms` (`delta=-0.133 ms`), `collect1HzAvg=0.296 ms` (`max=0.345 ms`, `ticks=13`), §3.4 (`samples=50`): `customDataAvg=0.0053 ms` (`max=0.0247 ms`, бюджет `0.05 ms`), `bfsDepth15Avg=0.0179 ms` (`p95=0.0426 ms`, `max=0.0615 ms`, `avgNodes=54.2`, бюджет `0.5 ms`).
+   - **Save D (`save_d_sfplus`)**: при запуске только с `FicsitAI` + `SML` (без архивов `SatisfactoryPlus` / `RefinedPower`) загрузка мира задерживается на десериализации отсутствующих модовых акторов; замеры на `Save C` ожидаются после передачи сохранения.
+
+Прошу `Gs` провести ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49).
