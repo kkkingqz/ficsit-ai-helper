@@ -316,17 +316,40 @@ LAUNCH
 # Разбор журнала игры. Переменные: FA_LOG_CL, FA_LOG_MODS, FA_LOG_FATAL, FA_LOG_PLUGIN_ERRORS, FA_LOG_MENU.
 # Главное меню считается достигнутым только по двум строкам настоящего журнала CL 517554:
 # движок закончил загрузку карты меню и виджет главного меню начал работать.
-# Номер сборки игры, под которую сделаны заголовки проекта SML ($1). Заголовки SML не несут номера в файлах,
-# поэтому берётся последний коммит «Update headers to CL<номер>» в истории проекта; FICSITAI_SML_HEADERS_CL
-# задаёт его явно, если история проекта обрезана. Печатает номер или ничего. Сборка мода на заголовках
-# другой сборки игры даёт сдвиг виртуальных таблиц (ENVIRONMENT.md §5.1, Co-75).
-fa_sml_headers_cl() {
-    if [[ -n "${FICSITAI_SML_HEADERS_CL:-}" ]]; then
-        [[ "$FICSITAI_SML_HEADERS_CL" =~ ^[0-9]+$ ]] && echo "$FICSITAI_SML_HEADERS_CL"
+# Сборка игры, под которую сделаны заголовки проекта SML ($1). В файлах заголовков номера нет, поэтому он берётся
+# из последнего коммита «Update headers to CL<номер>» в истории проекта. FICSITAI_SML_HEADERS_CL — запасной путь
+# для обрезанной истории: при известной истории он должен с ней совпасть. Заголовки игры (Source/) и SML
+# (Mods/SML/Source/) не должны отличаться от коммита: правка в рабочем дереве меняет ABI при том же номере.
+# Локальные правки Mods/WwisePatches и прочих инструментов сборки допустимы (ENVIRONMENT.md §5.1).
+# Мод на заголовках другой сборки игры компилируется, но виртуальные вызовы уходят в чужие слоты (Co-75).
+# Результат: FA_HCL — номер или пусто; FA_HCL_SRC — откуда он; FA_HCL_PROBLEM — почему номеру нельзя верить.
+FA_HCL_PATHS=(Source Mods/SML/Source)
+fa_sml_headers() {
+    local proj="$1" manual="${FICSITAI_SML_HEADERS_CL:-}" hist changed
+    FA_HCL=""; FA_HCL_SRC=""; FA_HCL_PROBLEM=""
+    if [[ -n "$manual" && ! "$manual" =~ ^[0-9]+$ ]]; then
+        FA_HCL_PROBLEM="FICSITAI_SML_HEADERS_CL — не номер сборки: $manual"; return 0
+    fi
+    hist="$("$FA_GIT" -C "$proj" log -E -i --grep='headers to CL ?[0-9]+' -1 --format=%s 2>/dev/null \
+        | grep -oiE 'CL ?[0-9]+' | head -1 | grep -oE '[0-9]+' || true)"
+    if [[ -n "$hist" ]]; then
+        FA_HCL="$hist"; FA_HCL_SRC="история проекта"
+        if [[ -n "$manual" && "$manual" != "$hist" ]]; then
+            FA_HCL_PROBLEM="в истории проекта CL $hist, в FICSITAI_SML_HEADERS_CL — CL $manual"; return 0
+        fi
+    elif [[ -n "$manual" ]]; then
+        FA_HCL="$manual"; FA_HCL_SRC="задан вручную"
+    else
+        FA_HCL_PROBLEM="в истории проекта нет коммита «Update headers to CL…»; если история обрезана, задайте FICSITAI_SML_HEADERS_CL"
         return 0
     fi
-    "$FA_GIT" -C "$1" log -E -i --grep='headers to CL ?[0-9]+' -1 --format=%s 2>/dev/null \
-        | grep -oiE 'CL ?[0-9]+' | head -1 | grep -oE '[0-9]+' || true
+    if changed="$("$FA_GIT" -C "$proj" status --porcelain --untracked-files=all -- "${FA_HCL_PATHS[@]}" 2>/dev/null)"; then
+        if [[ -n "$changed" ]]; then
+            FA_HCL_PROBLEM="заголовки изменены в рабочем дереве проекта: $(awk '{print $NF}' <<<"$changed" | head -3 | paste -sd ' ' -)$([[ $(wc -l <<<"$changed") -gt 3 ]] && echo ' …')"
+        fi
+    else
+        FA_HCL_SRC="$FA_HCL_SRC, правки заголовков не проверены: проект не в git"
+    fi
 }
 
 fa_parse_game_log() {
