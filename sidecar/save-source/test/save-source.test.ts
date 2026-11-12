@@ -407,7 +407,7 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
 
     const missingSource = createMockSource({ exists: false });
     const missingStatus = await missingSource.getStatus();
-    expect(missingStatus.inert).toBe(true);
+    expect(missingStatus.inert).toBe(false);
     expect(missingStatus.lastSnapshotSessionTimeSec).toBe(0);
     expect(missingStatus.reason).toContain("Save file not found");
   });
@@ -446,17 +446,35 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
       value: null,
     });
 
-    // Сеть 2: геотермальный (variable -> 0 MW в static save) и конструктор (4 MW), батарея 40 MWh -> разряд 4 MW (36000s)
+    // Сеть 2: геотермальный (переменная мощность) и конструктор (4 MW), батарея 40 MWh
+    // Так как выработка геотермального генератора неизвестна в статике:
+    // production, capacity, fuse_tripped, battery_output, battery_time_to_empty/full -> notApplicable
     expect((await source.queryMetric({ metricId: "power.network.consumption", scopeId: "2" })).value).toBe(4);
-    expect((await source.queryMetric({ metricId: "power.network.battery_output", scopeId: "2" })).value).toBe(4);
+    expect(await source.queryMetric({ metricId: "power.network.production", scopeId: "2" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
+    expect(await source.queryMetric({ metricId: "power.network.capacity", scopeId: "2" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
+    expect(await source.queryMetric({ metricId: "power.network.fuse_tripped", scopeId: "2" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
+    expect(await source.queryMetric({ metricId: "power.network.battery_output", scopeId: "2" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
     expect(await source.queryMetric({ metricId: "power.network.battery_time_to_empty", scopeId: "2" })).toMatchObject({
-      state: "value",
-      value: 36000,
+      state: "notApplicable",
+      value: null,
     });
     expect(await source.queryMetric({ metricId: "power.network.battery_time_to_full", scopeId: "2" })).toMatchObject({
       state: "notApplicable",
       value: null,
     });
+    expect((await source.queryMetric({ metricId: "power.network.battery_charge", scopeId: "2" })).value).toBe(40);
 
     // Сеть 3: нет батарей (все 4 поля NotApplicable), fuse_tripped = 1
     // WaterPump (20) + Refinery (30 * 2^1.321928 = 75) = 95 MW
@@ -475,7 +493,7 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
       });
     }
 
-    // Итоги по фабрике
+    // Итоги по фабрике (75 MW постоянной генерации от Сети 1)
     expect((await source.queryMetric({ metricId: "power.production" })).value).toBe(75);
     expect((await source.queryMetric({ metricId: "power.consumption" })).value).toBe(120);
 
@@ -484,6 +502,117 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
     expect((await source.queryMetric({ metricId: "generators.running", scopeId: "Build_GeneratorCoal_C" })).value).toBe(1);
     expect((await source.queryMetric({ metricId: "generators.production", scopeId: "Build_GeneratorCoal_C" })).value).toBe(75);
     expect((await source.queryMetric({ metricId: "generators.running", scopeId: "Build_GeneratorGeoThermal_C" })).value).toBe(1);
+    expect(await source.queryMetric({ metricId: "generators.production", scopeId: "Build_GeneratorGeoThermal_C" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
+  });
+
+  it("correctly models battery discharge under deficit and trips fuse if discharge limit is exceeded", async () => {
+    const state: SaveState = {
+      saveName: "batt-deficit",
+      playDurationSeconds: 100,
+      creativeMode: { noPower: false },
+      advancedGameSettings: { powerConsumptionMultiplier: 1 },
+      production: {
+        producers: [
+          {
+            instanceName: "ref_deficit",
+            buildingClass: "Build_OilRefinery_C",
+            recipeClass: "Recipe_Plastic_C",
+            clockSpeed: 1,
+            productionBoost: 1,
+          },
+          {
+            instanceName: "ref_overload_1",
+            buildingClass: "Build_OilRefinery_C",
+            recipeClass: "Recipe_Plastic_C",
+            clockSpeed: 2,
+            productionBoost: 1,
+          },
+          {
+            instanceName: "ref_overload_2",
+            buildingClass: "Build_OilRefinery_C",
+            recipeClass: "Recipe_Plastic_C",
+            clockSpeed: 2,
+            productionBoost: 1,
+          },
+        ],
+        extractors: [],
+        generators: [
+          {
+            instanceName: "coal_gen_d1",
+            buildingClass: "Build_GeneratorCoal_C",
+            clockSpeed: 1,
+            fuelClass: "Desc_Coal_C",
+          },
+        ],
+        batteries: [
+          {
+            instanceName: "batt_ok",
+            buildingClass: "Build_PowerStorageMk1_C",
+            chargeMWh: 50,
+          },
+          {
+            instanceName: "batt_capped",
+            buildingClass: "Build_PowerStorageMk1_C",
+            chargeMWh: 50,
+          },
+          {
+            instanceName: "batt_empty",
+            buildingClass: "Build_PowerStorageMk1_C",
+            chargeMWh: 0,
+          },
+        ],
+      },
+      topology: {
+        buildables: [],
+        powerCircuits: [
+          // Сеть 10: Генерация 75 MW, потребление 30 + 75 = 105 MW. Дефицит 30 MW <= 100 MW (1 батарея).
+          {
+            circuitId: 10,
+            members: ["coal_gen_d1", "ref_deficit", "ref_overload_1", "batt_ok"],
+          },
+          // Сеть 20: 0 генерации, потребление 75 + 75 = 150 MW. Дефицит 150 MW > 100 MW (1 батарея).
+          {
+            circuitId: 20,
+            members: ["ref_overload_1", "ref_overload_2", "batt_capped"],
+          },
+          // Сеть 30: 0 генерации, потребление 30 MW, батарея пуста.
+          {
+            circuitId: 30,
+            members: ["ref_deficit", "batt_empty"],
+          },
+        ],
+      },
+      resourceNodeOverrides: [],
+    };
+
+    const source = createMockSource({ state });
+
+    // Сеть 10: дефицит покрыт, fuseTripped = 0, output = 30, timeToEmpty = 3600*50/30 = 6000
+    expect((await source.queryMetric({ metricId: "power.network.fuse_tripped", scopeId: "10" })).value).toBe(0);
+    expect((await source.queryMetric({ metricId: "power.network.battery_output", scopeId: "10" })).value).toBe(30);
+    expect(await source.queryMetric({ metricId: "power.network.battery_time_to_empty", scopeId: "10" })).toMatchObject({
+      state: "value",
+      value: 6000,
+    });
+
+    // Сеть 20: дефицит 150 MW превышает лимит батареи 100 MW -> fuseTripped = 1, output = 100, time = 1800
+    expect((await source.queryMetric({ metricId: "power.network.fuse_tripped", scopeId: "20" })).value).toBe(1);
+    expect((await source.queryMetric({ metricId: "power.network.battery_output", scopeId: "20" })).value).toBe(100);
+    expect(await source.queryMetric({ metricId: "power.network.battery_time_to_empty", scopeId: "20" })).toMatchObject({
+      state: "value",
+      value: 1800,
+    });
+
+    // Сеть 30: батарея пуста -> fuseTripped = 1, output = 0, time = notApplicable
+    expect((await source.queryMetric({ metricId: "power.network.fuse_tripped", scopeId: "30" })).value).toBe(1);
+    expect((await source.queryMetric({ metricId: "power.network.battery_output", scopeId: "30" })).value).toBe(0);
+    expect(await source.queryMetric({ metricId: "power.network.battery_time_to_empty", scopeId: "30" })).toMatchObject({
+      state: "notApplicable",
+      value: null,
+    });
   });
 
   it("splits solid items vs fluids and applies Somersloop + ResourceNodeOverride", async () => {

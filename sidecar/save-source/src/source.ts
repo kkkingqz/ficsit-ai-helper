@@ -32,7 +32,6 @@ import {
   QueryMetricRequest,
   QueryMetricResponse,
   QuerySeriesRequest,
-  QuerySeriesResponse,
   SaveDataSourceMode,
   SaveSourceDeps,
   SaveSourceOptions,
@@ -208,13 +207,15 @@ export class SaveSource {
           { metricId: def.id, scopeId },
         );
       }
-      const value =
-        def.id === "power.production"
-          ? snapshot.factory.powerProductionMW
-          : snapshot.factory.powerConsumptionMW;
+      if (def.id === "power.production") {
+        return {
+          resolvedScopeId: "",
+          sample: snapshot.factory.powerProduction,
+        };
+      }
       return {
         resolvedScopeId: "",
-        sample: { state: "value", value },
+        sample: { state: "value", value: snapshot.factory.powerConsumptionMW },
       };
     }
 
@@ -236,11 +237,11 @@ export class SaveSource {
         );
       }
       const sampleMap: Record<string, MetricSample> = {
-        "power.network.production": { state: "value", value: circuit.productionMW },
+        "power.network.production": circuit.production,
         "power.network.consumption": { state: "value", value: circuit.consumptionMW },
-        "power.network.capacity": { state: "value", value: circuit.capacityMW },
+        "power.network.capacity": circuit.capacity,
         "power.network.max_consumption": { state: "value", value: circuit.maxConsumptionMW },
-        "power.network.fuse_tripped": { state: "value", value: circuit.fuseTripped },
+        "power.network.fuse_tripped": circuit.fuseTripped,
         "power.network.battery_charge": circuit.batteryCharge,
         "power.network.battery_output": circuit.batteryOutput,
         "power.network.battery_time_to_empty": circuit.batteryTimeToEmpty,
@@ -262,12 +263,13 @@ export class SaveSource {
           { metricId: def.id, scopeId },
         );
       }
-      const value =
-        def.id === "generators.total"
-          ? gen.total
-          : def.id === "generators.running"
-            ? gen.running
-            : gen.productionMW;
+      if (def.id === "generators.production") {
+        return {
+          resolvedScopeId: scopeId,
+          sample: gen.production,
+        };
+      }
+      const value = def.id === "generators.total" ? gen.total : gen.running;
       return {
         resolvedScopeId: scopeId,
         sample: { state: "value", value },
@@ -328,7 +330,7 @@ export class SaveSource {
         apiVersion: PUBLIC_API_VERSION,
         saveId: location.saveId,
         source: this.sourceMode,
-        inert: true,
+        inert: false,
         lastSnapshotSessionTimeSec: 0,
         sidecarConnected: false,
         apiVersionMismatch,
@@ -472,7 +474,7 @@ export class SaveSource {
   }
 
   /** Временные ряды в Save и SaveEstimated отсутствуют (возвращает SERIES_NOT_AVAILABLE). */
-  async querySeries(request: QuerySeriesRequest): Promise<QuerySeriesResponse> {
+  async querySeries(request: QuerySeriesRequest): Promise<never> {
     this.assertApiVersion();
 
     if (!request.metricId || request.metricId.trim() === "") {

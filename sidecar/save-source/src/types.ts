@@ -163,23 +163,6 @@ export interface QuerySeriesRequest {
   scopeId?: string;
 }
 
-export interface SeriesPoint {
-  sessionTimeSec: number;
-  value: number | null;
-  state: ValueState;
-}
-
-export interface QuerySeriesResponse {
-  kind: "series";
-  metricId: string;
-  scopeId: string;
-  window: SeriesWindow;
-  unit: Unit;
-  source: DataSource;
-  precisionDigits: number;
-  points: SeriesPoint[];
-}
-
 /* ---------- Структурные типы пакетов FICSIT Foreman ---------- */
 
 export type Purity = "impure" | "normal" | "pure";

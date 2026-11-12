@@ -12,10 +12,12 @@ const hasForemanBuild = existsSync(
   path.join(foremanDir, "packages", "sf-save-data", "dist", "index.js"),
 );
 
-const candidateSavePath =
-  process.env.FICSIT_TEST_SAV_PATH ??
-  path.join(os.homedir(), "Projects", "ficsitai-gf2", "fixtures", "saves", "save_a_starter.sav");
-const hasRealSave = hasForemanBuild && existsSync(candidateSavePath);
+const candidateSavePath = process.env.FICSIT_TEST_SAV_PATH;
+const hasRealSave = Boolean(
+  hasForemanBuild &&
+    candidateSavePath &&
+    existsSync(candidateSavePath),
+);
 
 describe.skipIf(!hasForemanBuild)("Foreman real packages integration", () => {
   it("loads compiled @foreman/* packages and bundled GameData", async () => {

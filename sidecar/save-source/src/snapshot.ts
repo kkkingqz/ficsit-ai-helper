@@ -23,6 +23,7 @@ const OVERCLOCK_POWER_EXPONENT = 1.321928;
 const NODE_MATCH_CM = 2000;
 const BATTERY_MK1_CAPACITY_MWH = 100;
 const BATTERY_MK1_MAX_CHARGE_MW = 100;
+const BATTERY_MK1_MAX_DISCHARGE_MW = 100;
 
 const PURITY_MULTIPLIER: Record<Purity, number> = {
   impure: 0.5,
@@ -37,11 +38,11 @@ export interface MetricSample {
 
 export interface CircuitSnapshot {
   scope: ScopeRef;
-  productionMW: number;
+  production: MetricSample;
   consumptionMW: number;
-  capacityMW: number;
+  capacity: MetricSample;
   maxConsumptionMW: number;
-  fuseTripped: number;
+  fuseTripped: MetricSample;
   batteryCharge: MetricSample;
   batteryOutput: MetricSample;
   batteryTimeToEmpty: MetricSample;
@@ -52,7 +53,7 @@ export interface GeneratorTypeSnapshot {
   scope: ScopeRef;
   total: number;
   running: number;
-  productionMW: number;
+  production: MetricSample;
 }
 
 export interface ItemRateSnapshot {
@@ -68,7 +69,7 @@ export interface SaveSnapshot {
   sessionTimeSec: number;
   mtimeMs: number;
   factory: {
-    powerProductionMW: number;
+    powerProduction: MetricSample;
     powerConsumptionMW: number;
   };
   powerNetworks: ReadonlyMap<string, CircuitSnapshot>;
@@ -171,21 +172,25 @@ function actorPowerDrawMW(
 function buildBatteryMetrics(
   batteryCount: number,
   chargeMWh: number,
-  capacityMW: number,
+  productionMW: number,
   consumptionMW: number,
+  powerMul: number,
 ): {
   batteryCharge: MetricSample;
   batteryOutput: MetricSample;
   batteryTimeToEmpty: MetricSample;
   batteryTimeToFull: MetricSample;
+  fuseTripped: MetricSample;
 } {
   const na: MetricSample = { state: "notApplicable", value: null };
   if (batteryCount <= 0) {
+    const isTripped = powerMul > 0 && consumptionMW > productionMW ? 1 : 0;
     return {
       batteryCharge: na,
       batteryOutput: na,
       batteryTimeToEmpty: na,
       batteryTimeToFull: na,
+      fuseTripped: { state: "value", value: isTripped },
     };
   }
 
@@ -196,43 +201,65 @@ function buildBatteryMetrics(
     value: roundTo((clampedChargeMWh / totalCapacityMWh) * 100, 1),
   };
 
-  if (consumptionMW > capacityMW && clampedChargeMWh > 0) {
-    const dischargeMW = roundTo(consumptionMW - capacityMW, 1);
+  if (consumptionMW > productionMW) {
+    const deficitMW = roundTo(consumptionMW - productionMW, 1);
+    const maxDischargeMW = batteryCount * BATTERY_MK1_MAX_DISCHARGE_MW;
+
+    if (clampedChargeMWh > 0) {
+      const dischargeMW = roundTo(Math.min(deficitMW, maxDischargeMW), 1);
+      const isTripped = powerMul > 0 && deficitMW > maxDischargeMW ? 1 : 0;
+      return {
+        batteryCharge,
+        batteryOutput: { state: "value", value: dischargeMW },
+        batteryTimeToEmpty: {
+          state: "value",
+          value: roundTo((3600 * clampedChargeMWh) / dischargeMW, 0),
+        },
+        batteryTimeToFull: na,
+        fuseTripped: { state: "value", value: isTripped },
+      };
+    }
+
+    // Батареи пусты при дефиците -> аварийное отключение
     return {
       batteryCharge,
-      batteryOutput: { state: "value", value: dischargeMW },
-      batteryTimeToEmpty: {
-        state: "value",
-        value: roundTo((3600 * clampedChargeMWh) / dischargeMW, 0),
-      },
+      batteryOutput: { state: "value", value: 0 },
+      batteryTimeToEmpty: na,
       batteryTimeToFull: na,
+      fuseTripped: { state: "value", value: powerMul > 0 ? 1 : 0 },
     };
   }
 
-  if (capacityMW > consumptionMW && clampedChargeMWh < totalCapacityMWh) {
-    const chargeRateMW = Math.min(
-      capacityMW - consumptionMW,
-      batteryCount * BATTERY_MK1_MAX_CHARGE_MW,
-    );
+  if (productionMW > consumptionMW) {
+    const surplusMW = roundTo(productionMW - consumptionMW, 1);
+    const maxChargeMW = batteryCount * BATTERY_MK1_MAX_CHARGE_MW;
+    const chargeRateMW = Math.min(surplusMW, maxChargeMW);
+
     return {
       batteryCharge,
       batteryOutput: { state: "value", value: 0 },
       batteryTimeToEmpty: na,
       batteryTimeToFull:
-        chargeRateMW > 0
+        clampedChargeMWh < totalCapacityMWh && chargeRateMW > 0
           ? {
               state: "value",
-              value: roundTo((3600 * (totalCapacityMWh - clampedChargeMWh)) / chargeRateMW, 0),
+              value: roundTo(
+                (3600 * (totalCapacityMWh - clampedChargeMWh)) / chargeRateMW,
+                0,
+              ),
             }
           : na,
+      fuseTripped: { state: "value", value: 0 },
     };
   }
 
+  // productionMW === consumptionMW
   return {
     batteryCharge,
     batteryOutput: { state: "value", value: 0 },
     batteryTimeToEmpty: na,
     batteryTimeToFull: na,
+    fuseTripped: { state: "value", value: 0 },
   };
 }
 
@@ -243,7 +270,7 @@ function computePowerSnapshot(
 ): {
   powerNetworks: Map<string, CircuitSnapshot>;
   powerNetworkScopes: ScopeRef[];
-  factoryProductionMW: number;
+  factoryProduction: MetricSample;
   factoryConsumptionMW: number;
 } {
   const powerMul = state.creativeMode.noPower
@@ -254,8 +281,11 @@ function computePowerSnapshot(
   const powerNetworkScopes: ScopeRef[] = [];
   let factoryProductionMW = 0;
   let factoryConsumptionMW = 0;
+  let factoryHasVariableGenerators = false;
 
+  const na: MetricSample = { state: "notApplicable", value: null };
   const circuits = [...graph.powerCircuits()].sort((a, b) => a.circuitId - b.circuitId);
+
   for (const circuit of circuits) {
     const scopeId = String(circuit.circuitId);
     const scope: ScopeRef = {
@@ -269,6 +299,7 @@ function computePowerSnapshot(
     let maxConsumptionMW = 0;
     let batteryCount = 0;
     let batteryChargeMWh = 0;
+    let hasVariableGenerators = false;
 
     for (const memberId of circuit.members) {
       const actor = graph.getActor(memberId);
@@ -278,16 +309,20 @@ function computePowerSnapshot(
 
       if (actor.kind === "generator" && actor.generator) {
         const building = index.buildings.get(actor.generator.buildingClass);
-        const capMW = generatorCapacityMW(building, actor.generator.clockSpeed);
-        capacityMW += capMW;
-        if (
-          isGeneratorRunning(
-            actor.generator.buildingClass,
-            actor.generator.fuelClass,
-            index,
-          )
-        ) {
-          productionMW += capMW;
+        if (building?.variablePowerProduction) {
+          hasVariableGenerators = true;
+        } else {
+          const capMW = generatorCapacityMW(building, actor.generator.clockSpeed);
+          capacityMW += capMW;
+          if (
+            isGeneratorRunning(
+              actor.generator.buildingClass,
+              actor.generator.fuelClass,
+              index,
+            )
+          ) {
+            productionMW += capMW;
+          }
         }
         continue;
       }
@@ -308,34 +343,79 @@ function computePowerSnapshot(
     consumptionMW = roundTo(consumptionMW, 1);
     maxConsumptionMW = roundTo(maxConsumptionMW, 1);
 
-    const fuseTripped =
-      powerMul > 0 && consumptionMW > productionMW && batteryChargeMWh <= 0 ? 1 : 0;
-    const batteryMetrics = buildBatteryMetrics(
-      batteryCount,
-      batteryChargeMWh,
-      productionMW,
-      consumptionMW,
+    const totalBatteryCapacityMWh = batteryCount * BATTERY_MK1_CAPACITY_MWH;
+    const clampedChargeMWh = Math.max(
+      0,
+      Math.min(batteryChargeMWh, totalBatteryCapacityMWh),
     );
+    const circuitBatteryCharge: MetricSample =
+      batteryCount > 0
+        ? {
+            state: "value",
+            value: roundTo((clampedChargeMWh / totalBatteryCapacityMWh) * 100, 1),
+          }
+        : na;
+
+    let circuitProduction: MetricSample;
+    let circuitCapacity: MetricSample;
+    let circuitFuseTripped: MetricSample;
+    let circuitBatteryOutput: MetricSample;
+    let circuitBatteryTimeToEmpty: MetricSample;
+    let circuitBatteryTimeToFull: MetricSample;
+
+    if (hasVariableGenerators) {
+      circuitProduction = na;
+      circuitCapacity = na;
+      circuitFuseTripped = na;
+      circuitBatteryOutput = na;
+      circuitBatteryTimeToEmpty = na;
+      circuitBatteryTimeToFull = na;
+    } else {
+      circuitProduction = { state: "value", value: productionMW };
+      circuitCapacity = { state: "value", value: capacityMW };
+      const batt = buildBatteryMetrics(
+        batteryCount,
+        batteryChargeMWh,
+        productionMW,
+        consumptionMW,
+        powerMul,
+      );
+      circuitBatteryOutput = batt.batteryOutput;
+      circuitBatteryTimeToEmpty = batt.batteryTimeToEmpty;
+      circuitBatteryTimeToFull = batt.batteryTimeToFull;
+      circuitFuseTripped = batt.fuseTripped;
+    }
 
     powerNetworks.set(scopeId, {
       scope,
-      productionMW,
+      production: circuitProduction,
       consumptionMW,
-      capacityMW,
+      capacity: circuitCapacity,
       maxConsumptionMW,
-      fuseTripped,
-      ...batteryMetrics,
+      fuseTripped: circuitFuseTripped,
+      batteryCharge: circuitBatteryCharge,
+      batteryOutput: circuitBatteryOutput,
+      batteryTimeToEmpty: circuitBatteryTimeToEmpty,
+      batteryTimeToFull: circuitBatteryTimeToFull,
     });
     powerNetworkScopes.push(scope);
 
+    if (hasVariableGenerators) {
+      factoryHasVariableGenerators = true;
+    }
     factoryProductionMW += productionMW;
     factoryConsumptionMW += consumptionMW;
   }
 
+  const factoryProduction: MetricSample =
+    factoryProductionMW === 0 && factoryHasVariableGenerators
+      ? na
+      : { state: "value", value: roundTo(factoryProductionMW, 1) };
+
   return {
     powerNetworks,
     powerNetworkScopes,
-    factoryProductionMW: roundTo(factoryProductionMW, 1),
+    factoryProduction,
     factoryConsumptionMW: roundTo(factoryConsumptionMW, 1),
   };
 }
@@ -349,11 +429,20 @@ function computeGeneratorTypesSnapshot(
 } {
   const accum = new Map<
     string,
-    { scope: ScopeRef; total: number; running: number; productionMW: number }
+    {
+      scope: ScopeRef;
+      total: number;
+      running: number;
+      productionMW: number;
+      variableOutput: boolean;
+    }
   >();
 
   for (const gen of state.production.generators) {
     const scopeId = gen.buildingClass;
+    const building = index.buildings.get(gen.buildingClass);
+    const isVariable = Boolean(building?.variablePowerProduction);
+
     const existing = accum.get(scopeId) ?? {
       scope: {
         scopeId,
@@ -362,26 +451,40 @@ function computeGeneratorTypesSnapshot(
       total: 0,
       running: 0,
       productionMW: 0,
+      variableOutput: isVariable,
     };
     existing.total += 1;
     const running = isGeneratorRunning(gen.buildingClass, gen.fuelClass, index);
     if (running) {
       existing.running += 1;
-      const building = index.buildings.get(gen.buildingClass);
-      existing.productionMW = roundTo(
-        existing.productionMW + generatorCapacityMW(building, gen.clockSpeed),
-        1,
-      );
+      if (!isVariable) {
+        existing.productionMW = roundTo(
+          existing.productionMW + generatorCapacityMW(building, gen.clockSpeed),
+          1,
+        );
+      }
     }
     accum.set(scopeId, existing);
   }
 
-  const generatorTypeScopes = [...accum.values()]
+  const map = new Map<string, GeneratorTypeSnapshot>();
+  for (const [key, entry] of accum.entries()) {
+    map.set(key, {
+      scope: entry.scope,
+      total: entry.total,
+      running: entry.running,
+      production: entry.variableOutput
+        ? { state: "notApplicable", value: null }
+        : { state: "value", value: entry.productionMW },
+    });
+  }
+
+  const generatorTypeScopes = [...map.values()]
     .map((entry) => entry.scope)
     .sort((a, b) => a.scopeId.localeCompare(b.scopeId));
 
   return {
-    generatorTypes: accum,
+    generatorTypes: map,
     generatorTypeScopes,
   };
 }
@@ -721,7 +824,7 @@ export function buildSaveSnapshot(params: {
     sessionTimeSec: Math.max(0, Math.round(state.playDurationSeconds ?? 0)),
     mtimeMs,
     factory: {
-      powerProductionMW: power.factoryProductionMW,
+      powerProduction: power.factoryProduction,
       powerConsumptionMW: power.factoryConsumptionMW,
     },
     powerNetworks: power.powerNetworks,
