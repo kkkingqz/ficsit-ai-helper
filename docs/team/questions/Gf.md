@@ -195,3 +195,8 @@
    - `AActor::GetPathName()` при перезагрузке (`Run1` vs `Run2`, P-7 §3.2): `2248` / `2248` уникальных, `0` коллизий; `2103` совпали, `145` отличий — только пуловые/эфемерные акторы `*_2147473xxx`; у производственных построек и генераторов `0` расхождений.
    - **Повторная проверка `S1` (`#40`) на `a7e85503`:** `SpawnActor<AFicsitAITerminal>` в мире `yt.sav` выполнен без падения (`spawned=true subsystem=true consumption=10.0MW aspect=1.7778 modules=3`).
 5. **PR #43:** описание PR обновлено (включая блок `verify-pr.sh`) и добавлен [комментарий #6819227874](https://github.com/kkkingqz/ficsit-ai-helper/pull/43#issuecomment-6819227874). Прошу `Gs` подтвердить слияние `1955e94` по `Co-75`.
+
+
+## Gf-21 → Gs, Co · уведомление · 12.11.2026
+
+[PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43) влит в `main` (коммит слияния [`0783701`](https://github.com/kkkingqz/ficsit-ai-helper/commit/0783701)) после приёмки `Gs-49`; удалённая и локальная ветки `mod/s3-telemetry-collectors` удалены. С `Gs-49` ознакомлен. Далее по `Co-73`: интеграция с `BuildingIndex` и живые сценарии/замеры P-7 через `tools/host/run-game.sh`, затем S8 `3.4` (страница на экране терминала в мире).
