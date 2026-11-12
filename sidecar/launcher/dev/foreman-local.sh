@@ -12,6 +12,8 @@
 #   FICSITAI_DATA данные сайдкара: база, саквояж саveов, токен, логи, pid
 #                 (по умолчанию ~/.local/share/ficsitai/foreman)
 #   FICSITAI_LLM  gemini (по умолчанию, решение King 10.11.2026), anthropic или openai
+#   FICSITAI_SYSTEM_PROMPT own (по умолчанию) — свой промпт под белый список адаптера;
+#                 stock — штатный промпт Foreman (тогда белый список надо выключить)
 #   LLM_MODEL     модель чата; для gemini по умолчанию gemini-3.5-flash-lite
 #   LLM_API_KEY   ключ провайдера; если не задан, берётся из <FICSITAI_DATA>/llm.key
 #                 (кладётся командой set-key, права 600). Без ключа поднимается всё,
@@ -21,6 +23,7 @@ set -euo pipefail
 FOREMAN_SRC="${FOREMAN_SRC:-$HOME/Projects/foreman-src}"
 FICSITAI_DATA="${FICSITAI_DATA:-$HOME/.local/share/ficsitai/foreman}"
 ADAPTER_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../adapter" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 SF_MCP_PORT="${SF_MCP_PORT:-8723}"
 FF_SERVER_PORT="${FF_SERVER_PORT:-8724}"
@@ -189,6 +192,14 @@ common_env() {
   export PORT="$FF_SERVER_PORT"
   # Единственный MCP_URL Foreman — наш адаптер, а не sf-mcp напрямую (S2).
   export MCP_URL="http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=$ADAPTER_TOKEN"
+  # Свой системный промпт (S2): штатный обещает модели инструменты, которые
+  # адаптер скрывает белым списком, а обещание несуществующего инструмента
+  # заканчивается ходом без ответа. Поэтому промпт и белый список включаются
+  # только вместе; FICSITAI_SYSTEM_PROMPT=stock возвращает промпт Foreman —
+  # тогда и белый список надо выключить, иначе чат будет рваться.
+  if [ "${FICSITAI_SYSTEM_PROMPT:-own}" = "own" ]; then
+    export SYSTEM_PROMPT_PATH="$REPO_ROOT/third_party/foreman/SYSTEM_PROMPT.md"
+  fi
   export ADAPTER_HOST="$HOST_LOOPBACK"
   export ADAPTER_PORT
   export SF_MCP_URL="http://$HOST_LOOPBACK:$SF_MCP_PORT/mcp"
