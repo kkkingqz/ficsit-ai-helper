@@ -24,7 +24,7 @@ done
 [[ -n "$mod" ]] || fa_die "не задано имя мода"
 [[ -n "$project" ]] || fa_die "не задан проект SML: --project или FICSITAI_SML_PROJECT"
 fa_require_role
-out="${out:-$FA_ROLE_DIR/builds/$(date +%Y%m%d-%H%M%S)}"
+if [[ -z "$out" ]]; then fa_new_dir builds ""; out="$FA_NEW_DIR"; fi
 fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"
 echo "BUILD_EXIT=$FA_BUILD_EXIT"
 echo "SOURCE=$FA_BUILD_ORIGIN"

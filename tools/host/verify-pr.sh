@@ -27,7 +27,7 @@ done
 [[ ${#mods[@]} -gt 0 ]] || fa_die "не задан ни один мод"
 [[ -n "$project" ]] || fa_die "не задан проект SML: --project или FICSITAI_SML_PROJECT"
 fa_require_role
-out="$FA_ROLE_DIR/runs/verify-$(date +%Y%m%d-%H%M%S)"; mkdir -p "$out" || fa_die "не создаётся $out"
+fa_new_dir runs "verify-"; out="$FA_NEW_DIR"
 ok=1; lines=(); zips=()
 
 for mod in "${mods[@]}"; do

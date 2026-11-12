@@ -103,6 +103,17 @@ check "первая сборка собрала свои исходники" "$(
 check "вторая сборка собрала свои" "$(unzip -p "$T/b2/TestMod-Windows.zip" Source/a.cpp)" "int changed;"
 check "вторая ждала в очереди" "$(grep -c "очередь 'build' занята" "$T/b2.txt")" 1
 
+echo "3а. Два запуска без --out в одну секунду (второе ревью)"
+printf '#!/bin/sh\ncase "$*" in *%%Y%%m%%d-%%H%%M%%S*) echo 20261111-120000;; *) exec /bin/date "$@";; esac\n' > "$T/bin/date"; chmod +x "$T/bin/date"
+echo 'int first;' > "$T/repo/mod/TestMod/Source/a.cpp"
+"$B" TestMod --project "$T/proj" > "$T/s1.txt" 2>&1
+echo 'int second;' > "$T/repo/mod/TestMod/Source/a.cpp"
+"$B" TestMod --project "$T/proj" > "$T/s2.txt" 2>&1
+A1="$(grep -o 'ARCHIVE=.*' "$T/s1.txt" | cut -d= -f2)"; A2="$(grep -o 'ARCHIVE=.*' "$T/s2.txt" | cut -d= -f2)"
+check "каталоги результата разные" "$([[ -n "$A1" && "$A1" != "$A2" ]] && echo yes || echo no)" yes
+check "архив первой сборки не перезаписан" "$(unzip -p "$A1" Source/a.cpp)" "int first;"
+rm -f "$T/bin/date"
+
 echo "4. Два запуска одной роли (замечание 3)"
 R="$T/repo/tools/host/run-game.sh"
 ( cd "$T" && mkdir -p m1 m2 && echo '{}' > m1/ModA.uplugin && echo '{}' > m2/ModB.uplugin && (cd m1 && zip -q ../ModA-Windows.zip ModA.uplugin) && (cd m2 && zip -q ../ModB-Windows.zip ModB.uplugin) )
@@ -125,6 +136,15 @@ sleep 0.7
 STUB_SAVED="${STUB_SAVED/ficsitai-test/ficsitai-other}" STUB_MODS="${STUB_MODS/ficsitai-test/ficsitai-other}" FICSITAI_ROLE=other \
     "$R" --mod "$T/ModB-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r6" > "$T/r6.txt" 2>&1; wait
 check "при замере другая роль ждёт" "$(grep -c "очередь 'game' занята" "$T/r6.txt")" 1
+
+echo "4б. Мод с GameFeature ставится в Mods/GameFeatures (второе ревью)"
+( cd "$T" && mkdir -p gf && printf '{\n\t"FileVersion": 3,\n\t"GameFeature" : true\n}\n' > gf/FeatMod.uplugin && (cd gf && zip -q ../FeatMod-Windows.zip FeatMod.uplugin) )
+"$R" --mod "$T/FeatMod-Windows.zip" --mod "$T/ModA-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r7" > "$T/r7.txt" 2>&1
+check "GameFeature-мод в GameFeatures" "$([[ -f "$STUB_MODS/GameFeatures/FeatMod/FeatMod.uplugin" ]] && echo yes || echo no)" yes
+check "его нет в корне Mods" "$([[ -e "$STUB_MODS/FeatMod" ]] && echo yes || echo no)" no
+check "обычный мод в корне Mods" "$([[ -f "$STUB_MODS/ModA/ModA.uplugin" ]] && echo yes || echo no)" yes
+"$R" --mod "$T/ModB-Windows.zip" --sml "$T/SML-Windows.zip" --seconds 1 --out "$T/r8" > "$T/r8.txt" 2>&1
+check "следующий запуск убирает прежний GameFeature-мод" "$([[ -e "$STUB_MODS/GameFeatures/FeatMod" ]] && echo yes || echo no)" no
 
 echo "5. Блокировка и роль (замечание 5)"
 W="$T/repo/tools/host/with-lock.sh"

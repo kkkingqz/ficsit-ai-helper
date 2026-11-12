@@ -25,7 +25,7 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 fa_require_role
-out="${out:-$FA_ROLE_DIR/runs/$(date +%Y%m%d-%H%M%S)}"
+if [[ -z "$out" ]]; then fa_new_dir runs ""; out="$FA_NEW_DIR"; fi
 fa_game_session "$seconds" "$out" "$mode" "$sml"
 fa_parse_game_log "$FA_RUN_LOG"
 echo "RUN_EXIT=$FA_RUN_EXIT"

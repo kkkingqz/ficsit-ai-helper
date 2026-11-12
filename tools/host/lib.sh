@@ -40,6 +40,16 @@ fa_require_role() {
     FA_ROLE_DIR="$FA_STEAM_APP/Projects/ficsitai-$FA_ROLE"
 }
 
+# fa_new_dir <runs|builds> <префикс>
+# Новый каталог результата в каталоге роли, результат — в FA_NEW_DIR. Каталог создаётся атомарно и уникален,
+# даже если два запуска пришлись на одну секунду: иначе второй перезаписал бы архив и журналы первого.
+fa_new_dir() {
+    local base="$FA_ROLE_DIR/$1"
+    mkdir -p "$base" || fa_die "не создаётся $base"
+    FA_NEW_DIR="$(mktemp -d "$base/$2$(date +%Y%m%d-%H%M%S)-XXXXXX")" || fa_die "не создаётся каталог результата в $base"
+    chmod 755 "$FA_NEW_DIR"
+}
+
 # fa_with_lock <имя> <-x|-s> <команда...>
 # Очередь вместо отказа. -x — один владелец (сборка, замер, копия игры роли), -s — можно вместе с другими.
 # Если блокировку получить не удалось, команда не выполняется.
@@ -203,17 +213,24 @@ _fa_game_copy_ensure() {
 }
 
 # Ставит моды в личную копию, заменяя всё, кроме SML. Только под блокировкой роли.
+# Мод с "GameFeature": true в .uplugin ставится в Mods/GameFeatures/<мод>, остальные — в Mods/<мод>:
+# так требует SML, иначе игра останавливается на старте (нашёл Gs на наборе модов Save D).
 _fa_install_mods() {
-    local mods="$FA_ROLE_DIR/game/FactoryGame/Mods" zip name
-    for name in "$mods"/*; do
+    local mods="$FA_ROLE_DIR/game/FactoryGame/Mods" zip name target
+    for name in "$mods"/* "$mods"/GameFeatures/*; do
         [[ -e "$name" ]] || continue
-        [[ "$(basename "$name")" == SML ]] || rm -rf "$name" || return 1
+        case "$(basename "$name")" in SML|GameFeatures) continue ;; esac
+        rm -rf "$name" || return 1
     done
     for zip in "$@"; do
         [[ -f "$zip" ]] || { fa_say "нет архива $zip"; return 1; }
         name="$(basename "$zip")"; name="${name%-Windows.zip}"; name="${name%.zip}"
-        mkdir -p "$mods/$name" && unzip -q "$zip" -d "$mods/$name" || return 1
-        [[ -f "$mods/$name/$name.uplugin" ]] || { fa_say "в архиве $zip нет $name.uplugin в корне"; return 1; }
+        unzip -l "$zip" "$name.uplugin" >/dev/null 2>&1 || { fa_say "в архиве $zip нет $name.uplugin в корне"; return 1; }
+        target="$mods/$name"
+        if unzip -p "$zip" "$name.uplugin" | tr -d '\r\n\t ' | grep -q '"GameFeature":true'; then
+            target="$mods/GameFeatures/$name"
+        fi
+        mkdir -p "$target" && unzip -q "$zip" -d "$target" || return 1
     done
 }
 
