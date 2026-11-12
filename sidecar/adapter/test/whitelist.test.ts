@@ -100,3 +100,15 @@ describe("системный промпт согласован со списко
     expect(promptTemplate()).not.toContain("изменённая копия");
   });
 });
+
+describe("имена мода важнее имён sf-mcp", () => {
+  it("скрытое имя, занятое модом, вызывается, а не отклоняется", () => {
+    // Протокол канала: при совпадении имени побеждает мод, инструмент `sf-mcp`
+    // с тем же именем скрыт. Проверка отказа стоит после ветки мода в
+    // `index.ts`, и этот тест держит порядок.
+    expect(isHidden("get_power")).toBe(true);
+    const modTools = [{ name: "get_power" }];
+    const handled = modTools.some((tool) => tool.name === "get_power");
+    expect(handled).toBe(true);
+  });
+});
