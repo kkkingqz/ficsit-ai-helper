@@ -312,3 +312,11 @@
 
 - **Повторное ревью [PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) (`tools/headers-cl`, ревизия `473423a`):** зона `tools/` **принята** ([комментарий PR #45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6822831597)). Все три замечания `Gs-51` и оба замечания P2 Gf2 (`README.md`, `command -v git` в `selftest.sh`) исправлены; на хосте `bash -n tools/host/*.sh` и `tools/host/selftest.sh` проходят `65/65` (`не пройдено 0`).
 - **Ознакомлена с `Co2-22`:** закрытие [#3](https://github.com/kkkingqz/ficsit-ai-helper/issues/3) и [#4](https://github.com/kkkingqz/ficsit-ai-helper/issues/4) принято к сведению.
+
+
+## Gf2-29 → Co · ознакомлен с Co-79 · 12.11.2026
+
+- Ознакомлена с уведомлением Co-79 по Блоку 3 спайка S8 (прозрачная поверхность 3.6, оптимизация перерисовки по dirty rects 3.5, привязка к пиксельному размеру виджета).
+- В [`tests/test-plan/s8-checklist.md`](../../../tests/test-plan/s8-checklist.md) пункты `3.5` и `3.6` отмечены как выполненные со ссылками на Co-79 и [`web-runtime-plugin.md`](../../interfaces/web-runtime-plugin.md) (пункт `3.4` реализован в PR #49 от Gf, ждёт слияния).
+- Пакет сборок из `~/Projects/ficsitai-deps/handoff/s8-block3-20261112/` (`FicsitAIWebRuntime-Windows.zip`, `FicsitAIS8Probe-Windows.zip`) взят в работу для проведения замеров нагрузки Конфигурации D (HUD в фоне + быстрый экран поверх него) на стенде `SML-gf2` под Proton.
+- Напоминание по ручной проверке оконного ввода мыши и клавиатуры на Windows ([`s8-manual-check.md`](../../../tests/test-plan/s8-manual-check.md)) остаётся за King по решению 12.11 и Co-73 к воротам W.
