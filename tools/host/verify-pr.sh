@@ -9,6 +9,7 @@
 # все моды собрались, игра дошла до главного меню, дожила до таймера и не записала критических ошибок.
 # Ревью начинается при наличии этого блока в PR (решение King 11.11.2026).
 #
+# Протокол не проходит, если заголовки проекта SML сделаны не под ту сборку игры, что загрузилась (ENVIRONMENT.md §5.1).
 # Что протокол НЕ проверяет: загрузку сохранения, поведение мода в мире, EGS-сборку в игре, Windows.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 project="${FICSITAI_SML_PROJECT:-}"; sml="${FICSITAI_SML_ZIP:-}"; extra=(); seconds=120; keeps=(); sync=1; mods=()
@@ -20,13 +21,14 @@ while [[ $# -gt 0 ]]; do
         --seconds) seconds="$2"; shift 2 ;;
         --keep) keeps+=("$2"); shift 2 ;;
         --no-sync) sync=0; shift ;;
-        -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
         *) mods+=("$1"); shift ;;
     esac
 done
 [[ ${#mods[@]} -gt 0 ]] || fa_die "не задан ни один мод"
 [[ -n "$project" ]] || fa_die "не задан проект SML: --project или FICSITAI_SML_PROJECT"
 fa_require_role
+hcl="$(fa_sml_headers_cl "$project")"; hsrc="история проекта"; [[ -n "${FICSITAI_SML_HEADERS_CL:-}" ]] && hsrc="задан вручную"
 fa_new_dir runs "verify-"; out="$FA_NEW_DIR"
 ok=1; lines=(); zips=(); declare -A want=()
 
@@ -53,6 +55,12 @@ if [[ $ok -eq 1 ]]; then
         menu="нет"; [[ "$FA_LOG_MENU" == yes ]] && menu="да"
         lines+=("- Игра: CL ${FA_LOG_CL:-не определён}, Proton, без клиента Steam; загружены: ${FA_LOG_MODS:-ни одного мода}")
         lines+=("- Запуск на $seconds с: главное меню — $menu; дожила до таймера — $alive; критических ошибок — $FA_LOG_FATAL; ошибок загрузки плагинов — $FA_LOG_PLUGIN_ERRORS")
+        # Заголовки проекта SML должны быть от той же сборки игры, иначе виртуальные вызовы уходят в чужие слоты.
+        if [[ -z "$hcl" ]]; then
+            ok=0; lines+=("- **Номер сборки заголовков проекта SML не определён:** в истории проекта нет коммита «Update headers to CL…»; если уверены в заголовках, задайте \`FICSITAI_SML_HEADERS_CL\` (ENVIRONMENT.md §5.1)")
+        elif [[ -n "$FA_LOG_CL" && "$hcl" != "$FA_LOG_CL" ]]; then
+            ok=0; lines+=("- **Заголовки проекта SML не от этой сборки игры:** заголовки CL $hcl, игра CL $FA_LOG_CL (ENVIRONMENT.md §5.1)")
+        fi
         # Загружен должен быть именно собранный архив: имя и SemVersion из его дескриптора.
         for mod in "${mods[@]}"; do
             if [[ ", $FA_LOG_MODS," != *", $mod: "* ]]; then
@@ -78,7 +86,7 @@ smlrev="$("$FA_GIT" -C "$project" rev-parse --short HEAD 2>/dev/null || echo 'н
     echo "**Протокол проверки** · роль ${FA_ROLE^} · $(date '+%d.%m.%Y %H:%M') · \`tools/host/verify-pr.sh\`"
     echo
     echo "- Репозиторий: \`$rev\` (\`$branch\`), рабочее дерево — $dirty"
-    echo "- Проект SML: \`${project/#$HOME/\~}\` на \`$smlrev\`"
+    echo "- Проект SML: \`${project/#$HOME/\~}\` на \`$smlrev\`, заголовки CL ${hcl:-не определены} ($hsrc)"
     printf '%s\n' "${lines[@]}"
     echo "- Не проверялось: загрузка сохранения, поведение в мире, EGS в игре, Windows"
     echo

@@ -316,6 +316,19 @@ LAUNCH
 # Разбор журнала игры. Переменные: FA_LOG_CL, FA_LOG_MODS, FA_LOG_FATAL, FA_LOG_PLUGIN_ERRORS, FA_LOG_MENU.
 # Главное меню считается достигнутым только по двум строкам настоящего журнала CL 517554:
 # движок закончил загрузку карты меню и виджет главного меню начал работать.
+# Номер сборки игры, под которую сделаны заголовки проекта SML ($1). Заголовки SML не несут номера в файлах,
+# поэтому берётся последний коммит «Update headers to CL<номер>» в истории проекта; FICSITAI_SML_HEADERS_CL
+# задаёт его явно, если история проекта обрезана. Печатает номер или ничего. Сборка мода на заголовках
+# другой сборки игры даёт сдвиг виртуальных таблиц (ENVIRONMENT.md §5.1, Co-75).
+fa_sml_headers_cl() {
+    if [[ -n "${FICSITAI_SML_HEADERS_CL:-}" ]]; then
+        [[ "$FICSITAI_SML_HEADERS_CL" =~ ^[0-9]+$ ]] && echo "$FICSITAI_SML_HEADERS_CL"
+        return 0
+    fi
+    "$FA_GIT" -C "$1" log -E -i --grep='headers to CL ?[0-9]+' -1 --format=%s 2>/dev/null \
+        | grep -oiE 'CL ?[0-9]+' | head -1 | grep -oE '[0-9]+' || true
+}
+
 fa_parse_game_log() {
     local log="$1"
     FA_LOG_CL="$(grep -o 'Game Changelist: [0-9]*' "$log" | head -1 | grep -o '[0-9]*' || true)"

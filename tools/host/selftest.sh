@@ -68,7 +68,8 @@ echo '"buildid" "1"' > "$S/.local/share/Steam/steamapps/appmanifest_526870.acf"
 mkdir -p "$T/sml" && echo '{}' > "$T/sml/SML.uplugin" && ( cd "$T/sml" && zip -q "$T/SML-Windows.zip" SML.uplugin )
 
 export PATH="$T/bin:$PATH" UE_WINE_MSVC="$T/msvc" FICSITAI_ENGINE="$T/engine" FICSITAI_STEAM_APP="$S" \
-       FICSITAI_LOCK_DIR="$T/locks" FICSITAI_ROLE=test FICSITAI_GIT=/bin/false HOME="$T/home"
+       FICSITAI_LOCK_DIR="$T/locks" FICSITAI_ROLE=test FICSITAI_GIT=/bin/false HOME="$T/home" \
+       FICSITAI_SML_HEADERS_CL=517554
 mkdir -p "$HOME"
 export STUB_SAVED="$S/Projects/ficsitai-test/compat/pfx/drive_c/users/steamuser/AppData/Local/FactoryGame/Saved"
 export STUB_MODS="$S/Projects/ficsitai-test/game/FactoryGame/Mods"
@@ -173,6 +174,24 @@ check "та же версия — пройдено" "$(STUB_MOD_VERSION=2.0.0 ru
 printf '{}' > "$U"
 check "без SemVersion — не пройдено" "$([[ "$(run "$V" "${ARGS[@]}")" != 0 ]] && echo yes || echo no)" yes
 echo '{"SemVersion":"0.1.0"}' > "$U"
+
+echo "4д. Заголовки проекта SML от другой сборки игры (Co-75)"
+check "заголовки CL 491125 при игре CL 517554 — не пройдено" "$(FICSITAI_SML_HEADERS_CL=491125 run "$V" "${ARGS[@]}")" 1
+check "протокол называет обе сборки" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
+check "номер заголовков не определён — не пройдено" "$(FICSITAI_SML_HEADERS_CL= run "$V" "${ARGS[@]}")" 1
+check "причина названа" "$(grep -c 'Номер сборки заголовков проекта SML не определён' "$T/out.txt")" 1
+check "совпадение — пройдено, номер в протоколе" "$(run "$V" "${ARGS[@]}"; grep -c 'заголовки CL 517554 (задан вручную)' "$T/out.txt")" "0
+1"
+if command -v /usr/bin/git >/dev/null; then
+    H="$T/hproj"; mkdir -p "$H"
+    hgit() { /usr/bin/git -C "$H" -c user.name=t -c user.email=t@t "$@" >/dev/null 2>&1; }
+    hgit init -q && hgit commit -q --allow-empty -m "Update headers to CL491125" && hgit commit -q --allow-empty -m "Bump version"
+    hcl() { ( FICSITAI_SML_HEADERS_CL= FICSITAI_GIT=/usr/bin/git; source "$T/repo/tools/host/lib.sh"; fa_sml_headers_cl "$H" ); }
+    check "номер из истории: последний коммит заголовков под «Bump version»" "$(hcl)" 491125
+    hgit commit -q --allow-empty -m "Update headers to CL517554"
+    check "более новый коммит заголовков побеждает" "$(hcl)" 517554
+    check "проект без истории — пусто" "$( ( FICSITAI_SML_HEADERS_CL= FICSITAI_GIT=/usr/bin/git; source "$T/repo/tools/host/lib.sh"; fa_sml_headers_cl "$T/proj" ) )" ""
+fi
 
 echo "5. Блокировка и роль (замечание 5)"
 W="$T/repo/tools/host/with-lock.sh"
