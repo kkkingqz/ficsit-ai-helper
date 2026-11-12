@@ -39,28 +39,13 @@ struct FFicsitAIManufacturerAccess final : public AFGBuildableManufacturer
             return false;
         }
 
-        // Qualified call resolves FactoryGame's exported AFGBuildableManufacturer::HasRequiredIngredients()
-        // directly (bypassing C++ vtable slot indices, which shift across Satisfactory builds when
-        // AFGBuildable virtuals change relative to SML headers). Verified zero overrides in subclasses.
-        return static_cast<const FFicsitAIManufacturerAccess*>(Manufacturer)->AFGBuildableManufacturer::HasRequiredIngredients();
+        // ISO C++ [class.protected]: member-pointer to protected virtual method preserves
+        // virtual dispatch to the live AFGBuildableManufacturer subclass (respecting
+        // PartsCostMultiplier, slot indices, and overrides) without altering FactoryGame headers.
+        constexpr bool (AFGBuildableManufacturer::*MethodPtr)() const = &FFicsitAIManufacturerAccess::HasRequiredIngredients;
+        return (Manufacturer->*MethodPtr)();
     }
 };
-
-template <typename TReturn>
-static TReturn InvokeFactoryGetter(const AFGBuildableFactory* Factory, UFunction* Func, TReturn DefaultValue)
-{
-    if (!Factory || !Func || Func->ReturnValueOffset == MAX_uint16 || Func->ParmsSize > 64
-        || Func->ReturnValueOffset + sizeof(TReturn) > Func->ParmsSize)
-    {
-        return DefaultValue;
-    }
-
-    alignas(16) uint8 Params[64] = {};
-    // UFunction dispatch runs through FactoryGame's own exec* thunk so virtual overrides
-    // (e.g. AFGBuildableManufacturer::IsConfigured) resolve against the live binary's vtable.
-    const_cast<AFGBuildableFactory*>(Factory)->ProcessEvent(Func, Params);
-    return *reinterpret_cast<const TReturn*>(Params + Func->ReturnValueOffset);
-}
 
 static bool HasSpaceForCycleOutputs(
     const UFGInventoryComponent& OutputInv,
@@ -123,31 +108,20 @@ bool FFicsitAIMachineLoadCollector::Collect(const AFGBuildableFactory* Factory, 
     const UFGPowerInfoComponent* PowerInfo = Factory->GetPowerInfo();
     Snapshot.bHasPower = PowerInfo ? PowerInfo->HasPower() : Factory->HasPower();
 
-    static TWeakObjectPtr<UFunction> IsConfiguredFunc = AFGBuildableFactory::StaticClass()->FindFunctionByName(
-        GET_FUNCTION_NAME_CHECKED(AFGBuildableFactory, IsConfigured));
-    static TWeakObjectPtr<UFunction> IndicatorFunc = AFGBuildableFactory::StaticClass()->FindFunctionByName(
-        GET_FUNCTION_NAME_CHECKED(AFGBuildableFactory, GetProductionIndicatorStatus));
-    static TWeakObjectPtr<UFunction> ProductivityFunc = AFGBuildableFactory::StaticClass()->FindFunctionByName(
-        GET_FUNCTION_NAME_CHECKED(AFGBuildableFactory, GetProductivity));
-    static TWeakObjectPtr<UFunction> CycleTimeFunc = AFGBuildableFactory::StaticClass()->FindFunctionByName(
-        GET_FUNCTION_NAME_CHECKED(AFGBuildableFactory, GetProductionCycleTime));
-
     Snapshot.bIsProducing = Factory->IsProducing();
     Snapshot.bIsProductionPaused = Factory->IsProductionPaused();
 
-    const EProductionStatus Indicator = InvokeFactoryGetter<EProductionStatus>(
-        Factory, IndicatorFunc.Get(), EProductionStatus::IS_NONE);
+    const EProductionStatus Indicator = Factory->GetProductionIndicatorStatus();
     Snapshot.ProductionIndicator = ConvertProductionIndicator(Indicator);
     Snapshot.bIsStandby = (Indicator == EProductionStatus::IS_STANDBY);
 
-    Snapshot.Productivity = FMath::Clamp(
-        InvokeFactoryGetter<float>(Factory, ProductivityFunc.Get(), 0.0f), 0.0f, 1.0f);
-    Snapshot.CycleTimeSeconds = InvokeFactoryGetter<float>(Factory, CycleTimeFunc.Get(), 0.0f);
+    Snapshot.Productivity = FMath::Clamp(Factory->GetProductivity(), 0.0f, 1.0f);
+    Snapshot.CycleTimeSeconds = Factory->GetProductionCycleTime();
 
     if (const AFGBuildableManufacturer* Manufacturer = Cast<AFGBuildableManufacturer>(Factory))
     {
         const TSubclassOf<UFGRecipe> RecipeClass = Manufacturer->GetCurrentRecipe();
-        Snapshot.bIsConfigured = InvokeFactoryGetter<bool>(Factory, IsConfiguredFunc.Get(), false) || (RecipeClass != nullptr);
+        Snapshot.bIsConfigured = Manufacturer->IsConfigured() || (RecipeClass != nullptr);
 
         if (RecipeClass)
         {
@@ -172,7 +146,7 @@ bool FFicsitAIMachineLoadCollector::Collect(const AFGBuildableFactory* Factory, 
     }
     else
     {
-        Snapshot.bIsConfigured = InvokeFactoryGetter<bool>(Factory, IsConfiguredFunc.Get(), false);
+        Snapshot.bIsConfigured = Factory->IsConfigured();
         // bHasIngredientsForCycle and bHasOutputSpaceForCycle remain unset for non-manufacturer factories
     }
 
