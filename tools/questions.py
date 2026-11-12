@@ -74,6 +74,7 @@ def parse_questions(repo_root: Path):
 
     files = glob.glob(str(questions_dir / "*.md"))
     answered_ids = set()
+    answered_by = collections.defaultdict(set)
     acknowledgments = collections.defaultdict(set)
     questions = []
 
@@ -102,7 +103,10 @@ def parse_questions(repo_root: Path):
 
             # Поиск блоков ответов («ответ на <ID>»)
             for m in re.finditer(r"ответ на ([A-Za-z0-9]+-\d+)", stripped):
-                answered_ids.add(m.group(1))
+                ans_id = m.group(1)
+                answered_ids.add(ans_id)
+                if file_role:
+                    answered_by[ans_id].add(file_role)
 
             # Поиск отметок об ознакомлении в файле конкретной роли
             if file_role:
@@ -228,17 +232,27 @@ def parse_questions(repo_root: Path):
                         if word in ROLES:
                             acknowledgments[current_q["id"]].add(word)
 
-    # 3. Финальный проход по questions: вычисляем acked_roles и unacked_roles
+    # 3. Финальный проход по questions: вычисляем acked_roles / unacked_roles и answered_by / unanswered_roles
     for q in questions:
         q_id = q["id"]
         acked = acknowledgments.get(q_id, set())
+        ans_roles = answered_by.get(q_id, set())
         q["acked_roles"] = sorted(list(acked))
+        q["answered_by"] = sorted(list(ans_roles))
         if q["status"] == "закрыт":
             q["unacked_roles"] = []
             q["is_fully_acked"] = True
+            q["unanswered_roles"] = []
+            q["is_fully_answered"] = True
         else:
             q["unacked_roles"] = [r for r in q["expected_roles"] if r not in acked]
             q["is_fully_acked"] = len(q["unacked_roles"]) == 0
+            q["unanswered_roles"] = [r for r in q["expected_roles"] if r not in ans_roles]
+            q["is_fully_answered"] = (
+                len(q["unanswered_roles"]) == 0
+                if q["expected_roles"]
+                else (q_id in answered_ids)
+            )
 
     return questions, answered_ids, acknowledgments
 
@@ -400,9 +414,8 @@ def main():
                 1
                 for q in questions
                 if q["kind"] == "question"
-                and (r in q["recipients"] or "все" in q["recipients"])
                 and q["status"] == "открыт"
-                and not q["has_answer"]
+                and r in q["unanswered_roles"]
             )
             answ = sum(
                 1
@@ -410,7 +423,7 @@ def main():
                 if q["kind"] == "question"
                 and q["id"].startswith(f"{r}-")
                 and q["status"] == "открыт"
-                and q["has_answer"]
+                and q["is_fully_answered"]
             )
             closed = sum(
                 1
@@ -490,9 +503,15 @@ def main():
             continue
 
         # Открытые вопросы:
-        if q["has_answer"]:
-            # Отвечен, ожидает закрытия автором
-            if is_author:
+        is_answered_here = (
+            (target_role in q["answered_by"])
+            if (target_role and target_role in q["expected_roles"])
+            else q["is_fully_answered"]
+        )
+
+        if is_answered_here:
+            # Отвечен (для роли или всеми адресатами)
+            if is_author and q["is_fully_answered"]:
                 waiting_close_count += 1
                 if args.answered or args.all:
                     recips = ", ".join(q["recipients"])
@@ -515,6 +534,10 @@ def main():
                 recips = ", ".join(q["recipients"])
                 dt = f" · {q['date']}" if q["date"] else ""
                 print(f"  [ЖДЕТ ОТВЕТА] {q['id']} → {recips}{dt} ({q['file']}:{q['line']})")
+                if not target_role and q["answered_by"] and q["unanswered_roles"]:
+                    print(
+                        f"    Уже ответили: {', '.join(q['answered_by'])} · Ждут ответа: {', '.join(q['unanswered_roles'])}"
+                    )
                 if q["desc"]:
                     print(f"    Вопрос: {q['desc']}")
 

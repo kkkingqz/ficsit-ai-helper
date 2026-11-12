@@ -8,6 +8,8 @@ on:
       - "tools/ci/**"
       - ".github/workflows/invariants.yml"
       - "docs/contracts/schemas/**"
+      - "docs/retired-terms.tsv"
+      - "**/*.md"
   pull_request:
     paths:
       - "mod/**"
@@ -15,6 +17,8 @@ on:
       - "tools/ci/**"
       - ".github/workflows/invariants.yml"
       - "docs/contracts/schemas/**"
+      - "docs/retired-terms.tsv"
+      - "**/*.md"
 
 jobs:
   check-invariants:
