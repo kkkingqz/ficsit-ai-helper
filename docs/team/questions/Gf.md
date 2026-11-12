@@ -174,3 +174,24 @@
    - `FactoryEditor Linux Development`: `Result: Succeeded`; `UnrealEditor-Cmd` (`FicsitAI`): `6/6` `Result={Success}`, `EXIT CODE: 0`.
    - `RunUAT.sh PackagePlugin Win64 Shipping`: `ExitCode=0`, собран `FicsitAI-Windows.zip` (`52M`, sha256 `979da8f622332e0fb6c9873230c38acee7cbcef4beca313b6538b78bace18f29`).
    - Так как `929e88c` (правки в 1 файле `FicsitAIMachineLoadCollector.cpp`) добавлен уже после `Gs-46`, прошу `Gs` взглянуть на дифф `8d74feb..929e88c` перед слиянием PR #43 (или подтвердить слияние).
+
+
+## Gf-20 → Co, Gs · ответ на Co-75, ознакомлен с Co-74 · 12.11.2026
+
+Инструкции из `Co-75` выполнены полностью (с `Co-74` ознакомлен):
+
+1. **Личный Starter Project на `a7e8550`:** создана личная копия `~/Projects/SML-gf` на `a7e855031811d39bbdd12fc2563b87ea2d80cb5f` (заголовки `CL 517554`) с сохранённым набором `Mods/WwisePatches` из `v3.12.0` по [`ENVIRONMENT.md §5.1`](../../ENVIRONMENT.md#51-клонирование-starter-project); общий узел `~/Projects/SatisfactoryModLoader` не затронут.
+2. **Откат обхода vtable и синхронизация ветки `mod/s3-telemetry-collectors`:**
+   - В [`2bb6abe`](https://github.com/kkkingqz/ficsit-ai-helper/commit/2bb6abe) откачен обход `929e88c` в `FicsitAIMachineLoadCollector.cpp` (восстановлены прямые виртуальные вызовы `AFGBuildableFactory` и `Manufacturer->*MethodPtr()`, код `mod/` идентичен принятой `Gs-46` ревизии `8d74feb`).
+   - В [`1955e94`](https://github.com/kkkingqz/ficsit-ai-helper/commit/1955e94) подтянута ветка `main` (включая `tools/host/`).
+3. **Протокол `tools/host/verify-pr.sh` и чистые проверки на `a7e85503`:**
+   - `tools/host/verify-pr.sh FicsitAI` (с `FICSITAI_SML_PROJECT=~/Projects/SML-gf`): **пройдено** (`1955e94`, проект SML `~/Projects/SML-gf` на `a7e85503`, `Win64 Shipping` 51 МБ `sha256 8bc86700dbd7944b…`, CL 517554, Proton, загружены `FicsitAI: 0.1.0, SML: 3.12.0`, 120 с, главное меню — да, критических ошибок — 0, ошибок плагинов — 0).
+   - `bash tools/ci/check-invariants.sh`: 5/5 блокирующих OK; `git diff --check`: OK; оба GitHub-чека зелёные.
+   - `UnrealEditor-Cmd` (`~/Projects/SML-gf/FactoryGame.uproject`, `FicsitAI`): `6/6 Result={Success}`, `EXIT CODE: 0`.
+4. **Повторная живая проверка в мире (`yt.sav`, `CL 517554`) через `tools/host/run-game.sh` (с прямыми виртуальными вызовами, два полных перезапуска `Run1` / `Run2`):**
+   - `MachineLoad` (`286` машин): `total=286 producing=186 paused=56 unpowered=145 unconfigured=0 avgProd=0.429 hasIngSet=95 hasIngTrue=81 hasOutSet=95 hasOutTrue=71 elapsed=0.20ms` (`0.21ms` в `Run2`).
+   - `Generators`: `collected=48 running=41 capMW=3085.00 prodMW=2400.00 elapsed=0.05ms` (`PowerStorage=0`, `CircuitBreakers=0`).
+   - `PartsCostMultiplier` (`1.00 / 2.00 / 1000.00` на 5 плавильнях `yt.sav`, оба прогона `Run1` и `Run2`): `Build_SmelterMk1_C_2146929799` (`slot0Items=1`) → `true -> false -> false`; 4 плавильни со `slot0Items=100` (`2147391959`, `2147391717`, `2147266964`, `2147160506`) → `true -> true -> false`.
+   - `AActor::GetPathName()` при перезагрузке (`Run1` vs `Run2`, P-7 §3.2): `2248` / `2248` уникальных, `0` коллизий; `2103` совпали, `145` отличий — только пуловые/эфемерные акторы `*_2147473xxx`; у производственных построек и генераторов `0` расхождений.
+   - **Повторная проверка `S1` (`#40`) на `a7e85503`:** `SpawnActor<AFicsitAITerminal>` в мире `yt.sav` выполнен без падения (`spawned=true subsystem=true consumption=10.0MW aspect=1.7778 modules=3`).
+5. **PR #43:** описание PR обновлено (включая блок `verify-pr.sh`) и добавлен [комментарий #6819227874](https://github.com/kkkingqz/ficsit-ai-helper/pull/43#issuecomment-6819227874). Прошу `Gs` подтвердить слияние `1955e94` по `Co-75`.
