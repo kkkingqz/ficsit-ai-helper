@@ -1,0 +1,30 @@
+/* Контейнеру нужен ограниченный размер от родителя или --scroll-panel-limit. */
+.scroll-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-block-size: 0;
+  max-block-size: var(--scroll-panel-limit, 100%);
+}
+
+.scroll-panel__body {
+  min-block-size: 0;
+  min-inline-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--stroke-strong, GrayText) var(--bg-base, Canvas);
+  scrollbar-gutter: stable;
+}
+
+.scroll-panel__body:focus-visible {
+  outline: 2px solid var(--focus, Highlight);
+  outline-offset: 1px;
+}
+
+.scroll-panel__sticky {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 1;
+  background: var(--surface, Canvas);
+}
