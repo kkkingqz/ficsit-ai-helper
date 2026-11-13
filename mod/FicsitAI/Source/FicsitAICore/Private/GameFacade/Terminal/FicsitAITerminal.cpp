@@ -176,8 +176,16 @@ FFicsitAIScreenContext AFicsitAITerminal::GetWorldScreenContext() const
 {
     FFicsitAIScreenContext Context = HostContext;
     Context.bWorldSurface = true;
-    Context.SizePx = FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx);
-    Context.AspectRatio = 16.0f / 9.0f;
+    if (WorldSurfaceWidget)
+    {
+        Context.SizePx = WorldSurfaceWidget->GetModuleAreaSizePx();
+        Context.AspectRatio = WorldSurfaceWidget->GetModuleAreaAspectRatio();
+    }
+    else
+    {
+        Context.SizePx = FIntPoint(1880, 972);
+        Context.AspectRatio = 1880.0f / 972.0f;
+    }
     Context.bHasInputFocus = false;
     return Context;
 }
@@ -187,44 +195,16 @@ FFicsitAIScreenContext AFicsitAITerminal::GetInteractiveScreenContext() const
     FFicsitAIScreenContext Context = HostContext;
     Context.bWorldSurface = false;
 
-    FIntPoint ViewportSize = CustomInteractiveScreenSize.Get(FIntPoint::ZeroValue);
-    if (ViewportSize.X <= 0 || ViewportSize.Y <= 0)
+    if (const UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
     {
-        if (const UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
-        {
-            if (APlayerController* PC = SurfaceWidget->GetOwningPlayer())
-            {
-                int32 SizeX = 0, SizeY = 0;
-                PC->GetViewportSize(SizeX, SizeY);
-                if (SizeX > 0 && SizeY > 0)
-                {
-                    ViewportSize = FIntPoint(SizeX, SizeY);
-                }
-            }
-        }
-        else if (UWorld* World = GetWorld())
-        {
-            if (APlayerController* PC = World->GetFirstPlayerController())
-            {
-                int32 SizeX = 0, SizeY = 0;
-                PC->GetViewportSize(SizeX, SizeY);
-                if (SizeX > 0 && SizeY > 0)
-                {
-                    ViewportSize = FIntPoint(SizeX, SizeY);
-                }
-            }
-        }
+        Context.SizePx = SurfaceWidget->GetModuleAreaSizePx();
+        Context.AspectRatio = SurfaceWidget->GetModuleAreaAspectRatio();
     }
-
-    if (ViewportSize.X <= 0 || ViewportSize.Y <= 0)
+    else
     {
-        ViewportSize = FIntPoint(1920, 1080);
+        Context.SizePx = FIntPoint(1880, 936);
+        Context.AspectRatio = 1880.0f / 936.0f;
     }
-
-    Context.SizePx = ViewportSize;
-    Context.AspectRatio = (ViewportSize.Y > 0)
-        ? static_cast<float>(ViewportSize.X) / static_cast<float>(ViewportSize.Y)
-        : (16.0f / 9.0f);
     return Context;
 }
 
@@ -244,24 +224,6 @@ bool AFicsitAITerminal::IsInteractiveScreenOpen() const
 FFicsitAIScreenContext AFicsitAITerminal::GetScreenContext() const
 {
     return IsInteractiveScreenOpen() ? GetInteractiveScreenContext() : GetWorldScreenContext();
-}
-
-void AFicsitAITerminal::SetInteractiveScreenSize(const FIntPoint& InSizePx)
-{
-    CustomInteractiveScreenSize = InSizePx;
-    if (IsInteractiveScreenOpen() && ActiveModuleInstance)
-    {
-        ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
-    }
-}
-
-void AFicsitAITerminal::ClearInteractiveScreenSize()
-{
-    CustomInteractiveScreenSize.Reset();
-    if (IsInteractiveScreenOpen() && ActiveModuleInstance)
-    {
-        ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
-    }
 }
 
 void AFicsitAITerminal::BeginPlay()
@@ -285,32 +247,19 @@ void AFicsitAITerminal::Tick(float DeltaSeconds)
         UpdateHostState();
     }
 
-    // При открытом интерактивном экране отслеживаем изменение фактического размера viewport (1280x800 vs 1920x1080)
-    if (IsInteractiveScreenOpen() && ActiveModuleInstance && !CustomInteractiveScreenSize.IsSet())
+    // При открытом интерактивном экране передаём актуальный размер viewport игрока в виджет поверхности
+    if (IsInteractiveScreenOpen() && ActiveModuleInstance)
     {
-        int32 SizeX = 0, SizeY = 0;
-        if (const UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+        if (UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
         {
             if (APlayerController* PC = SurfaceWidget->GetOwningPlayer())
             {
+                int32 SizeX = 0, SizeY = 0;
                 PC->GetViewportSize(SizeX, SizeY);
-            }
-        }
-        else if (UWorld* World = GetWorld())
-        {
-            if (APlayerController* PC = World->GetFirstPlayerController())
-            {
-                PC->GetViewportSize(SizeX, SizeY);
-            }
-        }
-
-        if (SizeX > 0 && SizeY > 0)
-        {
-            const FIntPoint CurSize(SizeX, SizeY);
-            if (LastReportedInteractiveSize != CurSize)
-            {
-                LastReportedInteractiveSize = CurSize;
-                ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
+                if (SizeX > 0 && SizeY > 0)
+                {
+                    SurfaceWidget->SetCanvasSize(FVector2D(SizeX, SizeY));
+                }
             }
         }
     }

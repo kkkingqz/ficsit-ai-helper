@@ -100,6 +100,7 @@ void UFicsitAIScreenSurfaceWidget::SetWorldSurfaceMode(bool bInWorldSurface)
     {
         bWorldSurfaceMode = bInWorldSurface;
         UpdateLayout();
+        UpdateModuleContentAreaGeometry();
         RefreshModuleContent();
     }
 }
@@ -421,9 +422,9 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
             .BorderBackgroundColor(FLinearColor(0.02f, 0.02f, 0.03f, 0.95f))
             .Padding(FMargin(20.0f))
             [
-                SNew(SBox)
-                .WidthOverride(1920.0f)
-                .HeightOverride(1080.0f)
+                SAssignNew(CanvasBox, SBox)
+                .WidthOverride(CanvasSize.X)
+                .HeightOverride(CanvasSize.Y)
                 [
                     SNew(SVerticalBox)
                     // Верхняя полоса (Header, 64px)
@@ -474,7 +475,103 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
 
     UpdateLayout();
     RefreshModuleContent();
+    UpdateModuleContentAreaGeometry();
     return Widget;
+}
+
+void UFicsitAIScreenSurfaceWidget::SetCanvasSize(const FVector2D& InCanvasSize)
+{
+    if (InCanvasSize.X > 0.0f && InCanvasSize.Y > 0.0f && InCanvasSize != CanvasSize)
+    {
+        CanvasSize = InCanvasSize;
+        if (CanvasBox.IsValid())
+        {
+            CanvasBox->SetWidthOverride(CanvasSize.X);
+            CanvasBox->SetHeightOverride(CanvasSize.Y);
+        }
+        UpdateModuleContentAreaGeometry();
+    }
+}
+
+void UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()
+{
+    FIntPoint NewSize = FIntPoint::ZeroValue;
+
+    if (ModuleContentBox.IsValid())
+    {
+        const FGeometry& BoxGeo = ModuleContentBox->GetTickSpaceGeometry();
+        const FVector2D LocalSize = BoxGeo.GetLocalSize();
+        if (LocalSize.X > 1.0f && LocalSize.Y > 1.0f)
+        {
+            NewSize = FIntPoint(FMath::RoundToInt(LocalSize.X), FMath::RoundToInt(LocalSize.Y));
+        }
+    }
+
+    if (NewSize.X <= 0 || NewSize.Y <= 0)
+    {
+        // Рассчитываем номинальный размер области модуля из текущей геометрии CanvasBox:
+        // Поля SBorder: 20px с каждой стороны (40px)
+        // Отступы Header + отступ слота: 48px
+        // Отступы слота ModuleContentBox: 20px (10px сверху, 10px снизу)
+        // Отступы Footer (если видим): 36px
+        const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);
+        const int32 NonContentHeight = 40 + 48 + 20 + (bWorldSurfaceMode ? 0 : 36);
+        const int32 ContentHeight = FMath::Max(100, FMath::RoundToInt(CanvasSize.Y) - NonContentHeight);
+        NewSize = FIntPoint(ContentWidth, ContentHeight);
+    }
+
+    const float NewAspect = (NewSize.Y > 0) ? (static_cast<float>(NewSize.X) / static_cast<float>(NewSize.Y)) : (16.0f / 9.0f);
+
+    if (NewSize != CachedModuleAreaSizePx || !FMath::IsNearlyEqual(NewAspect, CachedModuleAreaAspectRatio, 0.001f))
+    {
+        CachedModuleAreaSizePx = NewSize;
+        CachedModuleAreaAspectRatio = NewAspect;
+
+        if (ActiveModule && Host)
+        {
+            FFicsitAIScreenContext Context = Host->GetScreenContext();
+            Context.SizePx = CachedModuleAreaSizePx;
+            Context.AspectRatio = CachedModuleAreaAspectRatio;
+            Context.bWorldSurface = bWorldSurfaceMode;
+            ActiveModule->OnContextChanged(Context);
+        }
+    }
+}
+
+void UFicsitAIScreenSurfaceWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
+{
+    Super::NativeTick(MyGeometry, InDeltaTime);
+    UpdateModuleContentAreaGeometry();
+}
+
+FIntPoint UFicsitAIScreenSurfaceWidget::GetModuleAreaSizePx() const
+{
+    if (CachedModuleAreaSizePx.X > 0 && CachedModuleAreaSizePx.Y > 0)
+    {
+        return CachedModuleAreaSizePx;
+    }
+    if (ModuleContentBox.IsValid())
+    {
+        const FVector2D LocalSize = ModuleContentBox->GetTickSpaceGeometry().GetLocalSize();
+        if (LocalSize.X > 1.0f && LocalSize.Y > 1.0f)
+        {
+            return FIntPoint(FMath::RoundToInt(LocalSize.X), FMath::RoundToInt(LocalSize.Y));
+        }
+    }
+    const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);
+    const int32 NonContentHeight = 40 + 48 + 20 + (bWorldSurfaceMode ? 0 : 36);
+    const int32 ContentHeight = FMath::Max(100, FMath::RoundToInt(CanvasSize.Y) - NonContentHeight);
+    return FIntPoint(ContentWidth, ContentHeight);
+}
+
+float UFicsitAIScreenSurfaceWidget::GetModuleAreaAspectRatio() const
+{
+    if (CachedModuleAreaAspectRatio > 0.0f)
+    {
+        return CachedModuleAreaAspectRatio;
+    }
+    const FIntPoint Size = GetModuleAreaSizePx();
+    return (Size.Y > 0) ? (static_cast<float>(Size.X) / static_cast<float>(Size.Y)) : (16.0f / 9.0f);
 }
 
 FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)

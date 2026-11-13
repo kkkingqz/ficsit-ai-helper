@@ -2,11 +2,11 @@
 
 **Сейчас:** Исправление замечаний ревью Gs на PR #49 (S8 3.4 & §6.6, рендер экрана терминала в мире). Ветка `mod/s8-terminal-screen`, личный Starter Project `~/Projects/SML-gf` на `a7e85503` (заголовки `CL 517554`).
 
-**Последний результат:** Полностью отработаны замечания второго раунда ревью Gs (комментарий #6862851746):
-1. [P1] `IsInteractiveScreenOpen()` и `CloseInteractiveScreen()` строго привязаны к терминалу-владельцу (`Widget->GetHost().GetObject() == this`). Демонтаж терминала B не закрывает интерактивный экран терминала A. Добавлен автотест с двумя терминалами (п. 12).
-2. [P2] `GetInteractiveScreenContext()` динамически определяет размер через viewport с поддержкой переопределения (`SetInteractiveScreenSize`, 1280×800, 16:10). `RequestInputFocus` формирует контекст на основе `GetScreenContext()` с сохранением параметров текущей поверхности меша. Обновлён автотест п. 11.
-3. [P2] Shipping-диагностика: проверка допустимости сценария с немедленным выходом (код 1) при неизвестном имени (§13), запись структурированных событий `test_event` и `benchmark` в Recording JSONL (`<ProjectSavedDir>/Recording/<SaveId>.jsonl`).
-Подтверждены: `tools/ci/check-invariants.sh` (5/5 OK), `git diff --check` (OK), `FactoryEditor Linux Development` (Succeeded), `UnrealEditor-Cmd` (8/8 тестов, EXIT CODE: 0). Опубликован ответ `Gf-23` (`Gs`, `Co`).
+**Последний результат:** Полностью отработаны замечания третьего раунда ревью Gs (комментарий #6863664690):
+1. [P2] `S1Screen`: запись `FAIL` при отсутствии терминала в мире, валидация всех параметров (`Aspect` 16:9, `State`, `WorldSurfaceWidget`, `WorldScreenRenderTarget`). Добавлено примечание для Gf2 по очистке Recording JSONL перед тестами.
+2. [P2] Изоляция P-7: прямой профиль P-7 убран из PR #49 до решения Co по Gs-60, имя сценария экранируется в JSON при записи ошибки, выход с кодом 1 при неизвестном сценарии (§13).
+3. [P2] Контекст модуля `SizePx` и `AspectRatio` формируется из реальной геометрии раскладки `ModuleContentBox` (`GetModuleAreaSizePx()`, `GetModuleAreaAspectRatio()`). Синтетические переопределения убраны. Автотест п. 11 переписан на проверку реальной геометрии `ModuleContentBox` и динамического изменения `CanvasSize`.
+Подтверждены: `tools/ci/check-invariants.sh` (5/5 OK), `git diff --check` (OK), `FactoryEditor Linux Development` (Succeeded), `UnrealEditor-Cmd` (8/8 тестов, EXIT CODE: 0). Опубликован ответ `Gf-24` (`Gs`, `Gf2`, `Co`).
 
 **Блокирует меня:** Не заблокирован.
 

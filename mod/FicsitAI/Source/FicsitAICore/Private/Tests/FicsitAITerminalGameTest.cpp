@@ -291,15 +291,15 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         TestTrue(TEXT("ScreenTerm открывает Notes на меше"), ScreenTerm->OpenModule(FName(TEXT("Notes"))));
         UFicsitAITestNotesModule* NotesMod = Cast<UFicsitAITestNotesModule>(ScreenTerm->GetActiveModuleInstance().GetObject());
         TestNotNull(TEXT("NotesMod создан"), NotesMod);
-        if (NotesMod)
-        {
-            TestTrue(TEXT("Контекст на меше: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("Контекст на меше: SizePx == (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
-        }
-
         UFicsitAIScreenSurfaceWidget* WorldSurface = ScreenTerm->GetWorldSurfaceWidget();
         TestNotNull(TEXT("WorldSurface существует"), WorldSurface);
         TestEqual(TEXT("Модуль привязан к WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+        if (NotesMod)
+        {
+            TestTrue(TEXT("Контекст на меше: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("Контекст на меше: SizePx соответствует области модуля WorldSurface"), NotesMod->GetCurrentContext().SizePx, WorldSurface->GetModuleAreaSizePx());
+            TestTrue(TEXT("Контекст на меше: AspectRatio соответствует WorldSurface"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, WorldSurface->GetModuleAreaAspectRatio(), 0.01f));
+        }
 
         // Проверка сохранения контекста поверхности при запросе фокуса ввода (Gs-59 P2)
         ScreenTerm->RequestInputFocus(true);
@@ -307,7 +307,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         {
             TestTrue(TEXT("После RequestInputFocus(true) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
             TestTrue(TEXT("После RequestInputFocus(true) bHasInputFocus == true"), NotesMod->GetCurrentContext().bHasInputFocus);
-            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся неизменным"), NotesMod->GetCurrentContext().SizePx, WorldSurface->GetModuleAreaSizePx());
+            TestTrue(TEXT("После RequestInputFocus(true) AspectRatio остаётся неизменным"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, WorldSurface->GetModuleAreaAspectRatio(), 0.01f));
         }
         ScreenTerm->RequestInputFocus(false);
         if (NotesMod)
@@ -325,18 +326,18 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesMod)
         {
             TestFalse(TEXT("Интерактивный контекст: bWorldSurface == false"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("Интерактивный контекст: SizePx по умолчанию (1920, 1080)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1920, 1080));
+            TestEqual(TEXT("Интерактивный контекст: SizePx соответствует области модуля интерактивной поверхности"), NotesMod->GetCurrentContext().SizePx, InteractiveSurface->GetModuleAreaSizePx());
+            TestTrue(TEXT("Интерактивный контекст: AspectRatio соответствует интерактивной поверхности"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, InteractiveSurface->GetModuleAreaAspectRatio(), 0.01f));
         }
 
-        // Проверка динамического изменения размера (например, Steam Deck 1280x800 / 16:10)
-        ScreenTerm->SetInteractiveScreenSize(FIntPoint(1280, 800));
+        // Проверка динамического изменения раскладки поверхности (например, при переходе на экран 1280x800)
+        InteractiveSurface->SetCanvasSize(FVector2D(1280.0f, 800.0f));
         if (NotesMod)
         {
-            TestEqual(TEXT("Размер обновлён до 1280x800"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 800));
-            TestTrue(TEXT("Соотношение сторон обновлено до 16:10 (1.6)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1.6f, 0.01f));
+            TestEqual(TEXT("Размер обновлён по геометрии ModuleContentBox (1240, 656)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1240, 656));
+            TestTrue(TEXT("Соотношение сторон ModuleContentBox обновлено (~1.89)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1240.0f / 656.0f, 0.01f));
             TestFalse(TEXT("Интерактивный флаг остаётся false"), NotesMod->GetCurrentContext().bWorldSurface);
         }
-        ScreenTerm->ClearInteractiveScreenSize();
 
         // 11.3 «меш»: закрытие интерактивного экрана через CloseInteractiveScreen
         ScreenTerm->CloseInteractiveScreen();
@@ -346,7 +347,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesMod)
         {
             TestTrue(TEXT("После возврата на меш: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("После возврата на меш: SizePx == (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestEqual(TEXT("После возврата на меш: SizePx соответствует WorldSurface"), NotesMod->GetCurrentContext().SizePx, WorldSurface->GetModuleAreaSizePx());
+            TestTrue(TEXT("После возврата на меш: AspectRatio соответствует WorldSurface"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, WorldSurface->GetModuleAreaAspectRatio(), 0.01f));
         }
 
         ScreenTerm->EndPlay(EEndPlayReason::Destroyed);
@@ -381,7 +383,7 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesB)
         {
             TestTrue(TEXT("NotesB остаётся в мировом контексте"), NotesB->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("NotesB остаётся 1280x720"), NotesB->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestEqual(TEXT("NotesB остаётся в мировом размере раскладки"), NotesB->GetCurrentContext().SizePx, TermB->GetWorldSurfaceWidget()->GetModuleAreaSizePx());
         }
         TestEqual(TEXT("Модуль TermB по-прежнему привязан к WorldSurface B"), TermB->GetWorldSurfaceWidget()->GetActiveModule(), TermB->GetActiveModuleInstance());
 

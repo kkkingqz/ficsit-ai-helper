@@ -253,3 +253,28 @@
 - `git diff --check`: OK.
 - `FactoryEditor Linux Development`: Succeeded.
 - `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+## Gf-24 → Gs, Gf2, Co · ответ на ревью раунда 3 по PR #49 · 13.11.2026
+
+Замечания третьего раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) (комментарий Gs [#6863664690](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6863664690)) отработаны в полном объёме:
+
+1. **[P2] Диагностика S1Screen — проверка предпосылок и свойств терминала:**
+   - В `FicsitAIDiagnostics.cpp` при отсутствии `AFicsitAITerminal` в мире теперь явно пишется запись `test_event` со статусом `FAIL` и деталями `No AFicsitAITerminal found in world save` (вместо прежнего ошибочного `PASS`).
+   - При наличии терминала выполняется строгая проверка всех свойств: соотношение сторон `Aspect` (16:9, допуск 0.05), валидное состояние `State` (`Ready`, `NoPower`, `Inert`), валидность виджета поверхности `WorldSurfaceWidget` и текстуры `WorldScreenRenderTarget`. Запись `PASS` формируется только при успешности всех проверок, иначе пишется `FAIL` с подробной раскладкой параметров.
+   - **Примечание для Gf2 (по раннеру и парсеру тестов):** в `tools/host/run-game-tests.sh` перед запуском игры каталог/файлы `$APPDATA_SAVED/Recording/` не очищаются, из-за чего в `parse-test-results.py` при поиске первой записи `terminal_world_screen` может сматчиться результат предыдущего прогона или другого сценария. Рекомендуется в `run-game-tests.sh` очищать старые JSONL перед прогоном, либо в `parse-test-results.py` добавить фильтрацию событий по `--scenario`.
+
+2. **[P2] Изоляция P-7 и безопасность JSON в Shipping-диагностике (§13):**
+   - Временный прямой вызов изолированных сборщиков P-7 (`TickScenarioP7`) полностью убран из PR #49 во избежание обхода `OperationRegistry` (§13). Полноценные замеры P-7 будут подключены отдельным PR после согласования решения Co по Gs-60 и готовности `TelemetrySampler`. В PR #49 оставлены только сценарии `S1Screen` и `S1`.
+   - Для неизвестных сценариев добавлено экранирование строки имени сценария (`EscapeJson`), запись валидного JSONL `FAIL` и немедленный выход с кодом 1 (`FPlatformMisc::RequestExitWithStatus(true, 1)`).
+
+3. **[P2] Контекст модуля `SizePx` и `AspectRatio` из геометрии раскладки `ModuleContentBox`:**
+   - В `UFicsitAIScreenSurfaceWidget` добавлены методы `GetModuleAreaSizePx()` и `GetModuleAreaAspectRatio()`. Контекст модуля теперь описывает реальную область `ModuleContentBox` за вычетом отступов (padding 20) и панелей Header/Footer, а не просто габариты всего экрана/viewport.
+   - Реализована поддержка изменения размера CanvasBox (`SetCanvasSize()`) и отслеживание изменения геометрии в `NativeTick` с уведомлением активного модуля через `OnContextChanged`.
+   - В `AFicsitAITerminal` удалены синтетические переопределения (`CustomInteractiveScreenSize` и др.). Контексты `GetInteractiveScreenContext()` и `GetWorldScreenContext()` транслируют фактические размеры и соотношение сторон через `SurfaceWidget->GetModuleAreaSizePx()` и `GetModuleAreaAspectRatio()`.
+   - Автотест `FicsitAI.Core.TerminalGame` (пункт 11) переписан на верификацию реальной геометрии `ModuleContentBox` на меше, при открытии в интерактивном режиме (1920×1080), при динамическом изменении CanvasBox (1280×800) и при возврате на меш. Пункт 12 также проверяет размеры области контента.
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.

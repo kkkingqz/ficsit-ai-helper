@@ -94,14 +94,6 @@ public:
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
     void OpenInteractiveScreen(class UFicsitAIScreenSurfaceWidget* InSurfaceWidget);
 
-    /** Установить переопределение размера интерактивного экрана (для тестов или кастомных окон) */
-    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
-    void SetInteractiveScreenSize(const FIntPoint& InSizePx);
-
-    /** Сбросить переопределение размера интерактивного экрана (размер будет браться из Viewport) */
-    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
-    void ClearInteractiveScreenSize();
-
     /** Синхронизировать отображение активного модуля на экране терминала в мире (§6.6) */
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
     void SyncWorldSurfaceState();
@@ -234,9 +226,6 @@ protected:
     bool bWorldScreenDirty = false;
     uint64 WorldScreenRenderRevision = 0;
     uint64 WorldScreenDrawCount = 0;
-
-    TOptional<FIntPoint> CustomInteractiveScreenSize;
-    FIntPoint LastReportedInteractiveSize = FIntPoint::ZeroValue;
 
     void InitializeWorldScreen();
     void UpdateWorldScreenMaterialParameters();

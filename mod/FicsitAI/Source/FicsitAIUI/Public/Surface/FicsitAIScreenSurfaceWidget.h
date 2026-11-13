@@ -95,6 +95,21 @@ public:
     /** Создать offscreen Render Target заданного размера 16:9 (nullptr в -NullRHI / без Slate) */
     static class UTextureRenderTarget2D* CreateWorldRenderTarget(UObject* Outer, const FIntPoint& SizePx);
 
+    /** Получить фактический размер области модуля в пикселях раскладки (ModuleContentBox) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    FIntPoint GetModuleAreaSizePx() const;
+
+    /** Получить соотношение сторон области модуля (ModuleContentBox) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    float GetModuleAreaAspectRatio() const;
+
+    /** Задать размер виртуального полотна интерфейса (по умолчанию 1920x1080) */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
+    void SetCanvasSize(const FVector2D& InCanvasSize);
+
+    /** Обновить геометрию области модуля из раскладки Slate */
+    void UpdateModuleContentAreaGeometry();
+
     /** Освободить ресурсы поверхности в мире (окно, renderer, модуль) для разрыва Slate <-> UMG GC-циклов (P1) */
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     void ReleaseWorldSurfaceResources();
@@ -103,6 +118,7 @@ public:
 
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
+    virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
     virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
     virtual bool NativeSupportsKeyboardFocus() const override { return true; }
 
@@ -130,12 +146,17 @@ protected:
     UPROPERTY()
     TMap<FName, FKey> ActionKeyBindings;
 
+    TSharedPtr<class SBox> CanvasBox;
     TSharedPtr<class SBox> ModuleContentBox;
     TSharedPtr<class STextBlock> StatusTextBlock;
     TSharedPtr<class STextBlock> HeaderTextBlock;
     TSharedPtr<class STextBlock> FooterTextBlock;
     TSharedPtr<class SBorder> FooterBorder;
     TSharedPtr<class SVirtualWindow> WorldVirtualWindow;
+
+    FVector2D CanvasSize = FVector2D(1920.0f, 1080.0f);
+    FIntPoint CachedModuleAreaSizePx = FIntPoint::ZeroValue;
+    float CachedModuleAreaAspectRatio = 0.0f;
 
     class FWidgetRenderer* WorldWidgetRenderer = nullptr;
 
