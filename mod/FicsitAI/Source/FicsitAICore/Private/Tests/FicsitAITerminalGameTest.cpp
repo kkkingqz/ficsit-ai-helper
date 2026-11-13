@@ -280,7 +280,7 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("WorldSurfaceWidget успешно собран GC после EndPlay (нет утечки/цикла через SVirtualWindow/SObjectWidget)"), WeakSurfaceWidget.IsValid());
     }
 
-    // 11. Проверка контекста поверхности и изоляции Slate-дерева в цикле «меш → E → меш» (P2, Gs-59)
+    // 11. Проверка контекста поверхности, фокуса ввода и динамического размера (P2, Gs-59 раунд 2)
     {
         AFicsitAITerminal* ScreenTerm = NewObject<AFicsitAITerminal>();
         ScreenTerm->InitializeHost();
@@ -301,30 +301,47 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         TestNotNull(TEXT("WorldSurface существует"), WorldSurface);
         TestEqual(TEXT("Модуль привязан к WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
 
-        // 11.2 «E»: открытие интерактивного экрана (симуляция перехода по E)
-        // Снимаем модуль с поверхности в мире ДО переноса в интерактивный экран
-        WorldSurface->ClearModule();
-        TestNull(TEXT("WorldSurface очищен от модуля"), WorldSurface->GetActiveModule().GetObject());
+        // Проверка сохранения контекста поверхности при запросе фокуса ввода (Gs-59 P2)
+        ScreenTerm->RequestInputFocus(true);
+        if (NotesMod)
+        {
+            TestTrue(TEXT("После RequestInputFocus(true) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestTrue(TEXT("После RequestInputFocus(true) bHasInputFocus == true"), NotesMod->GetCurrentContext().bHasInputFocus);
+            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+        }
+        ScreenTerm->RequestInputFocus(false);
+        if (NotesMod)
+        {
+            TestFalse(TEXT("После RequestInputFocus(false) bHasInputFocus == false"), NotesMod->GetCurrentContext().bHasInputFocus);
+            TestTrue(TEXT("После RequestInputFocus(false) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
+        }
 
-        // Переводим модуль в интерактивный контекст
-        NotesMod->OnContextChanged(ScreenTerm->GetInteractiveScreenContext());
-        TestFalse(TEXT("Интерактивный контекст: bWorldSurface == false"), NotesMod->GetCurrentContext().bWorldSurface);
-        TestEqual(TEXT("Интерактивный контекст: SizePx == (1920, 1080)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1920, 1080));
-
-        // Создаём отдельный виджет интерактивного экрана
+        // 11.2 «E»: открытие интерактивного экрана через OpenInteractiveScreen
         UFicsitAIScreenSurfaceWidget* InteractiveSurface = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(ScreenTerm);
-        InteractiveSurface->SetHost(ScreenTerm);
-        InteractiveSurface->SetHostState(EFicsitAIHostState::Ready);
-        InteractiveSurface->SetModule(ScreenTerm->GetActiveModuleInstance());
-        ScreenTerm->SetScreenSurface(InteractiveSurface);
+        ScreenTerm->OpenInteractiveScreen(InteractiveSurface);
+        TestTrue(TEXT("ScreenTerm в интерактивном режиме"), ScreenTerm->IsInteractiveScreenOpen());
+        TestNull(TEXT("WorldSurface очищен от модуля"), WorldSurface->GetActiveModule().GetObject());
         TestEqual(TEXT("Модуль привязан к интерактивной поверхности"), InteractiveSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+        if (NotesMod)
+        {
+            TestFalse(TEXT("Интерактивный контекст: bWorldSurface == false"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("Интерактивный контекст: SizePx по умолчанию (1920, 1080)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1920, 1080));
+        }
 
-        // 11.3 «меш»: закрытие интерактивного экрана и возврат модуля на меш
-        InteractiveSurface->ClearModule();
+        // Проверка динамического изменения размера (например, Steam Deck 1280x800 / 16:10)
+        ScreenTerm->SetInteractiveScreenSize(FIntPoint(1280, 800));
+        if (NotesMod)
+        {
+            TestEqual(TEXT("Размер обновлён до 1280x800"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 800));
+            TestTrue(TEXT("Соотношение сторон обновлено до 16:10 (1.6)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1.6f, 0.01f));
+            TestFalse(TEXT("Интерактивный флаг остаётся false"), NotesMod->GetCurrentContext().bWorldSurface);
+        }
+        ScreenTerm->ClearInteractiveScreenSize();
+
+        // 11.3 «меш»: закрытие интерактивного экрана через CloseInteractiveScreen
+        ScreenTerm->CloseInteractiveScreen();
+        TestFalse(TEXT("ScreenTerm вышел из интерактивного режима"), ScreenTerm->IsInteractiveScreenOpen());
         TestNull(TEXT("Интерактивная поверхность очищена от модуля"), InteractiveSurface->GetActiveModule().GetObject());
-        ScreenTerm->SetScreenSurface(nullptr);
-
-        ScreenTerm->SyncWorldSurfaceState();
         TestEqual(TEXT("Модуль вернулся на WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
         if (NotesMod)
         {
@@ -333,6 +350,53 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         }
 
         ScreenTerm->EndPlay(EEndPlayReason::Destroyed);
+    }
+
+    // 12. Проверка двух терминалов в одном мире: независимый интерактивный режим и EndPlay (P1, Gs-59 раунд 2)
+    {
+        AFicsitAITerminal* TermA = NewObject<AFicsitAITerminal>();
+        AFicsitAITerminal* TermB = NewObject<AFicsitAITerminal>();
+        TermA->InitializeHost();
+        TermB->InitializeHost();
+        TermA->SetPowerOverride(true);
+        TermB->SetPowerOverride(true);
+        TermA->UpdateHostState();
+        TermB->UpdateHostState();
+
+        TestTrue(TEXT("TermA открыл Notes"), TermA->OpenModule(FName(TEXT("Notes"))));
+        TestTrue(TEXT("TermB открыл Notes"), TermB->OpenModule(FName(TEXT("Notes"))));
+        UFicsitAITestNotesModule* NotesA = Cast<UFicsitAITestNotesModule>(TermA->GetActiveModuleInstance().GetObject());
+        UFicsitAITestNotesModule* NotesB = Cast<UFicsitAITestNotesModule>(TermB->GetActiveModuleInstance().GetObject());
+
+        TestFalse(TEXT("TermA пока не интерактивен"), TermA->IsInteractiveScreenOpen());
+        TestFalse(TEXT("TermB пока не интерактивен"), TermB->IsInteractiveScreenOpen());
+
+        // Открываем экран на TermA
+        UFicsitAIScreenSurfaceWidget* SurfaceA = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(TermA);
+        TermA->OpenInteractiveScreen(SurfaceA);
+
+        TestTrue(TEXT("TermA интерактивен"), TermA->IsInteractiveScreenOpen());
+        TestFalse(TEXT("TermB НЕ интерактивен при открытом TermA"), TermB->IsInteractiveScreenOpen());
+        if (NotesA) { TestFalse(TEXT("NotesA в интерактивном контексте"), NotesA->GetCurrentContext().bWorldSurface); }
+        if (NotesB)
+        {
+            TestTrue(TEXT("NotesB остаётся в мировом контексте"), NotesB->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("NotesB остаётся 1280x720"), NotesB->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+        }
+        TestEqual(TEXT("Модуль TermB по-прежнему привязан к WorldSurface B"), TermB->GetWorldSurfaceWidget()->GetActiveModule(), TermB->GetActiveModuleInstance());
+
+        // Демонтируем TermB: это НЕ должно закрывать экран TermA!
+        TermB->EndPlay(EEndPlayReason::Destroyed);
+        TestTrue(TEXT("Экран TermA остаётся открытым после демонтажа TermB"), TermA->IsInteractiveScreenOpen());
+        TestEqual(TEXT("Поверхность SurfaceA по-прежнему держит модуль TermA"), SurfaceA->GetActiveModule(), TermA->GetActiveModuleInstance());
+
+        // Закрываем TermA
+        TermA->CloseInteractiveScreen();
+        TestFalse(TEXT("TermA закрыт"), TermA->IsInteractiveScreenOpen());
+        TestEqual(TEXT("Модуль TermA вернулся на WorldSurface A"), TermA->GetWorldSurfaceWidget()->GetActiveModule(), TermA->GetActiveModuleInstance());
+        if (NotesA) { TestTrue(TEXT("NotesA вернулся в мировой контекст"), NotesA->GetCurrentContext().bWorldSurface); }
+
+        TermA->EndPlay(EEndPlayReason::Destroyed);
     }
 
     // Удаляем временный тестовый файл .sav

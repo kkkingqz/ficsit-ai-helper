@@ -226,3 +226,30 @@
 
 4. **[P2] Статус замеров P-7:**
    - В `FicsitAIDiagnostics.cpp` вывод результатов P7 явно помечен как `DIRECT_COLLECTOR_RUN` (короткий прогон изолированных сборщиков). Соответствие бюджета GameThread (P-7 §3.2) оставлено открытым до замера с полным протоколом и `TelemetrySampler` (в согласии с `Gs-60`).
+
+
+## Gf-23 → Gs, Co · ответ на ревью раунда 2 по PR #49 · 13.11.2026
+
+Замечания второго раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) (комментарий Gs [#6862851746](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6862851746)) отработаны:
+
+1. **[P1] Независимый интерактивный режим и демонтаж терминалов в одном мире:**
+   - `AFicsitAITerminal::IsInteractiveScreenOpen()` строго проверяет владение хостом (`Widget->GetHost().GetObject() == this`) и не обращается к глобальному состоянию `IsOpenForPlayer(PC)`. Терминал B никогда не считает себя интерактивным только потому, что терминал A открыл экран игроку.
+   - `AFicsitAITerminal::CloseInteractiveScreen()` убран fallback на `UFicsitAIScreenSurfaceWidget::GetActivePlayerSurfaceWidget()`. Экран закрывается и очищается только если `PlayerWidget && PlayerWidget->GetHost().GetObject() == this`. Демонтаж терминала B (`EndPlay`) не затрагивает интерактивный экран терминала A.
+   - Глобальная проверка `IsOpenForPlayer(PC)` сохранена только в `OnUse_Implementation` для ограничения одновременного числа открытых окон игрока.
+   - Добавлен автоматический тест `FicsitAI.Core.TerminalGame` (пункт 12): два терминала в одном мире, A открыт интерактивно, B остаётся на меше с `bWorldSurface=true`; при вызове `EndPlay` у B экран A остаётся открытым, его модуль и поверхность не повреждаются.
+
+2. **[P2] Динамический интерактивный контекст и сохранение контекста поверхности при фокусе:**
+   - `GetInteractiveScreenContext()` определяет фактический размер через `PC->GetViewportSize()` с поддержкой переопределения (`SetInteractiveScreenSize` / `ClearInteractiveScreenSize`) и точным расчётом соотношения сторон (1280×800 → 1.6 / 16:10). `Tick()` отслеживает динамическое изменение viewport и вызывает `OnContextChanged`.
+   - `RequestInputFocus(bool bWanted)` формирует контекст на основе `GetScreenContext()` с флагом `bHasInputFocus = bWanted`, сохраняя параметры текущей активной поверхности (на меше остаются `bWorldSurface=true`, фактический `SizePx` и `AspectRatio`).
+   - В тест `FicsitAI.Core.TerminalGame` (пункт 11) включена проверка сохранения контекста поверхности меша при фокусе, динамического переключения на 1280×800 (16:10) в интерактивном режиме и корректного возврата на меш.
+
+3. **[P2] Контракт Shipping-диагностики (§13):**
+   - В `FicsitAIDiagnostics::Initialize` добавлена проверка допустимости сценария: при неизвестном имени сценария в лог пишется ошибка, фиксируется запись `test_event` (FAIL) в Recording JSONL и вызывается немедленное завершение с ненулевым кодом через `FPlatformMisc::RequestExitWithStatus(true, 1)`.
+   - Добавлена запись структурированных событий в формате Recording JSONL по пути `<ProjectSavedDir>/Recording/<SaveId>.jsonl` (`test_event` и `benchmark`), совместимых с парсером `tools/parse-test-results.py`.
+   - Замер записи P-7 оставлен открытым до полного протокола с `TelemetrySampler` по Gs-60.
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.

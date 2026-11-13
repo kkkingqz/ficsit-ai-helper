@@ -84,6 +84,11 @@ bool UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(APlayerController* PC)
     return PC && Widget && Widget->GetOwningPlayer() == PC && Widget->IsInViewport();
 }
 
+bool UFicsitAIScreenSurfaceWidget::IsSurfaceInViewport() const
+{
+    return IsInViewport();
+}
+
 void UFicsitAIScreenSurfaceWidget::SetHost(TScriptInterface<IFicsitAIScreenHost> InHost)
 {
     Host = InHost;

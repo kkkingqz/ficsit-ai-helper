@@ -186,30 +186,82 @@ FFicsitAIScreenContext AFicsitAITerminal::GetInteractiveScreenContext() const
 {
     FFicsitAIScreenContext Context = HostContext;
     Context.bWorldSurface = false;
-    Context.SizePx = FIntPoint(1920, 1080);
-    Context.AspectRatio = 16.0f / 9.0f;
+
+    FIntPoint ViewportSize = CustomInteractiveScreenSize.Get(FIntPoint::ZeroValue);
+    if (ViewportSize.X <= 0 || ViewportSize.Y <= 0)
+    {
+        if (const UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+        {
+            if (APlayerController* PC = SurfaceWidget->GetOwningPlayer())
+            {
+                int32 SizeX = 0, SizeY = 0;
+                PC->GetViewportSize(SizeX, SizeY);
+                if (SizeX > 0 && SizeY > 0)
+                {
+                    ViewportSize = FIntPoint(SizeX, SizeY);
+                }
+            }
+        }
+        else if (UWorld* World = GetWorld())
+        {
+            if (APlayerController* PC = World->GetFirstPlayerController())
+            {
+                int32 SizeX = 0, SizeY = 0;
+                PC->GetViewportSize(SizeX, SizeY);
+                if (SizeX > 0 && SizeY > 0)
+                {
+                    ViewportSize = FIntPoint(SizeX, SizeY);
+                }
+            }
+        }
+    }
+
+    if (ViewportSize.X <= 0 || ViewportSize.Y <= 0)
+    {
+        ViewportSize = FIntPoint(1920, 1080);
+    }
+
+    Context.SizePx = ViewportSize;
+    Context.AspectRatio = (ViewportSize.Y > 0)
+        ? static_cast<float>(ViewportSize.X) / static_cast<float>(ViewportSize.Y)
+        : (16.0f / 9.0f);
     return Context;
 }
 
 bool AFicsitAITerminal::IsInteractiveScreenOpen() const
 {
-    if (ScreenSurface)
+    if (!ScreenSurface)
     {
-        return true;
+        return false;
     }
-    if (UWorld* World = GetWorld())
+    if (const UFicsitAIScreenSurfaceWidget* Widget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
     {
-        if (APlayerController* PC = World->GetFirstPlayerController())
-        {
-            return UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(PC);
-        }
+        return Widget->GetHost().GetObject() == this;
     }
-    return false;
+    return true;
 }
 
 FFicsitAIScreenContext AFicsitAITerminal::GetScreenContext() const
 {
     return IsInteractiveScreenOpen() ? GetInteractiveScreenContext() : GetWorldScreenContext();
+}
+
+void AFicsitAITerminal::SetInteractiveScreenSize(const FIntPoint& InSizePx)
+{
+    CustomInteractiveScreenSize = InSizePx;
+    if (IsInteractiveScreenOpen() && ActiveModuleInstance)
+    {
+        ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
+    }
+}
+
+void AFicsitAITerminal::ClearInteractiveScreenSize()
+{
+    CustomInteractiveScreenSize.Reset();
+    if (IsInteractiveScreenOpen() && ActiveModuleInstance)
+    {
+        ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
+    }
 }
 
 void AFicsitAITerminal::BeginPlay()
@@ -231,6 +283,36 @@ void AFicsitAITerminal::Tick(float DeltaSeconds)
     if (HasAuthority())
     {
         UpdateHostState();
+    }
+
+    // При открытом интерактивном экране отслеживаем изменение фактического размера viewport (1280x800 vs 1920x1080)
+    if (IsInteractiveScreenOpen() && ActiveModuleInstance && !CustomInteractiveScreenSize.IsSet())
+    {
+        int32 SizeX = 0, SizeY = 0;
+        if (const UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+        {
+            if (APlayerController* PC = SurfaceWidget->GetOwningPlayer())
+            {
+                PC->GetViewportSize(SizeX, SizeY);
+            }
+        }
+        else if (UWorld* World = GetWorld())
+        {
+            if (APlayerController* PC = World->GetFirstPlayerController())
+            {
+                PC->GetViewportSize(SizeX, SizeY);
+            }
+        }
+
+        if (SizeX > 0 && SizeY > 0)
+        {
+            const FIntPoint CurSize(SizeX, SizeY);
+            if (LastReportedInteractiveSize != CurSize)
+            {
+                LastReportedInteractiveSize = CurSize;
+                ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
+            }
+        }
     }
 
     RenderWorldScreenIfDirty();
@@ -483,9 +565,8 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         if (Widget)
         {
             Widget->SetActionKeyBindings(CurrentBindings);
-            Widget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
+            OpenInteractiveScreen(Widget);
         }
-        SetScreenSurface(Widget);
         return;
     }
 
@@ -496,9 +577,8 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         if (Widget)
         {
             Widget->SetActionKeyBindings(CurrentBindings);
-            Widget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
+            OpenInteractiveScreen(Widget);
         }
-        SetScreenSurface(Widget);
         return;
     }
 
@@ -508,24 +588,42 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         OpenModule(FName(TEXT("Notes")));
     }
 
-    // Снимаем модуль с поверхности в мире ДО открытия интерактивного экрана (§6.6, Gs-59 P2)
+    UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, HostContext.HostState, nullptr);
+    if (Widget)
+    {
+        Widget->SetActionKeyBindings(CurrentBindings);
+        OpenInteractiveScreen(Widget);
+    }
+}
+
+void AFicsitAITerminal::OpenInteractiveScreen(UFicsitAIScreenSurfaceWidget* InSurfaceWidget)
+{
+    if (!InSurfaceWidget)
+    {
+        return;
+    }
+
+    // 1. Снимаем модуль с поверхности в мире ДО открытия интерактивного экрана (§6.6, Gs-59 P2)
     if (WorldSurfaceWidget)
     {
         WorldSurfaceWidget->ClearModule();
     }
 
+    // 2. Подключаем интерактивную поверхность и делегат закрытия
+    SetScreenSurface(InSurfaceWidget);
+    InSurfaceWidget->SetHost(this);
+    InSurfaceWidget->SetWorldSurfaceMode(false);
+    InSurfaceWidget->SetHostState(HostContext.HostState);
+    InSurfaceWidget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
+
+    // 3. Переводим модуль в контекст интерактивного экрана и привязываем к интерактивной поверхности
     if (ActiveModuleInstance)
     {
         ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
+        InSurfaceWidget->SetModule(ActiveModuleInstance);
     }
 
-    UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, HostContext.HostState, ActiveModuleInstance);
-    if (Widget)
-    {
-        Widget->SetActionKeyBindings(CurrentBindings);
-        Widget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
-    }
-    SetScreenSurface(Widget);
+    MarkWorldScreenDirty();
 }
 
 bool AFicsitAITerminal::IsUseable_Implementation() const
@@ -642,15 +740,7 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
 void AFicsitAITerminal::CloseInteractiveScreen()
 {
     UFicsitAIScreenSurfaceWidget* PlayerWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject());
-    if (!PlayerWidget && GetWorld())
-    {
-        if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-        {
-            PlayerWidget = UFicsitAIScreenSurfaceWidget::GetActivePlayerSurfaceWidget();
-        }
-    }
-
-    if (PlayerWidget)
+    if (PlayerWidget && PlayerWidget->GetHost().GetObject() == this)
     {
         APlayerController* PC = PlayerWidget->GetOwningPlayer();
         if (ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr)
@@ -693,7 +783,9 @@ void AFicsitAITerminal::RequestInputFocus(bool bWanted)
     HostContext.bHasInputFocus = bWanted;
     if (ActiveModuleInstance)
     {
-        ActiveModuleInstance->OnContextChanged(HostContext);
+        FFicsitAIScreenContext CurContext = GetScreenContext();
+        CurContext.bHasInputFocus = bWanted;
+        ActiveModuleInstance->OnContextChanged(CurContext);
     }
 }
 

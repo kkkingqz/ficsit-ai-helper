@@ -24,6 +24,7 @@ private:
     void TickScenarioP7(UWorld* InWorld, float DeltaSeconds);
 
     FName Scenario = NAME_None;
+    FString SaveId;
     bool bIsMainMenuWorld = false;
     bool bFinished = false;
 

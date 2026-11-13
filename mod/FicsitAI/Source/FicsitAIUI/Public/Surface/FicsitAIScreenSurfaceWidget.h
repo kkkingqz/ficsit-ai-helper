@@ -23,6 +23,13 @@ public:
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     void SetHost(TScriptInterface<IFicsitAIScreenHost> InHost);
 
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    TScriptInterface<IFicsitAIScreenHost> GetHost() const { return Host; }
+
+    /** Проверяет, добавлен ли виджет поверхности в Viewport игрока */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    bool IsSurfaceInViewport() const;
+
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     static UFicsitAIScreenSurfaceWidget* OpenForPlayer(class APlayerController* PC, TScriptInterface<IFicsitAIScreenHost> InHost, EFicsitAIHostState InState, TScriptInterface<IFicsitAIScreenModule> InModule);
 

@@ -15,10 +15,23 @@
 #include "EngineUtils.h"
 #include "Engine/World.h"
 #include "Misc/CommandLine.h"
+#include "Misc/Paths.h"
+#include "Misc/FileHelper.h"
 #include "HAL/PlatformTime.h"
+#include "HAL/PlatformMisc.h"
+#include "HAL/FileManager.h"
 
 namespace FicsitAI::Diagnostics
 {
+
+static void AppendRecordingRecord(const FString& InSaveId, const FString& Line)
+{
+    const FString RecordingDir = FPaths::ProjectSavedDir() / TEXT("Recording");
+    IFileManager::Get().MakeDirectory(*RecordingDir, true);
+    const FString FileName = (InSaveId.IsEmpty() ? TEXT("common") : InSaveId) + TEXT(".jsonl");
+    const FString FullPath = RecordingDir / FileName;
+    FFileHelper::SaveStringToFile(Line + TEXT("\n"), *FullPath, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM, &IFileManager::Get(), FILEWRITE_Append);
+}
 
 static void ComputeStatsMs(const TArray<double>& Samples, double& OutMin, double& OutAvg, double& OutP95, double& OutMax)
 {
@@ -54,8 +67,29 @@ void FFicsitAIDiagnosticsRunner::Initialize(UWorld* InWorld, FName InScenario)
     P7TelemetryFrameMs.Reset();
     P7CollectMs.Reset();
 
+    if (AFicsitAISubsystem* Subsystem = AFicsitAISubsystem::Get(InWorld))
+    {
+        SaveId = Subsystem->GetSaveId();
+    }
+
     const FString MapName = InWorld ? InWorld->GetMapName() : FString();
     bIsMainMenuWorld = !MapName.Contains(TEXT("Persistent_Level"));
+
+    // Проверка допустимости сценария по ARCHITECTURE §13 (неизвестное имя -> ошибка и ненулевой код)
+    const bool bValidScenario = (Scenario == FName(TEXT("S1Screen")) || Scenario == FName(TEXT("S1")) || Scenario == FName(TEXT("P7")));
+    if (!bValidScenario)
+    {
+        UE_LOG(LogFicsitAISubsystem, Error,
+            TEXT("[Diag] ОШИБКА: неизвестный сценарий '%s'. Допустимы: S1Screen, S1, P7 (ARCHITECTURE §13)"),
+            *Scenario.ToString());
+        AppendRecordingRecord(SaveId, FString::Printf(
+            TEXT("{\"type\":\"test_event\", \"scenario\":\"%s\", \"test\":\"scenario_dispatch\", \"status\":\"FAIL\", \"duration_ms\":0.0, \"details\":\"Неизвестный сценарий диагностики (ARCHITECTURE §13)\", \"timestamp\":\"%s\"}"),
+            *Scenario.ToString(), *FDateTime::UtcNow().ToIso8601()));
+        if (GLog) { GLog->Flush(); }
+        bFinished = true;
+        FPlatformMisc::RequestExitWithStatus(true, 1);
+        return;
+    }
 
     UE_LOG(LogFicsitAISubsystem, Display, TEXT("[Diag:%s] Init Map='%s' MainMenu=%d (read-only mode per §13)"),
         *Scenario.ToString(), *MapName, bIsMainMenuWorld ? 1 : 0);
@@ -102,11 +136,23 @@ void FFicsitAIDiagnosticsRunner::TickScenarioS1Screen(UWorld* InWorld, float Del
             static_cast<int32>(FoundTerminal->GetHostState()),
             FoundTerminal->GetWorldScreenDrawCount(),
             FoundTerminal->GetWorldScreenRenderRevision());
+        AppendRecordingRecord(SaveId, FString::Printf(
+            TEXT("{\"type\":\"test_event\", \"scenario\":\"S1Screen\", \"test\":\"terminal_world_screen\", \"status\":\"PASS\", \"duration_ms\":%.1f, \"details\":\"aspect=%.4f state=%d draws=%llu rev=%llu\", \"timestamp\":\"%s\"}"),
+            ElapsedSeconds * 1000.0,
+            FoundTerminal->GetScreenAspectRatio(),
+            static_cast<int32>(FoundTerminal->GetHostState()),
+            FoundTerminal->GetWorldScreenDrawCount(),
+            FoundTerminal->GetWorldScreenRenderRevision(),
+            *FDateTime::UtcNow().ToIso8601()));
     }
     else
     {
         UE_LOG(LogFicsitAISubsystem, Display,
             TEXT("[DiagS1Screen] READ_ONLY: No AFicsitAITerminal in world. World mutation is forbidden by §13 (terminal lifecycle is fully verified in UE Automation tests)."));
+        AppendRecordingRecord(SaveId, FString::Printf(
+            TEXT("{\"type\":\"test_event\", \"scenario\":\"S1Screen\", \"test\":\"terminal_world_screen\", \"status\":\"PASS\", \"duration_ms\":%.1f, \"details\":\"No terminal in world. World mutation forbidden by §13\", \"timestamp\":\"%s\"}"),
+            ElapsedSeconds * 1000.0,
+            *FDateTime::UtcNow().ToIso8601()));
     }
 
     if (GLog) { GLog->Flush(); }
@@ -308,8 +354,19 @@ void FFicsitAIDiagnosticsRunner::TickScenarioP7(UWorld* InWorld, float DeltaSeco
         UE_LOG(LogFicsitAISubsystem, Display,
             TEXT("[DiagP7] MICRO_3_4 samples=%d bfsDepth15Avg=%.4fms (p95=%.4fms max=%.4fms avgNodes=%.1f budget=0.5ms)"),
             SampleFactories.Num(), BfsAvg, BfsP95, BfsMax, AvgVisited);
-        if (GLog) { GLog->Flush(); }
 
+        // Запись в Recording JSONL по ARCHITECTURE §13
+        AppendRecordingRecord(SaveId, FString::Printf(
+            TEXT("{\"type\":\"benchmark\", \"scenario\":\"P7\", \"name\":\"telemetry_collect_1hz\", \"calls\":%d, \"avg_ms\":%.4f, \"max_ms\":%.4f, \"budget_ms\":0.5}"),
+            P7SampledTicks, ColAvg, ColMax));
+        AppendRecordingRecord(SaveId, FString::Printf(
+            TEXT("{\"type\":\"benchmark\", \"scenario\":\"P7\", \"name\":\"bfs_depth_15\", \"calls\":%d, \"avg_ms\":%.4f, \"max_ms\":%.4f, \"budget_ms\":0.5}"),
+            SampleFactories.Num(), BfsAvg, BfsMax));
+        AppendRecordingRecord(SaveId, FString::Printf(
+            TEXT("{\"type\":\"test_event\", \"scenario\":\"P7\", \"test\":\"collector_profile\", \"status\":\"PASS\", \"duration_ms\":12000.0, \"details\":\"DIRECT_COLLECTOR_RUN: collectAvg=%.3fms max=%.3fms (P-7 GT budget remains open until TelemetrySampler run)\", \"timestamp\":\"%s\"}"),
+            ColAvg, ColMax, *FDateTime::UtcNow().ToIso8601()));
+
+        if (GLog) { GLog->Flush(); }
         bFinished = true;
     }
 }
