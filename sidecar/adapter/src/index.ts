@@ -10,42 +10,35 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { createChatRouter } from "./chat.js";
+import { ModChannel } from "./channel.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
 import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
 import { createLogger, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
 import { tokenMatches } from "./token.js";
+import { ChatTurns } from "./turns.js";
 import { UpstreamMcp } from "./upstream.js";
 import { applyWhitelist, hiddenCallRefusal, hiddenToolNames } from "./whitelist.js";
 
 /**
- * Каркас адаптера (P-3, задача #4).
+ * Адаптер сайдкара: единственный `MCP_URL` Foreman и канал к моду (S2, #10).
  *
- * Чем он станет в S2 (#10): единственный `MCP_URL` Foreman, автоматический вход
- * в Foreman, сопоставление `saveId` с playthrough, API чата поверх SSE,
- * белый список инструментов и исходящий канал к моду. Здесь — только рама:
- * петлевой слушатель, проверка токена, MCP-эндпоинт без инструментов и
- * здоровье. Инструменты появятся из реестра операций (V-3), а не напишутся
- * здесь: описания генерируются из реестра (ARCHITECTURE §7.5, правило 2).
+ * Собрано здесь, по одному файлу на часть: вход в Foreman и сопоставление
+ * сохранения с playthrough (`foreman.ts`), ходы чата (`turns.ts`), канал мода
+ * с рукопожатием и конвертом (`channel.ts`), белый список инструментов модели
+ * (`whitelist.ts`), нормализатор ответов провайдера (`normalizer.ts`).
+ *
+ * Своих инструментов адаптер по-прежнему не пишет: они приходят от мода в
+ * рукопожатии, сгенерированные из реестра операций (ARCHITECTURE §7.5,
+ * правило 2).
  */
 
 const SERVER_NAME = "ficsitai-adapter";
 const SERVER_VERSION = "0.0.1";
 
-/**
- * Инструменты мода — из реестра операций (V-3), а не из `sf-mcp`. В v0 набор
- * пуст: канала мода ещё нет (S2).
- *
- * Он здесь, чтобы граница была в коде, а не в голове (граница доверия §7,
- * Co-29): проброс `sf-mcp` ниже до операций мода не дотягивается, потому что
- * имена из этого набора в него не попадают, и `sf-mcp` не может занять имя
- * инструмента мода — список фильтруется по тому же набору.
- */
-const MOD_TOOL_NAMES = new Set<string>();
-
-export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
+export function createMcpServer(upstream: UpstreamMcp, channel: ModChannel, log: Logger): Server {
   // Низкоуровневый Server, а не McpServer с сахаром: список инструментов должен
   // приходить из реестра операций (S2, V-3), а не собираться из регистраций в
   // коде адаптера. Возможность `tools` объявляется сразу и пустым списком —
@@ -56,22 +49,67 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
     { capabilities: { tools: {} } },
   );
 
-  // Инструменты игровых данных Foreman проходят насквозь, кроме скрытых белым
-  // списком (S2, `whitelist.ts`). Пустой список отдавать нельзя: модель всё
-  // равно зовёт инструменты по системному промпту, Foreman их не находит, и ход
-  // заканчивается без ответа — поэтому промпт и список правятся только вместе.
+  // Модель видит инструменты мода из рукопожатия канала и инструменты
+  // игровых данных `sf-mcp`, кроме скрытых белым списком (`whitelist.ts`).
+  // Пустой список отдавать нельзя: модель всё равно зовёт инструменты по
+  // системному промпту, Foreman их не находит, и ход заканчивается без ответа.
+  //
+  // Граница доверия §7 видна здесь: имя, занятое инструментом мода,
+  // вычёркивается из проброса, поэтому `sf-mcp` не может подменить операцию
+  // мода. Набор больше не константа — он живёт ровно столько, сколько сессия
+  // канала (протокол, §Рукопожатие).
   server.setRequestHandler(ListToolsRequestSchema, async () => {
-    const all = (await upstream.listTools()).filter((tool) => !MOD_TOOL_NAMES.has(tool.name));
+    const modTools = channel.modTools();
+    const modNames = new Set(modTools.map((tool) => tool.name));
+
+    // Недоступность `sf-mcp` не должна уносить инструменты мода: канал жив,
+    // `tools/call` работает, а модель переставала видеть игру целиком —
+    // находка Co-86 на живом прогоне 13.11.2026. Два источника инструментов
+    // отказывают порознь, и список строится из того, что есть.
+    let all: Tool[] = [];
+    try {
+      all = (await upstream.listTools()).filter((tool) => !modNames.has(tool.name));
+    } catch (err: unknown) {
+      log.warn("sf-mcp не отвечает — отдаю только инструменты мода", err);
+    }
+
     const passthrough = applyWhitelist(all);
     log.debug(
-      `tools/list: инструментов мода ${MOD_TOOL_NAMES.size}, ` +
+      `tools/list: инструментов мода ${modTools.length}, ` +
         `проброшено из sf-mcp ${passthrough.length}, скрыто ${all.length - passthrough.length}`,
     );
-    return { tools: passthrough };
+    return { tools: [...modTools, ...passthrough] };
   });
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request, extra) => {
     const { name, arguments: args } = request.params;
+
+    // Операции мода идут своим каналом и до `sf-mcp` не доходят. Проверка
+    // стоит раньше белого списка: при совпадении имён побеждает мод (протокол,
+    // §Рукопожатие), и инструмент мода не должен получить отказ за чужое имя.
+    if (channel.modTools().some((tool) => tool.name === name)) {
+      // `extra.signal` сообщает каналу, что ждать ответа больше некому:
+      // тогда моду уходит `tool.cancel`, и он бросает работу.
+      const outcome = await channel.callTool(
+        name,
+        (args ?? {}) as Record<string, unknown>,
+        extra.signal,
+      );
+      if (outcome.ok) {
+        return { content: [{ type: "text" as const, text: outcome.text }] };
+      }
+      // Ошибка инструмента — не ошибка протокола: модель должна прочитать
+      // причину и сказать её игроку, а не получить обрыв хода.
+      return {
+        isError: true,
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ code: outcome.code, message: outcome.message }),
+          },
+        ],
+      };
+    }
 
     // Скрытый инструмент модель по списку не видит, но может позвать по памяти
     // о чужом промпте. Отказ с причиной лучше тихого проброса: иначе белый
@@ -80,14 +118,6 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
     if (refusal !== undefined) {
       log.warn(`вызов скрытого инструмента «${name}» отклонён`);
       throw new McpError(ErrorCode.InvalidRequest, refusal);
-    }
-
-    // Операции мода идут своим каналом и до `sf-mcp` не доходят.
-    if (MOD_TOOL_NAMES.has(name)) {
-      throw new McpError(
-        ErrorCode.InvalidRequest,
-        `инструмент мода «${name}» появится вместе с каналом мода (S2)`,
-      );
     }
 
     try {
@@ -114,6 +144,17 @@ export async function createApp(config: Config, log: Logger) {
     loadOrCreateAccount(config.accountPath),
     log,
   );
+  const turns = new ChatTurns(foreman, log);
+  const channel = new ModChannel({
+    turns,
+    token: config.token,
+    apiVersion: config.apiVersion,
+    model: config.model,
+    log,
+  });
+  // Состояние входа в Foreman уходит моду сообщением `adapter.status`.
+  foreman.onState = (state, reason) => channel.setForemanState(state, reason);
+
   const app = express();
   app.disable("x-powered-by");
   app.use(express.json({ limit: "1mb" }));
@@ -128,7 +169,11 @@ export async function createApp(config: Config, log: Logger) {
       sfMcpUrl: config.sfMcpUrl,
       foreman: { signedIn: foreman.authenticated },
       hiddenTools: hiddenToolNames(),
-      mod: { connected: false, reason: "канал вызова инструментов мода появится вместе с реестром" },
+      mod: {
+        connected: channel.connected,
+        session: channel.sessionId ?? "",
+        tools: channel.modTools().map((tool) => tool.name),
+      },
     });
   });
 
@@ -143,7 +188,7 @@ export async function createApp(config: Config, log: Logger) {
       return;
     }
 
-    const server = createMcpServer(upstream, log);
+    const server = createMcpServer(upstream, channel, log);
     const transport = new StreamableHTTPServerTransport({});
     res.on("close", () => {
       void transport.close();
@@ -159,22 +204,23 @@ export async function createApp(config: Config, log: Logger) {
     }
   });
 
-  // API чата для мода: поток, отмена, история (S2). Токен здесь в заголовке —
-  // обе стороны канала наши (§13), query-строка остаётся только у Foreman.
-  app.use("/mod/saves", createChatRouter({ foreman, token: config.token, log }));
+  // Канал мода: рукопожатие, поток и приём сообщений (протокол 1, Co-82).
+  // Токен здесь в заголовке — обе стороны канала наши (§13), query-строка
+  // остаётся только у Foreman, чей MCP-клиент заголовков не шлёт.
+  app.use("/mod", channel.router());
 
   app.all("/mcp", (req: Request, res: Response) => {
     res.status(405).json({ error: "method_not_allowed", allow: "POST" });
     log.debug("не-POST на /mcp", { method: req.method });
   });
 
-  return { app, foreman };
+  return { app, foreman, channel };
 }
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const log = createLogger(config.logLevel);
-  const { app, foreman } = await createApp(config, log);
+  const { app, foreman, channel } = await createApp(config, log);
 
   const httpServer = app.listen(config.port, config.host);
 
@@ -233,6 +279,8 @@ async function main(): Promise<void> {
 
   const shutdown = (signal: string) => {
     log.info(`${signal}: останавливаюсь`);
+    // Мод должен узнать об остановке строкой `bye`, а не тишиной в потоке.
+    channel.closeSession("shutdown");
     normalizerServer?.close();
     httpServer.close(() => process.exit(0));
   };

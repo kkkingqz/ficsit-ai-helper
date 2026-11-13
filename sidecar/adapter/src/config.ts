@@ -49,6 +49,12 @@ const schema = z.object({
    * выбирает, иначе их стало бы два.
    */
   accountPath: z.string().min(1).default(defaultAccountPath()),
+  /**
+   * Имя модели чата. Адаптер её не выбирает — выбирает лаунчер, который
+   * задаёт `LLM_MODEL` и Foreman, и нам. Мы только показываем: §5 требует
+   * модель в строке состояния ассистента, а Foreman её не отдаёт (Co2-25).
+   */
+  model: z.string().default(""),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -74,6 +80,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     llmUpstreamBaseUrl: env.LLM_UPSTREAM_BASE_URL,
     normalizerPort: env.NORMALIZER_PORT,
     accountPath: env.FOREMAN_ACCOUNT_PATH,
+    model: env.LLM_MODEL,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 

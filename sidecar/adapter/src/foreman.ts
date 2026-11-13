@@ -117,6 +117,13 @@ export class ForemanSession {
   private foremanId: string | undefined;
 
   /**
+   * Куда сообщать о смене состояния входа. Канал шлёт это моду сообщением
+   * `adapter.status`: экрану чата нужно отличать «сайдкар думает» от
+   * «сайдкар не отвечает», а узнать это можно только здесь.
+   */
+  public onState: ((state: "ready" | "signingIn" | "unavailable", reason?: string) => void) | undefined;
+
+  /**
    * Свой `Origin` в каждом запросе.
    *
    * Better Auth отвечает `403 MISSING_OR_NULL_ORIGIN` на запрос без этого
@@ -155,6 +162,7 @@ export class ForemanSession {
    * только попыткой регистрации: она вернёт 422, если пользователь уже есть.
    */
   public async authenticate(): Promise<void> {
+    this.onState?.("signingIn");
     const body = JSON.stringify({
       email: this.account.email,
       password: this.account.password,
@@ -168,6 +176,7 @@ export class ForemanSession {
     if (signIn.ok) {
       this.cookie = cookieHeaderFrom(signIn, this.cookie);
       this.log.debug("вход в Foreman выполнен");
+      this.onState?.("ready");
       return;
     }
 
@@ -179,11 +188,16 @@ export class ForemanSession {
     if (signUp.ok) {
       this.cookie = cookieHeaderFrom(signUp, this.cookie);
       this.log.info("локальный аккаунт Foreman создан при первом запуске");
+      this.onState?.("ready");
       return;
     }
 
     // Ни вход, ни регистрация: дальше идти некуда. Тело ответа не пишем —
     // в него Better Auth кладёт присланный адрес, а рядом лежал пароль.
+    this.onState?.(
+      "unavailable",
+      `вход не удался: sign-in ${signIn.status}, sign-up ${signUp.status}`,
+    );
     throw new ForemanError(
       `вход в Foreman не удался: sign-in ${signIn.status}, sign-up ${signUp.status}. ` +
         "Если аккаунт заведён с другим паролем, удалите файл аккаунта адаптера и перезапустите сайдкар",
