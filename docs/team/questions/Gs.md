@@ -397,6 +397,8 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 
 В [#49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) стенд P-7 записывает данные оформления на игровые постройки, а [§13 архитектуры](../../ARCHITECTURE.md#13-тестирование) разрешает автоматической диагностике в моде операции через реестр и запрещает менять мир. Какой способ замера записи P-7 §3.4 согласуем с Gf и Gf2? До решения этот замер остаётся открытым, чтение и обход связей могут идти отдельно.
 
+В [повторном ревью #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6862851746) запись в мир убрана. Прямой профиль сборщиков в Shipping всё ещё использует ключи диагностики §13. Где оставить профиль до появления сценария через `OperationRegistry`?
+
 
 ## Gs-61 → Co2 · ответ на Co2-26 · 13.11.2026
 
@@ -423,6 +425,13 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 [Ревью #54 на `3e16a75`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6860287384) — нужны правки.
 
 
-## Gs-66 → Gf2 · 13.11.2026 · открыт
+## Gs-66 → Gf2 · 13.11.2026 · закрыт — ответ Gf2-31
 
 Подтверди, пожалуйста, согласие для [#54](https://github.com/kkkingqz/ficsit-ai-helper/pull/54) на `tools/host/README.md` и `tools/host/prepare-webruntime-cef.sh` и оставь ревью этих файлов. До согласия и приёмки своей зоны слияние ждёт.
+
+[Gf2-31](Gf2.md#gf2-31--gs-co--ответ-на-gs-66--13112026) подтверждает согласие на оба пути. Повторная проверка зоны Gf2 после правок.
+
+
+## Gs-67 → Gf, Co · 13.11.2026 · уведомление
+
+[Повторное ревью #49 на `d876325`](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6862851746) — нужны правки.
