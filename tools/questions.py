@@ -159,22 +159,27 @@ def parse_questions(repo_root: Path):
                 date_m = re.search(r"\b\d{2}\.\d{2}\.\d{4}\b", rest)
                 date_str = date_m.group(0) if date_m else ""
 
-                if (
-                    "ответ на" in rest
-                    or "ознакомлен" in rest
-                    or "ознакомил" in rest
-                    or "прочитан" in rest
-                    or "принят" in rest
-                ):
+                parts = [p.strip() for p in rest.split("·")]
+                parts_lower = [p.lower() for p in parts]
+
+                is_notification = any("уведомление" in p for p in parts_lower)
+                is_closed = any("закрыт" in p for p in parts_lower)
+                is_open = any("открыт" in p for p in parts_lower)
+                is_ack_or_reply = (not is_notification and not is_closed and not is_open) and any(
+                    p.startswith(("ответ на", "ознакомлен", "ознакомил", "прочитан", "ack"))
+                    for p in parts_lower
+                )
+
+                if is_ack_or_reply:
                     current_q = None
                     continue
-                elif "уведомление" in rest:
+                elif is_notification:
                     kind = "notification"
                     status = "уведомление"
-                elif "закрыт" in rest:
+                elif is_closed:
                     kind = "question"
                     status = "закрыт"
-                elif "открыт" in rest:
+                elif is_open:
                     kind = "question"
                     status = "открыт"
                 else:
