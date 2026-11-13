@@ -1,0 +1,37 @@
+{
+  "name": "@ficsitai/screens-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Фасад публичного API мода для веб-экранов: один интерфейс поверх моста в игре и HTTP в браузере",
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./dev": {
+      "types": "./dist/dev/server.d.ts",
+      "import": "./dist/dev/server.js"
+    }
+  },
+  "bin": {
+    "ficsitai-screens-dev": "./dist/dev/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run",
+    "dev": "node dist/dev/cli.js"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
