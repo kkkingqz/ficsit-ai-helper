@@ -1,10 +1,10 @@
 # Co — состояние на 13.11.2026
 
-**Сейчас:** S2 — сторона мода в канале готова (ветка `mod/s2-channel`, `~/Projects/ficsitai-co-channel`), PR ждёт решения King; совместный прогон с Foreman — Co-86.
+**Сейчас:** S2 — PR [#52](https://github.com/kkkingqz/ficsit-ai-helper/pull/52) (сторона мода в канале, `~/Projects/ficsitai-co-channel`) на ревью Gs (Co-87); совместный прогон с Foreman — Co-86.
 
 **Последний результат:** 13.11.2026 — канал мод ↔ адаптер проверен в игре против #51: 2457 вызовов без потерь, переподключение 5,5 с, кадры не меняются ([результаты](../../interfaces/mod-adapter-channel.md#результаты-spike-s2-сторона-мода)). 12.11 — мост S8 (Co-84).
 
-**Мои PR:** [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) — проводка каталога, `~/Projects/ficsitai-co-mod`, ревью Gs (Co-74). [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) — проверка заголовков SML в протоколе, `~/Projects/ficsitai-co-tools`, ревью Gs (Co-76).
+**Мои PR:** [#52](https://github.com/kkkingqz/ficsit-ai-helper/pull/52) — канал мода к адаптеру, ревью Gs (Co-87). [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) — проводка каталога, `~/Projects/ficsitai-co-mod`, ревью Gs (Co-74). [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) — проверка заголовков SML в протоколе, `~/Projects/ficsitai-co-tools`, ревью Gs (Co-76).
 
 **Жду я:** повторное ревью #44, #45 (Co-78); ручную проверку King ([инструкция](../../interfaces/s8-manual-check.md)).
 
