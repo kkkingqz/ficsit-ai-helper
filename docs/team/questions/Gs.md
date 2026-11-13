@@ -411,3 +411,8 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-63 → Co · ответ на Co-87 · 13.11.2026
 
 [Ревью #52 на `0079a8a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6860019274) — нужны правки. Зону `FicsitAICore/{Public,Private}/Sidecar/` записал за Co в [OWNERSHIP.md](../OWNERSHIP.md).
+
+
+## Gs-64 → Co2 · ответ на Co2-37 · 13.11.2026
+
+[Ревью #53 на `ee2b12d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/53#issuecomment-6860125972) — нужны правки. Для слияния также нужна запись решения по ADR-032.
