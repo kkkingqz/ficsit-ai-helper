@@ -66,13 +66,33 @@ public:
     virtual void UpdateUseState_Implementation(class AFGCharacterPlayer* byCharacter, const FVector& atLocation, class UPrimitiveComponent* componentHit, FUseState& out_useState) override;
 
     // IFicsitAIScreenHost
-    virtual FFicsitAIScreenContext GetScreenContext() const override { return HostContext; }
+    virtual FFicsitAIScreenContext GetScreenContext() const override;
     virtual TArray<FName> GetAvailableModules() const override;
     virtual bool OpenModule(FName ModuleId) override;
     virtual void CloseActiveModule() override;
     virtual FName GetActiveModuleId() const override { return ActiveModuleId; }
     virtual void RequestInputFocus(bool bWanted) override;
     virtual void NotifyContentChanged() override;
+
+    /** Контекст экрана на меше терминала в мире (§6.6, 1280x720, bWorldSurface=true) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    FFicsitAIScreenContext GetWorldScreenContext() const;
+
+    /** Контекст интерактивного экрана игрока (1920x1080, bWorldSurface=false) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    FFicsitAIScreenContext GetInteractiveScreenContext() const;
+
+    /** Открыт ли в данный момент интерактивный экран для локального игрока */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    bool IsInteractiveScreenOpen() const;
+
+    /** Закрыть интерактивный экран для игрока с возвратом модуля на поверхность в мире */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
+    void CloseInteractiveScreen();
+
+    /** Синхронизировать отображение активного модуля на экране терминала в мире (§6.6) */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
+    void SyncWorldSurfaceState();
 
     /** Немедленная запись текущего состояния открытого модуля в подсистему (Gs-15.5) */
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Terminal")
@@ -116,6 +136,9 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
     class UTextureRenderTarget2D* GetWorldScreenRenderTarget() const { return WorldScreenRenderTarget; }
+
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
+    class UFicsitAIScreenSurfaceWidget* GetWorldSurfaceWidget() const { return WorldSurfaceWidget; }
 
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
     class UMaterialInstanceDynamic* GetWorldScreenMaterial() const { return WorldScreenMaterial; }
@@ -201,7 +224,6 @@ protected:
     uint64 WorldScreenDrawCount = 0;
 
     void InitializeWorldScreen();
-    void SyncWorldSurfaceState();
     void UpdateWorldScreenMaterialParameters();
     void TeardownActiveModule();
 };

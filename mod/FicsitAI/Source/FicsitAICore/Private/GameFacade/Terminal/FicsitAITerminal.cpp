@@ -123,7 +123,18 @@ AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 
 void AFicsitAITerminal::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    CloseInteractiveScreen();
     CloseActiveModule();
+
+    if (WorldSurfaceWidget)
+    {
+        WorldSurfaceWidget->ReleaseWorldSurfaceResources();
+        WorldSurfaceWidget = nullptr;
+    }
+    WorldScreenRenderTarget = nullptr;
+    WorldScreenMaterial = nullptr;
+    ExternalScreenTexture = nullptr;
+
     if (AFicsitAISubsystem* Subsystem = GetSubsystem())
     {
         Subsystem->UnregisterTerminal(this);
@@ -159,6 +170,46 @@ void AFicsitAITerminal::InitializeHost()
     }
 
     InitializeWorldScreen();
+}
+
+FFicsitAIScreenContext AFicsitAITerminal::GetWorldScreenContext() const
+{
+    FFicsitAIScreenContext Context = HostContext;
+    Context.bWorldSurface = true;
+    Context.SizePx = FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx);
+    Context.AspectRatio = 16.0f / 9.0f;
+    Context.bHasInputFocus = false;
+    return Context;
+}
+
+FFicsitAIScreenContext AFicsitAITerminal::GetInteractiveScreenContext() const
+{
+    FFicsitAIScreenContext Context = HostContext;
+    Context.bWorldSurface = false;
+    Context.SizePx = FIntPoint(1920, 1080);
+    Context.AspectRatio = 16.0f / 9.0f;
+    return Context;
+}
+
+bool AFicsitAITerminal::IsInteractiveScreenOpen() const
+{
+    if (ScreenSurface)
+    {
+        return true;
+    }
+    if (UWorld* World = GetWorld())
+    {
+        if (APlayerController* PC = World->GetFirstPlayerController())
+        {
+            return UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(PC);
+        }
+    }
+    return false;
+}
+
+FFicsitAIScreenContext AFicsitAITerminal::GetScreenContext() const
+{
+    return IsInteractiveScreenOpen() ? GetInteractiveScreenContext() : GetWorldScreenContext();
 }
 
 void AFicsitAITerminal::BeginPlay()
@@ -257,6 +308,11 @@ void AFicsitAITerminal::TeardownActiveModule()
         if (ScreenSurface)
         {
             ScreenSurface->ClearModule();
+        }
+
+        if (WorldSurfaceWidget)
+        {
+            WorldSurfaceWidget->ClearModule();
         }
 
         ActiveModuleInstance = nullptr;
@@ -427,6 +483,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         if (Widget)
         {
             Widget->SetActionKeyBindings(CurrentBindings);
+            Widget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
         }
         SetScreenSurface(Widget);
         return;
@@ -439,6 +496,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         if (Widget)
         {
             Widget->SetActionKeyBindings(CurrentBindings);
+            Widget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
         }
         SetScreenSurface(Widget);
         return;
@@ -450,10 +508,22 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         OpenModule(FName(TEXT("Notes")));
     }
 
+    // Снимаем модуль с поверхности в мире ДО открытия интерактивного экрана (§6.6, Gs-59 P2)
+    if (WorldSurfaceWidget)
+    {
+        WorldSurfaceWidget->ClearModule();
+    }
+
+    if (ActiveModuleInstance)
+    {
+        ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
+    }
+
     UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, HostContext.HostState, ActiveModuleInstance);
     if (Widget)
     {
         Widget->SetActionKeyBindings(CurrentBindings);
+        Widget->OnCloseRequested.BindUObject(this, &AFicsitAITerminal::CloseInteractiveScreen);
     }
     SetScreenSurface(Widget);
 }
@@ -537,9 +607,13 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
     ActiveModuleId = ModuleId;
     ActiveModuleInstance = TargetModule;
 
+    const FFicsitAIScreenContext TargetContext = IsInteractiveScreenOpen()
+        ? GetInteractiveScreenContext()
+        : GetWorldScreenContext();
+
     // Жизненный цикл по docs/interfaces/screen-host-and-module.md:
     // CreateModule -> OnAttach(Context) -> RestorePersistentState(State) -> Surface->SetModule
-    ActiveModuleInstance->OnAttach(HostContext);
+    ActiveModuleInstance->OnAttach(TargetContext);
 
     // Восстанавливаем сохранённое состояние модуля из подсистемы по (SaveId, ModuleId)
     if (AFicsitAISubsystem* Subsystem = GetSubsystem())
@@ -551,9 +625,13 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
         }
     }
 
-    if (ScreenSurface)
+    if (IsInteractiveScreenOpen() && ScreenSurface)
     {
         ScreenSurface->SetModule(TargetModule);
+    }
+    else
+    {
+        SyncWorldSurfaceState();
     }
 
     MarkWorldScreenDirty();
@@ -561,17 +639,20 @@ bool AFicsitAITerminal::OpenModule(FName ModuleId)
     return true;
 }
 
-void AFicsitAITerminal::CloseActiveModule()
+void AFicsitAITerminal::CloseInteractiveScreen()
 {
-    if (ActiveModuleInstance)
+    UFicsitAIScreenSurfaceWidget* PlayerWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject());
+    if (!PlayerWidget && GetWorld())
     {
-        UE_LOG(LogFicsitAITerminal, Log, TEXT("Закрытие активного модуля: %s"), *ActiveModuleId.ToString());
-        TeardownActiveModule();
+        if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
+        {
+            PlayerWidget = UFicsitAIScreenSurfaceWidget::GetActivePlayerSurfaceWidget();
+        }
     }
 
-    if (UFicsitAIScreenSurfaceWidget* Widget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+    if (PlayerWidget)
     {
-        APlayerController* PC = Widget->GetOwningPlayer();
+        APlayerController* PC = PlayerWidget->GetOwningPlayer();
         if (ULocalPlayer* LP = PC ? PC->GetLocalPlayer() : nullptr)
         {
             if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
@@ -579,9 +660,32 @@ void AFicsitAITerminal::CloseActiveModule()
                 Subsystem->ControlMappingsRebuiltDelegate.RemoveAll(this);
             }
         }
+        PlayerWidget->OnCloseRequested.Unbind();
+        PlayerWidget->ClearModule();
         UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
     }
     SetScreenSurface(nullptr);
+
+    // Возвращаем модуль на поверхность в мире (§6.6, Gs-59 P2)
+    SyncWorldSurfaceState();
+    MarkWorldScreenDirty();
+}
+
+void AFicsitAITerminal::CloseActiveModule()
+{
+    CloseInteractiveScreen();
+
+    if (ActiveModuleInstance)
+    {
+        UE_LOG(LogFicsitAITerminal, Log, TEXT("Закрытие активного модуля: %s"), *ActiveModuleId.ToString());
+        TeardownActiveModule();
+    }
+
+    if (WorldSurfaceWidget)
+    {
+        WorldSurfaceWidget->ClearModule();
+    }
+    MarkWorldScreenDirty();
 }
 
 void AFicsitAITerminal::RequestInputFocus(bool bWanted)
@@ -606,7 +710,7 @@ bool AFicsitAITerminal::HandleBackAction()
         return true;
     }
 
-    CloseActiveModule();
+    CloseInteractiveScreen();
     return true;
 }
 
@@ -676,11 +780,13 @@ void AFicsitAITerminal::SyncWorldSurfaceState()
     WorldSurfaceWidget->SetWorldSurfaceMode(true);
     WorldSurfaceWidget->SetHostState(HostContext.HostState);
 
-    if (HostContext.HostState == EFicsitAIHostState::Ready && ActiveModuleInstance && !UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr))
+    const bool bInteractiveOpen = IsInteractiveScreenOpen();
+    if (HostContext.HostState == EFicsitAIHostState::Ready && ActiveModuleInstance && !bInteractiveOpen)
     {
+        ActiveModuleInstance->OnContextChanged(GetWorldScreenContext());
         WorldSurfaceWidget->SetModule(ActiveModuleInstance);
     }
-    else if (!ActiveModuleInstance)
+    else
     {
         WorldSurfaceWidget->ClearModule();
     }

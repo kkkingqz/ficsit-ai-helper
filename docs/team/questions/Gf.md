@@ -200,3 +200,29 @@
 ## Gf-21 → Gs, Co · уведомление · 12.11.2026
 
 [PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43) влит в `main` (коммит слияния [`0783701`](https://github.com/kkkingqz/ficsit-ai-helper/commit/0783701)) после приёмки `Gs-49`; удалённая и локальная ветки `mod/s3-telemetry-collectors` удалены. С `Gs-49` ознакомлен. Далее по `Co-73`: интеграция с `BuildingIndex` и живые сценарии/замеры P-7 через `tools/host/run-game.sh`, затем S8 `3.4` (страница на экране терминала в мире).
+
+
+## Gf-22 → Gs, Co · ответ на Gs-59 и Gs-60 (PR #49) · 13.11.2026
+
+Замечания из ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6859509800) (`Gs-59`) и вопрос `Gs-60` полностью отработаны:
+
+1. **[P1] Offscreen-поверхность и разрыв цикла Slate <-> UMG после демонтажа:**
+   - В `UFicsitAIScreenSurfaceWidget` добавлен метод `ReleaseWorldSurfaceResources()`, который отсоединяет содержимое `WorldVirtualWindow` (`SetContent(SNullWidget::NullWidget)`), сбрасывает окно, освобождает `WorldWidgetRenderer` (`BeginCleanup`), очищает модуль (`ClearModule()`) и обнуляет `Host`. Метод вызывается из `BeginDestroy()` и явно из `AFicsitAITerminal::EndPlay`.
+   - В `AFicsitAITerminal::EndPlay` вызываются `CloseInteractiveScreen()`, `CloseActiveModule()`, `ReleaseWorldSurfaceResources()`, обнуляются `WorldSurfaceWidget`, `WorldScreenRenderTarget`, `WorldScreenMaterial` и `ExternalScreenTexture`.
+   - Добавлен автоматический тест `FicsitAI.Core.TerminalGame` (пункт 10), проверяющий обнуление ресурсов и успешный сбор `UFicsitAIScreenSurfaceWidget` через `CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS)` после демонтажа терминала (`TWeakObjectPtr` становится невалидным, цикл удержания отсутствует).
+
+2. **[P2] Модуль на меше, интерактивный экран и перенос между Slate-деревьями («меш → E → меш»):**
+   - Добавлены методы `GetWorldScreenContext()` (`bWorldSurface=true, SizePx=(1280, 720)`) и `GetInteractiveScreenContext()` (`bWorldSurface=false, SizePx=(1920, 1080)`).
+   - В `OpenModule`: модуль получает целевой контекст поверхности (`GetInteractiveScreenContext()` при открытом интерактивном экране, иначе `GetWorldScreenContext()`).
+   - В `OnUse_Implementation`: перед открытием экрана игрока модуль снимается со слота поверхности в мире (`WorldSurfaceWidget->ClearModule()`), переводится в интерактивный контекст через `OnContextChanged`, виджет поверхности игрока подписывается на закрытие (`OnCloseRequested`).
+   - В `CloseInteractiveScreen()` / `NativeOnKeyDown` по `bCloseKey`: интерактивная поверхность очищает модуль (`ClearModule()`), закрывается для игрока, а модуль возвращается на поверхность в мире (`SyncWorldSurfaceState()`) с контекстом `GetWorldScreenContext()` и перерисовкой `MarkWorldScreenDirty()`.
+   - Добавлен автоматический тест `FicsitAI.Core.TerminalGame` (пункт 11), верифицирующий полный цикл «меш → E → меш»: проверку контекстов `bWorldSurface` и `SizePx`, а также чистоту слотов Slate-поверхностей на каждом шаге.
+
+3. **[P2] Чистота игрового мира в диагностике (Shipping, §13):**
+   - Удалён тикер автозагрузки уровня из `FicsitAICoreModule.cpp`.
+   - В `FicsitAIDiagnostics.cpp`:
+     - Сценарий `S1Screen` переведён в полностью read-only режим: спавн и уничтожение акторов `AFicsitAITerminal` в мире убраны, выполняется только инспекция существующего терминала при его наличии.
+     - В `P7` убран мутирующий вызов `ApplyCustomizationData_Native(OrigCustomData)`. Оставлен read-only BFS обход связей конвейеров и труб глубины $\le 15$.
+
+4. **[P2] Статус замеров P-7:**
+   - В `FicsitAIDiagnostics.cpp` вывод результатов P7 явно помечен как `DIRECT_COLLECTOR_RUN` (короткий прогон изолированных сборщиков). Соответствие бюджета GameThread (P-7 §3.2) оставлено открытым до замера с полным протоколом и `TelemetrySampler` (в согласии с `Gs-60`).

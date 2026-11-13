@@ -254,6 +254,87 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("TerminalA закрыт"), TerminalA->GetActiveModuleId(), NAME_None);
     TestEqual(TEXT("TerminalB закрыт"), TerminalB->GetActiveModuleId(), NAME_None);
 
+    // 10. Проверка освобождения ресурсов поверхности в мире и сборки мусора после EndPlay (P1, Gs-59)
+    {
+        AFicsitAITerminal* GcTerminal = NewObject<AFicsitAITerminal>();
+        TestNotNull(TEXT("GcTerminal создан"), GcTerminal);
+        GcTerminal->InitializeHost();
+        GcTerminal->SetPowerOverride(true);
+        GcTerminal->UpdateHostState();
+        TestTrue(TEXT("GcTerminal открывает Notes"), GcTerminal->OpenModule(FName(TEXT("Notes"))));
+
+        UFicsitAIScreenSurfaceWidget* SurfaceWidget = GcTerminal->GetWorldSurfaceWidget();
+        TestNotNull(TEXT("WorldSurfaceWidget существует на GcTerminal"), SurfaceWidget);
+
+        TWeakObjectPtr<UFicsitAIScreenSurfaceWidget> WeakSurfaceWidget = SurfaceWidget;
+        TestTrue(TEXT("WeakSurfaceWidget валиден до EndPlay"), WeakSurfaceWidget.IsValid());
+
+        // Демонтаж терминала
+        GcTerminal->EndPlay(EEndPlayReason::Destroyed);
+        TestNull(TEXT("GetWorldSurfaceWidget обнулён после EndPlay"), GcTerminal->GetWorldSurfaceWidget());
+        TestNull(TEXT("GetWorldScreenRenderTarget обнулён после EndPlay"), GcTerminal->GetWorldScreenRenderTarget());
+        TestNull(TEXT("GetWorldScreenMaterial обнулён после EndPlay"), GcTerminal->GetWorldScreenMaterial());
+
+        // Принудительный сбор мусора: Slate <-> UMG цикл должен быть разорван в ReleaseWorldSurfaceResources
+        CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+        TestFalse(TEXT("WorldSurfaceWidget успешно собран GC после EndPlay (нет утечки/цикла через SVirtualWindow/SObjectWidget)"), WeakSurfaceWidget.IsValid());
+    }
+
+    // 11. Проверка контекста поверхности и изоляции Slate-дерева в цикле «меш → E → меш» (P2, Gs-59)
+    {
+        AFicsitAITerminal* ScreenTerm = NewObject<AFicsitAITerminal>();
+        ScreenTerm->InitializeHost();
+        ScreenTerm->SetPowerOverride(true);
+        ScreenTerm->UpdateHostState();
+
+        // 11.1 «меш»: открытие модуля Notes на поверхности в мире
+        TestTrue(TEXT("ScreenTerm открывает Notes на меше"), ScreenTerm->OpenModule(FName(TEXT("Notes"))));
+        UFicsitAITestNotesModule* NotesMod = Cast<UFicsitAITestNotesModule>(ScreenTerm->GetActiveModuleInstance().GetObject());
+        TestNotNull(TEXT("NotesMod создан"), NotesMod);
+        if (NotesMod)
+        {
+            TestTrue(TEXT("Контекст на меше: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("Контекст на меше: SizePx == (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+        }
+
+        UFicsitAIScreenSurfaceWidget* WorldSurface = ScreenTerm->GetWorldSurfaceWidget();
+        TestNotNull(TEXT("WorldSurface существует"), WorldSurface);
+        TestEqual(TEXT("Модуль привязан к WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+
+        // 11.2 «E»: открытие интерактивного экрана (симуляция перехода по E)
+        // Снимаем модуль с поверхности в мире ДО переноса в интерактивный экран
+        WorldSurface->ClearModule();
+        TestNull(TEXT("WorldSurface очищен от модуля"), WorldSurface->GetActiveModule().GetObject());
+
+        // Переводим модуль в интерактивный контекст
+        NotesMod->OnContextChanged(ScreenTerm->GetInteractiveScreenContext());
+        TestFalse(TEXT("Интерактивный контекст: bWorldSurface == false"), NotesMod->GetCurrentContext().bWorldSurface);
+        TestEqual(TEXT("Интерактивный контекст: SizePx == (1920, 1080)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1920, 1080));
+
+        // Создаём отдельный виджет интерактивного экрана
+        UFicsitAIScreenSurfaceWidget* InteractiveSurface = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(ScreenTerm);
+        InteractiveSurface->SetHost(ScreenTerm);
+        InteractiveSurface->SetHostState(EFicsitAIHostState::Ready);
+        InteractiveSurface->SetModule(ScreenTerm->GetActiveModuleInstance());
+        ScreenTerm->SetScreenSurface(InteractiveSurface);
+        TestEqual(TEXT("Модуль привязан к интерактивной поверхности"), InteractiveSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+
+        // 11.3 «меш»: закрытие интерактивного экрана и возврат модуля на меш
+        InteractiveSurface->ClearModule();
+        TestNull(TEXT("Интерактивная поверхность очищена от модуля"), InteractiveSurface->GetActiveModule().GetObject());
+        ScreenTerm->SetScreenSurface(nullptr);
+
+        ScreenTerm->SyncWorldSurfaceState();
+        TestEqual(TEXT("Модуль вернулся на WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+        if (NotesMod)
+        {
+            TestTrue(TEXT("После возврата на меш: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("После возврата на меш: SizePx == (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+        }
+
+        ScreenTerm->EndPlay(EEndPlayReason::Destroyed);
+    }
+
     // Удаляем временный тестовый файл .sav
     IFileManager::Get().Delete(*SaveFilePath);
 

@@ -58,11 +58,12 @@ UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::OpenForPlayer(APlaye
 void UFicsitAIScreenSurfaceWidget::CloseForPlayer(APlayerController* PC)
 {
     UFicsitAIScreenSurfaceWidget* Widget = ActivePlayerSurfaceWidget.Get();
-    if (!Widget || Widget->GetOwningPlayer() != PC)
+    if (!Widget || (PC && Widget->GetOwningPlayer() != PC))
     {
         return;
     }
 
+    Widget->ClearModule();
     Widget->RemoveFromParent();
     ActivePlayerSurfaceWidget.Reset();
     if (PC && PC->IsLocalController())
@@ -70,6 +71,11 @@ void UFicsitAIScreenSurfaceWidget::CloseForPlayer(APlayerController* PC)
         PC->SetInputMode(FInputModeGameOnly());
         PC->bShowMouseCursor = false;
     }
+}
+
+UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::GetActivePlayerSurfaceWidget()
+{
+    return ActivePlayerSurfaceWidget.Get();
 }
 
 bool UFicsitAIScreenSurfaceWidget::IsOpenForPlayer(APlayerController* PC)
@@ -197,8 +203,11 @@ UTextureRenderTarget2D* UFicsitAIScreenSurfaceWidget::CreateWorldRenderTarget(UO
     return Target;
 }
 
-void UFicsitAIScreenSurfaceWidget::BeginDestroy()
+void UFicsitAIScreenSurfaceWidget::ReleaseWorldSurfaceResources()
 {
+    ClearModule();
+    Host = nullptr;
+
     if (WorldVirtualWindow.IsValid())
     {
         WorldVirtualWindow->SetContent(SNullWidget::NullWidget);
@@ -209,6 +218,11 @@ void UFicsitAIScreenSurfaceWidget::BeginDestroy()
         BeginCleanup(WorldWidgetRenderer);
         WorldWidgetRenderer = nullptr;
     }
+}
+
+void UFicsitAIScreenSurfaceWidget::BeginDestroy()
+{
+    ReleaseWorldSurfaceResources();
     Super::BeginDestroy();
 }
 
@@ -480,6 +494,11 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
     {
         if (ActiveModule && ActiveModule->HandleBackAction())
         {
+            return FReply::Handled();
+        }
+        if (OnCloseRequested.IsBound())
+        {
+            OnCloseRequested.Execute();
             return FReply::Handled();
         }
         if (Host)

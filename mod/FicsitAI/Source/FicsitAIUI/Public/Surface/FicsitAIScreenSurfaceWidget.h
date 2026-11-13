@@ -32,6 +32,13 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
     static bool IsOpenForPlayer(class APlayerController* PC);
 
+    /** Получить активный виджет поверхности экрана игрока (nullptr, если закрыт) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    static UFicsitAIScreenSurfaceWidget* GetActivePlayerSurfaceWidget();
+
+    DECLARE_DELEGATE(FOnCloseRequested);
+    FOnCloseRequested OnCloseRequested;
+
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     void SetHostState(EFicsitAIHostState NewState);
 
@@ -80,6 +87,10 @@ public:
 
     /** Создать offscreen Render Target заданного размера 16:9 (nullptr в -NullRHI / без Slate) */
     static class UTextureRenderTarget2D* CreateWorldRenderTarget(UObject* Outer, const FIntPoint& SizePx);
+
+    /** Освободить ресурсы поверхности в мире (окно, renderer, модуль) для разрыва Slate <-> UMG GC-циклов (P1) */
+    UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
+    void ReleaseWorldSurfaceResources();
 
     virtual void BeginDestroy() override;
 
