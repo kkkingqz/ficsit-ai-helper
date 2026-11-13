@@ -4,7 +4,37 @@
 #include "BluTypes.h"
 #include "BluManager.h"
 #include "UObject/Object.h"
+#include "Containers/Queue.h"
 #include "BluEye.generated.h"
+
+/**
+ * FicsitAI (3.5): буферы загрузки текстуры переиспользуются. Новый буфер на каждый кадр CEF под Wine стоил
+ * страничных ошибок на каждой странице памяти: 3,1 мс GameThread на кадр страницы нагрузки (прогон 12.11.2026).
+ * Берёт GameThread, возвращает рендер-поток — один производитель и один потребитель.
+ */
+struct FFicsitAIUploadPool
+{
+	TQueue<TArray<uint8>, EQueueMode::Spsc> Free;
+	TArray<uint8> Take(int64 Bytes)
+	{
+		TArray<uint8> Buffer;
+		Free.Dequeue(Buffer);
+		Buffer.SetNumUninitialized(Bytes, EAllowShrinking::No);
+		return Buffer;
+	}
+	void Give(TArray<uint8>&& Buffer) { Free.Enqueue(MoveTemp(Buffer)); }
+};
+
+/** FicsitAI (3.5): счётчики перерисовки — кадры CEF и то, что из них ушло в текстуру. Только GameThread. */
+struct FFicsitAIPaintStats
+{
+	int64 Paints = 0;       // вызовы OnPaint от CEF (страница и слой)
+	int64 Uploads = 0;      // загрузки в текстуру
+	int64 Pixels = 0;       // пикселей загружено
+	int64 Bytes = 0;        // байт скопировано для загрузки
+	int64 SkippedSize = 0;  // кадров не того размера (идёт смена размера)
+	double Seconds = 0.0;   // время в OnPaint на GameThread
+};
 
 UCLASS(ClassGroup = Blu, Blueprintable)
 class BLU_API UBluEye : public UObject
@@ -134,6 +164,12 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FLogEvent LogEventEmitter;
 
+	/** FicsitAI: событие страницы для C++ (мост). Приходит только из главного кадра нашего источника. */
+	TMulticastDelegate<void(const FString&, const FString&)> NativeScriptEvent;
+
+	/** FicsitAI: сколько blu_event отклонено — не главный кадр или чужой источник. */
+	int32 RejectedScriptEvents = 0;
+
 	/** Trigger a key down event */
 	UFUNCTION(BlueprintCallable, Category = "Blu")
 	void KeyDown(FKeyEvent InKey);
@@ -224,6 +260,28 @@ public:
 
 	void BeginDestroy() override;
 
+	// FicsitAI: доступ виджета ввода SFicsitAIWebView к браузеру. Только для C++ на GameThread.
+	CefRefPtr<CefBrowserHost> GetBrowserHost() const { return Browser ? Browser->GetHost() : nullptr; }
+	int32 GetCursorType() const { return ClientHandler ? ClientHandler->CursorType.load() : 0; }
+
+	/**
+	 * FicsitAI: текстура для показа. До первого кадра CEF — nullptr (новая текстура не заполнена, на прозрачной
+	 * поверхности был бы мусор). После смены размера, пока не пришёл кадр нового размера, — прежняя текстура.
+	 */
+	UTexture2D* GetDisplayTexture() const { return bTexturePainted ? Texture : PreviousTexture; }
+
+	/** FicsitAI: освободить текстуры, заменённые сменой размера, когда их уже точно не рисуют. Вызывать раз в кадр. */
+	void ReleaseRetiredTextures();
+
+	/** FicsitAI: доля полностью прозрачных пикселей последнего кадра страницы (выборка); -1 — кадра ещё нет. */
+	float SampleTransparentShare() const;
+
+	FFicsitAIPaintStats PaintStats;
+
+	/** FicsitAI: для проверок смены размера. */
+	bool IsShowingCurrentTexture() const { return bTexturePainted && GetDisplayTexture() == Texture; }
+	int32 NumRetiredTextures() const { return RetiredTextures.Num() + (PreviousTexture ? 1 : 0); }
+
 	/** Use this to pause the tick loop in the new system */
 	UFUNCTION(BlueprintCallable, Category = "Blu")
 	static void SetShouldTickEventLoop(bool ShouldTick = true);
@@ -263,4 +321,12 @@ private:
 
 	FBluTextureParams RenderParams;
 	FThreadSafeBool bValidTexture;
+
+	// FicsitAI: смена размера без пустого кадра и без утечки прежней текстуры.
+	UPROPERTY()
+	UTexture2D* PreviousTexture = nullptr;
+	bool bTexturePainted = false;
+	TArray<TPair<UTexture2D*, uint64>> RetiredTextures;   // текстура и кадр, после которого её уже не рисуют
+	void RetireTexture(UTexture2D* Old);
+	TSharedPtr<FFicsitAIUploadPool, ESPMode::ThreadSafe> UploadPool;
 };

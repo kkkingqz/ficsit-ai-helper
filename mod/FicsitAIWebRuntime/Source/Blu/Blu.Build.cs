@@ -61,6 +61,13 @@ public class Blu : ModuleRules
 			var FilesToStage = Directory.GetFiles(Path.Combine(ThirdPartyPath, "cef/Win/shipping"), "*", SearchOption.AllDirectories);
 			stageFiles(FilesToStage);
 
+			// FicsitAI: каталог страниц плагина (на время спайка S8) едет в поставку вместе с бинарниками.
+			var WebDir = Path.GetFullPath(Path.Combine(ModuleDirectory, "../../Web"));
+			if (Directory.Exists(WebDir))
+			{
+				stageFiles(Directory.GetFiles(WebDir, "*", SearchOption.AllDirectories));
+			}
+
 		} else if(Target.Platform == UnrealTargetPlatform.Linux)
 		{
 

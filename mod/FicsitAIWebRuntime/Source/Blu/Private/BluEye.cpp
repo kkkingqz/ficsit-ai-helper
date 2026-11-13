@@ -24,6 +24,7 @@ UBluEye::UBluEye(const class FObjectInitializer& PCIP)
 {
 	Texture = nullptr;
 	bValidTexture = false;
+	UploadPool = MakeShared<FFicsitAIUploadPool, ESPMode::ThreadSafe>();
 }
 
 void UBluEye::Init()
@@ -59,6 +60,11 @@ void UBluEye::Init()
 	// Set transparant option
 	Info.SetAsWindowless(0); //bIsTransparent
 
+	// FicsitAI (3.6): фон браузера. У браузера без окна альфа 0 включает прозрачную отрисовку: где страница
+	// ничего не рисует, кадр прозрачен (BGRA, premultiplied alpha). Значение 0 в настройках браузера CEF читает
+	// как «не задано» и берёт общее, тоже прозрачное, — поэтому непрозрачный экран явно белый.
+	BrowserSettings.background_color = Settings.bIsTransparent ? CefColorSetARGB(0, 0, 0, 0) : CefColorSetARGB(255, 255, 255, 255);
+
 	// Figure out if we want to turn on WebGL support
 	if (Settings.bEnableWebGL)
 	{
@@ -78,6 +84,7 @@ void UBluEye::Init()
 	// Setup JS event emitter
 	ClientHandler->SetEventEmitter(&ScriptEventEmitter);
 	ClientHandler->SetLogEmitter(&LogEventEmitter);
+	ClientHandler->SetNativeEmitter(&NativeScriptEvent, &RejectedScriptEvents);
 
 	Browser = CefBrowserHost::CreateBrowserSync(
 		Info,
@@ -115,6 +122,7 @@ void UBluEye::ResetTexture()
 
 	bValidTexture = false;
 	Texture = nullptr;
+	bTexturePainted = false;
 	
 
 	// init the new Texture2D
@@ -169,48 +177,133 @@ void UBluEye::TextureUpdate(const void *Buffer, FUpdateTextureRegion2D *UpdateRe
 	if (!Browser || !bEnabled)
 	{
 		UE_LOG(LogBlu, Warning, TEXT("No Browser access or BluEye not Enabled"))
+		FMemory::Free(UpdateRegions);
 		return;
 	}
 
-	if (bValidTexture && Texture->IsValidLowLevelFast())
+	if (!bValidTexture || !Texture || !Texture->GetResource() || Buffer == nullptr)
 	{
-		if (Buffer == nullptr)
+		UE_LOG(LogBlu, Warning, TEXT("No Texture, Texture->GetResource() or Texture Data Buffer"))
+		FMemory::Free(UpdateRegions);
+		return;
+	}
+
+	// FicsitAI (3.5): копируются только изменённые области, плотно, а не весь кадр ViewSize на каждую перерисовку.
+	// BLUI копировал 3,7 МБ (1280 × 720) на любой кадр CEF, даже если изменилась одна цифра.
+	const int32 VW = int32(Settings.ViewSize.X);
+	const int32 VH = int32(Settings.ViewSize.Y);
+	const int64 Pitch = int64(VW) * 4;
+	uint32 Kept = 0;
+	int64 Total = 0;
+	for (uint32 i = 0; i < RegionCount; ++i)
+	{
+		FUpdateTextureRegion2D R = UpdateRegions[i];
+		const int32 X0 = FMath::Clamp<int32>(R.SrcX, 0, VW), Y0 = FMath::Clamp<int32>(R.SrcY, 0, VH);
+		const int32 X1 = FMath::Clamp<int32>(R.SrcX + R.Width, 0, VW), Y1 = FMath::Clamp<int32>(R.SrcY + R.Height, 0, VH);
+		if (X1 <= X0 || Y1 <= Y0) { continue; }
+		R.SrcX = R.DestX = X0; R.SrcY = R.DestY = Y0; R.Width = X1 - X0; R.Height = Y1 - Y0;
+		UpdateRegions[Kept++] = R;
+		Total += int64(R.Width) * R.Height * 4;
+	}
+	if (Kept == 0)
+	{
+		FMemory::Free(UpdateRegions);
+		return;
+	}
+
+	FUpdateTextureRegionsData* RegionData = new FUpdateTextureRegionsData;
+	RegionData->Texture2DResource = (FTextureResource*)Texture->GetResource();
+	RegionData->NumRegions = Kept;
+	RegionData->SrcBpp = 4;
+	RegionData->SrcPitch = 0; // у каждой области свой шаг строки: ширина области × 4
+	RegionData->Regions = UpdateRegions;
+	RegionData->SrcData = UploadPool->Take(Total);
+	uint8* Dst = RegionData->SrcData.GetData();
+	for (uint32 i = 0; i < Kept; ++i)
+	{
+		FUpdateTextureRegion2D& R = UpdateRegions[i];
+		const int64 RowBytes = int64(R.Width) * 4;
+		const uint8* Src = static_cast<const uint8*>(Buffer) + int64(R.SrcY) * Pitch + int64(R.SrcX) * 4;
+		for (uint32 Row = 0; Row < R.Height; ++Row)
 		{
-			UE_LOG(LogBlu, Warning, TEXT("No Texture Data Buffer"))
-			return;
+			FMemory::Memcpy(Dst, Src + Row * Pitch, RowBytes);
+			Dst += RowBytes;
 		}
-	 
-		FUpdateTextureRegionsData* RegionData = new FUpdateTextureRegionsData;
-		RegionData->Texture2DResource = (FTextureResource*)Texture->GetResource();
-		RegionData->NumRegions = RegionCount;
-		RegionData->SrcBpp = 4;
-		RegionData->SrcPitch = int32(Settings.ViewSize.X) * 4;
-		RegionData->Regions = UpdateRegions;
+		// Источник теперь начинается с самой области: смещение источника — ноль при любом RHI.
+		R.SrcX = 0;
+		R.SrcY = 0;
+		++PaintStats.Uploads;
+		PaintStats.Pixels += int64(R.Width) * R.Height;
+	}
+	PaintStats.Bytes += Total;
 
-		//We need to copy this memory or it might get uninitialized
-		RegionData->SrcData.SetNumUninitialized(RegionData->SrcPitch * int32(Settings.ViewSize.Y));
-		FPlatformMemory::Memcpy(RegionData->SrcData.GetData(), Buffer, RegionData->SrcData.Num());
-
-		ENQUEUE_RENDER_COMMAND(UpdateBLUICommand)(
-			[RegionData](FRHICommandList& CommandList)
+	ENQUEUE_RENDER_COMMAND(UpdateBLUICommand)(
+		[RegionData, Pool = UploadPool](FRHICommandList& CommandList)
+		{
+			const uint8* Src = RegionData->SrcData.GetData();
+			for (uint32 RegionIndex = 0; RegionIndex < RegionData->NumRegions; RegionIndex++)
 			{
-				for (uint32 RegionIndex = 0; RegionIndex < RegionData->NumRegions; RegionIndex++)
-				{
-					CommandList.UpdateTexture2D(RegionData->Texture2DResource->TextureRHI->GetTexture2D(), 0, RegionData->Regions[RegionIndex], RegionData->SrcPitch, RegionData->SrcData.GetData());
-				}
+				const FUpdateTextureRegion2D& R = RegionData->Regions[RegionIndex];
+				CommandList.UpdateTexture2D(RegionData->Texture2DResource->TextureRHI->GetTexture2D(), 0, R, R.Width * 4, Src);
+				Src += int64(R.Width) * R.Height * 4;
+			}
 
-				FMemory::Free(RegionData->Regions);
-				delete RegionData;
-			});
-	}
-	else 
+			Pool->Give(MoveTemp(RegionData->SrcData));
+			FMemory::Free(RegionData->Regions);
+			delete RegionData;
+		});
+
+	if (!bTexturePainted)
 	{
-		UE_LOG(LogBlu, Warning, TEXT("No Texture or Texture->GetResource()"))
+		// Первый кадр в новой текстуре: прежнюю показывали до этого кадра включительно.
+		bTexturePainted = true;
+		if (PreviousTexture)
+		{
+			RetireTexture(PreviousTexture);
+			PreviousTexture = nullptr;
+		}
 	}
+}
+
+void UBluEye::RetireTexture(UTexture2D* Old)
+{
+	if (Old) { RetiredTextures.Add(TPair<UTexture2D*, uint64>(Old, GFrameCounter)); }
+}
+
+void UBluEye::ReleaseRetiredTextures()
+{
+	// Три кадра запаса: Slate этого кадра и рендер-поток предыдущих уже не держат текстуру. Сам ресурс освобождает
+	// сборщик мусора, который ждёт рендер-поток, — снятие с корня безопасно и при меньшем запасе.
+	for (int32 i = RetiredTextures.Num() - 1; i >= 0; --i)
+	{
+		if (GFrameCounter > RetiredTextures[i].Value + 3)
+		{
+			RetiredTextures[i].Key->RemoveFromRoot();
+			RetiredTextures[i].Key->MarkAsGarbage();
+			RetiredTextures.RemoveAtSwap(i);
+		}
+	}
+}
+
+float UBluEye::SampleTransparentShare() const
+{
+	if (!Renderer) { return -1.f; }
+	const TArray<uint8>& Pixels = Renderer->GetViewPixels();
+	const int64 Count = Pixels.Num() / 4;
+	if (Count == 0) { return -1.f; }
+	int64 Seen = 0, Clear = 0;
+	for (int64 i = 0; i < Count; i += 7)
+	{
+		++Seen;
+		if (Pixels[i * 4 + 3] == 0) { ++Clear; }
+	}
+	return float(double(Clear) / double(Seen));
 }
 
 void UBluEye::ExecuteJS(const FString& Code)
 {
+	// FicsitAI: ответ моста может прийти после закрытия браузера.
+	if (!Browser || !Browser->GetMainFrame()) { return; }
 	CefString CodeStr = *Code;
 	Browser->GetMainFrame()->ExecuteJavaScript(CodeStr, "", 0);
 }
@@ -272,6 +365,8 @@ void UBluEye::LoadURL(const FString& newURL)
 
 	// Load as usual
 	Browser->GetMainFrame()->LoadURL(*FinalUrl);
+	// FicsitAI: сторож взводится здесь, а не только в OnBeforeBrowse — потерянный переход до него может не дойти.
+	ClientHandler->WatchPendingLoad(Browser->GetMainFrame(), CefString(*FinalUrl));
 
 }
 
@@ -342,6 +437,10 @@ UTexture2D* UBluEye::ResizeBrowser(const int32 NewWidth, const int32 NewHeight)
 		UE_LOG(LogBlu, Log, TEXT("Can't resize when one or both of the sizes are <= 0!"));
 		return Texture;
 	}
+	if (!Browser || (NewWidth == int32(Settings.ViewSize.X) && NewHeight == int32(Settings.ViewSize.Y)))
+	{
+		return Texture;
+	}
 
 	// Disable the web view while we resize
 	bEnabled = false;
@@ -353,22 +452,40 @@ UTexture2D* UBluEye::ResizeBrowser(const int32 NewWidth, const int32 NewHeight)
 	// Update our render handler
 	Renderer->Width = NewWidth;
 	Renderer->Height = NewHeight;
+	Renderer->OnResized();
 
 	bValidTexture = false;
+
+	// FicsitAI: BLUI оставлял прежнюю текстуру в корне навсегда (утечка на каждую смену размера), а новую показывал
+	// пустой до первого кадра. Теперь прежняя показывается, пока CEF не пришлёт кадр нового размера, затем уходит
+	// в сборщик. Если размер сменился снова до первого кадра, незаполненная промежуточная текстура уходит сразу.
+	if (bTexturePainted || !PreviousTexture)
+	{
+		RetireTexture(PreviousTexture);
+		PreviousTexture = bTexturePainted ? Texture : nullptr;
+		if (!bTexturePainted) { RetireTexture(Texture); }
+	}
+	else
+	{
+		RetireTexture(Texture);
+	}
+	bTexturePainted = false;
 
 	Texture = UTexture2D::CreateTransient(Settings.ViewSize.X, Settings.ViewSize.Y, PF_B8G8R8A8);
 	Texture->AddToRoot();
 	Texture->UpdateResource();
 
 	bValidTexture = true;
+	ResetMatInstance();
 
 	// Let the browser's host know we resized it
 	Browser->GetHost()->WasResized();
+	Browser->GetHost()->Invalidate(PET_VIEW);
 
 	// Now we can keep going
 	bEnabled = true;
 
-	UE_LOG(LogBlu, Log, TEXT("BluEye was resized!"))
+	UE_LOG(LogBlu, Log, TEXT("FicsitAI: browser resized to %dx%d"), NewWidth, NewHeight);
 
 	return Texture;
 
@@ -769,6 +886,10 @@ void UBluEye::BeginDestroy()
 	}
 
 	DestroyTexture();
+	// FicsitAI: текстуры, заменённые сменой размера.
+	if (PreviousTexture) { PreviousTexture->RemoveFromRoot(); PreviousTexture = nullptr; }
+	for (const TPair<UTexture2D*, uint64>& Old : RetiredTextures) { Old.Key->RemoveFromRoot(); }
+	RetiredTextures.Reset();
 	SetFlags(RF_BeginDestroyed);
 
 	//Remove our auto-ticking setup

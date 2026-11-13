@@ -1,6 +1,7 @@
 #include "IBlu.h"
 #include "Interfaces/IPluginManager.h"
 #include "BluManager.h"
+#include "FicsitAIWebIsolation.h"
 
 #if PLATFORM_WINDOWS && IS_MONOLITHIC
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -35,13 +36,18 @@ class FBlu : public IBlu
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override
 	{
-		CefString GameDirCef = *FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + "BluCache");
-		FString ExecutablePath = FPaths::ConvertRelativePathToFull(IPluginManager::Get().FindPlugin("BLUI")->GetBaseDir() + "/ThirdParty/cef/");
+		// FicsitAI: ничего не пишем в каталог игры; кэш в памяти, служебный корень и лог CEF — в Saved пользователя.
+		const FString FicsitCefRoot = FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("FicsitAI/Cef"));
+		FString ExecutablePath = FPaths::ConvertRelativePathToFull(IPluginManager::Get().FindPlugin(TEXT("FicsitAIWebRuntime"))->GetBaseDir() + "/ThirdParty/cef/");
 
 		// Setup the default settings for BluManager
 		BluManager::Settings.windowless_rendering_enabled = true;
 		BluManager::Settings.no_sandbox = true;
-		BluManager::Settings.remote_debugging_port = 7777;
+		// FicsitAI: порт DevTools — входящий слушатель в процессе игры (§12 п. 1, п. 11). Выключен.
+		BluManager::Settings.remote_debugging_port = 0;
+		BluManager::Settings.log_severity = LOGSEVERITY_WARNING;
+		const CefString FicsitCefLog = *(FicsitCefRoot / TEXT("cef.log"));
+		CefString(&BluManager::Settings.log_file).FromString(FicsitCefLog);
 		BluManager::Settings.uncaught_exception_stack_size = 5;
 
 	#if PLATFORM_LINUX
@@ -59,8 +65,12 @@ class FBlu : public IBlu
 		// Set the sub-process path
 		CefString(&BluManager::Settings.browser_subprocess_path).FromString(realExePath);
 
-		// Set the cache path
-		CefString(&BluManager::Settings.cache_path).FromString(GameDirCef);
+		// FicsitAI: cache_path пуст — профиль в памяти; root_cache_path обязателен для CEF и лежит в Saved.
+		const CefString FicsitCefRootPath = *FicsitCefRoot;
+		CefString(&BluManager::Settings.root_cache_path).FromString(FicsitCefRootPath);
+
+		// FicsitAI: страницы раздаются только из каталога Web плагина (пока идёт спайк; основной мод задаст свой).
+		FicsitAIWeb::SetWebRoot(IPluginManager::Get().FindPlugin(TEXT("FicsitAIWebRuntime"))->GetBaseDir() / TEXT("Web"));
 
 		// Make a new manager instance
 		CefRefPtr<BluManager> BluApp = new BluManager();
