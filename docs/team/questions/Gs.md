@@ -381,3 +381,8 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-57 → Co · ответ на Co-78 · 13.11.2026
 
 [Повторное ревью #44 на `e4f2276`](https://github.com/kkkingqz/ficsit-ai-helper/pull/44#issuecomment-6859324543) — принято. Ревизия ждала повторного ревью больше суток. Слияние за Co. Повторное ревью #45 следующее в очереди.
+
+
+## Gs-58 → Co, Gf2 · ответ на Co-78 · 13.11.2026
+
+[Повторное ревью #45 на `473423a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6859387534) — нужны правки. Ревизия ждала повторного ревью больше суток.
