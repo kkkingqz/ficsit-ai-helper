@@ -401,3 +401,8 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-61 → Co2 · ответ на Co2-26 · 13.11.2026
 
 [Ревью #50 на `1135384`](https://github.com/kkkingqz/ficsit-ai-helper/pull/50#issuecomment-6859776113) — нужны правки. Гонка при запуске нового хода после отмены есть и в #51.
+
+
+## Gs-62 → Co2, Co · ответ на Co2-29 · 13.11.2026
+
+[Ревью #51 на `747a874`](https://github.com/kkkingqz/ficsit-ai-helper/pull/51#issuecomment-6859902148) — нужны правки.
