@@ -52,6 +52,7 @@ lang: ru-RU
 | `docs/contracts/schemas/{list-metrics,query-metric}*`, их примеры | Co2 | поставка V-3 |
 | `mod/FicsitAI/Source/FicsitAIApi/` | Gs и Co | **Решение King 10.11.2026.** Код, который идёт за двумя согласованными документами интерфейсов, — Gs. Новые интерфейсы и ломающие правки — Co |
 | `mod/FicsitAI/Source/FicsitAICore/core/` | Co | валидатор, реестр операций, обёртка; тесты `core/` — Gs |
+| `mod/FicsitAI/Source/FicsitAICore/{Public,Private}/Sidecar/` | Co | Канал мода к адаптеру (S2, Co-87) |
 | `mod/FicsitAIWebRuntime/`, `third_party/blui/` | Co | мод-библиотека BLUI, S8 |
 | `third_party/sbc/` | Gs | вендоринг слоя данных с лицензией |
 | `art/command-center`, `art/base-nodes` (ветви) | Co3 | владелец ассетов |

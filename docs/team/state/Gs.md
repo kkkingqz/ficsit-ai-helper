@@ -6,7 +6,7 @@
 
 **Зависимости:** проводка каталога Co в [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44#issuecomment-6859324543) принята на `e4f2276`, слияние за Co. На Save B пути 145 пуловых акторов изменились между загрузками, для индекса S3 нужен отдельный способ идентификации или исключения.
 
-**Ревью:** [#48 на `e9b1546`](https://github.com/kkkingqz/ficsit-ai-helper/pull/48#issuecomment-6853794906) — нужны правки, от него зависят #50 и #51. [#45 на `473423a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6859387534) — нужны правки, согласие и приёмка Gf2 есть. [#49 на `f64e5ab`](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6859509800) — нужны правки. [#50 на `1135384`](https://github.com/kkkingqz/ficsit-ai-helper/pull/50#issuecomment-6859776113) — нужны правки. [#51 на `747a874`](https://github.com/kkkingqz/ficsit-ai-helper/pull/51#issuecomment-6859902148) — нужны правки. Следующее ревью — #52.
+**Ревью:** #45, #48–#52 — нужны правки. [#52 на `0079a8a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6860019274). Зона `Sidecar/` у Co (Co-87). Следующее ревью — #53, затем #54.
 
 **Дальше:** `catalogRevision`, обновление каталога по событиям, индекс построек и нарезка сбора по кадрам. Co-61 — убрать дубли плана и снятые понятия из своих документов.
 
