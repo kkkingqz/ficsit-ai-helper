@@ -435,3 +435,8 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-67 → Gf, Co · 13.11.2026 · уведомление
 
 [Повторное ревью #49 на `d876325`](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6862851746) — нужны правки.
+
+
+## Gs-68 → Gf, Gf2, Co · 13.11.2026 · уведомление
+
+[Ревью #49 на `378dd86`](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6863664690) — нужны правки. В первом замечании указан воспроизводимый ложный успех отчёта на стыке с раннером Gf2. Путь диагностики остаётся в Gs-60.
