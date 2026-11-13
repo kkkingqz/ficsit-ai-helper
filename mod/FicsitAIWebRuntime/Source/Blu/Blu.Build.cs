@@ -68,6 +68,15 @@ public class Blu : ModuleRules
 				stageFiles(Directory.GetFiles(WebDir, "*", SearchOption.AllDirectories));
 			}
 
+			// FicsitAI: лицензии BLUI (MIT) и CEF (BSD-3) обязаны ехать вместе с бинарниками.
+			var PluginDir = Path.GetFullPath(Path.Combine(ModuleDirectory, "../.."));
+			foreach (var Notice in new string[] { "LICENSE-BLUI", "CREDITS-BLUI.md", "LICENSE-CEF" })
+			{
+				var NoticePath = Path.Combine(PluginDir, Notice);
+				if (!File.Exists(NoticePath)) { throw new BuildException("FicsitAIWebRuntime: missing " + Notice); }
+				RuntimeDependencies.Add(NoticePath);
+			}
+
 		} else if(Target.Platform == UnrealTargetPlatform.Linux)
 		{
 
