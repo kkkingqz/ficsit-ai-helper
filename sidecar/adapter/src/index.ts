@@ -10,6 +10,7 @@ import {
   ErrorCode,
   ListToolsRequestSchema,
   McpError,
+  type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { ModChannel } from "./channel.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
@@ -60,7 +61,18 @@ export function createMcpServer(upstream: UpstreamMcp, channel: ModChannel, log:
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const modTools = channel.modTools();
     const modNames = new Set(modTools.map((tool) => tool.name));
-    const all = (await upstream.listTools()).filter((tool) => !modNames.has(tool.name));
+
+    // Недоступность `sf-mcp` не должна уносить инструменты мода: канал жив,
+    // `tools/call` работает, а модель переставала видеть игру целиком —
+    // находка Co-86 на живом прогоне 13.11.2026. Два источника инструментов
+    // отказывают порознь, и список строится из того, что есть.
+    let all: Tool[] = [];
+    try {
+      all = (await upstream.listTools()).filter((tool) => !modNames.has(tool.name));
+    } catch (err: unknown) {
+      log.warn("sf-mcp не отвечает — отдаю только инструменты мода", err);
+    }
+
     const passthrough = applyWhitelist(all);
     log.debug(
       `tools/list: инструментов мода ${modTools.length}, ` +

@@ -4,6 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ModChannel } from "../src/channel.js";
 import { loadConfig } from "../src/config.js";
 import { playthroughIdFor } from "../src/foreman.js";
@@ -131,13 +133,14 @@ interface Adapter {
   channel: ModChannel;
 }
 
-async function adapterFor(fake: Fake): Promise<Adapter> {
+async function adapterFor(fake: Fake, env: Record<string, string> = {}): Promise<Adapter> {
   const accountPath = join(mkdtempSync(join(tmpdir(), "ficsitai-channel-")), "account.json");
   const config = loadConfig({
     ADAPTER_TOKEN: TOKEN,
     FOREMAN_BASE_URL: `http://127.0.0.1:${fake.port}`,
     FOREMAN_ACCOUNT_PATH: accountPath,
     LLM_MODEL: MODEL,
+    ...env,
   } as NodeJS.ProcessEnv);
   const { app, channel } = await createApp(config, silent);
   const server = app.listen(0, "127.0.0.1");
@@ -716,5 +719,39 @@ describe("вызов инструмента мода", () => {
 
     channel.closeSession("shutdown");
     expect(channel.modTools()).toHaveLength(0);
+  });
+});
+
+describe("список инструментов для Foreman", () => {
+  /** Клиент MCP, как ходит Foreman: токен в строке запроса, заголовков у него нет. */
+  async function listTools(base: string): Promise<string[]> {
+    const client = new Client({ name: "test-foreman", version: "0" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp?token=${TOKEN}`)));
+    try {
+      return (await client.listTools()).tools.map((tool) => tool.name);
+    } finally {
+      await client.close();
+    }
+  }
+
+  it("молчащий sf-mcp не уносит с собой инструменты мода", async () => {
+    // Порт 1 на петле закрыт: подключение к `sf-mcp` не состоится.
+    const { base } = await adapterFor(await holdingForeman(), {
+      SF_MCP_URL: "http://127.0.0.1:1/mcp",
+    });
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    // Прежде здесь падал весь `tools/list`, и модель переставала видеть игру,
+    // хотя канал жив (находка Co-86 на живом прогоне 13.11.2026).
+    expect(await listTools(base)).toEqual(["query_metric"]);
+  });
+
+  it("без сессии и без sf-mcp список пуст, но это не ошибка", async () => {
+    const { base } = await adapterFor(await holdingForeman(), {
+      SF_MCP_URL: "http://127.0.0.1:1/mcp",
+    });
+    expect(await listTools(base)).toEqual([]);
   });
 });
