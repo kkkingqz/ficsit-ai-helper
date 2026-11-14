@@ -1,16 +1,18 @@
-# Gf — состояние на 12.11.2026
+# Gf — состояние на 14.11.2026
 
-**Сейчас:** Переход от сборщиков S3 ([#11](https://github.com/kkkingqz/ficsit-ai-helper/issues/11)) к интеграции с `BuildingIndex`, замерам P-7 и задаче S8 `3.4` (`Co-73`). Документы в `work/gf`, код в `main` (`0783701`), личный Starter Project `~/Projects/SML-gf` на `a7e85503` (заголовки `CL 517554`).
+**Сейчас:** Исправление замечаний ревью Gs (раунд 5) на PR #49 (S8 3.4 & §6.6, рендер экрана терминала в мире). Ветка `mod/s8-terminal-screen`, личный Starter Project `~/Projects/SML-gf` на `a7e85503` (заголовки `CL 517554`).
 
-**Последний результат:** После приёмки `Gs-49` [PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43) (`1955e94`) влит в `main` (коммит `0783701`), ветка `mod/s3-telemetry-collectors` удалена. На `a7e85503` подтверждены `./tools/host/verify-pr.sh FicsitAI` (**пройдено**, `CL 517554`, главное меню, `0` ошибок), `5/5` инвариантов, `6/6` UE Automation (`EXIT CODE: 0`) и живые прогоны `yt.sav` через `tools/host/run-game.sh` (`MachineLoad`: `total=286 producing=186 paused=56 unpowered=145 unconfigured=0 avgProd=0.429 hasIngTrue=81/95 elapsed=0.20ms`; `Generators`: `48`, `2400/3085 MW`; `PartsCostMultiplier 1/2/1000`; `GetPathName()` `2103/2248` совпали, `145` отличий — только пуловые `*_2147473xxx`; `S1` спавн `AFicsitAITerminal` без падения). Отправлено уведомление `Gf-21` (`Gs`, `Co`).
+**Последний результат:** Полностью отработаны замечания пятого раунда ревью Gs (комментарий #6876167821):
+1. [P2] Замечание 1: Верхняя полоса статуса (`HeaderBorder`) возвращена на экране в мире (`bWorldSurfaceMode = true`, §6.6 по Co3-2), высота 48px (SBox 38px + отступ 10px). Холст и Render Target сохраняют строго 16:9 (1280×720). Модуль `ModuleContentBox` честно занимает оставшиеся `1280 × 672` (соотношение ~1.905), транслируя фактические размеры Slate-раскладки в контекст активного модуля.
+2. [P2] Замечание 2: В `LayoutInVirtualWindow` окно сделано локальным с явным отсоединением содержимого `TempVirtualWindow->SetContent(SNullWidget::NullWidget)` при выходе. В `CloseInteractiveScreen` добавлен вызов `PlayerWidget->ReleaseWorldSurfaceResources()`. В автотесте п. 10 добавлена реальная Slate-привязка через `LayoutInVirtualWindow` перед `EndPlay` и проверен сбор мусора `WorldSurfaceWidget`. В п. 11 добавлена проверка GC для `InteractiveSurface` после `CloseInteractiveScreen` и `EndPlay`.
+Подтверждены: `tools/ci/check-invariants.sh` (5/5 OK), `git diff --check` (OK), `FactoryEditor Linux Development` (Succeeded), `UnrealEditor-Cmd` (6/6 тестов, EXIT CODE: 0). Опубликован ответ `Gf-26` (`Gs`, `Co`).
 
-**Блокирует меня:** Не заблокирован; очередь `Gf` чиста (`0` непрочитанных уведомлений, `0` открытых вопросов). Закрытие [#2](https://github.com/kkkingqz/ficsit-ai-helper/issues/2) (`P-1`) можно выполнить с хоста.
+**Блокирует меня:** Не заблокирован.
 
-**Ждут меня:** Совместная интеграция с `BuildingIndex` и замеры телеметрии на Save A/B/C (`Gs`, `Gf2`, P-7); отображение страницы на экране терминала в мире для S8 `3.4` (`Co`, `Co-73`).
+**Ждут меня:** Приёмка PR #49 (`Gs`, `Co`), закрытие Блока 3 S8.
 
-**Решения, на которых стою:** [архитектура §8.2, §17.1, ADR-029, ADR-035](../../ARCHITECTURE.md), [среда §5.1](../../ENVIRONMENT.md#51-клонирование-starter-project), [протокол P-7](../../../tests/test-plan/telemetry-protocol.md), [каталог метрик](../../../mod/FicsitAI/Source/FicsitAICore/GameFacade/Telemetry/Sampling/metrics-v0.1.md), [зоны владения](../OWNERSHIP.md).
+**Решения, на которых стою:** [архитектура §6.6, §13, ADR-030](../../ARCHITECTURE.md), [среда §5.1](../../ENVIRONMENT.md#51-клонирование-starter-project), [протокол P-7](../../../tests/test-plan/telemetry-protocol.md).
 
 **Дальше:**
-1. Интеграция сборщиков S3 с `BuildingIndex` и замеры бюджета GameThread на Save A/B/C (P-7 §3.2, V-09) через `tools/host/run-game.sh`.
-2. Задача S8 `3.4` — отображение веб-страницы на экране терминала `AFicsitAITerminal` в мире (`Co-73`).
-3. При случае с хоста закрыть [#2](https://github.com/kkkingqz/ficsit-ai-helper/issues/2) (`P-1`).
+1. Выполнение `./tools/host/verify-pr.sh FicsitAI`, пуш ветки `mod/s8-terminal-screen` и ответ в PR #49.
+2. После слияния PR #49 — участие в интеграции с `BuildingIndex` и замеры P-7 по протоколу.

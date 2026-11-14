@@ -12,6 +12,8 @@
 #include "Modules/FicsitAITestNotesModule.h"
 #include "Modules/FicsitAITestStatusModule.h"
 #include "Modules/FicsitAITestIncompatibleModule.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture2D.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
@@ -35,9 +37,51 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TestNotNull(TEXT("PowerInfoComponent существует"), TerminalA->PowerInfoComponent.Get());
     TestNotNull(TEXT("PowerConnectionComponent существует"), TerminalA->PowerConnectionComponent.Get());
 
-    // Проверка плоской поверхности экрана 16:9 на меше с учётом родителя (ADR-030, P-7 §1.1, Gs-15 раунд 4)
+    // Проверка плоской поверхности экрана 16:9 на меше с учётом родителя (ADR-030, P-7 §1.1, S8 3.4, Gs-15 раунд 4)
     TestNotNull(TEXT("ScreenMeshComponent существует"), TerminalA->ScreenMeshComponent.Get());
     TestTrue(TEXT("Меш экрана имеет соотношение сторон 16:9 с учётом родителя"), FMath::IsNearlyEqual(TerminalA->GetScreenAspectRatio(), 16.0f / 9.0f, 0.01f));
+    if (UStaticMeshComponent* ScreenComp = TerminalA->ScreenMeshComponent.Get())
+    {
+        // Нормаль плоскости экрана (+Z компонента) направлена наружу (+X терминала), +X=лево->право(-Y), +Y=верх->низ(-Z)
+        const FTransform ScreenXform = ScreenComp->GetRelativeTransform();
+        const FVector OutwardNormal = ScreenXform.GetRotation().RotateVector(FVector(0.0f, 0.0f, 1.0f));
+        const FVector RightDir = ScreenXform.GetRotation().RotateVector(FVector(1.0f, 0.0f, 0.0f));
+        const FVector DownDir = ScreenXform.GetRotation().RotateVector(FVector(0.0f, 1.0f, 0.0f));
+        TestTrue(TEXT("Нормаль экрана направлена наружу (+X)"), OutwardNormal.Equals(FVector(1.0f, 0.0f, 0.0f), 0.01f));
+        TestTrue(TEXT("Ось U направлена слева направо (-Y)"), RightDir.Equals(FVector(0.0f, -1.0f, 0.0f), 0.01f));
+        TestTrue(TEXT("Ось V направлена сверху вниз (-Z)"), DownDir.Equals(FVector(0.0f, 0.0f, -1.0f), 0.01f));
+        TestEqual(TEXT("Коллизия экрана отвечает на Visibility trace"), ScreenComp->GetCollisionResponseToChannel(ECC_Visibility), ECR_Block);
+    }
+
+    // Проверка материала экрана в мире, внешней текстуры (S8 3.4), dirty revision и проекции UV попадания
+    TestNotNull(TEXT("WorldScreenMaterial создан на меше экрана"), TerminalA->GetWorldScreenMaterial());
+    {
+        FVector2D HitUV = FVector2D::ZeroVector;
+        // Центр экрана: (25.5, 0.0, 20.0) -> UV=(0.5, 0.5)
+        TestTrue(TEXT("Проекция центра экрана в UV"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, 0.0f, 20.0f), HitUV));
+        TestTrue(TEXT("UV центра близок к (0.5, 0.5)"), HitUV.Equals(FVector2D(0.5f, 0.5f), 0.01f));
+
+        // Левый верхний угол (вид от +X: +Y=48, +Z=20+27=47) -> UV=(0, 0)
+        TestTrue(TEXT("Проекция левого верхнего угла в UV"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, 48.0f, 47.0f), HitUV));
+        TestTrue(TEXT("UV левого верхнего угла равен (0, 0)"), HitUV.Equals(FVector2D(0.0f, 0.0f), 0.01f));
+
+        // Правый нижний угол (вид от +X: -Y=-48, Z=20-27=-7) -> UV=(1, 1)
+        TestTrue(TEXT("Проекция правого нижнего угла в UV"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, -48.0f, -7.0f), HitUV));
+        TestTrue(TEXT("UV правого нижнего угла равен (1, 1)"), HitUV.Equals(FVector2D(1.0f, 1.0f), 0.01f));
+
+        // Точка вне экрана отклоняется
+        TestFalse(TEXT("Точка за границей экрана отклоняется"), TerminalA->TryProjectWorldHitToScreenUV(FVector(25.5f, 80.0f, 20.0f), HitUV));
+        TestFalse(TEXT("Точка далеко перед плоскостью отклоняется"), TerminalA->TryProjectWorldHitToScreenUV(FVector(40.0f, 0.0f, 20.0f), HitUV));
+
+        // Внешняя текстура (S8 3.4 / BLUI UTexture)
+        UTexture2D* DummyExternalTex = UTexture2D::CreateTransient(16, 9, PF_B8G8R8A8);
+        const uint64 RevBefore = TerminalA->GetWorldScreenRenderRevision();
+        TerminalA->SetWorldScreenTexture(DummyExternalTex);
+        TestEqual(TEXT("Внешняя текстура подключена к экрану в мире"), TerminalA->GetWorldScreenTexture(), static_cast<UTexture*>(DummyExternalTex));
+        TestTrue(TEXT("SetWorldScreenTexture увеличивает renderRevision"), TerminalA->GetWorldScreenRenderRevision() > RevBefore);
+        TerminalA->SetWorldScreenTexture(nullptr);
+        TestNull(TEXT("Сброс внешней текстуры очищает ExternalScreenTexture"), Cast<UTexture2D>(TerminalA->GetWorldScreenTexture()));
+    }
 
     // 2.1 Проверка потери и восстановления питания через сеть (Authority & Replication) (ADR-027, AC-01, Gs-15 раунд 4)
     AFicsitAITerminal* TerminalClient = NewObject<AFicsitAITerminal>();
@@ -49,6 +93,13 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalA->UpdateHostState();
     TestEqual(TEXT("Сервер при потере питания переходит в NoPower"), TerminalA->GetScreenContext().HostState, EFicsitAIHostState::NoPower);
     TestFalse(TEXT("Обесточенный сервер не открывает модули"), TerminalA->OpenModule(FName(TEXT("Notes"))));
+    TestFalse(TEXT("Обесточенный терминал не рендерит экран в мире (§6.6)"), TerminalA->RenderWorldScreenIfDirty());
+    if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
+    {
+        FLinearColor TintVal = FLinearColor::White;
+        Mat->GetVectorParameterValue(TEXT("TintColorAndOpacity"), TintVal);
+        TestTrue(TEXT("При NoPower экран затемнён в Чёрный"), TintVal.Equals(FLinearColor::Black, 0.01f));
+    }
 
     // Клиент получает реплицированный контекст от сервера
     TerminalClient->SetHostContextForClient(TerminalA->GetScreenContext());
@@ -60,6 +111,12 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalA->SetPowerOverride(true);
     TerminalA->UpdateHostState();
     TestEqual(TEXT("Сервер при подаче питания переходит в Ready"), TerminalA->GetScreenContext().HostState, EFicsitAIHostState::Ready);
+    if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
+    {
+        FLinearColor TintVal = FLinearColor::Black;
+        Mat->GetVectorParameterValue(TEXT("TintColorAndOpacity"), TintVal);
+        TestTrue(TEXT("При Ready экран подсвечен в Белый"), TintVal.Equals(FLinearColor::White, 0.01f));
+    }
 
     // Клиент реплицирует восстановление питания
     TerminalClient->SetHostContextForClient(TerminalA->GetScreenContext());
@@ -196,6 +253,168 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     SubsystemB->UnregisterTerminal(TerminalB);
     TestEqual(TEXT("TerminalA закрыт"), TerminalA->GetActiveModuleId(), NAME_None);
     TestEqual(TEXT("TerminalB закрыт"), TerminalB->GetActiveModuleId(), NAME_None);
+
+    // 10. Проверка освобождения ресурсов поверхности в мире и сборки мусора после EndPlay (P1, Gs-59, раунд 5 P2)
+    {
+        AFicsitAITerminal* GcTerminal = NewObject<AFicsitAITerminal>();
+        TestNotNull(TEXT("GcTerminal создан"), GcTerminal);
+        GcTerminal->InitializeHost();
+        GcTerminal->SetPowerOverride(true);
+        GcTerminal->UpdateHostState();
+        TestTrue(TEXT("GcTerminal открывает Notes"), GcTerminal->OpenModule(FName(TEXT("Notes"))));
+
+        UFicsitAIScreenSurfaceWidget* SurfaceWidget = GcTerminal->GetWorldSurfaceWidget();
+        TestNotNull(TEXT("WorldSurfaceWidget существует на GcTerminal"), SurfaceWidget);
+
+        // Реальная привязка к Slate-окну через LayoutInVirtualWindow (построение дерева Slate и проход layout/paint)
+        SurfaceWidget->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f));
+
+        TWeakObjectPtr<UFicsitAIScreenSurfaceWidget> WeakSurfaceWidget = SurfaceWidget;
+        TestTrue(TEXT("WeakSurfaceWidget валиден до EndPlay"), WeakSurfaceWidget.IsValid());
+
+        // Демонтаж терминала
+        GcTerminal->EndPlay(EEndPlayReason::Destroyed);
+        TestNull(TEXT("GetWorldSurfaceWidget обнулён после EndPlay"), GcTerminal->GetWorldSurfaceWidget());
+        TestNull(TEXT("GetWorldScreenRenderTarget обнулён после EndPlay"), GcTerminal->GetWorldScreenRenderTarget());
+        TestNull(TEXT("GetWorldScreenMaterial обнулён после EndPlay"), GcTerminal->GetWorldScreenMaterial());
+
+        // Принудительный сбор мусора: Slate <-> UMG цикл должен быть разорван в ReleaseWorldSurfaceResources
+        CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+        TestFalse(TEXT("WorldSurfaceWidget успешно собран GC после EndPlay (нет утечки/цикла через SVirtualWindow/SObjectWidget)"), WeakSurfaceWidget.IsValid());
+    }
+
+    // 11. Проверка контекста поверхности, фокуса ввода и динамического размера (P2, Gs-59 раунд 2, раунд 5 P2)
+    {
+        AFicsitAITerminal* ScreenTerm = NewObject<AFicsitAITerminal>();
+        ScreenTerm->InitializeHost();
+        ScreenTerm->SetPowerOverride(true);
+        ScreenTerm->UpdateHostState();
+
+        // 11.1 «меш»: открытие модуля Notes на поверхности в мире
+        TestTrue(TEXT("ScreenTerm открывает Notes на меше"), ScreenTerm->OpenModule(FName(TEXT("Notes"))));
+        UFicsitAITestNotesModule* NotesMod = Cast<UFicsitAITestNotesModule>(ScreenTerm->GetActiveModuleInstance().GetObject());
+        TestNotNull(TEXT("NotesMod создан"), NotesMod);
+        UFicsitAIScreenSurfaceWidget* WorldSurface = ScreenTerm->GetWorldSurfaceWidget();
+        TestNotNull(TEXT("WorldSurface существует"), WorldSurface);
+        TestEqual(TEXT("Модуль привязан к WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+
+        WorldSurface->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f));
+
+        if (NotesMod)
+        {
+            TestTrue(TEXT("Контекст на меше: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("Контекст на меше: SizePx соответствует области модуля WorldSurface с верхней полосой статуса (1280, 672)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("Контекст на меше: AspectRatio соответствует области модуля (~1.90)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
+        }
+
+        // Проверка сохранения контекста поверхности при запросе фокуса ввода (Gs-59 P2)
+        ScreenTerm->RequestInputFocus(true);
+        if (NotesMod)
+        {
+            TestTrue(TEXT("После RequestInputFocus(true) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestTrue(TEXT("После RequestInputFocus(true) bHasInputFocus == true"), NotesMod->GetCurrentContext().bHasInputFocus);
+            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся неизменным (1280, 672)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("После RequestInputFocus(true) AspectRatio остаётся ~1.90"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
+        }
+        ScreenTerm->RequestInputFocus(false);
+        if (NotesMod)
+        {
+            TestFalse(TEXT("После RequestInputFocus(false) bHasInputFocus == false"), NotesMod->GetCurrentContext().bHasInputFocus);
+            TestTrue(TEXT("После RequestInputFocus(false) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
+        }
+
+        // 11.2 «E»: открытие интерактивного экрана через OpenInteractiveScreen
+        UFicsitAIScreenSurfaceWidget* InteractiveSurface = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(ScreenTerm);
+        InteractiveSurface->SetWorldSurfaceMode(false);
+        InteractiveSurface->LayoutInVirtualWindow(FVector2D(1920.0f, 1080.0f));
+        ScreenTerm->OpenInteractiveScreen(InteractiveSurface);
+        TestTrue(TEXT("ScreenTerm в интерактивном режиме"), ScreenTerm->IsInteractiveScreenOpen());
+        TestNull(TEXT("WorldSurface очищен от модуля"), WorldSurface->GetActiveModule().GetObject());
+        TestEqual(TEXT("Модуль привязан к интерактивной поверхности"), InteractiveSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+        if (NotesMod)
+        {
+            TestFalse(TEXT("Интерактивный контекст: bWorldSurface == false"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("Интерактивный контекст: SizePx соответствует области модуля интерактивной поверхности (1880, 936)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1880, 936));
+            TestTrue(TEXT("Интерактивный контекст: AspectRatio соответствует интерактивной поверхности (~2.01)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1880.0f / 936.0f, 0.01f));
+        }
+
+        // Проверка динамического изменения раскладки поверхности через реальную раскладку Slate (1280x800)
+        InteractiveSurface->LayoutInVirtualWindow(FVector2D(1280.0f, 800.0f));
+        if (NotesMod)
+        {
+            TestEqual(TEXT("Размер обновлён по геометрии ModuleContentBox (1240, 656)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1240, 656));
+            TestTrue(TEXT("Соотношение сторон ModuleContentBox обновлено (~1.89)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1240.0f / 656.0f, 0.01f));
+            TestFalse(TEXT("Интерактивный флаг остаётся false"), NotesMod->GetCurrentContext().bWorldSurface);
+        }
+
+        // 11.3 «меш»: закрытие интерактивного экрана через CloseInteractiveScreen
+        TWeakObjectPtr<UFicsitAIScreenSurfaceWidget> WeakInteractiveSurface = InteractiveSurface;
+        ScreenTerm->CloseInteractiveScreen();
+        TestFalse(TEXT("ScreenTerm вышел из интерактивного режима"), ScreenTerm->IsInteractiveScreenOpen());
+        TestNull(TEXT("Интерактивная поверхность очищена от модуля"), InteractiveSurface->GetActiveModule().GetObject());
+        TestEqual(TEXT("Модуль вернулся на WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+        if (NotesMod)
+        {
+            TestTrue(TEXT("После возврата на меш: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("После возврата на меш: SizePx соответствует WorldSurface с верхней полосой статуса (1280, 672)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("После возврата на меш: AspectRatio соответствует ~1.90"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
+        }
+
+        InteractiveSurface = nullptr;
+        ScreenTerm->EndPlay(EEndPlayReason::Destroyed);
+
+        // Проверка отсутствия удержания интерактивного виджета после закрытия и EndPlay (раунд 5 P2)
+        CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+        TestFalse(TEXT("InteractiveSurface успешно собрана GC после закрытия и EndPlay (нет утечки через виртуальное окно)"), WeakInteractiveSurface.IsValid());
+    }
+
+    // 12. Проверка двух терминалов в одном мире: независимый интерактивный режим и EndPlay (P1, Gs-59 раунд 2)
+    {
+        AFicsitAITerminal* TermA = NewObject<AFicsitAITerminal>();
+        AFicsitAITerminal* TermB = NewObject<AFicsitAITerminal>();
+        TermA->InitializeHost();
+        TermB->InitializeHost();
+        TermA->SetPowerOverride(true);
+        TermB->SetPowerOverride(true);
+        TermA->UpdateHostState();
+        TermB->UpdateHostState();
+
+        TestTrue(TEXT("TermA открыл Notes"), TermA->OpenModule(FName(TEXT("Notes"))));
+        TestTrue(TEXT("TermB открыл Notes"), TermB->OpenModule(FName(TEXT("Notes"))));
+        UFicsitAITestNotesModule* NotesA = Cast<UFicsitAITestNotesModule>(TermA->GetActiveModuleInstance().GetObject());
+        UFicsitAITestNotesModule* NotesB = Cast<UFicsitAITestNotesModule>(TermB->GetActiveModuleInstance().GetObject());
+
+        TestFalse(TEXT("TermA пока не интерактивен"), TermA->IsInteractiveScreenOpen());
+        TestFalse(TEXT("TermB пока не интерактивен"), TermB->IsInteractiveScreenOpen());
+
+        // Открываем экран на TermA
+        UFicsitAIScreenSurfaceWidget* SurfaceA = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(TermA);
+        TermA->OpenInteractiveScreen(SurfaceA);
+
+        TestTrue(TEXT("TermA интерактивен"), TermA->IsInteractiveScreenOpen());
+        TestFalse(TEXT("TermB НЕ интерактивен при открытом TermA"), TermB->IsInteractiveScreenOpen());
+        if (NotesA) { TestFalse(TEXT("NotesA в интерактивном контексте"), NotesA->GetCurrentContext().bWorldSurface); }
+        if (NotesB)
+        {
+            TestTrue(TEXT("NotesB остаётся в мировом контексте"), NotesB->GetCurrentContext().bWorldSurface);
+            TestEqual(TEXT("NotesB остаётся в мировом размере раскладки (1280, 672)"), NotesB->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("NotesB AspectRatio соответствует ~1.90"), FMath::IsNearlyEqual(NotesB->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
+        }
+        TestEqual(TEXT("Модуль TermB по-прежнему привязан к WorldSurface B"), TermB->GetWorldSurfaceWidget()->GetActiveModule(), TermB->GetActiveModuleInstance());
+
+        // Демонтируем TermB: это НЕ должно закрывать экран TermA!
+        TermB->EndPlay(EEndPlayReason::Destroyed);
+        TestTrue(TEXT("Экран TermA остаётся открытым после демонтажа TermB"), TermA->IsInteractiveScreenOpen());
+        TestEqual(TEXT("Поверхность SurfaceA по-прежнему держит модуль TermA"), SurfaceA->GetActiveModule(), TermA->GetActiveModuleInstance());
+
+        // Закрываем TermA
+        TermA->CloseInteractiveScreen();
+        TestFalse(TEXT("TermA закрыт"), TermA->IsInteractiveScreenOpen());
+        TestEqual(TEXT("Модуль TermA вернулся на WorldSurface A"), TermA->GetWorldSurfaceWidget()->GetActiveModule(), TermA->GetActiveModuleInstance());
+        if (NotesA) { TestTrue(TEXT("NotesA вернулся в мировой контекст"), NotesA->GetCurrentContext().bWorldSurface); }
+
+        TermA->EndPlay(EEndPlayReason::Destroyed);
+    }
 
     // Удаляем временный тестовый файл .sav
     IFileManager::Get().Delete(*SaveFilePath);

@@ -187,6 +187,12 @@ bool FFicsitAIScreenHostTest::RunTest(const FString& Parameters)
             SlateSurface->OnKeyDown(FGeometry(), PressedReboundKey).IsEventHandled());
         TestEqual(TEXT("The remapped interaction key closes the module"),
             Host->GetActiveModuleId(), NAME_None);
+
+        // 11.1 Проверка режима поверхности в мире (bWorldSurface = true скрывает нижнюю полосу клавиш, §6.6 / Co3-2)
+        Surface->SetWorldSurfaceMode(true);
+        TestTrue(TEXT("SetWorldSurfaceMode(true) активирован"), Surface->IsWorldSurfaceMode());
+        Surface->SetWorldSurfaceMode(false);
+        TestFalse(TEXT("SetWorldSurfaceMode(false) восстановлен"), Surface->IsWorldSurfaceMode());
     }
 
     // 12. Перенос состояния между двумя хостами одного сохранения (Gs-15.5, AC-14)

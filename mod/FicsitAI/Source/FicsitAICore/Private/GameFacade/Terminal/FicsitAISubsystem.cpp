@@ -7,6 +7,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "EngineUtils.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Paths.h"
@@ -19,8 +20,11 @@ DEFINE_LOG_CATEGORY(LogFicsitAISubsystem);
 AFicsitAISubsystem::AFicsitAISubsystem()
 {
     PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;
     ReplicationPolicy = ESubsystemReplicationPolicy::SpawnOnServer;
 }
+
+AFicsitAISubsystem::~AFicsitAISubsystem() = default;
 
 void AFicsitAISubsystem::BeginPlay()
 {
@@ -56,7 +60,7 @@ void AFicsitAISubsystem::BeginPlay()
     {
         DiagnosticsScenario = FName(*ScenarioStr);
         bDiagnosticsActive = true;
-        UE_LOG(LogFicsitAISubsystem, Log, TEXT("Активирован диагностический сценарий: %s"), *ScenarioStr);
+        UE_LOG(LogFicsitAISubsystem, Log, TEXT("Активирован диагностический сценарий: %s (автоматические сценарии в мире отложены до готовности OperationRegistry, ARCHITECTURE §13)"), *ScenarioStr);
     }
     else if (FParse::Param(FCommandLine::Get(), TEXT("FicsitAIDiagnostics")))
     {
