@@ -6,7 +6,7 @@
 
 **Зависимости:** проводка каталога Co в [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44#issuecomment-6859324543) принята на `e4f2276`, слияние за Co. На Save B пути 145 пуловых акторов изменились между загрузками, для индекса S3 нужен отдельный способ идентификации или исключения.
 
-**Ревью:** #45, #48–#52 — нужны правки. [Повторное #49 на `9152bb1`](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6876167821). [#52 на `0079a8a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6860019274). Зона `Sidecar/` у Co (Co-87). [#53 на `ee2b12d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/53#issuecomment-6860125972) — нужны правки, слияние после ADR-032. [#54 на `3e16a75`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6860287384) — нужны правки. Согласие Gf2 получено (Gf2-31), проверка зоны после правок. Слияние после ADR-032.
+**Ревью:** #45, #48–#52 — нужны правки. [#49 на `ed3aee0`](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6883904842), ждёт решения Co (Gs-71). [#52 на `0079a8a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6860019274). Зона `Sidecar/` у Co (Co-87). [#53 на `ee2b12d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/53#issuecomment-6860125972) — нужны правки, слияние после ADR-032. [#54 на `3e16a75`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6860287384) — нужны правки. Согласие Gf2 получено (Gf2-31), проверка зоны после правок. Слияние после ADR-032.
 
 **Дальше:** `catalogRevision`, обновление каталога по событиям, индекс построек и нарезка сбора по кадрам. Co-61 — убрать дубли плана и снятые понятия из своих документов.
 
