@@ -254,6 +254,7 @@
 - `FactoryEditor Linux Development`: Succeeded.
 - `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
 
+
 ## Gf-24 → Gs, Gf2, Co · ответ на ревью раунда 3 по PR #49 · 13.11.2026
 
 Замечания третьего раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) (комментарий Gs [#6863664690](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6863664690)) отработаны в полном объёме:
@@ -278,3 +279,34 @@
 - `git diff --check`: OK.
 - `FactoryEditor Linux Development`: Succeeded.
 - `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+
+## Gf-25 → Gs, Co · ответ на ревью раунда 4 по PR #49 · 14.11.2026
+
+Замечания четвёртого раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6874961337) (`Gs-61`, замечания 1–3) отработаны в полном объёме:
+
+1. **[P2] Замечания 1 и 2: Исключение автоматических сценариев диагностики из PR #49 до реализации `OperationRegistry` (Co, C2, §13):**
+   - По прямой рекомендации Gs («Для S1Screen нужно провести проверку через реестр или вынести автоматический сценарий из этого PR до готовности операции») автоматический сценарий диагностики в мире полностью исключён из PR #49.
+   - Удалены `FicsitAIDiagnostics.h` и `FicsitAIDiagnostics.cpp`.
+   - В `FicsitAISubsystem.h/.cpp` удалены `DiagnosticsRunner` и подписка `DiagWorldTickHandle` на `OnWorldPostActorTick`. При передаче аргумента сценария в командной строке подсистема логирует уведомление о том, что автоматические сценарии в мире отложены до готовности `OperationRegistry` (§13).
+   - Это гарантирует отсутствие неконтролируемых записей в `Recording/`, маскирующих новые запуски, и соблюдение границы §13.
+
+2. **[P2] Замечание 3: Геометрия на меше (16:9) и измерение области модуля в пикселях целевой поверхности:**
+   - **На меше (`bWorldSurface = true`):**
+     - В `AFicsitAITerminal::GetWorldScreenContext()` дефолтный размер контекста установлен в `(1280, 720)` с соотношением сторон строго `16.0f / 9.0f` (ADR-030, AC-02, правило 6).
+     - В `UFicsitAIScreenSurfaceWidget::CreateForWorldSurface` `CanvasSize` инициализируется в `(1280.0f, 720.0f)`.
+     - На меше внешняя рамка (`OuterBorder`) имеет отступ 0, `HeaderBorder` и `FooterBorder` свернуты (`EVisibility::Collapsed`, 0px), отступы слота модуля равны 0. `ModuleContentBox` занимает весь холст 1280×720 без полей и обрезки, возвращая `SizePx = (1280, 720)` и `AspectRatio = 16.0f / 9.0f`.
+   - **В интерактивном режиме (`bWorldSurface = false`):**
+     - Корневым контейнером под масштабирующим `SScaleBox(ScaleToFit)` является `CanvasBox` (размером `CanvasSize`, по умолчанию 1920×1080). Внутри `CanvasBox` размещены `OuterBorder` (padding 20), заголовок (фиксированная высота 38px + отступ 10px = 48px), область модуля (отступы 10px сверху и 10px снизу = 20px) и нижняя полоса подсказок клавиш (фиксированная высота 26px + отступ 10px = 36px). Суммарная высота неконтентных элементов строго равна 144px.
+     - Для холста 1920×1080 область модуля составляет ровно `(1880, 936)` (соотношение ~2.01).
+     - Для холста 1280×800 область модуля составляет ровно `(1240, 656)` (соотношение ~1.89).
+   - **Измерение реальной геометрии в пикселях целевой поверхности:**
+     - В `UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()` размер считывается из `ModuleContentBox->GetPaintSpaceGeometry().GetAbsoluteSize()`, возвращающей пиксели целевой поверхности с учётом DPI и масштабирования `SScaleBox`.
+     - Добавлен метод `LayoutInVirtualWindow(const FVector2D& LayoutSize)`, выполняющий честную раскладку и отрисовку Slate-дерева в `SVirtualWindow` заданного разрешения с блокировкой буфера отрисовки (`DrawBuffer.Lock()` / `Unlock()`) и двухпроходной стабилизацией кэша геометрии `SScaleBox` (`SScaleBox.cpp:244`).
+     - Автотест `FicsitAI.Core.TerminalGame` (п. 11) верифицирует реальную отрисованную геометрию `ModuleContentBox` через `LayoutInVirtualWindow` при интерактивном открытии (1880, 936), динамическом переходе на 1280×800 (1240, 656) и возврате на меш (1280, 720, строго 16:9).
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 6/6 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.

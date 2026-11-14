@@ -107,6 +107,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     void SetCanvasSize(const FVector2D& InCanvasSize);
 
+    /** Выполнить реальную раскладку Slate в виртуальном окне заданного размера (для автотестов и offscreen-рендера) */
+    void LayoutInVirtualWindow(const FVector2D& LayoutSize);
+
     /** Обновить геометрию области модуля из раскладки Slate */
     void UpdateModuleContentAreaGeometry();
 
@@ -146,6 +149,8 @@ protected:
     UPROPERTY()
     TMap<FName, FKey> ActionKeyBindings;
 
+    TSharedPtr<class SBorder> OuterBorder;
+    TSharedPtr<class SBorder> HeaderBorder;
     TSharedPtr<class SBox> CanvasBox;
     TSharedPtr<class SBox> ModuleContentBox;
     TSharedPtr<class STextBlock> StatusTextBlock;

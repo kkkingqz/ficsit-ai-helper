@@ -183,8 +183,8 @@ FFicsitAIScreenContext AFicsitAITerminal::GetWorldScreenContext() const
     }
     else
     {
-        Context.SizePx = FIntPoint(1880, 972);
-        Context.AspectRatio = 1880.0f / 972.0f;
+        Context.SizePx = FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx);
+        Context.AspectRatio = 16.0f / 9.0f;
     }
     Context.bHasInputFocus = false;
     return Context;

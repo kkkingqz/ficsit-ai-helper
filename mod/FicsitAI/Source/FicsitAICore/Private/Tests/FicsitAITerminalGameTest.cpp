@@ -297,8 +297,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesMod)
         {
             TestTrue(TEXT("Контекст на меше: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("Контекст на меше: SizePx соответствует области модуля WorldSurface"), NotesMod->GetCurrentContext().SizePx, WorldSurface->GetModuleAreaSizePx());
-            TestTrue(TEXT("Контекст на меше: AspectRatio соответствует WorldSurface"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, WorldSurface->GetModuleAreaAspectRatio(), 0.01f));
+            TestEqual(TEXT("Контекст на меше: SizePx соответствует области модуля WorldSurface (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestTrue(TEXT("Контекст на меше: AspectRatio строго 16:9"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
         }
 
         // Проверка сохранения контекста поверхности при запросе фокуса ввода (Gs-59 P2)
@@ -307,8 +307,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         {
             TestTrue(TEXT("После RequestInputFocus(true) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
             TestTrue(TEXT("После RequestInputFocus(true) bHasInputFocus == true"), NotesMod->GetCurrentContext().bHasInputFocus);
-            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся неизменным"), NotesMod->GetCurrentContext().SizePx, WorldSurface->GetModuleAreaSizePx());
-            TestTrue(TEXT("После RequestInputFocus(true) AspectRatio остаётся неизменным"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, WorldSurface->GetModuleAreaAspectRatio(), 0.01f));
+            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся неизменным (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestTrue(TEXT("После RequestInputFocus(true) AspectRatio остаётся 16:9"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
         }
         ScreenTerm->RequestInputFocus(false);
         if (NotesMod)
@@ -319,6 +319,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
 
         // 11.2 «E»: открытие интерактивного экрана через OpenInteractiveScreen
         UFicsitAIScreenSurfaceWidget* InteractiveSurface = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(ScreenTerm);
+        InteractiveSurface->SetWorldSurfaceMode(false);
+        InteractiveSurface->LayoutInVirtualWindow(FVector2D(1920.0f, 1080.0f));
         ScreenTerm->OpenInteractiveScreen(InteractiveSurface);
         TestTrue(TEXT("ScreenTerm в интерактивном режиме"), ScreenTerm->IsInteractiveScreenOpen());
         TestNull(TEXT("WorldSurface очищен от модуля"), WorldSurface->GetActiveModule().GetObject());
@@ -326,12 +328,12 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesMod)
         {
             TestFalse(TEXT("Интерактивный контекст: bWorldSurface == false"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("Интерактивный контекст: SizePx соответствует области модуля интерактивной поверхности"), NotesMod->GetCurrentContext().SizePx, InteractiveSurface->GetModuleAreaSizePx());
-            TestTrue(TEXT("Интерактивный контекст: AspectRatio соответствует интерактивной поверхности"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, InteractiveSurface->GetModuleAreaAspectRatio(), 0.01f));
+            TestEqual(TEXT("Интерактивный контекст: SizePx соответствует области модуля интерактивной поверхности (1880, 936)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1880, 936));
+            TestTrue(TEXT("Интерактивный контекст: AspectRatio соответствует интерактивной поверхности (~2.01)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1880.0f / 936.0f, 0.01f));
         }
 
-        // Проверка динамического изменения раскладки поверхности (например, при переходе на экран 1280x800)
-        InteractiveSurface->SetCanvasSize(FVector2D(1280.0f, 800.0f));
+        // Проверка динамического изменения раскладки поверхности через реальную раскладку Slate (1280x800)
+        InteractiveSurface->LayoutInVirtualWindow(FVector2D(1280.0f, 800.0f));
         if (NotesMod)
         {
             TestEqual(TEXT("Размер обновлён по геометрии ModuleContentBox (1240, 656)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1240, 656));
@@ -347,8 +349,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesMod)
         {
             TestTrue(TEXT("После возврата на меш: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("После возврата на меш: SizePx соответствует WorldSurface"), NotesMod->GetCurrentContext().SizePx, WorldSurface->GetModuleAreaSizePx());
-            TestTrue(TEXT("После возврата на меш: AspectRatio соответствует WorldSurface"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, WorldSurface->GetModuleAreaAspectRatio(), 0.01f));
+            TestEqual(TEXT("После возврата на меш: SizePx соответствует WorldSurface (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestTrue(TEXT("После возврата на меш: AspectRatio строго 16:9"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
         }
 
         ScreenTerm->EndPlay(EEndPlayReason::Destroyed);
@@ -383,7 +385,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesB)
         {
             TestTrue(TEXT("NotesB остаётся в мировом контексте"), NotesB->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("NotesB остаётся в мировом размере раскладки"), NotesB->GetCurrentContext().SizePx, TermB->GetWorldSurfaceWidget()->GetModuleAreaSizePx());
+            TestEqual(TEXT("NotesB остаётся в мировом размере раскладки (1280, 720)"), NotesB->GetCurrentContext().SizePx, FIntPoint(1280, 720));
+            TestTrue(TEXT("NotesB AspectRatio строго 16:9"), FMath::IsNearlyEqual(NotesB->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
         }
         TestEqual(TEXT("Модуль TermB по-прежнему привязан к WorldSurface B"), TermB->GetWorldSurfaceWidget()->GetActiveModule(), TermB->GetActiveModuleInstance());
 

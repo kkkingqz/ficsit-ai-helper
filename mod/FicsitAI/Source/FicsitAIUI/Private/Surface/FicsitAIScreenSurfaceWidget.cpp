@@ -4,6 +4,8 @@
 #include "Widgets/Layout/SScaleBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "Widgets/SBoxPanel.h"
+#include "Widgets/SVirtualWindow.h"
+#include "Rendering/SlateDrawBuffer.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/TextureRenderTarget2D.h"
 #include "Slate/WidgetRenderer.h"
@@ -99,6 +101,7 @@ void UFicsitAIScreenSurfaceWidget::SetWorldSurfaceMode(bool bInWorldSurface)
     if (bWorldSurfaceMode != bInWorldSurface)
     {
         bWorldSurfaceMode = bInWorldSurface;
+        CanvasSize = bWorldSurfaceMode ? FVector2D(1280.0f, 720.0f) : FVector2D(1920.0f, 1080.0f);
         UpdateLayout();
         UpdateModuleContentAreaGeometry();
         RefreshModuleContent();
@@ -124,6 +127,8 @@ UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::CreateForWorldSurfac
     if (Widget)
     {
         Widget->SetWorldSurfaceMode(true);
+        Widget->SetCanvasSize(FVector2D(1280.0f, 720.0f));
+        Widget->UpdateModuleContentAreaGeometry();
     }
     return Widget;
 }
@@ -336,6 +341,14 @@ void UFicsitAIScreenSurfaceWidget::UpdateLayout()
 {
     CurrentHotkeyHints.Empty();
 
+    if (OuterBorder.IsValid())
+    {
+        OuterBorder->SetPadding(bWorldSurfaceMode ? FMargin(0.0f) : FMargin(20.0f));
+    }
+    if (HeaderBorder.IsValid())
+    {
+        HeaderBorder->SetVisibility(bWorldSurfaceMode ? EVisibility::Collapsed : EVisibility::Visible);
+    }
     if (FooterBorder.IsValid())
     {
         // На экране в мире (§6.6, Co3-2) нижняя полоса подсказок клавиш не отображается
@@ -418,33 +431,38 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
     TSharedRef<SWidget> Widget = SNew(SScaleBox)
         .Stretch(EStretch::ScaleToFit)
         [
-            SNew(SBorder)
-            .BorderBackgroundColor(FLinearColor(0.02f, 0.02f, 0.03f, 0.95f))
-            .Padding(FMargin(20.0f))
+            SAssignNew(CanvasBox, SBox)
+            .WidthOverride_Lambda([this]() { return CanvasSize.X; })
+            .HeightOverride_Lambda([this]() { return CanvasSize.Y; })
             [
-                SAssignNew(CanvasBox, SBox)
-                .WidthOverride(CanvasSize.X)
-                .HeightOverride(CanvasSize.Y)
+                SAssignNew(OuterBorder, SBorder)
+                .BorderBackgroundColor(FLinearColor(0.02f, 0.02f, 0.03f, 0.95f))
+                .Padding_Lambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(20.0f); })
                 [
                     SNew(SVerticalBox)
-                    // Верхняя полоса (Header, 64px)
+                    // Верхняя полоса (Header; скрывается в bWorldSurfaceMode)
                     + SVerticalBox::Slot()
                     .AutoHeight()
-                    .Padding(FMargin(0.0f, 0.0f, 0.0f, 10.0f))
+                    .Padding(TAttribute<FMargin>::CreateLambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(0.0f, 0.0f, 0.0f, 10.0f); }))
                     [
-                        SNew(SBorder)
+                        SAssignNew(HeaderBorder, SBorder)
                         .BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.12f, 1.0f))
-                        .Padding(FMargin(16.0f, 12.0f))
+                        .Padding(FMargin(16.0f, 0.0f))
                         [
-                            SAssignNew(HeaderTextBlock, STextBlock)
-                            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetHeaderTitle)
-                            .ColorAndOpacity(FLinearColor::White)
+                            SNew(SBox)
+                            .HeightOverride(38.0f)
+                            .VAlign(VAlign_Center)
+                            [
+                                SAssignNew(HeaderTextBlock, STextBlock)
+                                .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetHeaderTitle)
+                                .ColorAndOpacity(FLinearColor::White)
+                            ]
                         ]
                     ]
-                    // Основная область модуля (16:9)
+                    // Основная область модуля (16:9 на меше терминала)
                     + SVerticalBox::Slot()
                     .FillHeight(1.0f)
-                    .Padding(FMargin(0.0f, 10.0f))
+                    .Padding(TAttribute<FMargin>::CreateLambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(0.0f, 10.0f); }))
                     [
                         SAssignNew(ModuleContentBox, SBox)
                         .HAlign(HAlign_Fill)
@@ -455,18 +473,23 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
                             .ColorAndOpacity(FLinearColor(0.9f, 0.3f, 0.2f, 1.0f))
                         ]
                     ]
-                    // Нижняя полоса клавиш (Footer, 56px; скрывается в bWorldSurfaceMode)
+                    // Нижняя полоса клавиш (Footer, 36px; скрывается в bWorldSurfaceMode)
                     + SVerticalBox::Slot()
                     .AutoHeight()
-                    .Padding(FMargin(0.0f, 10.0f, 0.0f, 0.0f))
+                    .Padding(TAttribute<FMargin>::CreateLambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(0.0f, 10.0f, 0.0f, 0.0f); }))
                     [
                         SAssignNew(FooterBorder, SBorder)
                         .BorderBackgroundColor(FLinearColor(0.05f, 0.05f, 0.08f, 1.0f))
-                        .Padding(FMargin(16.0f, 8.0f))
+                        .Padding(FMargin(16.0f, 0.0f))
                         [
-                            SAssignNew(FooterTextBlock, STextBlock)
-                            .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints)
-                            .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+                            SNew(SBox)
+                            .HeightOverride(26.0f)
+                            .VAlign(VAlign_Center)
+                            [
+                                SAssignNew(FooterTextBlock, STextBlock)
+                                .Text_UObject(this, &UFicsitAIScreenSurfaceWidget::GetFormattedHotkeyHints)
+                                .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f))
+                            ]
                         ]
                     ]
                 ]
@@ -481,7 +504,7 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
 
 void UFicsitAIScreenSurfaceWidget::SetCanvasSize(const FVector2D& InCanvasSize)
 {
-    if (InCanvasSize.X > 0.0f && InCanvasSize.Y > 0.0f && InCanvasSize != CanvasSize)
+    if (InCanvasSize.X > 0.0f && InCanvasSize.Y > 0.0f)
     {
         CanvasSize = InCanvasSize;
         if (CanvasBox.IsValid())
@@ -493,34 +516,72 @@ void UFicsitAIScreenSurfaceWidget::SetCanvasSize(const FVector2D& InCanvasSize)
     }
 }
 
+void UFicsitAIScreenSurfaceWidget::LayoutInVirtualWindow(const FVector2D& LayoutSize)
+{
+    SetCanvasSize(LayoutSize);
+    const TSharedRef<SWidget> RootSlate = TakeWidget();
+    WorldVirtualWindow = SNew(SVirtualWindow).Size(LayoutSize);
+    WorldVirtualWindow->SetContent(RootSlate);
+
+    // SScaleBox кэширует LastPaintGeometry с предыдущего кадра отрисовки (см. SScaleBox.cpp:244);
+    // для корректного расчёта масштаба при динамической смене размера окна требуется 2 прохода layout & paint
+    for (int32 Pass = 0; Pass < 2; ++Pass)
+    {
+        WorldVirtualWindow->SlatePrepass(1.0f);
+
+        FSlateDrawBuffer DrawBuffer;
+        if (DrawBuffer.Lock())
+        {
+            FSlateWindowElementList& WindowElementList = DrawBuffer.AddWindowElementList(WorldVirtualWindow.ToSharedRef());
+            WorldVirtualWindow->PaintWindow(FApp::GetCurrentTime(), 0.0f, WindowElementList, FWidgetStyle(), true);
+            DrawBuffer.Unlock();
+        }
+    }
+
+    UpdateModuleContentAreaGeometry();
+}
+
 void UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()
 {
     FIntPoint NewSize = FIntPoint::ZeroValue;
 
     if (ModuleContentBox.IsValid())
     {
-        const FGeometry& BoxGeo = ModuleContentBox->GetTickSpaceGeometry();
-        const FVector2D LocalSize = BoxGeo.GetLocalSize();
-        if (LocalSize.X > 1.0f && LocalSize.Y > 1.0f)
+        // Приоритет - фактическая геометрия после раскладки и отрисовки (PaintSpace / AllottedGeometry)
+        // GetAbsoluteSize() возвращает пиксели целевой поверхности с учётом SScaleBox и DPI масштаба
+        const FVector2D PaintAbsSize = ModuleContentBox->GetPaintSpaceGeometry().GetAbsoluteSize();
+        if (PaintAbsSize.X > 1.0f && PaintAbsSize.Y > 1.0f)
         {
-            NewSize = FIntPoint(FMath::RoundToInt(LocalSize.X), FMath::RoundToInt(LocalSize.Y));
+            NewSize = FIntPoint(FMath::RoundToInt(PaintAbsSize.X), FMath::RoundToInt(PaintAbsSize.Y));
+        }
+        else
+        {
+            const FVector2D TickAbsSize = ModuleContentBox->GetTickSpaceGeometry().GetAbsoluteSize();
+            if (TickAbsSize.X > 1.0f && TickAbsSize.Y > 1.0f)
+            {
+                NewSize = FIntPoint(FMath::RoundToInt(TickAbsSize.X), FMath::RoundToInt(TickAbsSize.Y));
+            }
         }
     }
 
     if (NewSize.X <= 0 || NewSize.Y <= 0)
     {
-        // Рассчитываем номинальный размер области модуля из текущей геометрии CanvasBox:
-        // Поля SBorder: 20px с каждой стороны (40px)
-        // Отступы Header + отступ слота: 48px
-        // Отступы слота ModuleContentBox: 20px (10px сверху, 10px снизу)
-        // Отступы Footer (если видим): 36px
-        const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);
-        const int32 NonContentHeight = 40 + 48 + 20 + (bWorldSurfaceMode ? 0 : 36);
-        const int32 ContentHeight = FMath::Max(100, FMath::RoundToInt(CanvasSize.Y) - NonContentHeight);
-        NewSize = FIntPoint(ContentWidth, ContentHeight);
+        if (bWorldSurfaceMode)
+        {
+            // На меше терминала модуль компонуется 16:9 без полей и без заголовков (AC-02, ARCHITECTURE §6.6)
+            NewSize = FIntPoint(FMath::RoundToInt(CanvasSize.X), FMath::RoundToInt(CanvasSize.Y));
+        }
+        else
+        {
+            // В интерактивном режиме учитываем рамку, заголовок и полосу подсказок
+            const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);
+            const int32 NonContentHeight = 40 + 48 + 20 + 36;
+            const int32 ContentHeight = FMath::Max(100, FMath::RoundToInt(CanvasSize.Y) - NonContentHeight);
+            NewSize = FIntPoint(ContentWidth, ContentHeight);
+        }
     }
 
-    const float NewAspect = (NewSize.Y > 0) ? (static_cast<float>(NewSize.X) / static_cast<float>(NewSize.Y)) : (16.0f / 9.0f);
+    const float NewAspect = bWorldSurfaceMode ? (16.0f / 9.0f) : ((NewSize.Y > 0) ? (static_cast<float>(NewSize.X) / static_cast<float>(NewSize.Y)) : (16.0f / 9.0f));
 
     if (NewSize != CachedModuleAreaSizePx || !FMath::IsNearlyEqual(NewAspect, CachedModuleAreaAspectRatio, 0.001f))
     {
@@ -550,23 +611,23 @@ FIntPoint UFicsitAIScreenSurfaceWidget::GetModuleAreaSizePx() const
     {
         return CachedModuleAreaSizePx;
     }
-    if (ModuleContentBox.IsValid())
+    if (bWorldSurfaceMode)
     {
-        const FVector2D LocalSize = ModuleContentBox->GetTickSpaceGeometry().GetLocalSize();
-        if (LocalSize.X > 1.0f && LocalSize.Y > 1.0f)
-        {
-            return FIntPoint(FMath::RoundToInt(LocalSize.X), FMath::RoundToInt(LocalSize.Y));
-        }
+        return FIntPoint(FMath::RoundToInt(CanvasSize.X), FMath::RoundToInt(CanvasSize.Y));
     }
     const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);
-    const int32 NonContentHeight = 40 + 48 + 20 + (bWorldSurfaceMode ? 0 : 36);
+    const int32 NonContentHeight = 40 + 48 + 20 + 36;
     const int32 ContentHeight = FMath::Max(100, FMath::RoundToInt(CanvasSize.Y) - NonContentHeight);
     return FIntPoint(ContentWidth, ContentHeight);
 }
 
 float UFicsitAIScreenSurfaceWidget::GetModuleAreaAspectRatio() const
 {
-    if (CachedModuleAreaAspectRatio > 0.0f)
+    if (bWorldSurfaceMode)
+    {
+        return 16.0f / 9.0f;
+    }
+    if (CachedModuleAreaAspectRatio > 0.01f)
     {
         return CachedModuleAreaAspectRatio;
     }
