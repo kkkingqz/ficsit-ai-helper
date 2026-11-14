@@ -15,7 +15,10 @@ public class FicsitAICore : ModuleRules
             "FactoryGame",
             "SML",
             "FicsitAIApi",
-            "FicsitAIUI"
+            "FicsitAIUI",
+            // Канал к адаптеру (Sidecar/): публичный заголовок отдаёт типы запроса HTTP и JSON.
+            "HTTP",
+            "Json"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {
