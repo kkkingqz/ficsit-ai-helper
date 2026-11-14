@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <title>Фасад API — проверка</title>
+    <style>
+      body { font: 14px/1.5 system-ui, sans-serif; margin: 2rem; max-width: 46rem; }
+      table { border-collapse: collapse; margin: 1rem 0; width: 100%; }
+      th, td { border: 1px solid #ccc; padding: 0.3rem 0.5rem; text-align: left; }
+      td.num { text-align: right; font-variant-numeric: tabular-nums; }
+      .dash { color: #888; }
+      code { background: #f2f2f2; padding: 0 0.2rem; }
+    </style>
+  </head>
+  <body>
+    <h1>Фасад API v0 — горячая перезагрузка работает</h1>
+    <p>
+      Страница ничего не знает о том, где открыта: в игре фасад идёт мостом к
+      <code>FicsitAIApi</code>, в браузере — HTTP к dev-серверу. Транспорт:
+      <strong id="transport">…</strong>, источник: <strong id="source">…</strong>.
+    </p>
+    <table>
+      <thead><tr><th>Метрика</th><th>Область</th><th>Значение</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <p id="error" hidden></p>
+
+    <script src="/api/v0/reload.js"></script>
+    <script type="module">
+      import { createApi } from "../dist/index.js";
+
+      const api = createApi();
+      document.getElementById("transport").textContent = api.transport;
+
+      const rows = document.getElementById("rows");
+      const cell = (text, className) => {
+        const td = document.createElement("td");
+        td.textContent = text;
+        if (className) td.className = className;
+        return td;
+      };
+
+      /** Прочерк — это ответ, а не отсутствие ответа: state === "notApplicable". */
+      function show(descriptor, scope, value) {
+        const tr = document.createElement("tr");
+        tr.append(cell(descriptor.displayName), cell(scope?.displayName ?? "—"));
+        if (value.state === "notApplicable") {
+          tr.append(cell("неприменимо", "dash"));
+        } else {
+          tr.append(cell(`${value.value.toFixed(value.precisionDigits)} ${value.unit}`, "num"));
+        }
+        rows.append(tr);
+      }
+
+      try {
+        const status = await api.getStatus();
+        document.getElementById("source").textContent = status.source;
+
+        const catalog = await api.listMetrics({ pageSize: 10 });
+        for (const descriptor of catalog.metrics) {
+          const scope = descriptor.availableScopes[0];
+          const value = await api.queryMetric({
+            metricId: descriptor.id,
+            ...(scope ? { scopeId: scope.scopeId } : {}),
+          });
+          show(descriptor, scope, value);
+        }
+
+        // Экран перерисовывается по событию снимка, а не по своему таймеру.
+        api.on("metrics.snapshot", (data) => {
+          document.title = `Фасад API v0 — снимок ${data.sessionTimeSec}`;
+        });
+      } catch (err) {
+        const box = document.getElementById("error");
+        box.hidden = false;
+        box.textContent = `${err.code}: ${err.message}`;
+      }
+    </script>
+  </body>
+</html>
