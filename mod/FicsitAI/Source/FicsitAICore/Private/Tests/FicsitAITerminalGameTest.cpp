@@ -254,7 +254,7 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TestEqual(TEXT("TerminalA закрыт"), TerminalA->GetActiveModuleId(), NAME_None);
     TestEqual(TEXT("TerminalB закрыт"), TerminalB->GetActiveModuleId(), NAME_None);
 
-    // 10. Проверка освобождения ресурсов поверхности в мире и сборки мусора после EndPlay (P1, Gs-59)
+    // 10. Проверка освобождения ресурсов поверхности в мире и сборки мусора после EndPlay (P1, Gs-59, раунд 5 P2)
     {
         AFicsitAITerminal* GcTerminal = NewObject<AFicsitAITerminal>();
         TestNotNull(TEXT("GcTerminal создан"), GcTerminal);
@@ -265,6 +265,9 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
 
         UFicsitAIScreenSurfaceWidget* SurfaceWidget = GcTerminal->GetWorldSurfaceWidget();
         TestNotNull(TEXT("WorldSurfaceWidget существует на GcTerminal"), SurfaceWidget);
+
+        // Реальная привязка к Slate-окну через LayoutInVirtualWindow (построение дерева Slate и проход layout/paint)
+        SurfaceWidget->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f));
 
         TWeakObjectPtr<UFicsitAIScreenSurfaceWidget> WeakSurfaceWidget = SurfaceWidget;
         TestTrue(TEXT("WeakSurfaceWidget валиден до EndPlay"), WeakSurfaceWidget.IsValid());
@@ -280,7 +283,7 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         TestFalse(TEXT("WorldSurfaceWidget успешно собран GC после EndPlay (нет утечки/цикла через SVirtualWindow/SObjectWidget)"), WeakSurfaceWidget.IsValid());
     }
 
-    // 11. Проверка контекста поверхности, фокуса ввода и динамического размера (P2, Gs-59 раунд 2)
+    // 11. Проверка контекста поверхности, фокуса ввода и динамического размера (P2, Gs-59 раунд 2, раунд 5 P2)
     {
         AFicsitAITerminal* ScreenTerm = NewObject<AFicsitAITerminal>();
         ScreenTerm->InitializeHost();
@@ -294,11 +297,14 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         UFicsitAIScreenSurfaceWidget* WorldSurface = ScreenTerm->GetWorldSurfaceWidget();
         TestNotNull(TEXT("WorldSurface существует"), WorldSurface);
         TestEqual(TEXT("Модуль привязан к WorldSurface"), WorldSurface->GetActiveModule(), ScreenTerm->GetActiveModuleInstance());
+
+        WorldSurface->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f));
+
         if (NotesMod)
         {
             TestTrue(TEXT("Контекст на меше: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("Контекст на меше: SizePx соответствует области модуля WorldSurface (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
-            TestTrue(TEXT("Контекст на меше: AspectRatio строго 16:9"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
+            TestEqual(TEXT("Контекст на меше: SizePx соответствует области модуля WorldSurface с верхней полосой статуса (1280, 672)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("Контекст на меше: AspectRatio соответствует области модуля (~1.90)"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
         }
 
         // Проверка сохранения контекста поверхности при запросе фокуса ввода (Gs-59 P2)
@@ -307,8 +313,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         {
             TestTrue(TEXT("После RequestInputFocus(true) bWorldSurface остаётся true"), NotesMod->GetCurrentContext().bWorldSurface);
             TestTrue(TEXT("После RequestInputFocus(true) bHasInputFocus == true"), NotesMod->GetCurrentContext().bHasInputFocus);
-            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся неизменным (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
-            TestTrue(TEXT("После RequestInputFocus(true) AspectRatio остаётся 16:9"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
+            TestEqual(TEXT("После RequestInputFocus(true) SizePx остаётся неизменным (1280, 672)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("После RequestInputFocus(true) AspectRatio остаётся ~1.90"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
         }
         ScreenTerm->RequestInputFocus(false);
         if (NotesMod)
@@ -342,6 +348,7 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         }
 
         // 11.3 «меш»: закрытие интерактивного экрана через CloseInteractiveScreen
+        TWeakObjectPtr<UFicsitAIScreenSurfaceWidget> WeakInteractiveSurface = InteractiveSurface;
         ScreenTerm->CloseInteractiveScreen();
         TestFalse(TEXT("ScreenTerm вышел из интерактивного режима"), ScreenTerm->IsInteractiveScreenOpen());
         TestNull(TEXT("Интерактивная поверхность очищена от модуля"), InteractiveSurface->GetActiveModule().GetObject());
@@ -349,11 +356,16 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesMod)
         {
             TestTrue(TEXT("После возврата на меш: bWorldSurface == true"), NotesMod->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("После возврата на меш: SizePx соответствует WorldSurface (1280, 720)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 720));
-            TestTrue(TEXT("После возврата на меш: AspectRatio строго 16:9"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
+            TestEqual(TEXT("После возврата на меш: SizePx соответствует WorldSurface с верхней полосой статуса (1280, 672)"), NotesMod->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("После возврата на меш: AspectRatio соответствует ~1.90"), FMath::IsNearlyEqual(NotesMod->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
         }
 
+        InteractiveSurface = nullptr;
         ScreenTerm->EndPlay(EEndPlayReason::Destroyed);
+
+        // Проверка отсутствия удержания интерактивного виджета после закрытия и EndPlay (раунд 5 P2)
+        CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+        TestFalse(TEXT("InteractiveSurface успешно собрана GC после закрытия и EndPlay (нет утечки через виртуальное окно)"), WeakInteractiveSurface.IsValid());
     }
 
     // 12. Проверка двух терминалов в одном мире: независимый интерактивный режим и EndPlay (P1, Gs-59 раунд 2)
@@ -385,8 +397,8 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
         if (NotesB)
         {
             TestTrue(TEXT("NotesB остаётся в мировом контексте"), NotesB->GetCurrentContext().bWorldSurface);
-            TestEqual(TEXT("NotesB остаётся в мировом размере раскладки (1280, 720)"), NotesB->GetCurrentContext().SizePx, FIntPoint(1280, 720));
-            TestTrue(TEXT("NotesB AspectRatio строго 16:9"), FMath::IsNearlyEqual(NotesB->GetCurrentContext().AspectRatio, 16.0f / 9.0f, 0.001f));
+            TestEqual(TEXT("NotesB остаётся в мировом размере раскладки (1280, 672)"), NotesB->GetCurrentContext().SizePx, FIntPoint(1280, 672));
+            TestTrue(TEXT("NotesB AspectRatio соответствует ~1.90"), FMath::IsNearlyEqual(NotesB->GetCurrentContext().AspectRatio, 1280.0f / 672.0f, 0.01f));
         }
         TestEqual(TEXT("Модуль TermB по-прежнему привязан к WorldSurface B"), TermB->GetWorldSurfaceWidget()->GetActiveModule(), TermB->GetActiveModuleInstance());
 

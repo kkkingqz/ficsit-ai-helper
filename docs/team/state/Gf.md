@@ -1,12 +1,11 @@
 # Gf — состояние на 14.11.2026
 
-**Сейчас:** Исправление замечаний ревью Gs (раунд 4) на PR #49 (S8 3.4 & §6.6, рендер экрана терминала в мире). Ветка `mod/s8-terminal-screen`, личный Starter Project `~/Projects/SML-gf` на `a7e85503` (заголовки `CL 517554`).
+**Сейчас:** Исправление замечаний ревью Gs (раунд 5) на PR #49 (S8 3.4 & §6.6, рендер экрана терминала в мире). Ветка `mod/s8-terminal-screen`, личный Starter Project `~/Projects/SML-gf` на `a7e85503` (заголовки `CL 517554`).
 
-**Последний результат:** Полностью отработаны замечания четвёртого раунда ревью Gs (комментарий #6874961337):
-1. [P2] Замечания 1 и 2: Автоматический сценарий диагностики в мире полностью исключён из PR #49 до реализации `OperationRegistry` (Co, C2, §13). Удалены `FicsitAIDiagnostics.h/.cpp` и тикер в `FicsitAISubsystem`. Устранено накопление старых записей в `Recording/`, маскирующих новые прогоны.
-2. [P2] Замечание 3: Обеспечено строгое 16:9 (`16.0f / 9.0f`, ADR-030, AC-02, правило 6) на меше (`bWorldSurface=true`, `SizePx=(1280, 720)`). В интерактивном режиме `CanvasBox` является корневым контейнером под `SScaleBox`, с фиксированными высотами Header (48px) и Footer (36px) и OuterBorder padding 20 (неконтентная высота 144px).
-3. [P2] Измерение реальной отрисованной области в пикселях целевой поверхности через `ModuleContentBox->GetPaintSpaceGeometry().GetAbsoluteSize()`. Добавлен метод `LayoutInVirtualWindow` с честной раскладкой в `SVirtualWindow` и двухпроходной стабилизацией геометрии `SScaleBox`. Автотест п. 11 верифицирует реальные размеры раскладки для 1920×1080 (1880, 936), динамического перехода на 1280×800 (1240, 656) и возврата на меш (1280, 720, 16:9).
-Подтверждены: `tools/ci/check-invariants.sh` (5/5 OK), `git diff --check` (OK), `FactoryEditor Linux Development` (Succeeded), `UnrealEditor-Cmd` (6/6 тестов, EXIT CODE: 0). Опубликован ответ `Gf-25` (`Gs`, `Co`).
+**Последний результат:** Полностью отработаны замечания пятого раунда ревью Gs (комментарий #6876167821):
+1. [P2] Замечание 1: Верхняя полоса статуса (`HeaderBorder`) возвращена на экране в мире (`bWorldSurfaceMode = true`, §6.6 по Co3-2), высота 48px (SBox 38px + отступ 10px). Холст и Render Target сохраняют строго 16:9 (1280×720). Модуль `ModuleContentBox` честно занимает оставшиеся `1280 × 672` (соотношение ~1.905), транслируя фактические размеры Slate-раскладки в контекст активного модуля.
+2. [P2] Замечание 2: В `LayoutInVirtualWindow` окно сделано локальным с явным отсоединением содержимого `TempVirtualWindow->SetContent(SNullWidget::NullWidget)` при выходе. В `CloseInteractiveScreen` добавлен вызов `PlayerWidget->ReleaseWorldSurfaceResources()`. В автотесте п. 10 добавлена реальная Slate-привязка через `LayoutInVirtualWindow` перед `EndPlay` и проверен сбор мусора `WorldSurfaceWidget`. В п. 11 добавлена проверка GC для `InteractiveSurface` после `CloseInteractiveScreen` и `EndPlay`.
+Подтверждены: `tools/ci/check-invariants.sh` (5/5 OK), `git diff --check` (OK), `FactoryEditor Linux Development` (Succeeded), `UnrealEditor-Cmd` (6/6 тестов, EXIT CODE: 0). Опубликован ответ `Gf-26` (`Gs`, `Co`).
 
 **Блокирует меня:** Не заблокирован.
 

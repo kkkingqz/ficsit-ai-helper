@@ -347,7 +347,8 @@ void UFicsitAIScreenSurfaceWidget::UpdateLayout()
     }
     if (HeaderBorder.IsValid())
     {
-        HeaderBorder->SetVisibility(bWorldSurfaceMode ? EVisibility::Collapsed : EVisibility::Visible);
+        // На экране в мире (§6.6, Co3-2) верхняя полоса статуса отображается обязательно
+        HeaderBorder->SetVisibility(EVisibility::Visible);
     }
     if (FooterBorder.IsValid())
     {
@@ -440,10 +441,10 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
                 .Padding_Lambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(20.0f); })
                 [
                     SNew(SVerticalBox)
-                    // Верхняя полоса (Header; скрывается в bWorldSurfaceMode)
+                    // Верхняя полоса (Header: отображается как на меше терминала по §6.6 Co3-2, так и в интерактивном режиме)
                     + SVerticalBox::Slot()
                     .AutoHeight()
-                    .Padding(TAttribute<FMargin>::CreateLambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(0.0f, 0.0f, 0.0f, 10.0f); }))
+                    .Padding(TAttribute<FMargin>::CreateLambda([this]() { return FMargin(0.0f, 0.0f, 0.0f, 10.0f); }))
                     [
                         SAssignNew(HeaderBorder, SBorder)
                         .BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.12f, 1.0f))
@@ -520,25 +521,28 @@ void UFicsitAIScreenSurfaceWidget::LayoutInVirtualWindow(const FVector2D& Layout
 {
     SetCanvasSize(LayoutSize);
     const TSharedRef<SWidget> RootSlate = TakeWidget();
-    WorldVirtualWindow = SNew(SVirtualWindow).Size(LayoutSize);
-    WorldVirtualWindow->SetContent(RootSlate);
+    TSharedRef<SVirtualWindow> TempVirtualWindow = SNew(SVirtualWindow).Size(LayoutSize);
+    TempVirtualWindow->SetContent(RootSlate);
 
     // SScaleBox кэширует LastPaintGeometry с предыдущего кадра отрисовки (см. SScaleBox.cpp:244);
     // для корректного расчёта масштаба при динамической смене размера окна требуется 2 прохода layout & paint
     for (int32 Pass = 0; Pass < 2; ++Pass)
     {
-        WorldVirtualWindow->SlatePrepass(1.0f);
+        TempVirtualWindow->SlatePrepass(1.0f);
 
         FSlateDrawBuffer DrawBuffer;
         if (DrawBuffer.Lock())
         {
-            FSlateWindowElementList& WindowElementList = DrawBuffer.AddWindowElementList(WorldVirtualWindow.ToSharedRef());
-            WorldVirtualWindow->PaintWindow(FApp::GetCurrentTime(), 0.0f, WindowElementList, FWidgetStyle(), true);
+            FSlateWindowElementList& WindowElementList = DrawBuffer.AddWindowElementList(TempVirtualWindow);
+            TempVirtualWindow->PaintWindow(FApp::GetCurrentTime(), 0.0f, WindowElementList, FWidgetStyle(), true);
             DrawBuffer.Unlock();
         }
     }
 
     UpdateModuleContentAreaGeometry();
+
+    // Отсоединяем содержимое окна, чтобы не удерживать SObjectWidget / UUserWidget
+    TempVirtualWindow->SetContent(SNullWidget::NullWidget);
 }
 
 void UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()
@@ -568,8 +572,11 @@ void UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()
     {
         if (bWorldSurfaceMode)
         {
-            // На меше терминала модуль компонуется 16:9 без полей и без заголовков (AC-02, ARCHITECTURE §6.6)
-            NewSize = FIntPoint(FMath::RoundToInt(CanvasSize.X), FMath::RoundToInt(CanvasSize.Y));
+            // На меше терминала (1280x720) верхняя полоса статуса занимает 48px (38px + 10px отступ),
+            // нижняя полоса клавиш свернута (0px), внешняя рамка 0px (§6.6 по Co3-2)
+            const int32 ContentWidth = FMath::RoundToInt(CanvasSize.X);
+            const int32 ContentHeight = FMath::RoundToInt(CanvasSize.Y) - 48;
+            NewSize = FIntPoint(ContentWidth, ContentHeight);
         }
         else
         {
@@ -581,7 +588,7 @@ void UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()
         }
     }
 
-    const float NewAspect = bWorldSurfaceMode ? (16.0f / 9.0f) : ((NewSize.Y > 0) ? (static_cast<float>(NewSize.X) / static_cast<float>(NewSize.Y)) : (16.0f / 9.0f));
+    const float NewAspect = (NewSize.Y > 0) ? (static_cast<float>(NewSize.X) / static_cast<float>(NewSize.Y)) : (16.0f / 9.0f);
 
     if (NewSize != CachedModuleAreaSizePx || !FMath::IsNearlyEqual(NewAspect, CachedModuleAreaAspectRatio, 0.001f))
     {
@@ -613,7 +620,9 @@ FIntPoint UFicsitAIScreenSurfaceWidget::GetModuleAreaSizePx() const
     }
     if (bWorldSurfaceMode)
     {
-        return FIntPoint(FMath::RoundToInt(CanvasSize.X), FMath::RoundToInt(CanvasSize.Y));
+        const int32 ContentWidth = FMath::RoundToInt(CanvasSize.X);
+        const int32 ContentHeight = FMath::RoundToInt(CanvasSize.Y) - 48;
+        return FIntPoint(ContentWidth, ContentHeight);
     }
     const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);
     const int32 NonContentHeight = 40 + 48 + 20 + 36;
@@ -623,10 +632,6 @@ FIntPoint UFicsitAIScreenSurfaceWidget::GetModuleAreaSizePx() const
 
 float UFicsitAIScreenSurfaceWidget::GetModuleAreaAspectRatio() const
 {
-    if (bWorldSurfaceMode)
-    {
-        return 16.0f / 9.0f;
-    }
     if (CachedModuleAreaAspectRatio > 0.01f)
     {
         return CachedModuleAreaAspectRatio;

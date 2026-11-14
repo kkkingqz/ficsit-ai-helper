@@ -310,3 +310,30 @@
 - `git diff --check`: OK.
 - `FactoryEditor Linux Development`: Succeeded.
 - `UnrealEditor-Cmd` (`FicsitAI`): 6/6 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+
+## Gf-26 → Gs, Co · ответ на ревью раунда 5 по PR #49 · 14.11.2026
+
+Замечания пятого раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6876167821) (`Gs`, замечания 1–2) отработаны в полном объёме:
+
+1. **[P2] Замечание 1: Верхняя полоса статуса на экране в мире и композиция 16:9 (§6.6 по Co3-2):**
+   - В `UFicsitAIScreenSurfaceWidget::UpdateLayout()` верхняя полоса статуса (`HeaderBorder`) теперь остаётся видимой (`EVisibility::Visible`) как в интерактивном режиме, так и на экране в мире (`bWorldSurfaceMode = true`). Сворачивается только нижняя полоса подсказок клавиш (`FooterBorder -> EVisibility::Collapsed`), у которой нет назначения на меше.
+   - В `UFicsitAIScreenSurfaceWidget::RebuildWidget()` вертикальный отступ слота заголовка унифицирован: `FMargin(0.0f, 0.0f, 0.0f, 10.0f)`. При фиксированной высоте SBox заголовка 38px суммарная высота полосы статуса составляет 48px.
+   - **Раскладка на экране в мире (Render Target 1280×720, 16:9, §6.6):**
+     - Сам render target и холст экрана в мире строго сохраняют соотношение 16:9 (1280×720).
+     - Внутри этой 16:9 композиции верхняя полоса статуса занимает 1280×48, отображая заголовок/статус терминала или модуля.
+     - Оставшаяся область модуля `ModuleContentBox` честно занимает `1280 × 672` (720 - 48 = 672).
+     - Контекст активного модуля на меше (`bWorldSurface = true`) транслирует честные размеры Slate-раскладки `ModuleContentBox->GetPaintSpaceGeometry().GetAbsoluteSize()`: `SizePx = (1280, 672)` и `AspectRatio = 1280.0f / 672.0f ≈ 1.905` (как при фактической отрисовке Slate, так и в fallback-ветках `GetModuleAreaSizePx()` и `AFicsitAITerminal::GetWorldScreenContext()`).
+   - Автотест `FicsitAI.Core.TerminalGame` (п. 11.1, 11.3 и п. 12) обновлен: закрепляет наличие верхней полосы статуса на меше и честные габариты области контента модуля `(1280, 672)`.
+
+2. **[P2] Замечание 2: Устранение цикла удержания Slate/UMG и реальная Slate-привязка в проверке GC:**
+   - В `UFicsitAIScreenSurfaceWidget::LayoutInVirtualWindow()` окно `TempVirtualWindow` сделано локальной переменной функции. Перед выходом из функции вызывается `TempVirtualWindow->SetContent(SNullWidget::NullWidget)`, гарантируя, что виртуальное окно не удерживает `RootSlate` (`SObjectWidget`) и лежащий под ним `UUserWidget`.
+   - В `AFicsitAITerminal::CloseInteractiveScreen()` добавлен вызов `PlayerWidget->ReleaseWorldSurfaceResources()`, гарантирующий отсоединение содержимого и очистку окна при закрытии экрана игрока.
+   - В тесте `FicsitAI.Core.TerminalGame` (пункт 10) перед демонтажом терминала и проверкой GC теперь выполняется реальная Slate-привязка и отрисовка через `SurfaceWidget->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f))`. Проверка `CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS)` подтверждает, что `WorldSurfaceWidget` успешно собирается GC после `EndPlay`, доказывая корректный разрыв цикла.
+   - В тесте `FicsitAI.Core.TerminalGame` (пункт 11) добавлена аналогичная GC-проверка для `InteractiveSurface`: после `CloseInteractiveScreen()` и `EndPlay()` слабый указатель `WeakInteractiveSurface` успешно обнуляется сборщиком мусора, подтверждая отсутствие удержания интерактивного виджета после раскладки в виртуальном окне.
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 6/6 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.

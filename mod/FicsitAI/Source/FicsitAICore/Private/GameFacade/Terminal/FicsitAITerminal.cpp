@@ -183,8 +183,10 @@ FFicsitAIScreenContext AFicsitAITerminal::GetWorldScreenContext() const
     }
     else
     {
-        Context.SizePx = FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx);
-        Context.AspectRatio = 16.0f / 9.0f;
+        constexpr int32 DefaultContentWidth = 1280;
+        constexpr int32 DefaultContentHeight = 672; // 720 - 48 (Header: 38px + 10px margin)
+        Context.SizePx = FIntPoint(DefaultContentWidth, DefaultContentHeight);
+        Context.AspectRatio = static_cast<float>(DefaultContentWidth) / static_cast<float>(DefaultContentHeight);
     }
     Context.bHasInputFocus = false;
     return Context;
@@ -702,6 +704,7 @@ void AFicsitAITerminal::CloseInteractiveScreen()
         PlayerWidget->OnCloseRequested.Unbind();
         PlayerWidget->ClearModule();
         UFicsitAIScreenSurfaceWidget::CloseForPlayer(PC);
+        PlayerWidget->ReleaseWorldSurfaceResources();
     }
     SetScreenSurface(nullptr);
 
