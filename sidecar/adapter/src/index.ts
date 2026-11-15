@@ -108,6 +108,7 @@ export async function createApp(config: Config, log: Logger) {
     config.foremanBaseUrl,
     loadOrCreateAccount(config.accountPath),
     log,
+    config.accountPath,
   );
   const app = express();
   app.disable("x-powered-by");
