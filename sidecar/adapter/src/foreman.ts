@@ -34,6 +34,23 @@ export interface ForemanAccount {
   password: string;
 }
 
+/**
+ * Что делать, когда файл аккаунта потерян или не совпал с базой.
+ *
+ * Не «удалите файл» (ревью Gs на #48, п. 2): пароль в файле — пароль записи в
+ * базе Foreman, а email адаптер каждый раз берёт один и тот же. Новый файл
+ * даёт новый пароль к той же записи, то есть `sign-in 401` и `sign-up 422`
+ * по кругу. Файл и база — пара: восстанавливаются вместе или убираются вместе.
+ */
+export function accountRecoveryHint(path?: string): string {
+  const file = path === undefined ? "файл аккаунта адаптера" : `файл ${path}`;
+  return (
+    `В нём пароль к записи в базе Foreman, и заново он не выводится: восстановите ${file} ` +
+    "из копии рядом с базой. Нужен чистый лист — уберите файл вместе с базой Foreman: " +
+    "новый файл при старой базе даёт тот же email с новым паролем, и вход не пройдёт"
+  );
+}
+
 export class ForemanError extends Error {
   public constructor(
     message: string,
@@ -75,7 +92,10 @@ export function playthroughIdFor(saveId: string): string {
  *   пользователя. Мы его не чиним сами: это чужое решение, но отказываемся
  *   работать и говорим, что сделать.
  */
-export function loadOrCreateAccount(path: string): ForemanAccount {
+export function loadOrCreateAccount(
+  path: string,
+  platform: NodeJS.Platform = process.platform,
+): ForemanAccount {
   let raw: string | undefined;
   try {
     raw = readFileSync(path, "utf8");
@@ -84,26 +104,35 @@ export function loadOrCreateAccount(path: string): ForemanAccount {
   }
 
   if (raw !== undefined) {
-    assertPrivateMode(path);
-    let parsed: Partial<ForemanAccount>;
+    assertPrivateMode(path, platform);
+    let parsed: unknown;
     try {
-      parsed = JSON.parse(raw) as Partial<ForemanAccount>;
+      parsed = JSON.parse(raw);
     } catch {
       // Сообщение разбора сюда не попадает — в нём бывает кусок пароля.
       throw new ForemanError(
-        `файл аккаунта ${path} не разобран как JSON. Удалите его и перезапустите сайдкар: ` +
-          "аккаунт заведётся заново",
+        `файл аккаунта ${path} не разобран как JSON. ${accountRecoveryHint()}`,
       );
     }
-    if (
-      typeof parsed.email === "string" &&
-      typeof parsed.password === "string" &&
-      parsed.email.length > 0 &&
-      parsed.password.length > 0
-    ) {
-      return { email: parsed.email, name: parsed.name ?? "FICSIT AI", password: parsed.password };
+    // `null` — тоже разобранный JSON: без этой проверки дальше был сырой
+    // `TypeError` вместо диагностики файла (ревью Gs на #48, п. 2).
+    if (typeof parsed !== "object" || parsed === null) {
+      throw new ForemanError(
+        `файл аккаунта ${path} разобран как JSON, но в нём не объект. ${accountRecoveryHint()}`,
+      );
     }
-    throw new ForemanError(`файл аккаунта ${path} есть, но в нём нет email и пароля`);
+    const fields = parsed as Partial<ForemanAccount>;
+    if (
+      typeof fields.email === "string" &&
+      typeof fields.password === "string" &&
+      fields.email.length > 0 &&
+      fields.password.length > 0
+    ) {
+      return { email: fields.email, name: fields.name ?? "FICSIT AI", password: fields.password };
+    }
+    throw new ForemanError(
+      `файл аккаунта ${path} есть, но в нём нет email и пароля. ${accountRecoveryHint()}`,
+    );
   }
 
   // Пароль видит только этот файл: в лог, в аргументы команд и в ответы API он
@@ -120,11 +149,17 @@ export function loadOrCreateAccount(path: string): ForemanAccount {
 }
 
 /**
- * Отказ, если файл с паролем доступен не только владельцу. На системах без
- * POSIX-прав (режим без бит доступа) проверка пропускается: там права файла
- * задаются иначе, и выдумывать их здесь нечего.
+ * Отказ, если файл с паролем доступен не только владельцу.
+ *
+ * Только на платформах с POSIX-правами. На Windows `writeFileSync` с
+ * `mode: 0o600` даёт файл с режимом `666` (в режиме живёт лишь бит «только
+ * чтение»), и прежняя проверка «есть биты для других» отказывала сайдкару
+ * читать свой же файл при втором запуске — на штатной раскладке S5-lite
+ * (ревью Gs на #48, п. 1). Доступ там ограничивают ACL каталога данных
+ * пользователя, а `chmod 600` в подсказке нечем выполнить.
  */
-function assertPrivateMode(path: string): void {
+function assertPrivateMode(path: string, platform: NodeJS.Platform): void {
+  if (platform === "win32") return;
   const mode = statSync(path).mode & 0o777;
   if ((mode & 0o077) === 0) return;
   throw new ForemanError(
@@ -186,6 +221,8 @@ export class ForemanSession {
     private readonly baseUrl: string,
     private readonly account: ForemanAccount,
     private readonly log: Logger,
+    /** Путь файла аккаунта — только для подсказки в ошибке входа. */
+    private readonly accountPath?: string,
   ) {
     this.origin = new URL(baseUrl).origin;
   }
@@ -257,7 +294,8 @@ export class ForemanSession {
     // в него Better Auth кладёт присланный адрес, а рядом лежал пароль.
     throw new ForemanError(
       `вход в Foreman не удался: sign-in ${signIn.status}, sign-up ${signUp.status}. ` +
-        "Если аккаунт заведён с другим паролем, удалите файл аккаунта адаптера и перезапустите сайдкар",
+        `Запись ${this.account.email} в базе Foreman заведена с другим паролем. ` +
+        accountRecoveryHint(this.accountPath),
       signUp.status,
     );
   }
