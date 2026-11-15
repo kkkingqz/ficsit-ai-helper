@@ -25,6 +25,11 @@ cat > "$T/engine/Engine/Build/BatchFiles/RunUAT.sh" <<'STUB'
 proj=""; mod=""
 for a in "$@"; do case "$a" in -Project=*) proj="$(dirname "${a#-Project=}")";; -dlcname=*) mod="${a#-dlcname=}";; esac; done
 [[ -n "${STUB_UAT_SLEEP:-}" ]] && sleep "$STUB_UAT_SLEEP"
+# Правка заголовка проекта во время сборки (ревью #45): STUB_UAT_EDIT — путь в проекте, STUB_UAT_COMMIT=1 — ещё и коммит.
+if [[ -n "${STUB_UAT_EDIT:-}" ]]; then
+  echo '// mid-build' >> "$proj/$STUB_UAT_EDIT"
+  [[ -n "${STUB_UAT_COMMIT:-}" ]] && "$FICSITAI_GIT" -C "$proj" -c user.name=t -c user.email=t@t commit -qam mid >/dev/null 2>&1
+fi
 case "${STUB_UAT:-ok}" in
   fail) echo "error C1234: stub"; exit 6 ;;
   stale) exit 0 ;;
@@ -207,6 +212,20 @@ if [[ -n "$GIT" ]]; then
     check "более новый коммит заголовков — пройдено" "$(HCL= GV)" 0
     check "источник — история проекта" "$(grep -c 'заголовки CL 517554 (история проекта)' "$T/out.txt")" 1
     check "ручной номер, равный истории, — пройдено" "$(HCL=517554 GV)" 0
+    # Ревью #45, п. 1: заголовок заменён следующим коммитом — рабочее дерево чистое, но ABI уже не тот.
+    echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"; pgit commit -qam "Swap header"
+    check "заголовок заменён коммитом после «Update headers» — не пройдено" "$(HCL= GV)" 1
+    check "файл и коммит названы" "$(grep -c 'изменены коммитами после «Update headers to CL517554»: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1
+    pgit revert --no-edit HEAD
+    check "возврат заголовка коммитом — пройдено: дерево снова как в «Update headers»" "$(HCL= GV)" 0
+    # Ревью #45, п. 2: заголовок меняется, пока сборка держит блокировку.
+    check "правка заголовка во время сборки — не пройдено" "$(STUB_UAT_EDIT=Source/FactoryGame/Public/A.h HCL= GV)" 1
+    check "причина — проект изменился во время сборки" "$(grep -c 'проект SML изменился во время сборки' "$T/out.txt")" 1
+    pgit checkout -- Source
+    check "коммит заголовка во время сборки — не пройдено" "$(STUB_UAT_EDIT=Source/FactoryGame/Public/A.h STUB_UAT_COMMIT=1 HCL= GV)" 1
+    check "в причине оба коммита проекта" "$(grep -cE 'проект SML изменился во время сборки: коммит [0-9a-f]{8} → [0-9a-f]{8}' "$T/out.txt")" 1
+    pgit revert --no-edit HEAD
+    check "после возврата — снова пройдено" "$(HCL= GV)" 0
     echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
     check "заголовок изменён в рабочем дереве — не пройдено" "$(HCL= GV)" 1
     check "файл назван" "$(grep -c 'изменены в рабочем дереве проекта: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1

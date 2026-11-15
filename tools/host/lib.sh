@@ -112,8 +112,11 @@ fa_sync_mod_source() {
 # обе сборки, проверка свежести архива и его
 # копирование в каталог результата идут под одной блокировкой: пока она держится, никто другой через
 # эти скрипты не меняет ни исходники в проекте SML, ни архив.
+# Заголовки проекта SML (fa_sml_headers) проверяются под той же блокировкой — до сборки и ещё раз после UAT:
+# правка или коммит в проекте во время сборки делают архив непроверенным (ревью #45).
 # Результат: FA_BUILD_EXIT (0 — успех), FA_BUILD_STAGE (где остановилось), FA_BUILD_ORIGIN,
-# FA_BUILD_ARCHIVE (копия в каталоге результата), FA_BUILD_SHA, FA_BUILD_SIZE_MB, FA_BUILD_LOG.
+# FA_BUILD_ARCHIVE (копия в каталоге результата), FA_BUILD_SHA, FA_BUILD_SIZE_MB, FA_BUILD_LOG;
+# заголовки этого архива — FA_BUILD_HCL, FA_BUILD_HCL_SRC, FA_BUILD_HCL_PROBLEM, ревизия проекта — FA_BUILD_PROJECT_REV.
 fa_build_mod() {
     local mod="$1" project="$2" out="$3" sync="$4"; shift 4
     local keeps=("$@") uproject="$project/FactoryGame.uproject" src="$FA_REPO_ROOT/mod/$mod"
@@ -121,6 +124,7 @@ fa_build_mod() {
     fa_check_build_env
     mkdir -p "$out" || fa_die "не создаётся $out"
     FA_BUILD_LOG="$out/build-$mod.log"; FA_BUILD_EXIT=1; FA_BUILD_STAGE=""; FA_BUILD_ARCHIVE=""; FA_BUILD_SHA=""; FA_BUILD_SIZE_MB=""
+    FA_BUILD_HCL=""; FA_BUILD_HCL_SRC=""; FA_BUILD_HCL_PROBLEM=""; FA_BUILD_PROJECT_REV=""
     FA_BUILD_ORIGIN="каталог проекта SML, вне репозитория"
     local unused pct cook
     # Число процессов компиляции шейдеров (Gs-26): при 16 упирается в память.
@@ -129,7 +133,10 @@ fa_build_mod() {
     cook="-ini:Engine:[DevOptions.Shaders]:NumUnusedShaderCompilingThreads=$unused -ini:Engine:[DevOptions.Shaders]:PercentageUnusedShaderCompilingThreads=$pct"
 
     _fa_build_locked() {
-        local attempt started produced
+        local attempt started produced rev_after
+        fa_sml_headers "$project"
+        FA_BUILD_HCL="$FA_HCL"; FA_BUILD_HCL_SRC="$FA_HCL_SRC"; FA_BUILD_HCL_PROBLEM="$FA_HCL_PROBLEM"
+        FA_BUILD_PROJECT_REV="$("$FA_GIT" -C "$project" rev-parse -q --verify HEAD 2>/dev/null || true)"
         if [[ "$sync" == 1 && -f "$src/$mod.uplugin" ]]; then
             FA_BUILD_ORIGIN="репозиторий, \`mod/$mod\`"
             if ! fa_sync_mod_source "$src" "$project/Mods/$mod" "${keeps[@]}"; then
@@ -162,6 +169,13 @@ fa_build_mod() {
             sleep 45
         done
         if [[ $FA_BUILD_EXIT -ne 0 ]]; then FA_BUILD_STAGE="сборка: UAT вернул $FA_BUILD_EXIT"; rm -f "$started"; return "$FA_BUILD_EXIT"; fi
+        # Сверка после сборки: тот же коммит проекта, тот же номер, и проблем не прибавилось.
+        fa_sml_headers "$project"
+        rev_after="$("$FA_GIT" -C "$project" rev-parse -q --verify HEAD 2>/dev/null || true)"
+        if [[ "$rev_after" != "$FA_BUILD_PROJECT_REV" || "$FA_HCL" != "$FA_BUILD_HCL" \
+              || ( -n "$FA_HCL_PROBLEM" && -z "$FA_BUILD_HCL_PROBLEM" ) ]]; then
+            FA_BUILD_HCL_PROBLEM="проект SML изменился во время сборки: коммит ${FA_BUILD_PROJECT_REV:0:8} → ${rev_after:0:8}, заголовки CL ${FA_BUILD_HCL:-?} → ${FA_HCL:-?}${FA_HCL_PROBLEM:+; $FA_HCL_PROBLEM}"
+        fi
         produced="$project/Saved/ArchivedPlugins/$mod/$mod-Windows.zip"
         # Архив должен быть создан этой сборкой, а не остаться от прошлой.
         if [[ ! -f "$produced" || ! "$produced" -nt "$started" ]]; then
@@ -320,6 +334,8 @@ LAUNCH
 # из последнего коммита «Update headers to CL<номер>» в истории проекта. FICSITAI_SML_HEADERS_CL — запасной путь
 # для обрезанной истории: при известной истории он должен с ней совпасть. Заголовки игры (Source/) и SML
 # (Mods/SML/Source/) не должны отличаться от коммита: правка в рабочем дереве меняет ABI при том же номере.
+# Дерево заголовков игры (Source/FactoryGame) сверяется ещё и с самим коммитом «Update headers»: замена заголовка
+# следующим коммитом тоже меняет ABI, хотя рабочее дерево чистое (ревью #45). Прочие коммиты после него допустимы.
 # Локальные правки Mods/WwisePatches и прочих инструментов сборки допустимы (ENVIRONMENT.md §5.1).
 # Мод на заголовках другой сборки игры компилируется, но виртуальные вызовы уходят в чужие слоты (Co-75).
 # Результат: FA_HCL — номер или пусто; FA_HCL_SRC — откуда он; FA_HCL_PROBLEM — почему номеру нельзя верить.
@@ -330,12 +346,18 @@ fa_sml_headers() {
     if [[ -n "$manual" && ! "$manual" =~ ^[0-9]+$ ]]; then
         FA_HCL_PROBLEM="FICSITAI_SML_HEADERS_CL — не номер сборки: $manual"; return 0
     fi
-    hist="$("$FA_GIT" -C "$proj" log -E -i --grep='headers to CL ?[0-9]+' -1 --format=%s 2>/dev/null \
-        | grep -oiE 'CL ?[0-9]+' | head -1 | grep -oE '[0-9]+' || true)"
+    local line hcommit
+    line="$("$FA_GIT" -C "$proj" log -E -i --grep='headers to CL ?[0-9]+' -1 --format='%H %s' 2>/dev/null || true)"
+    hcommit="${line%% *}"
+    hist="$(grep -oiE 'CL ?[0-9]+' <<<"${line#* }" | head -1 | grep -oE '[0-9]+' || true)"
     if [[ -n "$hist" ]]; then
         FA_HCL="$hist"; FA_HCL_SRC="история проекта"
         if [[ -n "$manual" && "$manual" != "$hist" ]]; then
             FA_HCL_PROBLEM="в истории проекта CL $hist, в FICSITAI_SML_HEADERS_CL — CL $manual"; return 0
+        fi
+        if changed="$("$FA_GIT" -C "$proj" diff --name-only "$hcommit" HEAD -- Source/FactoryGame 2>/dev/null)" && [[ -n "$changed" ]]; then
+            FA_HCL_PROBLEM="заголовки игры изменены коммитами после «Update headers to CL$hist»: $(head -3 <<<"$changed" | paste -sd ' ' -)$([[ $(wc -l <<<"$changed") -gt 3 ]] && echo ' …')"
+            return 0
         fi
     elif [[ -n "$manual" ]]; then
         FA_HCL="$manual"; FA_HCL_SRC="задан вручную"

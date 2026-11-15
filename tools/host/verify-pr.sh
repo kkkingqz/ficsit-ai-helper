@@ -28,14 +28,20 @@ done
 [[ ${#mods[@]} -gt 0 ]] || fa_die "не задан ни один мод"
 [[ -n "$project" ]] || fa_die "не задан проект SML: --project или FICSITAI_SML_PROJECT"
 fa_require_role
-fa_sml_headers "$project"
 fa_new_dir runs "verify-"; out="$FA_NEW_DIR"
 ok=1; lines=(); zips=(); declare -A want=()
+# Заголовки проекта SML проверяются под блокировкой сборки для каждого архива (fa_build_mod, ревью #45).
+hcl=""; hcl_src=""; hcl_problem=""; hcl_rev=""
 
 for mod in "${mods[@]}"; do
     if fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"; then
         lines+=("- Сборка Win64 Shipping, \`$mod\`: успешно; исходники — $FA_BUILD_ORIGIN; архив ${FA_BUILD_SIZE_MB} МБ, sha256 \`${FA_BUILD_SHA}…\`")
         zips+=("$FA_BUILD_ARCHIVE")
+        if [[ -z "$hcl_problem" && -n "$FA_BUILD_HCL_PROBLEM" ]]; then hcl_problem="$FA_BUILD_HCL_PROBLEM"
+        elif [[ -z "$hcl_problem" && -n "$hcl_rev$hcl" && ( "$FA_BUILD_PROJECT_REV" != "$hcl_rev" || "$FA_BUILD_HCL" != "$hcl" ) ]]; then
+            hcl_problem="архивы собраны на разных состояниях проекта SML: коммит ${hcl_rev:0:8} и ${FA_BUILD_PROJECT_REV:0:8}"
+        fi
+        [[ -z "$hcl$hcl_rev" ]] && { hcl="$FA_BUILD_HCL"; hcl_src="$FA_BUILD_HCL_SRC"; hcl_rev="$FA_BUILD_PROJECT_REV"; }
         d="$(_fa_mod_descriptor "$FA_BUILD_ARCHIVE" 2>/dev/null)" && want[$mod]="${d##*$'\t'}"
     else
         ok=0
@@ -59,10 +65,10 @@ if [[ $ok -eq 1 ]]; then
         if [[ ! "${FA_LOG_CL:-}" =~ ^[1-9][0-9]*$ ]]; then
             ok=0; lines+=("- **Номер сборки игры не найден в журнале** (\`Game Changelist\`): нельзя сверить его с заголовками проекта SML")
         fi
-        if [[ -n "$FA_HCL_PROBLEM" ]]; then
-            ok=0; lines+=("- **Заголовкам проекта SML нельзя верить:** $FA_HCL_PROBLEM (ENVIRONMENT.md §5.1)")
-        elif [[ "${FA_LOG_CL:-}" =~ ^[1-9][0-9]*$ && "$FA_HCL" != "$FA_LOG_CL" ]]; then
-            ok=0; lines+=("- **Заголовки проекта SML не от этой сборки игры:** заголовки CL $FA_HCL, игра CL $FA_LOG_CL (ENVIRONMENT.md §5.1)")
+        if [[ -n "$hcl_problem" ]]; then
+            ok=0; lines+=("- **Заголовкам проекта SML нельзя верить:** $hcl_problem (ENVIRONMENT.md §5.1)")
+        elif [[ "${FA_LOG_CL:-}" =~ ^[1-9][0-9]*$ && "$hcl" != "$FA_LOG_CL" ]]; then
+            ok=0; lines+=("- **Заголовки проекта SML не от этой сборки игры:** заголовки CL $hcl, игра CL $FA_LOG_CL (ENVIRONMENT.md §5.1)")
         fi
         # Загружен должен быть именно собранный архив: имя и SemVersion из его дескриптора.
         for mod in "${mods[@]}"; do
@@ -84,12 +90,12 @@ fi
 rev="$("$FA_GIT" -C "$FA_REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo '?')"
 branch="$("$FA_GIT" -C "$FA_REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
 dirty="чистое"; [[ -n "$("$FA_GIT" -C "$FA_REPO_ROOT" status --porcelain -- mod 2>/dev/null)" ]] && dirty="**есть незакоммиченные правки в \`mod/\`**"
-smlrev="$("$FA_GIT" -C "$project" rev-parse --short HEAD 2>/dev/null || echo 'не git')"
+smlrev="${hcl_rev:0:8}"; [[ -n "$smlrev" ]] || smlrev="$("$FA_GIT" -C "$project" rev-parse --short=8 HEAD 2>/dev/null || echo 'не git')"
 {
     echo "**Протокол проверки** · роль ${FA_ROLE^} · $(date '+%d.%m.%Y %H:%M') · \`tools/host/verify-pr.sh\`"
     echo
     echo "- Репозиторий: \`$rev\` (\`$branch\`), рабочее дерево — $dirty"
-    echo "- Проект SML: \`${project/#$HOME/\~}\` на \`$smlrev\`, заголовки CL ${FA_HCL:-не определены}${FA_HCL_SRC:+ ($FA_HCL_SRC)}"
+    echo "- Проект SML: \`${project/#$HOME/\~}\` на \`$smlrev\`, заголовки CL ${hcl:-не определены}${hcl_src:+ ($hcl_src)}"
     printf '%s\n' "${lines[@]}"
     echo "- Не проверялось: загрузка сохранения, поведение в мире, EGS в игре, Windows"
     echo
