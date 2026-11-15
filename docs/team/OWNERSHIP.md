@@ -52,8 +52,10 @@ lang: ru-RU
 | `docs/contracts/schemas/{list-metrics,query-metric}*`, их примеры | Co2 | поставка V-3 |
 | `mod/FicsitAI/Source/FicsitAIApi/` | Gs и Co | **Решение King 10.11.2026.** Код, который идёт за двумя согласованными документами интерфейсов, — Gs. Новые интерфейсы и ломающие правки — Co |
 | `mod/FicsitAI/Source/FicsitAICore/core/` | Co | валидатор, реестр операций, обёртка; тесты `core/` — Gs |
+| `mod/FicsitAI/Source/FicsitAICore/{Public,Private}/Sidecar/` | Co | Канал мода к адаптеру (S2, Co-87) |
 | `mod/FicsitAIWebRuntime/`, `third_party/blui/` | Co | мод-библиотека BLUI, S8 |
 | `third_party/sbc/` | Gs | вендоринг слоя данных с лицензией |
+| `third_party/uplot/` | Gs2 | uPlot для веб-компонентов D-2 и V-5: закреплённый дистрибутив, MIT и перечень изменений (Gs2-20) |
 | `art/command-center`, `art/base-nodes` (ветви) | Co3 | владелец ассетов |
 
 ## Разделяемые каталоги
@@ -66,7 +68,7 @@ lang: ru-RU
 | `mod/FicsitAI/Source/FicsitAIUI/` | Gf и верстальщик экранов | Gf — каркас хоста; экраны — Gs2 с Co2 (веб) или Gs (UMG), по итогам ворот W |
 | `web/README.md` | Co2 | внесён 10.11.2026: в таблице его не было |
 | `web/screens/api/`, `web/screens/chat/` | Co2 | Фасад API и логика чата для веб-варианта ADR-032 |
-| `web/screens/statistics/`, `web/screens/cards/` | Cf3 | Данные «Статистики» и карточек через фасад Co2, для веб-варианта ADR-032 после ворот W |
+| `web/screens/statistics/`, `web/screens/cards/` | Cf3 | Данные «Статистики» и карточек через фасад Co2. Веб-вариант принят на воротах W (ADR-032, Co-101) |
 | `web/ui-kit/` | Gs2 | дизайн-система и компоненты |
 | `web/spikes/` | тот, кто ведёт спайк | `spikes/s8/` — Gs2 и Co. Разрешено до ворот W как исключение для спайка: запрет наполнять `web/` касается продуктового кода экранов (решение 10.11.2026 по Gs2-1) |
 

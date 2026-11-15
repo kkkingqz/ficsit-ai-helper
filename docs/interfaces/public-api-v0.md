@@ -11,7 +11,7 @@ lang: ru-RU
 | Поле | Значение |
 |---|---|
 | Что это | **Замороженный контракт API v0** — имена, формы и семантика. Не реализация |
-| `apiVersion` | **0.4.0** (журнал версий — в конце документа; в плане, задачах и issues версия не дублируется — источник один) |
+| `apiVersion` | **0.5.0** (журнал версий — в конце документа; в плане, задачах и issues версия не дублируется — источник один) |
 | Заморожен | Неделя 1–2 вместо недели 6 (решение King 09.11.2026) |
 | Зачем раньше плана | Co2 строит фасад API для страниц в S6 на неделе 4. Без замороженного контракта он построит его по эскизу, и переделка попадёт в недели 6–7, где у него уже V-5, V-6 и V-7 |
 | Ревью | Gs |
@@ -36,6 +36,7 @@ v0 обслуживает вертикальный срез v0.1 и ровно �
 | Состояние API и мода | Операции записи — **никаких** | Заметки и экраны — Milestone 1 |
 | События `metrics.snapshot`, `mod.inert` | `line.changed`, `plan.updated`, `screen.updated`, `note.changed` | вместе со своими сущностями |
 | Сменный источник данных | Внешние поставщики метрик (`ext.<modId>.<name>`) | v1.1 вместе с публикацией API |
+| Чат с ассистентом: ход, отмена, история, события хода; состояние ассистента (с 0.5.0) | Work Orders, карточки в ответах | Milestone 2 |
 
 Запись в v0 отсутствует не потому, что не успели: в v0.1 у модели нет ни одного пишущего инструмента, а паритет (§7.5) требует, чтобы инструмент не появлялся раньше ручного пути. Пустое множество операций записи — это проверяемое состояние, а не заготовка.
 
@@ -207,11 +208,16 @@ struct FFicsitAISeries
 
 | Запрос | Вход | Выход |
 |---|---|---|
-| `GetStatus` | — | `FFicsitAIApiStatus`: `apiVersion`, `saveId`, текущий `EFicsitAIDataSource`, `bInert`, `LastSnapshotSessionTimeSec`, `bSidecarConnected`, `ApiVersionMismatch`, `Reason` |
+| `GetStatus` | — | `FFicsitAIApiStatus`: `apiVersion`, `saveId`, текущий `EFicsitAIDataSource`, `bInert`, `LastSnapshotSessionTimeSec`, `bSidecarConnected`, `ApiVersionMismatch`, `Reason`; с 0.5.0 — `AssistantState`, `AssistantModel` |
 | `ListMetrics` | необязательные `MetricId`, фильтр по `Scope` и подстроке, `PageSize`, `Cursor`; `ScopeFilter` и `ScopeCursor` — только вместе с `MetricId` | страница `FFicsitAIMetricDescriptor` плюс `NextCursor`; при заданном `MetricId` — ещё `NextScopeCursor` |
 | `QueryMetric` | `MetricId`, необязательный `ScopeId` | `FFicsitAIValue` |
 | `QuerySeries` | `MetricId`, `Window`, необязательный `ScopeId` | `FFicsitAISeries` |
 | `ListScopes` | `MetricId`, необязательные `ScopeFilter`, `PageSize`, `Cursor` | страница `FFicsitAIScopeRef` плюс `NextCursor` — доступные сети, предметы, типы машин |
+| `ChatSend` (0.5.0) | `Text` | `TurnId`; дальше — события `chat.*` с этим `TurnId` |
+| `ChatCancel` (0.5.0) | `TurnId` | `State`: `cancelled` или `alreadyCancelled` |
+| `ChatHistory` (0.5.0) | необязательный `Limit` (1–100, по умолчанию 50) | `Messages`: `Id`, `Role` (`user` \| `assistant`), `Text`, `CreatedAt` — от старых к новым |
+
+**Чат (добавлено 0.5.0, утвердил Co).** Это не операции `OperationRegistry`: мир они не меняют, модели как инструменты не выставляются, паритет §7.5 их не касается. Это запросы к сайдкару через API, как Work Orders в §3.6, — экранный модуль чата знает только API, а про канал и Foreman не знает. Сохранение — текущее, `saveId` клиент не передаёт. Семантика хода — из [протокола канала](mod-adapter-channel.md#ход-чата): один ход на сохранение, отмена останавливает вещание, а ответ Foreman всё равно дописывает в историю. Экран должен сказать это игроку словами. Без связи с сайдкаром все три запроса отвечают `SIDECAR_UNAVAILABLE` сразу, без ожидания.
 
 `ListMetrics` принимает также необязательные `ScopeFilter` (подстрока по названию области) и `ScopeCursor` — добавлено 10.11.2026 по Gs-5.1. Без них модель, у которой всего два инструмента, не могла получить ключ области за пределом первых 50 в `AvailableScopes`.
 
@@ -251,7 +257,19 @@ struct FFicsitAISeries
  *  Добавлено 10.11.2026 по Gs-3.4: metrics.snapshot не переносит переход связи, и при
  *  остановившемся сборе чат не узнал бы о падении сайдкара никогда. */
 // api.status → { bool bSidecarConnected, EFicsitAIDataSource Source, bool bInert,
-//                FString ApiVersionMismatch, FText Reason }
+//                FString ApiVersionMismatch, FText Reason,
+//                EFicsitAIAssistantState AssistantState, FString AssistantModel }   // два последних — 0.5.0
+
+/** Состояние ассистента (0.5.0): Unavailable — нет сайдкара или Foreman не отвечает (причина в Reason),
+ *  SigningIn — адаптер входит в Foreman, Ready — можно отправлять ход. AssistantModel — имя модели из адаптера. */
+// enum class EFicsitAIAssistantState : uint8 { Unavailable, SigningIn, Ready };
+
+/** Ход чата (0.5.0). Приходят только тому клиенту, который отправил ход, и только с его TurnId. */
+// chat.text      → { FString TurnId, FString Text }                    // кусок ответа, дописывается в конец
+// chat.tool      → { FString TurnId, FString Name }                    // ассистент вызвал инструмент; аргументов нет
+// chat.done      → { FString TurnId, FString Model, int32 LatencyMs }  // строка состояния: модель и задержка
+// chat.failed    → { FString TurnId, FString Code, FText Message }
+// chat.cancelled → { FString TurnId }                                  // ответ всё равно ляжет в историю
 ```
 
 Правило частоты относится к `metrics.snapshot`: оно приходит по поступлению снимка, а не по таймеру, и виджет не перерисовывается чаще, чем приходят данные (§8.2). **`api.status` приходит по изменению состояния независимо от снимков** — иначе два правила противоречили бы друг другу (Gs-5.2). Причина несовпадения версии лежит в `ApiVersionMismatch` и `Reason` и у события, и у `GetStatus`: источник один, поэтому клиент, подписавшийся после перехода, получит её первым же чтением — в 1.0-draft это было сделано неверно, и исправление зафиксировано как требование.
@@ -271,6 +289,8 @@ struct FFicsitAISeries
 | `SCOPE_NOT_FOUND` | `ScopeId` неизвестен или исчез — например, электросеть распалась после демонтажа |
 | `SOURCE_UNAVAILABLE` | источник данных не готов: игра не загружена, запись не открыта |
 | `INVALID_ARGUMENT` | аргументы противоречивы: `ScopeFilter` или `ScopeCursor` без `MetricId`, курсор метрик вместо курсора областей, `PageSize` вне допустимого (Gs-8.1) |
+| `SIDECAR_UNAVAILABLE` | 0.5.0: запрос чата без связи с сайдкаром |
+| `TURN_IN_PROGRESS`, `TURN_DRAINING`, `NO_TURN`, `TURN_MISMATCH` | 0.5.0: правила хода чата — [протокол канала](mod-adapter-channel.md#коды-ошибок-канала). Остальные коды канала тоже проходят без изменений |
 
 **Клиент обязан трактовать незнакомый код как общую ошибку.** Поэтому добавление нового кода аддитивно и мажорную версию не поднимает; `SCOPE_NOT_FOUND` добавлен так 10.11.2026.
 
@@ -281,7 +301,9 @@ struct FFicsitAISeries
 Границу с Co2 уточняю (Gs-3.2): **формы запросов, ответов, ошибок и событий — часть контракта и моя работа; файлы JSON Schema и примеры в `docs/contracts/schemas/` — Co2 в V-3.** В [#19](https://github.com/kkkingqz/ficsit-ai-helper/issues/19) я написал, что схемы придут вместе с контрактом, — неточно, границу вернул к плану.
 
 - **Значение против ряда.** `query_metric` различает две формы результата полем-дискриминатором `kind`: `value` без окна и `series` с окном. Угадывать по наличию массива не нужно.
-- **Enum** сериализуются строками в lowerCamelCase: `itemsPerMinute`, `megawatt`, `last15Min`, `saveEstimated`.
+- **Enum** сериализуются строками в lowerCamelCase: `itemsPerMinute`, `megawatt`, `last15Min`, `saveEstimated`, `signingIn`.
+- **Имена полей** — lowerCamelCase без префикса `b` у булевых: `bInert` → `inert`, `bSidecarConnected` → `sidecarConnected`.
+- **Имя запроса** в мосте страницы и в примерах ниже — lowerCamelCase: `getStatus`, `queryMetric`, `chatSend`. Конверт моста описан в [web-runtime-plugin.md](web-runtime-plugin.md#мост-пункты-4144).
 - **Курсор** — непрозрачная строка. Клиент её не разбирает и не конструирует.
 - **Ошибка** — `{ code, message, details? }`, где `code` из таблицы выше.
 - **Время** — секунды от начала сессии, число с плавающей точкой. Реальная метка живёт в заголовке снимка, а не в каждом значении (см. открытый вопрос 1).
@@ -331,12 +353,14 @@ struct FFicsitAISeries
 | 0.2.0 | 10.11.2026 | По ревью Gs: `ListScopes`, `AvailableScopes` и `bScopesTruncated`, `Timestamps` в ряду, событие `api.status`, код `SCOPE_NOT_FOUND`, `ScopeFilter` и `ScopeCursor` в `ListMetrics`, `ApiVersionMismatch` и `Reason` в статусе |
 | 0.3.0 | 10.11.2026 | По Gs-8: `MetricId` на входе `ListMetrics` и `NextScopeCursor` на выходе, пагинация `ListScopes`, код `INVALID_ARGUMENT`. Пагинация областей стала однозначной: курсор привязан к одной метрике |
 | 0.4.0 | 10.11.2026 | По Gs-13: `EFicsitAIValueState` и поле `State` у значения — неприменимое значение как успешный ответ, `value: null` в канонической форме; неприменимые точки в ряд не пишутся |
+| 0.5.0 | 12.11.2026 | **Утвердил Co** (новая поверхность для экрана чата, Co-84): запросы `ChatSend`, `ChatCancel`, `ChatHistory`; события `chat.text`, `chat.tool`, `chat.done`, `chat.failed`, `chat.cancelled`; `AssistantState` и `AssistantModel` в статусе и `api.status`; коды `SIDECAR_UNAVAILABLE` и правила хода. Правило имён полей и запросов в канонической форме записано явно |
 
 # Лимиты
 
 Стартовые значения, уточняются по замерам S3 на воротах G1:
 
 - Запросы на клиента: 10/с для экранов, 2/с для модели.
+- Чат: текст хода до 8000 знаков, история — до 100 сообщений за запрос (0.5.0; источник чисел — протокол канала).
 - `PageSize` для `ListMetrics` и `ListScopes`: по умолчанию 50, максимум 200. Вне этих границ — `INVALID_ARGUMENT`.
 - Нижний порог обновления виджета: `SampleIntervalSec` метрики, для `CostClass = heavy` — не чаще 15 с.
 - Превышение — `RATE_LIMITED`, а не молчаливое отбрасывание.

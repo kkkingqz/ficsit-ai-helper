@@ -57,6 +57,7 @@ mods="$( (ls "$STUB_MODS"; ls "$STUB_MODS/GameFeatures" 2>/dev/null) | grep -v -
     echo "[2026.11.11-10.00.02:000][  3]LogBlueprintUserMessages: [BP_MainMenuWidget] Offline LastWidget: "
   fi
   [[ "${STUB_GAME:-menu}" == fatal ]] && echo "LogWindows: Error: Fatal error!"
+  [[ "${STUB_GAME:-menu}" == app_error ]] && echo "LogWindows: Error: appError called: Assertion failed: BatchReleased"
 } > "$log"
 echo "MODS_AT_LAUNCH=$mods"
 echo "RUN_EXIT=124"
@@ -85,6 +86,7 @@ check "старый архив при коде UAT 0 отклоняется" "$(
 check "зависание до главного меню отклоняется" "$(STUB_GAME=hang run "$V" "${ARGS[@]}")" 1
 check "в протоколе «главное меню — нет»" "$(grep -c 'главное меню — нет' "$T/out.txt")" 1
 check "критическая ошибка игры отклоняется" "$(STUB_GAME=fatal run "$V" "${ARGS[@]}")" 1
+check "падение appError / Assertion failed отклоняется" "$(STUB_GAME=app_error run "$V" "${ARGS[@]}")" 1
 
 echo "2. Ошибка копирования исходников (замечание 1)"
 printf '#!/bin/sh\ncase "$*" in *mod/TestMod/Source*) exit 1;; esac\nexec /bin/cp "$@"\n' > "$T/bin/cp"; chmod +x "$T/bin/cp"

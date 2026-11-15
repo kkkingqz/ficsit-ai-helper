@@ -1,0 +1,92 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 620" width="1920" height="620" font-family="DejaVu Sans, Verdana, sans-serif">
+  <title>FICSIT AI - back action ladder in chat (D-1)</title>
+  <defs><style>
+    .bg{fill:#071320}
+    .panel{fill:#0E2032;stroke:#1E3D59;stroke-width:2}
+    .inner{fill:#0A1724;stroke:#1E3D59;stroke-width:1.5}
+    .slot{fill:#122A40;stroke:#1E3D59;stroke-width:2}
+    .sep{fill:#1E3D59}
+    .h{fill:#E6F0F7;font-size:21px;font-weight:bold;letter-spacing:1px}
+    .cap{fill:#E6F0F7;font-size:15px;letter-spacing:2px;font-weight:bold}
+    .capo{fill:#F5871F;font-size:16px;font-weight:bold;letter-spacing:2px}
+    .t{fill:#E6F0F7;font-size:17px}
+    .tm{fill:#8FA9BF;font-size:15px}
+    .ts{fill:#8FA9BF;font-size:13px;letter-spacing:1px}
+    .tt{fill:#6F8CA3;font-size:12px;letter-spacing:1px}
+    .ann{fill:#9CC4DB;font-size:14px}
+    .annd{fill:#6F8CA3;font-size:13px}
+    .big{fill:#E6F0F7;font-size:44px;font-weight:bold}
+    .bigd{fill:#7E99AE;font-size:44px;font-weight:bold}
+    .ok{fill:#46C46B;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .stale{fill:#E8C33C;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .err{fill:#E06B5A;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .neu{fill:#8FA9BF;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .icon{fill:none;stroke:#9CC4DB;stroke-width:2.2}
+    .grid{stroke:#16304A;stroke-width:1}
+</style></defs>
+  <rect class="bg" x="0" y="0" width="1920" height="620"/>
+  <text class="h" x="80" y="48">ДЕЙСТВИЕ «НАЗАД» В ЧАТЕ — ЛЕСТНИЦА ИЗ ТРЁХ СТУПЕНЕЙ</text>
+  <text class="ann" x="80" y="78">Хост спрашивает модуль первым: HandleBackAction() == true — модуль обработал сам, false — хост снимает фокус или закрывает модуль (Co-25). Клавиша на полосе — текущая привязка действия, а не буква Esc.</text>
+  <text class="capo" x="80" y="126">ШАГ 1 · ИДЁТ ПОТОК</text>
+  <rect class="panel" x="80" y="140" width="520" height="310"/>
+  <text class="cap" x="100" y="172" font-size="13">CHAT WITH AI</text>
+  <rect class="inner" x="100" y="186" width="480" height="100"/>
+  <text class="tm" x="114" y="214">Coal plants run at 86% of rated</text>
+  <text class="tm" x="114" y="238">output. Water supply is the</text>
+  <text class="tm" x="114" y="262">limiting factor for</text>
+  <rect class="" x="276" y="250" width="3" height="16" fill="#F5871F" stroke="none"/>
+  <rect class="inner" x="100" y="294" width="480" height="40"/>
+  <circle cx="122" cy="314" r="6" fill="#F5871F"/>
+  <text class="ts" x="140" y="319" style="fill:#F5871F">Streaming…</text>
+  <rect class="slot" x="472" y="300" width="88" height="28"/>
+  <text class="ts" x="516" y="319" text-anchor="middle">STOP</text>
+  <rect class="inner" x="100" y="344" width="372" height="44"/>
+  <rect class="" x="98" y="342" width="376" height="48" fill="none" stroke="#D9CEFF" stroke-width="2"/>
+  <text class="tm" x="116" y="373">How much water do they need?</text>
+  <rect class="slot" x="480" y="344" width="100" height="44"/>
+  <text class="ts" x="530" y="373" text-anchor="middle">SEND</text>
+  <text class="ts" x="100" y="432">ESC   stop the answer</text>
+  <text class="ok" x="80" y="490" font-size="15" font-weight="bold">HandleBackAction() → true</text>
+  <text class="ann" x="80" y="516">Модуль остановил поток сам. Полученная часть ответа</text>
+  <text class="ann" x="80" y="538">остаётся, фокус и набранный текст — тоже.</text>
+  <text class="capo" x="700" y="126">ШАГ 2 · ПОТОКА НЕТ, ФОКУС В ПОЛЕ</text>
+  <rect class="panel" x="700" y="140" width="520" height="310"/>
+  <text class="cap" x="720" y="172" font-size="13">CHAT WITH AI</text>
+  <rect class="inner" x="720" y="186" width="480" height="148"/>
+  <text class="tm" x="734" y="214">Coal plants run at 86% of rated</text>
+  <text class="tm" x="734" y="238">output. Water supply is the</text>
+  <text class="tm" x="734" y="262">limiting factor for three of them.</text>
+  <text class="tt" x="734" y="310">Answer complete — nothing is streaming</text>
+  <rect class="inner" x="720" y="344" width="372" height="44"/>
+  <rect class="" x="718" y="342" width="376" height="48" fill="none" stroke="#D9CEFF" stroke-width="2"/>
+  <text class="tm" x="736" y="373">How much water do they need?</text>
+  <rect class="slot" x="1100" y="344" width="100" height="44"/>
+  <text class="ts" x="1150" y="373" text-anchor="middle">SEND</text>
+  <text class="ts" x="720" y="432">ESC   leave the input</text>
+  <text class="neu" x="700" y="490" font-size="15" font-weight="bold">HandleBackAction() → false</text>
+  <text class="ann" x="700" y="516">Отменять нечего. Хост снимает фокус с поля ввода;</text>
+  <text class="ann" x="700" y="538">набранный текст остаётся в поле (правило Co-8).</text>
+  <text class="capo" x="1320" y="126">ШАГ 3 · НИ ПОТОКА, НИ ФОКУСА</text>
+  <rect class="panel" x="1320" y="140" width="520" height="310"/>
+  <text class="cap" x="1340" y="172" font-size="13">CHAT WITH AI</text>
+  <rect class="inner" x="1340" y="186" width="480" height="148"/>
+  <text class="tm" x="1354" y="214">Coal plants run at 86% of rated</text>
+  <text class="tm" x="1354" y="238">output. Water supply is the</text>
+  <text class="tm" x="1354" y="262">limiting factor for three of them.</text>
+  <text class="tt" x="1354" y="310">Answer complete — nothing is streaming</text>
+  <rect class="inner" x="1340" y="344" width="372" height="44"/>
+  <text class="tt" x="1356" y="373">Ask about your factory…</text>
+  <rect class="slot" x="1720" y="344" width="100" height="44"/>
+  <text class="ts" x="1770" y="373" text-anchor="middle">SEND</text>
+  <text class="ts" x="1340" y="432">ESC   close the screen</text>
+  <text class="neu" x="1320" y="490" font-size="15" font-weight="bold">HandleBackAction() → false</text>
+  <text class="ann" x="1320" y="516">Хост закрывает модуль и возвращает управление игроку.</text>
+  <text class="ann" x="1320" y="538">Черновик живёт в состоянии модуля и переживает закрытие.</text>
+  <line class="" x1="620" y1="290" x2="680" y2="290" stroke="#F5871F" stroke-width="2"/>
+  <polygon points="680,282 696,290 680,298" fill="#F5871F"/>
+  <text class="ts" x="658" y="274" text-anchor="middle" style="fill:#F5871F">ESC</text>
+  <line class="" x1="1240" y1="290" x2="1300" y2="290" stroke="#F5871F" stroke-width="2"/>
+  <polygon points="1300,282 1316,290 1300,298" fill="#F5871F"/>
+  <text class="ts" x="1278" y="274" text-anchor="middle" style="fill:#F5871F">ESC</text>
+  <text class="annd" x="80" y="596">Порядок именно такой: прервать идущий ответ — намерение более срочное и более частое, чем выход, и ни на одной ступени ничего не теряется.</text>
+</svg>
