@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
-import { ForemanError, type ForemanSession } from "./foreman.js";
+import { ForemanError, playthroughIdFor, type ForemanSession } from "./foreman.js";
 import type { Logger } from "./log.js";
 import { parseSse } from "./stream.js";
 
@@ -55,6 +55,7 @@ export const chatHistorySchema = z.object({
 });
 
 export type TurnErrorCode =
+  | "CHANNEL_RESET"
   | "TURN_IN_PROGRESS"
   | "TURN_DRAINING"
   | "NO_TURN"
@@ -70,6 +71,17 @@ export class TurnError extends Error {
     super(message);
     this.name = "TurnError";
   }
+}
+
+/**
+ * Кто попросил ход. Нужен, чтобы ход остался привязан к своей сессии канала:
+ * запрос вытесненной сессии не должен ни начинать ход, ни отдавать её
+ * сохранение в вызов инструмента следующей сессии (ревью Gs на #51).
+ */
+export interface TurnOwner {
+  id: string;
+  /** Жива ли ещё сессия, от имени которой начат ход. */
+  active(): boolean;
 }
 
 /** Что ход сообщает наружу. Имена событий Foreman сюда не доходят. */
@@ -97,6 +109,8 @@ interface StoredMessage {
 
 interface Turn {
   id: string;
+  /** Сессия канала, которой принадлежит ход; пусто — ход без канала. */
+  ownerId: string;
   saveId: string;
   playthroughId: string;
   controller: AbortController;
@@ -120,8 +134,11 @@ export class ChatTurns {
    * По нему канал решает, кому адресован вызов инструмента: одно сохранение —
    * его `saveId`, несколько — `AMBIGUOUS_TURN` (протокол, §Вызов инструмента).
    */
-  public liveSaveIds(): string[] {
-    return [...new Set([...this.turns.values()].map((turn) => turn.saveId))];
+  public liveSaveIds(ownerId?: string): string[] {
+    const turns = [...this.turns.values()].filter(
+      (turn) => ownerId === undefined || turn.ownerId === ownerId,
+    );
+    return [...new Set(turns.map((turn) => turn.saveId))];
   }
 
   private async playthroughFor(saveId: string, saveName?: string): Promise<string> {
@@ -140,28 +157,46 @@ export class ChatTurns {
   public async start(
     args: z.infer<typeof chatSendSchema>,
     events: TurnEvents,
+    owner?: TurnOwner,
   ): Promise<string> {
     const playthroughId = await this.playthroughFor(args.saveId, args.saveName);
 
-    const running = this.turns.get(playthroughId);
-    if (running !== undefined) {
+    // Слот занимается сразу после ожидания и с повторной проверкой: два
+    // запроса, ждавших один и тот же `drained`, иначе просыпались вместе и
+    // оба занимали один слот (ревью Gs на #50 и #51).
+    const deadline = Date.now() + DRAIN_WAIT_MS;
+    for (;;) {
+      const running = this.turns.get(playthroughId);
+      if (running === undefined) break;
+
       if (!running.cancelled) {
         throw new TurnError("TURN_IN_PROGRESS", "ход уже идёт: дождитесь конца или отмените");
       }
       // Предыдущий ход отменён и дочитывается. Ждём его, а не отказываем:
       // начать раньше нельзя — ответ брошенного хода ещё не лёг в историю.
-      const freed = await Promise.race([
-        running.drained.then(() => true),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), DRAIN_WAIT_MS)),
-      ]);
+      const left = deadline - Date.now();
+      const freed =
+        left > 0 &&
+        (await Promise.race([
+          running.drained.then(() => true),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), left)),
+        ]));
       if (!freed) {
         throw new TurnError("TURN_DRAINING", "отменённый ход всё ещё дописывается в историю");
       }
     }
 
+    // Пока мы ждали Foreman и слот, сессия могла уехать. Ход вытесненной
+    // сессии не начинаем вовсе: иначе он пойдёт в Foreman, а его вызов
+    // инструмента уедет в следующую сессию с чужим сохранением.
+    if (owner !== undefined && !owner.active()) {
+      throw new TurnError("CHANNEL_RESET", "связь с игрой переустановлена, ход не начат");
+    }
+
     let release = (): void => {};
     const turn: Turn = {
       id: `t-${randomUUID()}`,
+      ownerId: owner?.id ?? "",
       saveId: args.saveId,
       playthroughId,
       controller: new AbortController(),
@@ -211,15 +246,31 @@ export class ChatTurns {
         return;
       }
 
+      let finished = false;
       for await (const event of parseSse(upstream.body)) {
+        if (event.event === "done" || event.event === "error") finished = true;
         // Поток дочитывается и после отмены, но наружу больше ничего не идёт.
         if (turn.cancelled) continue;
         this.relay(turn, event.event, event.data, events, started);
       }
-      if (turn.cancelled) this.log.info(`отменённый ход ${turn.id} дочитан`);
+      if (turn.cancelled) {
+        this.log.info(`отменённый ход ${turn.id} дочитан`);
+      } else if (!finished) {
+        // Поток кончился без `done` и без `error`: мод остался бы с ходом
+        // без конца и ждал бы его вечно (ревью Gs на #50).
+        this.log.warn(`поток чата оборвался без конца хода (${turn.id})`);
+        events.failed(turn.id, "FOREMAN_ERROR", "Foreman закрыл поток, не закончив ход");
+      }
     } catch (err: unknown) {
       if (turn.controller.signal.aborted) {
         this.log.warn(`ход ${turn.id} брошен по пределу ожидания`);
+        if (!turn.cancelled) {
+          events.failed(
+            turn.id,
+            "FOREMAN_ERROR",
+            "ход прерван: Foreman не закончил его за отведённое время",
+          );
+        }
       } else {
         this.log.error("ход чата сорвался", err);
         if (!turn.cancelled) {
@@ -228,7 +279,8 @@ export class ChatTurns {
       }
     } finally {
       clearTimeout(limit);
-      this.turns.delete(turn.playthroughId);
+      // Снимаем только свою запись: чужой ход, занявший слот, не наш.
+      if (this.turns.get(turn.playthroughId) === turn) this.turns.delete(turn.playthroughId);
       release();
     }
   }
@@ -284,7 +336,11 @@ export class ChatTurns {
     args: z.infer<typeof chatCancelSchema>,
     events: TurnEvents,
   ): Promise<"cancelled" | "alreadyCancelled"> {
-    const playthroughId = await this.playthroughFor(args.saveId);
+    // Отмена не зависит от Foreman: идентификатор считается из `saveId`, а
+    // идущий ход лежит в памяти. Раньше здесь был запрос к Foreman, и при
+    // его недоступности отмена отвечала ошибкой, оставляя поток открытым
+    // (ревью Gs на #50).
+    const playthroughId = playthroughIdFor(args.saveId);
     const turn = this.turns.get(playthroughId);
     if (turn === undefined) {
       throw new TurnError("NO_TURN", "идущего хода нет");

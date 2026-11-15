@@ -276,7 +276,7 @@ export class ModChannel {
       return { ok: false, code: "MOD_DISCONNECTED", message: "игра не подключена" };
     }
 
-    const live = this.deps.turns.liveSaveIds();
+    const live = this.deps.turns.liveSaveIds(session.id);
     if (live.length > 1) {
       return {
         ok: false,
@@ -286,9 +286,15 @@ export class ModChannel {
     }
 
     const callId = `c-${randomUUID()}`;
+    // `savePath` Foreman подставляет в аргументы инструментов сохранений
+    // (§3.4). Моду он не нужен и не должен уходить: путь к файлу — дело
+    // Foreman, а не игры (протокол, §Вызов инструмента; ревью Gs на #51).
+    const { savePath: _savePath, ...safeArgs } = args as Record<string, unknown> & {
+      savePath?: unknown;
+    };
     const body: Record<string, unknown> = {
       name,
-      args,
+      args: safeArgs,
       deadlineSec: LIMITS.toolDeadlineSec,
     };
     const saveId = live[0];
@@ -416,7 +422,19 @@ export class ModChannel {
         res.status(400).json({ code: "INVALID_ARGUMENT", message: "ack — целое от 0" });
         return;
       }
-      this.release(session, Math.min(ack, session.outSeq));
+      // Подтверждение того, чего мы не отправляли, раньше просто обрезалось
+      // до `outSeq` и стирало непрочитанный буфер, а следующее законное
+      // переподключение получало `STREAM_LOST` (ревью Gs на #51). Теперь это
+      // отказ: расхождение видно сразу и там, где возникло.
+      if (ack > session.outSeq) {
+        res.status(400).json({
+          code: "INVALID_ARGUMENT",
+          message: `ack=${ack} больше выданного номера`,
+          ack: session.outSeq,
+        });
+        return;
+      }
+      this.release(session, ack);
 
       const oldest = session.buffer[0]?.seq ?? session.outSeq + 1;
       if (ack + 1 < oldest) {
@@ -482,23 +500,35 @@ export class ModChannel {
       }
 
       if (parsed.data.ack !== undefined) {
-        this.release(session, Math.min(parsed.data.ack, session.outSeq));
+        if (parsed.data.ack > session.outSeq) {
+          res.status(400).json({
+            code: "INVALID_ARGUMENT",
+            message: `ack=${parsed.data.ack} больше выданного номера`,
+            ack: session.outSeq,
+          });
+          return;
+        }
+        this.release(session, parsed.data.ack);
       }
 
       const ordered = [...messages].sort((a, b) => a.seq - b.seq);
-      for (const [index, message] of ordered.entries()) {
+      // Считаем принятое в этой пачке, а не её порядок: пачка `[1, 3]` после
+      // принятого `seq=1` не несёт ни одного нового сообщения, значит это
+      // пропуск, а не частичный приём (ревью Gs на #51).
+      let accepted = 0;
+      for (const message of ordered) {
         // Повтор: подтверждён раньше, второй раз не обрабатываем.
         if (message.seq <= session.inAck) continue;
         if (message.seq > session.inAck + 1) {
-          // Пропуск в начале пачки — отказ; дальше по пачке берём непрерывное
-          // начало и отвечаем его `ack`, остальное мод пришлёт снова.
-          if (index === 0) {
+          if (accepted === 0) {
             res.status(409).json({ code: "SEQ_GAP", ack: session.inAck });
             return;
           }
+          // Непрерывное начало принято — остальное мод пришлёт снова.
           break;
         }
         session.inAck = message.seq;
+        accepted += 1;
         // Подтверждение — не выполнение: результат придёт отдельным сообщением.
         void this.handle(session, message);
       }
@@ -566,7 +596,13 @@ export class ModChannel {
             this.replyError(session, message, "INVALID_ARGUMENT", body.error.message);
             return;
           }
-          const turnId = await turns.start(body.data, this.events(session));
+          // Владелец хода — эта сессия. Если её вытеснят, пока мы ждём
+          // Foreman, ход не начнётся: иначе его вызов инструмента уехал бы
+          // в следующую сессию с чужим сохранением (ревью Gs на #51).
+          const turnId = await turns.start(body.data, this.events(session), {
+            id: session.id,
+            active: () => this.session === session,
+          });
           this.reply(session, message, { turnId });
           return;
         }

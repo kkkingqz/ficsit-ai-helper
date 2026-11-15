@@ -28,6 +28,11 @@ const MODEL = "gemini-3.5-flash-lite";
 const SAVE_ID = "Сейв игрока 1";
 const OTHER_SAVE = "Сейв игрока 2";
 
+interface Held {
+  send: (event: string, data: unknown) => void;
+  end: () => void;
+}
+
 interface Seen {
   method: string;
   url: string;
@@ -753,5 +758,145 @@ describe("список инструментов для Foreman", () => {
       SF_MCP_URL: "http://127.0.0.1:1/mcp",
     });
     expect(await listTools(base)).toEqual([]);
+  });
+});
+
+describe("замечания ревью Gs на #51", () => {
+  it("вытесненная сессия не начинает ход", async () => {
+    let releaseGet: (() => void) | undefined;
+    const fake = await fakeForeman((req, res) => {
+      if (req.method === "GET") {
+        // Держим GET playthrough: сессию вытеснят, пока ход ещё не начат.
+        releaseGet = () => {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ id: "playthrough" }));
+        };
+        return;
+      }
+      const stream = sse(res);
+      stream.send("text", { delta: "не должно случиться" });
+    });
+    const { base } = await adapterFor(fake);
+
+    const first = new ModClient(base);
+    await first.hello();
+    await first.openStream();
+    await first.send([first.next("chat.send", { saveId: SAVE_ID, text: "вопрос" }, "m-1")]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+
+    const second = new ModClient(base);
+    await second.hello();
+    releaseGet?.();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    // Ход вытесненной сессии в Foreman не уходит.
+    expect(fake.seen.some((entry) => entry.url.endsWith("/chat"))).toBe(false);
+    expect(second.session).not.toBe(first.session);
+  });
+
+  it("два хода после отмены не занимают один слот", async () => {
+    const { fake, open } = await (async () => {
+      let held: Held | undefined;
+      const fake = await fakeForeman((req, res) => {
+        if (req.method === "GET") {
+          res.writeHead(200, { "content-type": "application/json" });
+          res.end(JSON.stringify({ id: playthroughIdFor(SAVE_ID) }));
+          return;
+        }
+        const stream = sse(res);
+        stream.send("text", { delta: "начал" });
+        if (held === undefined) held = stream;
+      });
+      return { fake, open: () => held };
+    })();
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "первый" }, "m-1")]);
+    const turnId = ((await mod.wait("reply", "m-1")).body as { turnId: string }).turnId;
+    await mod.send([mod.next("chat.cancel", { saveId: SAVE_ID, turnId }, "m-2")]);
+    await mod.wait("chat.cancelled");
+
+    await mod.send([
+      mod.next("chat.send", { saveId: SAVE_ID, text: "второй" }, "m-3"),
+      mod.next("chat.send", { saveId: SAVE_ID, text: "третий" }, "m-4"),
+    ]);
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    open()?.send("done", { ok: true });
+    open()?.end();
+
+    const third = await mod.wait("reply", "m-3");
+    const fourth = await mod.wait("reply", "m-4");
+    const outcomes = [third, fourth].map((reply) => (reply.error === undefined ? "ok" : reply.error.code));
+    expect(outcomes.filter((code) => code === "ok")).toHaveLength(1);
+    expect(outcomes).toContain("TURN_IN_PROGRESS");
+  });
+
+  it("будущий ack отклоняется и буфер остаётся цел", async () => {
+    const { base } = await adapterFor(await holdingForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+    await mod.wait("adapter.status");
+
+    const ahead = await mod.send([], 999_999);
+    expect(ahead.status).toBe(400);
+    expect(await ahead.json()).toMatchObject({ code: "INVALID_ARGUMENT" });
+
+    // Буфер не стёрт: законное переподключение с ack=0 получает своё.
+    const again = new ModClient(base);
+    again.session = mod.session;
+    expect((await again.openStream(0)).status).toBe(200);
+    expect((await again.wait("adapter.status")).seq).toBe(1);
+
+    const aheadOnStream = await fetch(`${base}/mod/stream?session=${mod.session}&ack=999999`, {
+      headers: { authorization: auth.authorization },
+    });
+    expect(aheadOnStream.status).toBe(400);
+  });
+
+  it("повтор в начале пачки не скрывает пропуск", async () => {
+    const { base } = await adapterFor(await holdingForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+    const first = await mod.send([{ seq: 1, type: "mod.status", body: { inert: false } }]);
+    expect(await first.json()).toMatchObject({ ack: 1 });
+
+    // Ни одного нового сообщения: это пропуск, а не частичный приём.
+    const gap = await mod.send([
+      { seq: 1, type: "mod.status", body: { inert: false } },
+      { seq: 3, type: "mod.status", body: { inert: true } },
+    ]);
+    expect(gap.status).toBe(409);
+    expect(await gap.json()).toMatchObject({ code: "SEQ_GAP", ack: 1 });
+  });
+
+  it("слишком большое тело получает код протокола, а не страницу Express", async () => {
+    const { base } = await adapterFor(await holdingForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    const response = await mod.send([
+      { seq: 1, type: "mod.status", body: { filler: "x".repeat(1_100_000) } },
+    ]);
+    expect(response.status).toBe(413);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect(await response.json()).toMatchObject({ code: "TOO_LARGE" });
+  });
+
+  it("savePath Foreman не уходит моду", async () => {
+    const { base, channel } = await adapterFor(await holdingForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    void channel.callTool("query_metric", {
+      metricId: "power.consumption",
+      savePath: "/home/king/.local/share/ficsitai/foreman/saves/чужой.sav",
+    });
+    const call = await mod.wait("tool.call");
+    expect(call.body?.args).toEqual({ metricId: "power.consumption" });
   });
 });

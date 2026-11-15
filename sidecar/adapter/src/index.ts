@@ -12,7 +12,7 @@ import {
   McpError,
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
-import { ModChannel } from "./channel.js";
+import { LIMITS, ModChannel } from "./channel.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
 import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
 import { createLogger, safeUrl, type Logger } from "./log.js";
@@ -37,6 +37,14 @@ import { applyWhitelist, hiddenCallRefusal, hiddenToolNames } from "./whitelist.
 
 const SERVER_NAME = "ficsitai-adapter";
 const SERVER_VERSION = "0.0.1";
+
+/**
+ * Предел тела запроса: пачка канала плюс запас на конверт сессии. Числа
+ * пределов живут в `channel.ts` (их же адаптер объявляет в рукопожатии), и
+ * этот запас нужен, чтобы сообщение ровно в `maxMessageBytes` доходило до
+ * проверки протокола, а не отсекалось разборщиком Express.
+ */
+const BODY_LIMIT = `${Math.ceil((LIMITS.maxMessageBytes * 1.5) / (1024 * 1024))}mb`;
 
 export function createMcpServer(
   upstream: UpstreamMcp,
@@ -162,7 +170,25 @@ export async function createApp(config: Config, log: Logger) {
 
   const app = express();
   app.disable("x-powered-by");
-  app.use(express.json({ limit: "1mb" }));
+  // Предел тела согласован с объявленными пределами канала: одно сообщение в
+  // 1 МиБ укладывается в `maxMessageBytes`, но вместе с конвертом сессии
+  // выходило за глобальный лимит, и мод получал HTML-страницу 413 вместо
+  // `{code:"TOO_LARGE"}` (ревью Gs на #51).
+  app.use(express.json({ limit: BODY_LIMIT }));
+
+  // Отказ разборщика тела — тоже ответ протокола, а не страница Express.
+  app.use((err: unknown, _req: Request, res: Response, next: (error?: unknown) => void) => {
+    const type = (err as { type?: string } | null)?.type;
+    if (type === "entity.too.large") {
+      res.status(413).json({ code: "TOO_LARGE", message: "тело запроса больше предела канала" });
+      return;
+    }
+    if (type === "entity.parse.failed") {
+      res.status(400).json({ code: "INVALID_ARGUMENT", message: "тело не разобрано как JSON" });
+      return;
+    }
+    next(err);
+  });
 
   app.get("/health", (_req: Request, res: Response) => {
     res.json({
