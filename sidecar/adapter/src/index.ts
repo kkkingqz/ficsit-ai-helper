@@ -1,6 +1,6 @@
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import type { Server as HttpServer } from "node:http";
+import type { IncomingMessage, Server as HttpServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import express, { type Request, type Response } from "express";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
@@ -172,7 +172,17 @@ export async function createApp(config: Config, log: Logger) {
   // 1 МиБ укладывается в `maxMessageBytes`, но вместе с конвертом сессии
   // выходило за глобальный лимит, и мод получал HTML-страницу 413 вместо
   // `{code:"TOO_LARGE"}` (ревью Gs на #51).
-  app.use(express.json({ limit: BODY_LIMIT }));
+  app.use(
+    express.json({
+      limit: BODY_LIMIT,
+      // Исходное тело нужно каналу: пределы протокола считаются по байтам
+      // конверта, как он пришёл (Co-105), а после разбора неизвестные поля
+      // и пробелы уже потеряны (третий круг ревью Gs на #51).
+      verify: (req, _res, buf: Buffer) => {
+        (req as IncomingMessage & { rawBody?: Buffer }).rawBody = buf;
+      },
+    }),
+  );
 
   // Отказ разборщика тела — тоже ответ протокола, а не страница Express.
   app.use((err: unknown, _req: Request, res: Response, next: (error?: unknown) => void) => {

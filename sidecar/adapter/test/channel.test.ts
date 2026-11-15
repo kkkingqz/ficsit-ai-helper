@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import type { ModChannel } from "../src/channel.js";
+import { LIMITS, type ModChannel } from "../src/channel.js";
 import { loadConfig } from "../src/config.js";
 import { playthroughIdFor } from "../src/foreman.js";
 import { createApp } from "../src/index.js";
@@ -985,5 +985,77 @@ describe("третий круг ревью Gs на #50 (тот же код зд�
       expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain(hidden);
       await expect(client.callTool({ name: hidden, arguments: {} })).rejects.toThrow();
     });
+  });
+});
+
+describe("третий круг ревью Gs на #51", () => {
+  /** Тело запроса целиком своими руками: предмет проверки — исходные байты. */
+  const sendRaw = (base: string, body: string) =>
+    fetch(`${base}/mod/send`, { method: "POST", headers: auth, body });
+
+  const batch = (session: string, messages: string[], ack?: number): string =>
+    `{"session":"${session}"${ack === undefined ? "" : `,"ack":${ack}`},"messages":[${messages.join(",")}]}`;
+
+  const status = (seq: number, extra = ""): string =>
+    `{"seq":${seq},"type":"mod.status","body":{"saveId":"${SAVE_ID}","inert":false}${extra}}`;
+
+  it("неизвестное поле на 1,1 МиБ не проходит: zod его выбрасывал", async () => {
+    const { base } = await adapterFor(await quietForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    const unknown = `,"будущее":"${"x".repeat(1_100_000)}"`;
+    const response = await sendRaw(base, batch(mod.session, [status(1, unknown)]));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "TOO_LARGE" });
+  });
+
+  it("пробелы внутри конвертов считаются: два по 550 000 — пачка больше предела", async () => {
+    const { base } = await adapterFor(await quietForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    // Повторная сериализация убирала эти пробелы, и пачка приезжала короткой.
+    const padded = (seq: number): string =>
+      `{"seq":${seq},${" ".repeat(550_000)}"type":"mod.status","body":{"saveId":"${SAVE_ID}","inert":false}}`;
+    const response = await sendRaw(base, batch(mod.session, [padded(1), padded(2)]));
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "TOO_LARGE" });
+  });
+
+  it("конверт ровно в 1 МиБ проходит, как обещает протокол", async () => {
+    const { base } = await adapterFor(await quietForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    // Добиваем конверт до 1 048 576 байт ровно. Длина считается в байтах, а
+    // не в символах: `saveId` в проверках кириллический.
+    const head = Buffer.byteLength(status(1, `,"filler":""`), "utf8");
+    const envelope = status(1, `,"filler":"${"x".repeat(LIMITS.maxMessageBytes - head)}"`);
+    expect(Buffer.byteLength(envelope, "utf8")).toBe(LIMITS.maxMessageBytes);
+
+    const response = await sendRaw(base, batch(mod.session, [envelope]));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ack: 1 });
+  });
+
+  it("отказ по размеру не освобождает подтверждённый буфер", async () => {
+    const { base, channel } = await adapterFor(await holdingForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    void channel.callTool("query_metric", {});
+    await mod.wait("tool.call");
+
+    const тяжёлая = status(1, `,"будущее":"${"x".repeat(1_100_000)}"`);
+    const refused = await sendRaw(base, batch(mod.session, [тяжёлая], 1));
+    expect(refused.status).toBe(413);
+
+    // `ack=1` в отвергнутой пачке не должен был очистить буфер: новый поток
+    // с `ack=0` получает то же сообщение снова.
+    await mod.openStream(0);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(mod.lines.filter((line) => line.type === "tool.call")).toHaveLength(2);
   });
 });

@@ -52,6 +52,114 @@ export const LIMITS = {
   sessionIdleSec: 120,
 } as const;
 
+/**
+ * Длины конвертов сообщений в исходном теле запроса, в байтах UTF-8.
+ *
+ * Считать по разобранному объекту нельзя (третий круг ревью Gs на #51): zod
+ * выбрасывает неизвестные поля, а повторная сериализация убирает пробелы, и
+ * конверт на 1,1 МиБ приезжал как короткий. Протокол (§Пределы, Co-105)
+ * считает длину конверта «как он сериализован в теле: объект целиком, от
+ * `{` до `}`», а обёртку `POST` в пачку не включает.
+ *
+ * `undefined` — тело не похоже на ожидаемый конверт; тогда зовущий считает
+ * по разобранным сообщениям, как раньше.
+ */
+export function rawEnvelopeSizes(raw: string): number[] | undefined {
+  let i = 0;
+  const isSpace = (ch: string): boolean => ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+  const skipSpace = (): void => {
+    while (i < raw.length && isSpace(raw[i] as string)) i += 1;
+  };
+  const skipString = (): void => {
+    i += 1; // открывающая кавычка
+    while (i < raw.length) {
+      const ch = raw[i] as string;
+      if (ch === "\\") {
+        i += 2;
+        continue;
+      }
+      i += 1;
+      if (ch === '"') return;
+    }
+  };
+  const readKey = (): string => {
+    const start = i;
+    skipString();
+    return raw.slice(start + 1, i - 1);
+  };
+  const skipValue = (): void => {
+    skipSpace();
+    const ch = raw[i];
+    if (ch === '"') {
+      skipString();
+      return;
+    }
+    if (ch === "{" || ch === "[") {
+      const open = ch;
+      const close = ch === "{" ? "}" : "]";
+      let depth = 0;
+      while (i < raw.length) {
+        const c = raw[i] as string;
+        if (c === '"') {
+          skipString();
+          continue;
+        }
+        if (c === open) depth += 1;
+        else if (c === close) {
+          depth -= 1;
+          i += 1;
+          if (depth === 0) return;
+          continue;
+        }
+        i += 1;
+      }
+      return;
+    }
+    while (i < raw.length && !",}] \t\n\r".includes(raw[i] as string)) i += 1;
+  };
+
+  skipSpace();
+  if (raw[i] !== "{") return undefined;
+  i += 1;
+  for (;;) {
+    skipSpace();
+    if (raw[i] === "}") return undefined; // ключа `messages` нет
+    if (raw[i] !== '"') return undefined;
+    const key = readKey();
+    skipSpace();
+    if (raw[i] !== ":") return undefined;
+    i += 1;
+    skipSpace();
+    if (key === "messages") {
+      if (raw[i] !== "[") return undefined;
+      i += 1;
+      const sizes: number[] = [];
+      for (;;) {
+        skipSpace();
+        if (raw[i] === "]") return sizes;
+        const start = i;
+        skipValue();
+        if (i <= start) return undefined;
+        sizes.push(Buffer.byteLength(raw.slice(start, i), "utf8"));
+        skipSpace();
+        if (raw[i] === ",") {
+          i += 1;
+          continue;
+        }
+        if (raw[i] === "]") return sizes;
+        return undefined;
+      }
+    }
+    skipValue();
+    skipSpace();
+    if (raw[i] === ",") {
+      i += 1;
+      continue;
+    }
+    return undefined;
+  }
+}
+
 /** Второй предел буфера: 1024 коротких сообщения дешевле восьми мегабайт. */
 const BUFFER_BYTES = 8 * 1024 * 1024;
 
@@ -512,13 +620,16 @@ export class ModChannel {
         return;
       }
       // Пределы протокола — два: на сообщение и на пачку целиком (§Пределы:
-      // «64 сообщения и 1 МиБ»). Проверялось только первое, и две полезные
-      // нагрузки по 600 000 байт проходили (повторное ревью Gs на #51).
-      // Считается сумма сообщений без внешнего конверта: иначе одиночное
-      // сообщение ровно на пределе не прошло бы. Учёт конверта уточняет Co.
+      // «64 сообщения и 1 МиБ по сумме конвертов», Co-105). Считаем по
+      // исходному телу: zod выбрасывает неизвестные поля, а повторная
+      // сериализация убирает пробелы, и конверт на 1,1 МиБ приезжал сюда
+      // коротким (третий круг ревью Gs на #51).
+      const raw = (req as Request & { rawBody?: Buffer }).rawBody;
+      const sizes =
+        (raw === undefined ? undefined : rawEnvelopeSizes(raw.toString("utf8"))) ??
+        messages.map((message) => Buffer.byteLength(JSON.stringify(message)));
       let batchBytes = 0;
-      for (const message of messages) {
-        const bytes = Buffer.byteLength(JSON.stringify(message));
+      for (const bytes of sizes) {
         if (bytes > LIMITS.maxMessageBytes) {
           res.status(413).json({ code: "TOO_LARGE", message: "сообщение больше предела" });
           return;
