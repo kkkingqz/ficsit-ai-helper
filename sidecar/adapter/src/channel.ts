@@ -44,6 +44,8 @@ export const PROTOCOL = 1;
 export const LIMITS = {
   maxMessageBytes: 1_048_576,
   maxBatchMessages: 64,
+  /** Пачка целиком: «64 сообщения и 1 МиБ» (протокол, §Пределы). */
+  maxBatchBytes: 1_048_576,
   bufferMessages: 1024,
   pingSec: 15,
   toolDeadlineSec: 10,
@@ -265,6 +267,13 @@ export class ModChannel {
    * сохранения A получил бы данные сохранения B, которое игрок успел
    * загрузить. Ходов несколько — отвечаем `AMBIGUOUS_TURN` сами, не спрашивая
    * мод; ходов нет (фоновый вызов) — `saveId` не передаём.
+   *
+   * Ход принадлежит той сессии, в которой начался, и до своего конца не
+   * переезжает в следующую (повторное ревью Gs на #51). Прежде адресат
+   * искался среди ходов текущей сессии: ход сессии A становился «фоновым
+   * вызовом», уходил в сессию B без `saveId`, и Foreman получал для хода A
+   * число из мира B. Теперь вызов хода вытесненной сессии — `CHANNEL_RESET`,
+   * и нового мода мы не спрашиваем.
    */
   public async callTool(
     name: string,
@@ -272,17 +281,28 @@ export class ModChannel {
     signal?: AbortSignal,
   ): Promise<ToolOutcome> {
     const session = this.alive();
-    if (session === undefined || session.stream === undefined) {
-      return { ok: false, code: "MOD_DISCONNECTED", message: "игра не подключена" };
-    }
 
-    const live = this.deps.turns.liveSaveIds(session.id);
+    // Адресат ищется среди всех живых ходов, а не только ходов текущей
+    // сессии: иначе ход вытесненной сессии выглядел бы фоновым вызовом.
+    const live = this.deps.turns.liveTurns();
     if (live.length > 1) {
       return {
         ok: false,
         code: "AMBIGUOUS_TURN",
         message: "идёт несколько ходов, вызов нельзя отнести к одному сохранению",
       };
+    }
+    const turn = live[0];
+    if (turn !== undefined && turn.ownerId.length > 0 && turn.ownerId !== session?.id) {
+      return {
+        ok: false,
+        code: "CHANNEL_RESET",
+        message: "ход начат в прежней сессии канала, а она уже закрыта",
+      };
+    }
+
+    if (session === undefined || session.stream === undefined) {
+      return { ok: false, code: "MOD_DISCONNECTED", message: "игра не подключена" };
     }
 
     const callId = `c-${randomUUID()}`;
@@ -297,8 +317,7 @@ export class ModChannel {
       args: safeArgs,
       deadlineSec: LIMITS.toolDeadlineSec,
     };
-    const saveId = live[0];
-    if (saveId !== undefined) body.saveId = saveId;
+    if (turn !== undefined) body.saveId = turn.saveId;
 
     return await new Promise<ToolOutcome>((resolve) => {
       let settled = false;
@@ -492,11 +511,23 @@ export class ModChannel {
         res.status(413).json({ code: "TOO_LARGE", message: "сообщений в пачке больше предела" });
         return;
       }
+      // Пределы протокола — два: на сообщение и на пачку целиком (§Пределы:
+      // «64 сообщения и 1 МиБ»). Проверялось только первое, и две полезные
+      // нагрузки по 600 000 байт проходили (повторное ревью Gs на #51).
+      // Считается сумма сообщений без внешнего конверта: иначе одиночное
+      // сообщение ровно на пределе не прошло бы. Учёт конверта уточняет Co.
+      let batchBytes = 0;
       for (const message of messages) {
-        if (Buffer.byteLength(JSON.stringify(message)) > LIMITS.maxMessageBytes) {
+        const bytes = Buffer.byteLength(JSON.stringify(message));
+        if (bytes > LIMITS.maxMessageBytes) {
           res.status(413).json({ code: "TOO_LARGE", message: "сообщение больше предела" });
           return;
         }
+        batchBytes += bytes;
+      }
+      if (batchBytes > LIMITS.maxBatchBytes) {
+        res.status(413).json({ code: "TOO_LARGE", message: "пачка больше предела" });
+        return;
       }
 
       if (parsed.data.ack !== undefined) {

@@ -130,15 +130,25 @@ export class ChatTurns {
   ) {}
 
   /**
-   * Сохранения, у которых прямо сейчас есть ход — идущий или дочитываемый.
-   * По нему канал решает, кому адресован вызов инструмента: одно сохранение —
-   * его `saveId`, несколько — `AMBIGUOUS_TURN` (протокол, §Вызов инструмента).
+   * Ходы, которые прямо сейчас идут или дочитываются, — вместе с сессией, в
+   * которой начались. По ним канал решает, кому адресован вызов инструмента:
+   * один ход — его `saveId`, несколько — `AMBIGUOUS_TURN` (протокол, §Вызов
+   * инструмента).
+   *
+   * Сессия здесь обязательна и не фильтруется (повторное ревью Gs на #51):
+   * ход живёт до своего конца, а канал под ним может смениться, и вызов
+   * начатого хода нельзя отдавать новой сессии — она ответит числом из
+   * другого мира.
    */
-  public liveSaveIds(ownerId?: string): string[] {
-    const turns = [...this.turns.values()].filter(
-      (turn) => ownerId === undefined || turn.ownerId === ownerId,
-    );
-    return [...new Set(turns.map((turn) => turn.saveId))];
+  public liveTurns(): { saveId: string; ownerId: string }[] {
+    const seen = new Set<string>();
+    const live: { saveId: string; ownerId: string }[] = [];
+    for (const turn of this.turns.values()) {
+      if (seen.has(turn.saveId)) continue;
+      seen.add(turn.saveId);
+      live.push({ saveId: turn.saveId, ownerId: turn.ownerId });
+    }
+    return live;
   }
 
   private async playthroughFor(saveId: string, saveName?: string): Promise<string> {

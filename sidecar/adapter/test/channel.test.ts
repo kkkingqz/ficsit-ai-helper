@@ -124,6 +124,9 @@ const playthroughJson = (req: IncomingMessage, res: ServerResponse): boolean => 
   return false;
 };
 
+/** Foreman, которому в проверке делать нечего. */
+const quietForeman = () => fakeForeman((_req, res) => res.end("{}"));
+
 /** Foreman, который отвечает одним ходом и ждёт, пока тест его отпустит. */
 const holdingForeman = () =>
   fakeForeman((req, res, hold) => {
@@ -898,5 +901,71 @@ describe("замечания ревью Gs на #51", () => {
     });
     const call = await mod.wait("tool.call");
     expect(call.body?.args).toEqual({ metricId: "power.consumption" });
+  });
+});
+
+describe("повторное ревью Gs на #51", () => {
+  it("инструмент начатого хода не уходит в следующую сессию", async () => {
+    const { base, channel } = await adapterFor(await holdingForeman());
+
+    const a = new ModClient(base);
+    await a.hello();
+    await a.openStream();
+    await a.send([a.next("chat.send", { saveId: SAVE_ID, text: "вопрос" }, "m-1")]);
+    await a.wait("reply", "m-1");
+    await a.wait("chat.text");
+
+    // Игрок вышел в меню и загрузил другой мир: мод открыл новую сессию, а
+    // ход сессии A ещё идёт у Foreman.
+    const b = new ModClient(base);
+    await b.hello({ saveId: OTHER_SAVE });
+    await b.openStream();
+
+    // Прежде ход A исчезал из выборки по текущей сессии, вызов выглядел
+    // фоновым и уходил в B без `saveId` — Foreman получал для хода A число
+    // из мира B.
+    const outcome = await channel.callTool("query_metric", { metricId: "power.consumption" });
+    expect(outcome).toMatchObject({ ok: false, code: "CHANNEL_RESET" });
+    expect(b.lines.some((line) => line.type === "tool.call")).toBe(false);
+  });
+
+  it("пачка больше предела по байтам — 413, одиночное сообщение на границе проходит", async () => {
+    const { base } = await adapterFor(await quietForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    // Два сообщения по 600 000 байт: каждое меньше предела, пачка — больше.
+    const half = (seq: number) => ({
+      seq,
+      type: "mod.status",
+      body: { saveId: SAVE_ID, inert: false, filler: "x".repeat(600_000) },
+    });
+    const batch = await mod.send([half(1), half(2)]);
+    expect(batch.status).toBe(413);
+    expect(await batch.json()).toMatchObject({ code: "TOO_LARGE" });
+
+    // Предел на сообщение остался на месте: одно сообщение под 1 МиБ — 200.
+    const single = await mod.send([
+      {
+        seq: 1,
+        type: "mod.status",
+        body: { saveId: SAVE_ID, inert: false, filler: "x".repeat(1_040_000) },
+      },
+    ]);
+    expect(single.status).toBe(200);
+    expect(await single.json()).toMatchObject({ ack: 1 });
+  });
+});
+
+describe("повторное ревью Gs на #50 (тот же код здесь)", () => {
+  it("FICSITAI_WHITELIST=off доходит до настроек", async () => {
+    const env = { ADAPTER_TOKEN: TOKEN } as NodeJS.ProcessEnv;
+    expect(loadConfig({ ...env, FICSITAI_WHITELIST: "off" }).whitelist).toBe(false);
+    expect(loadConfig(env).whitelist).toBe(true);
+    expect(() => loadConfig({ ...env, FICSITAI_WHITELIST: "может быть" })).toThrow(/whitelist/);
+
+    const off = await adapterFor(await quietForeman(), { FICSITAI_WHITELIST: "off" });
+    const health = (await (await fetch(`${off.base}/health`)).json()) as { hiddenTools: string[] };
+    expect(health.hiddenTools).toEqual([]);
   });
 });
