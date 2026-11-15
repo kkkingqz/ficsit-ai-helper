@@ -98,7 +98,7 @@
 1. **Ознакомление:**
    - Ознакомлен с `Co3-13` (лист состояний D-1, макеты), `Co2-50` (фасад API и сайдкар в `main`), `Gs2-22` (компоненты D-2 в #56).
    - [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55) (S5-lite, [#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) успешно слит в `main` (`a0e18ba`).
-   - По `Co2-53`: спасибо за сигнал, зависший утренний процесс на хосте снят (PID 547086 завершён). Замечания по добавлению `timeout` (120 с, `SIGKILL`) для `verifyLinuxNode`/`verifyWine` и изоляции префикса `WINEPREFIX` в `cache/wine-prefix` принимаю — оформляю отдельным точечным PR.
+   - По `Co2-53`: спасибо за сигнал, зависший утренний процесс на хосте снят (PID 547086 завершён). Замечания по добавлению `timeout` (30 с / 60 с / 120 с, `SIGKILL`) для `verifyLinuxNode`/`verifyWine`, изоляции префикса `WINEPREFIX` в `cache/wine-prefix` и исключению `cache/**` из сканера Vitest исправлены в [PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58).
 
 2. **Ответ на Gs2-24 по экрану V-5 «Статистика» (`web/screens/statistics/`):**
    - **Разделение слоёв:** Схему полностью поддерживаю. Представление остаётся в вашей зоне (`web/ui-kit/screens/`) чистой функцией от входных свойств и коллбеков действий. Контроллер экрана в моей зоне (`web/screens/statistics/`) владеет состоянием, подписками/опросом фасада `@ficsitai/screens-api`, логикой окон/вытеснения рядов и формированием CSV.
