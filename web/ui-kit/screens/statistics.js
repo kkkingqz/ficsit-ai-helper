@@ -96,7 +96,7 @@ export function mountStatistics(root, { presenter, Plot, copy, actions }) {
       exportButton.click();
       return true;
     },
-    destroy() {
+    unmount() {
       for (const { charts } of reports.values()) charts.forEach(chart => chart.destroy());
       page.remove();
     },

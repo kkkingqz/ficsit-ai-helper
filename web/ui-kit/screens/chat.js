@@ -141,7 +141,7 @@ export function mountChat(root, { presenter, copy, actions }) {
       actions.stop();
       return true;
     },
-    destroy() {
+    unmount() {
       page.remove();
     },
   };

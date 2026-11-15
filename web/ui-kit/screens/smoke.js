@@ -43,7 +43,7 @@ try {
     events.some(([name]) => name === "export") &&
     events.some(([name, value]) => name === "metric" && value === "water.production"),
     "Tabs, time window, export and metric selection are delegated");
-  stats.destroy();
+  stats.unmount();
 
   const chat = mountChat(target, { ...chatOptions, actions: {
     draft: record("draft"), send: record("send"), stop: record("stop"), retry: record("retry"),
@@ -95,7 +95,7 @@ try {
   assert(events.some(([name]) => name === "retry"), "Errors delegate retry separately from chat text");
   chat.update({ ...chatFixture("error"), error: null });
   assert(document.activeElement === draft, "Focus moves to draft after the retry action is hidden");
-  chat.destroy();
+  chat.unmount();
   assert(!target.children.length, "Destroy detaches both views");
   result.textContent = "Screen views smoke passed";
   result.dataset.pass = "true";

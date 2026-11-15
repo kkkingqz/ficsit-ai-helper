@@ -175,7 +175,7 @@ export const chatOptions = {
     offlineTitle: "Assistant unavailable — the sidecar is not connected",
     offlineDetail: "Start the sidecar and reopen Chat. Connection retries automatically.",
     offlineScope: "Statistics, Notes, Screens and Lines keep working.",
-    streaming: backKey => `Streaming… ${backKey} stops the answer`,
+    streaming: backKey => `Streaming… ${backKey} stops displaying the answer`,
     sending: "Sending request…",
     stop: "Stop", retry: "Retry", draftLabel: "Message", send: "Send",
     sendHint: "Enter to send · Shift+Enter for a new line",
