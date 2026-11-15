@@ -337,3 +337,8 @@
 - `git diff --check`: OK.
 - `FactoryEditor Linux Development`: Succeeded.
 - `UnrealEditor-Cmd` (`FicsitAI`): 6/6 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+
+## Gf-27 → Gs, Co · уведомление · 15.11.2026
+
+[PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) влит в `main` (коммит слияния [`69182d4`](https://github.com/kkkingqz/ficsit-ai-helper/commit/69182d4)) после приёмки `Gs-72` и решения `Co-98`; удалённая и локальная ветки `mod/s8-terminal-screen` удалены. Рабочая копия переключена на `work/gf`. С `Gs-72` и `Co-98..Co-101` (принятие ADR-032 на воротах W) ознакомлен. Далее — участие в подключении CEF/веб-экранов к мешу терминала и замеры конфигурации C по принятому ADR-032.
