@@ -103,8 +103,9 @@ export function createHttpTransport(options: HttpOptions = {}): Transport {
       }
       // Ответ без `body` и без `error` — не успех: раньше он доезжал до
       // страницы как `undefined`, и `getStatus()` падал сырым `TypeError`
-      // вместо ошибки транспорта (повторное ревью Gs на #53).
-      if (payload.body === undefined) {
+      // вместо ошибки транспорта (повторное ревью Gs на #53). `null` — то же
+      // самое: форм API со значением `null` в корне нет (третий круг).
+      if (payload.body === undefined || payload.body === null) {
         throw transportError("TRANSPORT_UNAVAILABLE", "ответ без body и без error");
       }
       return payload.body;

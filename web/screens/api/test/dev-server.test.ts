@@ -401,3 +401,54 @@ describe("повторное ревью Gs на #53", () => {
     expect(found.metrics[0]?.availableScopes.map((scope) => scope.displayName)).toEqual(["Item 7"]);
   });
 });
+
+describe("третий круг ревью Gs на #53", () => {
+  it("фабричная метрика не принимает выдуманную область", async () => {
+    const api = apiFor(await serve());
+
+    // Областей у метрики нет — но это не значит, что годится любой scopeId:
+    // ранний выход в общей проверке возвращал его же в ответе.
+    await expect(
+      api.queryMetric({ metricId: "power.production", scopeId: "bogus" }),
+    ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+    await expect(
+      api.querySeries({ metricId: "power.production", scopeId: "bogus", window: "last5Min" }),
+    ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+
+    // Без области та же метрика читается как раньше.
+    expect((await api.queryMetric({ metricId: "power.production" })).scopeId).toBe("");
+  });
+
+  it("body: null — ошибка транспорта, а не сырой TypeError", async () => {
+    const server = await serve();
+    const api = createApi({
+      transport: createHttpTransport({
+        baseUrl: server.url,
+        events: false,
+        fetchImpl: async (_url, init) => {
+          const { id } = JSON.parse(String((init as RequestInit).body)) as { id: string };
+          return new Response(JSON.stringify({ re: id, body: null }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        },
+      }),
+    });
+    await expect(api.getStatus()).rejects.toBeInstanceOf(ApiError);
+    await expect(api.getStatus()).rejects.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+  });
+
+  it("фасад отклоняет не-объект и от чужого транспорта", async () => {
+    // Экран может принести свой транспорт — проверка стоит и в фасаде.
+    const api = createApi({
+      transport: {
+        kind: "http",
+        call: async () => null,
+        on: () => () => {},
+        close: () => {},
+      },
+      checkApiVersion: false,
+    });
+    await expect(api.getStatus()).rejects.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+  });
+});

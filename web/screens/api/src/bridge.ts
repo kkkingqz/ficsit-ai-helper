@@ -117,8 +117,9 @@ function receive(message: BridgeInbound): void {
     clearTimeout(waiting.timer);
     if (message.error !== undefined) {
       waiting.reject(toErrorBody(message.error, "TRANSPORT_UNAVAILABLE"));
-    } else if (message.body === undefined) {
-      // Ни `body`, ни `error` — битый конверт, а не пустой успех.
+    } else if (message.body === undefined || message.body === null) {
+      // Ни `body`, ни `error` — битый конверт, а не пустой успех. `null` в
+      // корне — тоже не форма API (третий круг ревью Gs на #53).
       waiting.reject(transportError("TRANSPORT_UNAVAILABLE", "ответ моста без body и без error"));
     } else {
       waiting.resolve(message.body);

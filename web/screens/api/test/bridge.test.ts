@@ -294,3 +294,14 @@ describe("повторное ревью Gs на #53", () => {
     api.close();
   });
 });
+
+describe("третий круг ревью Gs на #53", () => {
+  it("body: null на мосту — ошибка транспорта", async () => {
+    const sent = installMod();
+    const api = createApi({ checkApiVersion: false });
+    const status = api.getStatus();
+    globals.__ficsitaiBridge?.receive({ re: sent[0]?.payload.id, body: null });
+    await expect(status).rejects.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+    api.close();
+  });
+});

@@ -104,7 +104,18 @@ export function createApi(options: CreateApiOptions = {}): FicsitAIApi {
 
   const call = async <T>(op: string, args: Record<string, unknown>): Promise<T> => {
     try {
-      return (await transport.call(op, args)) as T;
+      const body = await transport.call(op, args);
+      // Все формы API v0 — объекты. `body: null` транспорт считал успехом, и
+      // страница падала сырым `TypeError` на первом же поле вместо кода
+      // (третий круг ревью Gs на #53). Проверка стоит здесь, а не только в
+      // транспортах: экран может принести свой `transport`.
+      if (typeof body !== "object" || body === null || Array.isArray(body)) {
+        throw new ApiError({
+          code: "TRANSPORT_UNAVAILABLE",
+          message: `ответ на «${op}» не похож на форму API: ${typeof body}`,
+        });
+      }
+      return body as T;
     } catch (err: unknown) {
       // Единая форма наружу: страница ловит `ApiError` и читает `code`.
       if (err instanceof ApiError) throw err;

@@ -155,12 +155,15 @@ function matchingScopes(metricId: string, filter?: string): ScopeRef[] {
  */
 function requireScope(metric: MetricDescriptor, scopeId: string | undefined): void {
   const scopes = scopesOf(metric.id);
-  if (scopes.length === 0) return;
-  if (scopeId === undefined || scopeId === "") {
+  const given = scopeId !== undefined && scopeId !== "";
+  // Фабричной метрике область не нужна, но выдуманную она принимать не
+  // должна: ранний выход «областей нет — всё можно» пропускал любой
+  // `scopeId` и возвращал его в ответе (третий круг ревью Gs на #53).
+  if (scopes.length > 0 && !given) {
     throw new SourceError("SCOPE_REQUIRED", `метрике «${metric.id}» нужен scopeId`);
   }
-  if (!scopes.some((scope) => scope.scopeId === scopeId)) {
-    throw new SourceError("SCOPE_NOT_FOUND", `область «${scopeId}» неизвестна`);
+  if (given && !scopes.some((scope) => scope.scopeId === scopeId)) {
+    throw new SourceError("SCOPE_NOT_FOUND", `область «${scopeId as string}» неизвестна`);
   }
 }
 
