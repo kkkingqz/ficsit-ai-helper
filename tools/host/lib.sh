@@ -321,7 +321,7 @@ fa_parse_game_log() {
     FA_LOG_CL="$(grep -o 'Game Changelist: [0-9]*' "$log" | head -1 | grep -o '[0-9]*' || true)"
     FA_LOG_MODS="$(sed -n '/LogSatisfactoryModLoader: Display: List of loaded mods:/,/Discovered .* game instance modules/p' "$log" \
         | grep -o 'Display: [A-Za-z0-9_]*: [0-9][0-9A-Za-z.+-]*' | sed 's/Display: //' | grep -v '^FactoryGame:' | paste -sd, - | sed 's/,/, /g' || true)"
-    FA_LOG_FATAL="$(grep -c -E 'Critical error|Fatal error|Unhandled Exception' "$log" || true)"
+    FA_LOG_FATAL="$(grep -c -E 'Critical error|Fatal error|Unhandled Exception|appError called|Assertion failed' "$log" || true)"
     FA_LOG_PLUGIN_ERRORS="$(grep -c 'LogPluginManager: Error' "$log" || true)"
     FA_LOG_MENU=no
     if grep -q 'UEngine::LoadMap Load map complete /Game/FactoryGame/Map/MenuScenes/' "$log" \

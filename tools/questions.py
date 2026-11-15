@@ -164,7 +164,12 @@ def parse_questions(repo_root: Path):
 
                 is_notification = any("уведомление" in p for p in parts_lower)
                 is_closed = any("закрыт" in p for p in parts_lower)
-                is_open = any("открыт" in p for p in parts_lower)
+                is_open = any(
+                    "открыт" in p
+                    or p.strip() == "вопрос"
+                    or p.strip().startswith("вопрос ")
+                    for p in parts_lower
+                )
                 is_ack_or_reply = (not is_notification and not is_closed and not is_open) and any(
                     p.startswith(("ответ на", "ознакомлен", "ознакомил", "прочитан", "ack"))
                     for p in parts_lower
