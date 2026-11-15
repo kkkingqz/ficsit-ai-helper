@@ -6,5 +6,6 @@
 |---|---|---|---|
 | `sbc/` | Satisfactory Build Calculator | MIT | слой данных каталога (S3), кандидат ядра планировщика |
 | `blui/` | BLUI (форк getnamo, v5.1.0) | MIT, CEF — BSD-3-Clause | встроенный браузер; страницы раздаются с `https://ficsitai.invalid/` своим обработчиком ресурсов (S8) |
+| `foreman/` | FICSIT Foreman | Apache-2.0 | системный промпт, изменённый под белый список адаптера; подключается через `SYSTEM_PROMPT_PATH` (S2) |
 
 Полный реестр модулей и лицензий — [docs/MODULES.md](../docs/MODULES.md).

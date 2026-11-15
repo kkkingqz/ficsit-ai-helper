@@ -192,6 +192,13 @@ export class ForemanSession {
   private foremanId: string | undefined;
 
   /**
+   * Куда сообщать о смене состояния входа. Канал шлёт это моду сообщением
+   * `adapter.status`: экрану чата нужно отличать «сайдкар думает» от
+   * «сайдкар не отвечает», а узнать это можно только здесь.
+   */
+  public onState: ((state: "ready" | "signingIn" | "unavailable", reason?: string) => void) | undefined;
+
+  /**
    * Один полёт на операцию: вход, создание персоны и разрешение одного
    * сохранения выполняются по разу, сколько бы запросов их ни попросило.
    *
@@ -258,6 +265,7 @@ export class ForemanSession {
   }
 
   private async signIn(): Promise<void> {
+    this.onState?.("signingIn");
     const body = JSON.stringify({
       email: this.account.email,
       password: this.account.password,
@@ -275,6 +283,7 @@ export class ForemanSession {
     if (signIn.ok) {
       this.cookie = cookieHeaderFrom(signIn, this.cookie);
       this.log.debug("вход в Foreman выполнен");
+      this.onState?.("ready");
       return;
     }
 
@@ -287,11 +296,16 @@ export class ForemanSession {
     if (signUp.ok) {
       this.cookie = cookieHeaderFrom(signUp, this.cookie);
       this.log.info("локальный аккаунт Foreman создан при первом запуске");
+      this.onState?.("ready");
       return;
     }
 
     // Ни вход, ни регистрация: дальше идти некуда. Тело ответа не пишем —
     // в него Better Auth кладёт присланный адрес, а рядом лежал пароль.
+    this.onState?.(
+      "unavailable",
+      `вход не удался: sign-in ${signIn.status}, sign-up ${signUp.status}`,
+    );
     //
     // Что именно случилось, видно по паре кодов, и путать эти случаи дорого
     // (третий круг ревью Gs на #48): на `503` адаптер советовал убрать файл
