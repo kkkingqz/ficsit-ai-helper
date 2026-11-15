@@ -1,4 +1,5 @@
 import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -312,5 +313,91 @@ describe("замечания ревью Gs на #53: dev-сервер", () => {
     const response = await fetch(`${server.url}/link.txt`);
     expect(response.status).toBe(403);
     expect(await response.text()).not.toContain("чужое содержимое");
+  });
+});
+
+describe("повторное ревью Gs на #53", () => {
+  const post = (server: DevServer, body: string) =>
+    fetch(`${server.url}/api/v0`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body,
+    });
+
+  it("конверт без id и с args: null до источника не доходит", async () => {
+    const server = await serve();
+
+    const noId = await post(server, JSON.stringify({ op: "getStatus", args: {} }));
+    expect(noId.status).toBe(400);
+    expect(await noId.json()).toMatchObject({ error: { code: "INVALID_ARGUMENT" } });
+
+    // `args: null` — не «аргументов нет», а битый конверт.
+    const nullArgs = await post(server, JSON.stringify({ id: "m-1", op: "getStatus", args: null }));
+    expect(nullArgs.status).toBe(400);
+    expect(await nullArgs.json()).toMatchObject({ error: { code: "INVALID_ARGUMENT" } });
+  });
+
+  it("ответ без body и без error — ошибка транспорта, а не сырой TypeError", async () => {
+    const server = await serve();
+    const api = createApi({
+      transport: createHttpTransport({
+        baseUrl: server.url,
+        events: false,
+        fetchImpl: async (_url, init) => {
+          const { id } = JSON.parse(String((init as RequestInit).body)) as { id: string };
+          return new Response(JSON.stringify({ re: id }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        },
+      }),
+    });
+    await expect(api.getStatus()).rejects.toBeInstanceOf(ApiError);
+    await expect(api.getStatus()).rejects.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+  });
+
+  it("битый адрес запроса не уносит процесс", async () => {
+    const server = await serve({ "index.html": "<!doctype html><title>экран</title>" });
+    const { port } = server;
+
+    const answer = await new Promise<string>((resolve, reject) => {
+      const socket = connect(port, "127.0.0.1", () => {
+        // Сырой запрос, который `new URL` разобрать не может.
+        socket.write("GET //[ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n");
+      });
+      let text = "";
+      socket.on("data", (chunk: Buffer) => (text += chunk.toString("utf8")));
+      socket.on("end", () => resolve(text));
+      socket.on("error", reject);
+    });
+    expect(answer).toContain("400");
+
+    // Главное: сервер жив и отвечает дальше.
+    const status = await apiFor(server).getStatus();
+    expect(status.saveId).toBe("demo-save");
+  });
+
+  it("ряд требует область так же, как значение", async () => {
+    const api = apiFor(await serve());
+
+    await expect(
+      api.querySeries({ metricId: "items.produced", window: "last5Min" }),
+    ).rejects.toMatchObject({ code: "SCOPE_REQUIRED" });
+
+    await expect(
+      api.querySeries({ metricId: "items.produced", scopeId: "нет-такой", window: "last5Min" }),
+    ).rejects.toMatchObject({ code: "SCOPE_NOT_FOUND" });
+  });
+
+  it("scopeFilter применяется до выбора страницы", async () => {
+    const api = apiFor(await serve());
+    const result = await api.listMetrics({ metricId: "items.produced", scopeFilter: "такого нет" });
+    // Раньше приходила полная страница областей — отладка в браузере
+    // показывала то, чего живой API не вернёт.
+    expect(result.metrics[0]?.availableScopes).toEqual([]);
+    expect(result.metrics[0]?.scopesTruncated).toBe(false);
+
+    const found = await api.listMetrics({ metricId: "items.produced", scopeFilter: "item 7" });
+    expect(found.metrics[0]?.availableScopes.map((scope) => scope.displayName)).toEqual(["Item 7"]);
   });
 });

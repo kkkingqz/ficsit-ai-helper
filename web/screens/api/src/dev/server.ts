@@ -122,10 +122,15 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       return;
     }
 
-    const { id, op } = envelope;
-    const args = envelope.args ?? {};
-    if (id !== undefined && typeof id !== "string") {
-      sendJson(res, 400, { error: { code: "INVALID_ARGUMENT", message: "id — строка" } });
+    // Конверт S8 — это `{ id, op, args }` целиком: без `id` ответ некому
+    // соотнести с запросом, а `args: null` — не «нет аргументов», а битый
+    // конверт. И то и другое раньше проходило до источника (повторное ревью
+    // Gs на #53).
+    const { id, op, args } = envelope;
+    if (typeof id !== "string" || id === "") {
+      sendJson(res, 400, {
+        error: { code: "INVALID_ARGUMENT", message: "в конверте нужен непустой id" },
+      });
       return;
     }
     if (typeof args !== "object" || args === null || Array.isArray(args)) {
@@ -214,8 +219,19 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   };
 
   const server: Server = createServer((req, res) => {
-    const url = new URL(req.url ?? "/", `http://${host}`);
     void (async () => {
+      // Адрес разбирается внутри обработчика: сырой запрос вида `GET //[`
+      // роняет `new URL`, и прежде это уносило весь процесс (повторное
+      // ревью Gs на #53).
+      let url: URL;
+      try {
+        url = new URL(req.url ?? "/", `http://${host}`);
+      } catch {
+        sendJson(res, 400, {
+          error: { code: "INVALID_ARGUMENT", message: "некорректный адрес запроса" },
+        });
+        return;
+      }
       try {
         if (url.pathname === "/api/v0" && req.method === "POST") {
           await handleApi(req, res);

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { bridgeAvailable, createBridgeTransport } from "../src/bridge.js";
 import { createApi } from "../src/facade.js";
-import { API_VERSION, ApiError } from "../src/types.js";
+import { API_VERSION, ApiError, type ApiEvents } from "../src/types.js";
 
 /**
  * Мост в игре: конверт, корреляция и три правила, которые соблюдает фасад,
@@ -16,6 +16,7 @@ interface Sent {
 const globals = globalThis as unknown as {
   blu_event?: (channel: string, payload: string) => void;
   __ficsitaiBridge?: { receive(message: unknown): void; stray: number };
+  __ficsitaiBridgeState?: unknown;
 };
 
 function installMod(): Sent[] {
@@ -32,6 +33,9 @@ const fail = (id: string, error: unknown): void => globals.__ficsitaiBridge?.rec
 afterEach(() => {
   delete globals.blu_event;
   delete globals.__ficsitaiBridge;
+  // Состояние диспетчера живёт на странице, а не в модуле: без этого
+  // ожидающие запросы одной проверки видны следующей.
+  delete globals.__ficsitaiBridgeState;
 });
 
 describe("транспорт моста", () => {
@@ -208,6 +212,85 @@ describe("замечания ревью Gs на #53", () => {
     // для пустой строки, и причина уезжала как undefined.
     answer(sent[0]?.payload.id as string, { apiVersion: "1.0.0", source: "live" });
     expect((await status).apiVersionMismatch).toContain("1.0.0");
+    api.close();
+  });
+});
+
+describe("повторное ревью Gs на #53", () => {
+  it("две копии модуля на странице делят один диспетчер", async () => {
+    const sent = installMod();
+    // Второй импорт с другим URL — вторая копия модуля: так страница
+    // собирается из экрана и виджета разных сборок. Раньше копии подменяли
+    // приёмник друг друга, и запрос первой висел до срока.
+    const second = `../src/bridge.js?copy=${2}`;
+    const copy = (await import(second)) as typeof import("../src/bridge.js");
+    // Это действительно вторая копия модуля, а не тот же экземпляр.
+    expect(copy.createBridgeTransport).not.toBe(createBridgeTransport);
+    const one = createApi({ transport: createBridgeTransport(), checkApiVersion: false });
+    const two = createApi({ transport: copy.createBridgeTransport(), checkApiVersion: false });
+
+    const status = one.getStatus();
+    const value = two.queryMetric({ metricId: "power.production" });
+    expect(sent).toHaveLength(2);
+
+    answer(sent[1]?.payload.id as string, { kind: "value", value: 7 });
+    answer(sent[0]?.payload.id as string, { apiVersion: "0.5.0", source: "live" });
+
+    expect((await value).value).toBe(7);
+    expect((await status).source).toBe("live");
+    one.close();
+    two.close();
+  });
+
+  it("подменённый приёмник восстанавливается со следующего запроса", async () => {
+    const sent = installMod();
+    const api = createApi({ checkApiVersion: false });
+    // Чужой сценарий страницы поставил свой приёмник — README обещает
+    // восстановление, и оно должно быть настоящим.
+    globals.__ficsitaiBridge = { receive: () => {}, stray: 0 };
+
+    const status = api.getStatus();
+    answer(sent[0]?.payload.id as string, { apiVersion: "0.5.0", source: "live" });
+    expect((await status).source).toBe("live");
+    api.close();
+  });
+
+  it("ответ без body и без error — ошибка транспорта, а не пустой успех", async () => {
+    const sent = installMod();
+    const api = createApi({ checkApiVersion: false });
+    const status = api.getStatus();
+    globals.__ficsitaiBridge?.receive({ re: sent[0]?.payload.id });
+    // Раньше это разрешалось как `undefined`, и страница падала сырым
+    // `TypeError` на первом же поле статуса.
+    await expect(status).rejects.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+    api.close();
+  });
+
+  it("причина расхождения версий одна у чтения и у события", async () => {
+    const sent = installMod();
+    const api = createApi();
+    const seen: ApiEvents["api.status"][] = [];
+    api.on("api.status", (status) => seen.push(status));
+
+    // Форма события из контракта: `apiVersion` оно не несёт — расхождение
+    // находит мод, и фасаду остаётся не потерять причину.
+    globals.__ficsitaiBridge?.receive({
+      event: "api.status",
+      data: {
+        sidecarConnected: true,
+        source: "live",
+        inert: false,
+        apiVersionMismatch: "мод отдаёт 1.0.0",
+        reason: "",
+      },
+    });
+    // Контракт (§События): причина лежит в обоих полях и у чтения, и у
+    // события — источник один.
+    expect(seen[0]?.reason).toBe("мод отдаёт 1.0.0");
+
+    const status = api.getStatus();
+    answer(sent[0]?.payload.id as string, { apiVersion: "1.0.0", apiVersionMismatch: "", reason: "" });
+    expect((await status).reason).toContain(API_VERSION);
     api.close();
   });
 });

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Фасад публичного API мода для веб-экранов: один интерфейс поверх моста в игре и HTTP в браузере",
-  "license": "Apache-2.0",
+  "license": "GPL-3.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=22"

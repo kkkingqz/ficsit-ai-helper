@@ -132,8 +132,39 @@ function normalizePageSize(pageSize: number | undefined): number {
   return pageSize;
 }
 
-function withScopes(metric: MetricDescriptor, offset = 0): MetricDescriptor {
-  const all = scopesOf(metric.id);
+/**
+ * Области метрики с учётом `scopeFilter`. Фильтр применяется до выбора
+ * страницы: иначе `listMetrics` отдавал полную страницу областей даже на
+ * фильтр, которому не подходит ни одна (повторное ревью Gs на #53).
+ */
+function matchingScopes(metricId: string, filter?: string): ScopeRef[] {
+  const all = scopesOf(metricId);
+  const needle = filter?.trim().toLowerCase();
+  if (needle === undefined || needle === "") return all;
+  return all.filter(
+    (scope) =>
+      scope.displayName.toLowerCase().includes(needle) ||
+      scope.scopeId.toLowerCase().includes(needle),
+  );
+}
+
+/**
+ * Проверка области — одна на `queryMetric` и `querySeries`. Раньше ряд
+ * выдавался и без `scopeId`, и с несуществующим: браузерная отладка
+ * пропускала то, что живой API отклоняет (повторное ревью Gs на #53).
+ */
+function requireScope(metric: MetricDescriptor, scopeId: string | undefined): void {
+  const scopes = scopesOf(metric.id);
+  if (scopes.length === 0) return;
+  if (scopeId === undefined || scopeId === "") {
+    throw new SourceError("SCOPE_REQUIRED", `метрике «${metric.id}» нужен scopeId`);
+  }
+  if (!scopes.some((scope) => scope.scopeId === scopeId)) {
+    throw new SourceError("SCOPE_NOT_FOUND", `область «${scopeId}» неизвестна`);
+  }
+}
+
+function withScopes(metric: MetricDescriptor, offset = 0, all = scopesOf(metric.id)): MetricDescriptor {
   const page = all.slice(offset, offset + MAX_INLINE_SCOPES);
   return {
     ...metric,
@@ -174,8 +205,8 @@ export function createDemoSource(): DevSource {
       if (hasMetricId) {
         const metric = definitionOf(args.metricId as string);
         const offset = cursorOffset(args.scopeCursor, "s");
-        const all = scopesOf(metric.id);
-        const descriptor = withScopes(metric, offset);
+        const all = matchingScopes(metric.id, args.scopeFilter);
+        const descriptor = withScopes(metric, offset, all);
         const nextOffset = offset + descriptor.availableScopes.length;
         return {
           metrics: [descriptor],
@@ -207,14 +238,7 @@ export function createDemoSource(): DevSource {
       const metric = definitionOf(args.metricId);
       const pageSize = normalizePageSize(args.pageSize);
       const offset = cursorOffset(args.cursor, "s");
-      const needle = args.scopeFilter?.trim().toLowerCase();
-      const all = scopesOf(metric.id).filter(
-        (scope) =>
-          needle === undefined ||
-          needle === "" ||
-          scope.displayName.toLowerCase().includes(needle) ||
-          scope.scopeId.toLowerCase().includes(needle),
-      );
+      const all = matchingScopes(metric.id, args.scopeFilter);
       const page = all.slice(offset, offset + pageSize);
       const nextOffset = offset + page.length;
       return { scopes: page, nextCursor: nextOffset < all.length ? `s:${nextOffset}` : "" };
@@ -222,17 +246,7 @@ export function createDemoSource(): DevSource {
 
     queryMetric(args: QueryMetricArgs): MetricValue {
       const metric = definitionOf(args.metricId);
-      const scopes = scopesOf(metric.id);
-      if (scopes.length > 0 && (args.scopeId === undefined || args.scopeId === "")) {
-        throw new SourceError("SCOPE_REQUIRED", `метрике «${metric.id}» нужен scopeId`);
-      }
-      if (
-        args.scopeId !== undefined &&
-        args.scopeId !== "" &&
-        !scopes.some((scope) => scope.scopeId === args.scopeId)
-      ) {
-        throw new SourceError("SCOPE_NOT_FOUND", `область «${args.scopeId}» неизвестна`);
-      }
+      requireScope(metric, args.scopeId);
 
       const base: Omit<MetricValue, "state" | "value"> = {
         kind: "value",
@@ -271,6 +285,7 @@ export function createDemoSource(): DevSource {
       if (!metric.hasSeries) {
         throw new SourceError("SERIES_NOT_AVAILABLE", `у «${metric.id}» нет ряда`);
       }
+      requireScope(metric, args.scopeId);
       const windowSec =
         args.window === "last5Min" ? 300 : args.window === "last15Min" ? 900 : 3600;
       const now = SESSION_START + tick * 5;

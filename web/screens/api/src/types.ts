@@ -32,9 +32,16 @@ export type ValueState = "value" | "notApplicable";
 
 /**
  * Состояние ассистента (0.5.0): `unavailable` — нет сайдкара или Foreman не
- * отвечает, причина в `reason`.
+ * отвечает (причина в `reason`), `signingIn` — адаптер входит в Foreman,
+ * `ready` — можно отправлять ход.
+ *
+ * Ровно три значения контракта (`EFicsitAIAssistantState`). Четвёртого,
+ * `thinking`, в контракте нет: «ассистент думает» — это состояние хода, а не
+ * состояние API, и экран берёт его из `chat.*` своего хода (повторное ревью
+ * Gs на #53). Лишнее значение в типе — обещание страницам того, чего мод
+ * никогда не пришлёт.
  */
-export type AssistantState = "unavailable" | "signingIn" | "ready" | "thinking";
+export type AssistantState = "unavailable" | "signingIn" | "ready";
 
 export type Unit =
   | "itemsPerMinute"

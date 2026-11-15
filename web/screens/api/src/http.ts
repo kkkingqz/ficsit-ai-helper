@@ -101,6 +101,12 @@ export function createHttpTransport(options: HttpOptions = {}): Transport {
       if (!response.ok) {
         throw transportError("TRANSPORT_UNAVAILABLE", `dev-сервер ответил ${response.status}`);
       }
+      // Ответ без `body` и без `error` — не успех: раньше он доезжал до
+      // страницы как `undefined`, и `getStatus()` падал сырым `TypeError`
+      // вместо ошибки транспорта (повторное ревью Gs на #53).
+      if (payload.body === undefined) {
+        throw transportError("TRANSPORT_UNAVAILABLE", "ответ без body и без error");
+      }
       return payload.body;
     },
 

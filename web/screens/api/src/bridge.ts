@@ -33,9 +33,21 @@ interface BridgeInbound {
   data?: unknown;
 }
 
+/**
+ * Диспетчер, поставленный на страницу. `shared` — общее состояние всех копий
+ * модуля: по нему копия узнаёт свой диспетчер и подключается к нему вместо
+ * того, чтобы его подменять.
+ */
+interface Dispatcher {
+  receive(message: BridgeInbound): void;
+  readonly stray: number;
+  readonly shared?: SharedState;
+}
+
 interface BridgeGlobals {
   blu_event?: (channel: string, payload: string) => void;
-  __ficsitaiBridge?: { receive(message: BridgeInbound): void; stray: number };
+  __ficsitaiBridge?: Dispatcher;
+  __ficsitaiBridgeState?: SharedState;
 }
 
 const globals = globalThis as unknown as BridgeGlobals;
@@ -60,8 +72,13 @@ export interface BridgeOptions {
  *
  * `window.__ficsitaiBridge.receive` в странице ровно один, и второй фасад
  * раньше его подменял: ответы первого уходили в никуда, а его промисы висели
- * вечно (ревью Gs на #53). Поэтому диспетчер живёт в модуле, а фасады к нему
- * подключаются и отключаются.
+ * вечно (ревью Gs на #53).
+ *
+ * Состояние диспетчера живёт **на странице**, а не в модуле (повторное ревью
+ * Gs на #53): страницу можно собрать так, что модуль загрузится дважды —
+ * двумя импортами с разными URL, экраном и виджетом из разных сборок. Копии
+ * модуля — разные, страница одна, и ожидающие запросы у них должны быть
+ * общие, иначе ответ находит не ту таблицу и запрос висит до срока.
  */
 interface Waiting {
   resolve: (value: unknown) => void;
@@ -70,24 +87,39 @@ interface Waiting {
   owner: object;
 }
 
-const pending = new Map<string, Waiting>();
-const hubs = new Set<EventHub>();
-let stray = 0;
+interface SharedState {
+  pending: Map<string, Waiting>;
+  hubs: Set<EventHub>;
+  stray: number;
+}
+
+/** Общее состояние страницы: первая копия модуля его заводит, остальные берут. */
+function shared(): SharedState {
+  const existing = globals.__ficsitaiBridgeState;
+  if (existing !== undefined) return existing;
+  const fresh: SharedState = { pending: new Map(), hubs: new Set(), stray: 0 };
+  globals.__ficsitaiBridgeState = fresh;
+  return fresh;
+}
 
 function receive(message: BridgeInbound): void {
   if (message === null || typeof message !== "object") return;
+  const state = shared();
 
   if (typeof message.re === "string") {
-    const waiting = pending.get(message.re);
+    const waiting = state.pending.get(message.re);
     if (waiting === undefined) {
       // Ответ после перезагрузки страницы или после срока — не ошибка.
-      stray += 1;
+      state.stray += 1;
       return;
     }
-    pending.delete(message.re);
+    state.pending.delete(message.re);
     clearTimeout(waiting.timer);
     if (message.error !== undefined) {
       waiting.reject(toErrorBody(message.error, "TRANSPORT_UNAVAILABLE"));
+    } else if (message.body === undefined) {
+      // Ни `body`, ни `error` — битый конверт, а не пустой успех.
+      waiting.reject(transportError("TRANSPORT_UNAVAILABLE", "ответ моста без body и без error"));
     } else {
       waiting.resolve(message.body);
     }
@@ -95,22 +127,28 @@ function receive(message: BridgeInbound): void {
   }
 
   if (typeof message.event === "string") {
-    for (const hub of hubs) hub.emit(message.event, message.data);
+    for (const hub of state.hubs) hub.emit(message.event, message.data);
   }
 }
 
 /**
- * Ставит диспетчер, если его нет или он чужой. Проверка по самой функции, а
- * не по флагу: страницу мог перезаписать другой сценарий, и тогда ответы
- * уходили бы в никуда молча.
+ * Ставит диспетчер, если на странице нет нашего.
+ *
+ * «Наш» — тот, у кого то же общее состояние: диспетчер другой копии модуля
+ * подходит, и подменять его нечем. Чужой приёмник (его мог поставить другой
+ * сценарий страницы) заменяется — состояние при этом сохраняется, поэтому
+ * ожидающие запросы не теряются. Вызывается и при каждом запросе: отсюда
+ * обещанное README восстановление «со следующего запроса».
  */
 function install(): void {
-  if (globals.__ficsitaiBridge?.receive === receive) return;
+  const state = shared();
+  if (globals.__ficsitaiBridge?.shared === state) return;
   globals.__ficsitaiBridge = {
     receive,
     get stray() {
-      return stray;
+      return state.stray;
     },
+    shared: state,
   };
 }
 
@@ -123,7 +161,7 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
   let closed = false;
 
   install();
-  hubs.add(hub);
+  shared().hubs.add(hub);
 
   return {
     kind: "bridge",
@@ -132,6 +170,8 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
       if (closed) {
         throw transportError("TRANSPORT_UNAVAILABLE", "фасад закрыт");
       }
+      // Приёмник мог подменить другой сценарий страницы — ставим свой снова.
+      install();
       const send = globals.blu_event;
       if (typeof send !== "function") {
         throw transportError("TRANSPORT_UNAVAILABLE", "мост недоступен: страница открыта не в игре");
@@ -144,14 +184,15 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
         throw transportError("TOO_LARGE", "запрос больше 64 КиБ: мост отбросит его без ответа");
       }
 
+      const state = shared();
       return await new Promise<unknown>((resolve, reject) => {
         const timer = setTimeout(() => {
-          pending.delete(id);
+          state.pending.delete(id);
           reject(
             transportError("TRANSPORT_UNAVAILABLE", `мод не ответил на «${op}» за ${timeoutMs} мс`),
           );
         }, timeoutMs);
-        pending.set(id, { resolve, reject, timer, owner });
+        state.pending.set(id, { resolve, reject, timer, owner });
         send(CHANNEL, text);
       });
     },
@@ -162,13 +203,15 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
 
     close(): void {
       closed = true;
-      hubs.delete(hub);
+      const state = shared();
+      state.hubs.delete(hub);
       hub.clear();
       // Свои ожидающие запросы завершаем отказом: иначе страница ждала бы
-      // ответа, которого уже никто не примет.
-      for (const [id, waiting] of [...pending]) {
+      // ответа, которого уже никто не примет. Чужие — не трогаем: таблица
+      // общая на страницу.
+      for (const [id, waiting] of [...state.pending]) {
         if (waiting.owner !== owner) continue;
-        pending.delete(id);
+        state.pending.delete(id);
         clearTimeout(waiting.timer);
         waiting.reject(transportError("TRANSPORT_UNAVAILABLE", "фасад закрыт до ответа"));
       }
@@ -178,5 +221,5 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
 
 /** Сколько ответов пришло не к своему запросу — видно в отладке страницы. */
 export function strayResponses(): number {
-  return stray;
+  return shared().stray;
 }
