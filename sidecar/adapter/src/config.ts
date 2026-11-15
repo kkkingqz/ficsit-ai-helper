@@ -110,6 +110,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     llmUpstreamBaseUrl: env.LLM_UPSTREAM_BASE_URL,
     normalizerPort: env.NORMALIZER_PORT,
     accountPath: env.FOREMAN_ACCOUNT_PATH,
+    // Без этой строки поле оставалось при значении по умолчанию, и штатный
+    // запуск с `FICSITAI_WHITELIST=off` всё равно шёл с белым списком
+    // (повторное ревью Gs на #50): схема была, чтения не было.
+    whitelist: env.FICSITAI_WHITELIST,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 

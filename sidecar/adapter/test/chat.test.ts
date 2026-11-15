@@ -103,12 +103,13 @@ afterEach(async () => {
 });
 
 /** Поднимает адаптер против поддельного Foreman и возвращает его адрес. */
-async function adapterFor(fake: Fake): Promise<string> {
+async function adapterFor(fake: Fake, env: NodeJS.ProcessEnv = {}): Promise<string> {
   const accountPath = join(mkdtempSync(join(tmpdir(), "ficsitai-chat-")), "account.json");
   const config = loadConfig({
     ADAPTER_TOKEN: TOKEN,
     FOREMAN_BASE_URL: `http://127.0.0.1:${fake.port}`,
     FOREMAN_ACCOUNT_PATH: accountPath,
+    ...env,
   } as NodeJS.ProcessEnv);
   const { app } = await createApp(config, silent);
   const server = app.listen(0, "127.0.0.1");
@@ -586,5 +587,35 @@ describe("замечания ревью Gs на #50", () => {
     expect((await cancel(base, { turnId })).status).toBe(202);
     const rest = await stream.until((f) => f.some((frame) => frame.event === "cancelled"));
     expect(rest.some((frame) => frame.event === "cancelled")).toBe(true);
+  });
+});
+
+describe("повторное ревью Gs на #50", () => {
+  const healthOf = async (base: string): Promise<{ hiddenTools: string[] }> =>
+    (await (await fetch(`${base}/health`)).json()) as { hiddenTools: string[] };
+
+  /** Поддельный Foreman, которому в этих проверках ничего делать не нужно. */
+  const idle = () =>
+    fakeForeman((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ id: playthroughIdFor(SAVE_ID) }));
+    });
+
+  it("FICSITAI_WHITELIST=off доходит до настроек, а не теряется по пути", () => {
+    const env = { ADAPTER_TOKEN: TOKEN } as NodeJS.ProcessEnv;
+    // Поле в схеме было, чтения из окружения — нет: штатный запуск со штатным
+    // промптом Foreman всё равно шёл с белым списком.
+    expect(loadConfig({ ...env, FICSITAI_WHITELIST: "off" }).whitelist).toBe(false);
+    expect(loadConfig({ ...env, FICSITAI_WHITELIST: "on" }).whitelist).toBe(true);
+    expect(loadConfig(env).whitelist).toBe(true);
+    expect(() => loadConfig({ ...env, FICSITAI_WHITELIST: "может быть" })).toThrow(/whitelist/);
+  });
+
+  it("при выключенном списке адаптер не прячет инструменты", async () => {
+    const off = await adapterFor(await idle(), { FICSITAI_WHITELIST: "off" });
+    expect((await healthOf(off)).hiddenTools).toEqual([]);
+
+    const on = await adapterFor(await idle());
+    expect((await healthOf(on)).hiddenTools.length).toBeGreaterThan(0);
   });
 });
