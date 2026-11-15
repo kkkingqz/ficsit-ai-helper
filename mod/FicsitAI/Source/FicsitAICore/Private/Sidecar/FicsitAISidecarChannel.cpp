@@ -153,6 +153,7 @@ void FFicsitAISidecarChannel::Start()
 {
 	check(IsInGameThread());
 	if (State != EFicsitAIChannelState::Stopped) { return; }
+	++RunId;
 	TWeakPtr<FFicsitAISidecarChannel, ESPMode::ThreadSafe> Weak = AsShared();
 	TickHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([Weak](float Dt)
 	{
@@ -166,6 +167,7 @@ void FFicsitAISidecarChannel::Start()
 void FFicsitAISidecarChannel::Stop()
 {
 	check(IsInGameThread());
+	++RunId;
 	if (TickHandle.IsValid()) { FTSTicker::GetCoreTicker().RemoveTicker(TickHandle); TickHandle.Reset(); }
 	// Ответы рукопожатия и пачки, ушедших до остановки, не должны снова поднять канал: поколение сменено,
 	// запросы отменены вместе с обработчиками завершения.
@@ -173,9 +175,9 @@ void FFicsitAISidecarChannel::Stop()
 	CancelHttp(HelloRequest);
 	CancelHttp(PostRequest);
 	bHelloInFlight = false;
-	ResetSession(TEXT("stopped"));
-	Session.Empty();
+	TMap<FString, FPendingRequest> Lost = DetachSession();
 	SetState(EFicsitAIChannelState::Stopped, TEXT("stop"));
+	FailLost(Lost, TEXT("stopped"));
 }
 
 void FFicsitAISidecarChannel::SetState(EFicsitAIChannelState NewState, const FString& Reason)
@@ -284,10 +286,16 @@ void FFicsitAISidecarChannel::OnHelloDone(FHttpRequestPtr, FHttpResponsePtr Resp
 		(*Limits)->TryGetNumberField(TEXT("maxBatchMessages"), MaxBatch);
 		(*Limits)->TryGetNumberField(TEXT("bufferMessages"), BufferMessages);
 		(*Limits)->TryGetNumberField(TEXT("maxMessageBytes"), MaxMessageBytes);
+		// maxBatchBytes — с #51 (Co2-43); у адаптера без него предел пачки равен пределу сообщения.
+		if (!(*Limits)->TryGetNumberField(TEXT("maxBatchBytes"), MaxBatchBytes)) { MaxBatchBytes = MaxMessageBytes; }
 		PingSec = FMath::Max(1, PingSec); MaxBatch = FMath::Max(1, MaxBatch);
-		BufferMessages = FMath::Max(4, BufferMessages); MaxMessageBytes = FMath::Max(1024, MaxMessageBytes);
+		BufferMessages = FMath::Max(4, BufferMessages);
+		MaxBatchBytes = FMath::Max(1024, MaxBatchBytes);
+		// Сообщение, не влезающее в пачку, отправить нельзя вовсе: такое отсекается ещё при постановке в очередь.
+		MaxMessageBytes = FMath::Clamp(MaxMessageBytes, 1024, MaxBatchBytes);
 	}
-	ResetSession(TEXT("new session"));
+	const uint64 Run = RunId;
+	TMap<FString, FPendingRequest> Lost = DetachSession();
 	Session = NewSession;
 	{
 		FScopeLock Lock(&StreamLock);
@@ -295,19 +303,17 @@ void FFicsitAISidecarChannel::OnHelloDone(FHttpRequestPtr, FHttpResponsePtr Resp
 	}
 	UE_LOG(LogFicsitAIChannel, Display, TEXT("FicsitAI channel: session opened, adapter api %s, ping %d s"), *AdapterApiVersion, PingSec);
 	SetState(EFicsitAIChannelState::Reconnecting, TEXT("session opened, opening stream"));
+	FailLost(Lost, TEXT("new session"));
+	if (Run != RunId || State == EFicsitAIChannelState::Stopped) { return; } // остановлен из обработчика
 	RetryAt = 0.0;
 	OpenStream();
 }
 
-void FFicsitAISidecarChannel::ResetSession(const FString& Why)
+TMap<FString, FFicsitAISidecarChannel::FPendingRequest> FFicsitAISidecarChannel::DetachSession()
 {
-	// Запросы прежней сессии потеряны: ждущий видит ошибку, а не тишину (протокол, «Конверт»).
 	TMap<FString, FPendingRequest> Lost = MoveTemp(Pending);
 	Pending.Reset();
-	for (TPair<FString, FPendingRequest>& P : Lost)
-	{
-		if (P.Value.OnReply) { P.Value.OnReply(nullptr, TEXT("CHANNEL_RESET"), Why); }
-	}
+	Session.Empty(); // запрос из обработчика CHANNEL_RESET получит SIDECAR_UNAVAILABLE, а не уйдёт в очищаемую очередь
 	Outgoing.Reset();
 	NextSeqOut = 1;
 	AckedIn = 0;
@@ -326,15 +332,29 @@ void FFicsitAISidecarChannel::ResetSession(const FString& Why)
 		while (!Incoming.IsEmpty()) { Incoming.Pop(); }
 	}
 	CancelHttp(StreamRequest);
+	return Lost;
+}
+
+void FFicsitAISidecarChannel::FailLost(TMap<FString, FPendingRequest>& Lost, const FString& Why)
+{
+	// Запросы прежней сессии потеряны: ждущий видит ошибку, а не тишину (протокол, «Конверт»).
+	for (TPair<FString, FPendingRequest>& P : Lost)
+	{
+		if (P.Value.OnReply) { P.Value.OnReply(nullptr, TEXT("CHANNEL_RESET"), Why); }
+	}
+	Lost.Reset();
 }
 
 void FFicsitAISidecarChannel::RestartSession(const FString& Why)
 {
 	UE_LOG(LogFicsitAIChannel, Warning, TEXT("FicsitAI channel: %s, opening a new session"), *Why);
 	++Stats.SessionRestarts;
-	ResetSession(Why);
-	Session.Empty();
+	const uint64 Run = RunId;
+	TMap<FString, FPendingRequest> Lost = DetachSession();
 	SetState(EFicsitAIChannelState::Connecting, Why);
+	FailLost(Lost, Why);
+	// Обработчик состояния или CHANNEL_RESET мог остановить канал (ревью #52, второй круг): тогда без рукопожатия.
+	if (Run != RunId || State == EFicsitAIChannelState::Stopped) { return; }
 	SendHello();
 }
 
@@ -717,16 +737,16 @@ void FFicsitAISidecarChannel::MaybePost()
 	const bool bAckDue = Ack > AckedIn && (Ack - AckedIn >= BufferMessages / 4 || Now - LastAckAt > 5.0);
 	if (Outgoing.Num() == 0 && !bAckDue) { return; }
 
-	// Пачка: не больше MaxBatch сообщений и не больше 1 МиБ по сумме длин конвертов в UTF-8, без обёртки POST
-	// (протокол, «Как считается размер»). Отдельного поля для байтов пачки в рукопожатии нет: предел пачки
-	// равен maxMessageBytes. Каждый конверт в очереди уже не больше него, поэтому первый всегда помещается.
+	// Пачка: не больше maxBatchMessages сообщений и не больше maxBatchBytes по сумме длин конвертов в UTF-8,
+	// без обёртки POST (протокол, «Как считается размер»). Каждый конверт в очереди не больше maxMessageBytes,
+	// а тот не больше maxBatchBytes, поэтому первый всегда помещается.
 	TArray<uint8> Payload;
 	AppendUtf8(Payload, FString::Printf(TEXT("{\"session\":\"%s\",\"ack\":%lld,\"messages\":["), *Session, Ack));
 	int32 Count = 0;
 	int64 Bytes = 0;
 	for (const FOutgoing& O : Outgoing)
 	{
-		if (Count >= MaxBatch || (Count > 0 && Bytes + O.Utf8.Num() > MaxMessageBytes)) { break; }
+		if (Count >= MaxBatch || (Count > 0 && Bytes + O.Utf8.Num() > MaxBatchBytes)) { break; }
 		if (Count > 0) { Payload.Add(','); }
 		Payload.Append(O.Utf8);
 		Bytes += O.Utf8.Num();

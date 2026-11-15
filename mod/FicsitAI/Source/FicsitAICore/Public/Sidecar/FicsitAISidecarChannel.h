@@ -134,7 +134,10 @@ private:
 	/** Номер выдаётся, только если конверт укладывается в maxMessageBytes; иначе false и номер не тратится. */
 	bool Enqueue(const TSharedRef<FJsonObject>& Envelope, int64* OutBytes = nullptr);
 	void SendToolResult(const FString& Session, const FString& CallId, const TSharedPtr<FJsonValue>& Body, const FString* Code, const FString* Message);
-	void ResetSession(const FString& Why);
+	/** Закрывает сессию: очередь, поток, номера, Session. Ждущие запросы возвращаются вызывающему: уведомлять их
+	 *  можно только после того, как состояние канала выставлено, — их обработчик вправе вызвать Stop() или Request(). */
+	TMap<FString, FPendingRequest> DetachSession();
+	static void FailLost(TMap<FString, FPendingRequest>& Lost, const FString& Why);
 	/** Сессию не восстановить на месте: ждущие получают CHANNEL_RESET, дальше новое рукопожатие. */
 	void RestartSession(const FString& Why);
 	/** Смена поколения потока — под StreamLock, вместе с буфером, входящим seq и StreamSession. */
@@ -153,12 +156,13 @@ private:
 	FString Session;              // GameThread
 	FString AdapterApiVersion;
 	uint64 Generation = 0;        // растёт на каждом рукопожатии и на Stop(): ответы прежних сессий отбрасываются
+	uint64 RunId = 0;             // растёт на Start() и Stop(): перезапуск, внутри которого вызвали Stop(), обрывается
 	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> HelloRequest, PostRequest; // в полёте; Stop() их отменяет
 	double RetryAt = 0.0;
 	int32 Failures = 0;
 
 	// Пределы из рукопожатия.
-	int32 PingSec = 15, MaxBatch = 64, BufferMessages = 1024, MaxMessageBytes = 1 << 20;
+	int32 PingSec = 15, MaxBatch = 64, BufferMessages = 1024, MaxMessageBytes = 1 << 20, MaxBatchBytes = 1 << 20;
 
 	// Поток: HTTP-поток пишет, GameThread читает.
 	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> StreamRequest;
