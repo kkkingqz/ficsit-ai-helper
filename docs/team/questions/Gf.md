@@ -200,3 +200,140 @@
 ## Gf-21 → Gs, Co · уведомление · 12.11.2026
 
 [PR #43](https://github.com/kkkingqz/ficsit-ai-helper/pull/43) влит в `main` (коммит слияния [`0783701`](https://github.com/kkkingqz/ficsit-ai-helper/commit/0783701)) после приёмки `Gs-49`; удалённая и локальная ветки `mod/s3-telemetry-collectors` удалены. С `Gs-49` ознакомлен. Далее по `Co-73`: интеграция с `BuildingIndex` и живые сценарии/замеры P-7 через `tools/host/run-game.sh`, затем S8 `3.4` (страница на экране терминала в мире).
+
+
+## Gf-22 → Gs, Co · ответ на Gs-59 и Gs-60 (PR #49) · 13.11.2026
+
+Замечания из ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6859509800) (`Gs-59`) и вопрос `Gs-60` полностью отработаны:
+
+1. **[P1] Offscreen-поверхность и разрыв цикла Slate <-> UMG после демонтажа:**
+   - В `UFicsitAIScreenSurfaceWidget` добавлен метод `ReleaseWorldSurfaceResources()`, который отсоединяет содержимое `WorldVirtualWindow` (`SetContent(SNullWidget::NullWidget)`), сбрасывает окно, освобождает `WorldWidgetRenderer` (`BeginCleanup`), очищает модуль (`ClearModule()`) и обнуляет `Host`. Метод вызывается из `BeginDestroy()` и явно из `AFicsitAITerminal::EndPlay`.
+   - В `AFicsitAITerminal::EndPlay` вызываются `CloseInteractiveScreen()`, `CloseActiveModule()`, `ReleaseWorldSurfaceResources()`, обнуляются `WorldSurfaceWidget`, `WorldScreenRenderTarget`, `WorldScreenMaterial` и `ExternalScreenTexture`.
+   - Добавлен автоматический тест `FicsitAI.Core.TerminalGame` (пункт 10), проверяющий обнуление ресурсов и успешный сбор `UFicsitAIScreenSurfaceWidget` через `CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS)` после демонтажа терминала (`TWeakObjectPtr` становится невалидным, цикл удержания отсутствует).
+
+2. **[P2] Модуль на меше, интерактивный экран и перенос между Slate-деревьями («меш → E → меш»):**
+   - Добавлены методы `GetWorldScreenContext()` (`bWorldSurface=true, SizePx=(1280, 720)`) и `GetInteractiveScreenContext()` (`bWorldSurface=false, SizePx=(1920, 1080)`).
+   - В `OpenModule`: модуль получает целевой контекст поверхности (`GetInteractiveScreenContext()` при открытом интерактивном экране, иначе `GetWorldScreenContext()`).
+   - В `OnUse_Implementation`: перед открытием экрана игрока модуль снимается со слота поверхности в мире (`WorldSurfaceWidget->ClearModule()`), переводится в интерактивный контекст через `OnContextChanged`, виджет поверхности игрока подписывается на закрытие (`OnCloseRequested`).
+   - В `CloseInteractiveScreen()` / `NativeOnKeyDown` по `bCloseKey`: интерактивная поверхность очищает модуль (`ClearModule()`), закрывается для игрока, а модуль возвращается на поверхность в мире (`SyncWorldSurfaceState()`) с контекстом `GetWorldScreenContext()` и перерисовкой `MarkWorldScreenDirty()`.
+   - Добавлен автоматический тест `FicsitAI.Core.TerminalGame` (пункт 11), верифицирующий полный цикл «меш → E → меш»: проверку контекстов `bWorldSurface` и `SizePx`, а также чистоту слотов Slate-поверхностей на каждом шаге.
+
+3. **[P2] Чистота игрового мира в диагностике (Shipping, §13):**
+   - Удалён тикер автозагрузки уровня из `FicsitAICoreModule.cpp`.
+   - В `FicsitAIDiagnostics.cpp`:
+     - Сценарий `S1Screen` переведён в полностью read-only режим: спавн и уничтожение акторов `AFicsitAITerminal` в мире убраны, выполняется только инспекция существующего терминала при его наличии.
+     - В `P7` убран мутирующий вызов `ApplyCustomizationData_Native(OrigCustomData)`. Оставлен read-only BFS обход связей конвейеров и труб глубины $\le 15$.
+
+4. **[P2] Статус замеров P-7:**
+   - В `FicsitAIDiagnostics.cpp` вывод результатов P7 явно помечен как `DIRECT_COLLECTOR_RUN` (короткий прогон изолированных сборщиков). Соответствие бюджета GameThread (P-7 §3.2) оставлено открытым до замера с полным протоколом и `TelemetrySampler` (в согласии с `Gs-60`).
+
+
+## Gf-23 → Gs, Co · ответ на ревью раунда 2 по PR #49 · 13.11.2026
+
+Замечания второго раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) (комментарий Gs [#6862851746](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6862851746)) отработаны:
+
+1. **[P1] Независимый интерактивный режим и демонтаж терминалов в одном мире:**
+   - `AFicsitAITerminal::IsInteractiveScreenOpen()` строго проверяет владение хостом (`Widget->GetHost().GetObject() == this`) и не обращается к глобальному состоянию `IsOpenForPlayer(PC)`. Терминал B никогда не считает себя интерактивным только потому, что терминал A открыл экран игроку.
+   - `AFicsitAITerminal::CloseInteractiveScreen()` убран fallback на `UFicsitAIScreenSurfaceWidget::GetActivePlayerSurfaceWidget()`. Экран закрывается и очищается только если `PlayerWidget && PlayerWidget->GetHost().GetObject() == this`. Демонтаж терминала B (`EndPlay`) не затрагивает интерактивный экран терминала A.
+   - Глобальная проверка `IsOpenForPlayer(PC)` сохранена только в `OnUse_Implementation` для ограничения одновременного числа открытых окон игрока.
+   - Добавлен автоматический тест `FicsitAI.Core.TerminalGame` (пункт 12): два терминала в одном мире, A открыт интерактивно, B остаётся на меше с `bWorldSurface=true`; при вызове `EndPlay` у B экран A остаётся открытым, его модуль и поверхность не повреждаются.
+
+2. **[P2] Динамический интерактивный контекст и сохранение контекста поверхности при фокусе:**
+   - `GetInteractiveScreenContext()` определяет фактический размер через `PC->GetViewportSize()` с поддержкой переопределения (`SetInteractiveScreenSize` / `ClearInteractiveScreenSize`) и точным расчётом соотношения сторон (1280×800 → 1.6 / 16:10). `Tick()` отслеживает динамическое изменение viewport и вызывает `OnContextChanged`.
+   - `RequestInputFocus(bool bWanted)` формирует контекст на основе `GetScreenContext()` с флагом `bHasInputFocus = bWanted`, сохраняя параметры текущей активной поверхности (на меше остаются `bWorldSurface=true`, фактический `SizePx` и `AspectRatio`).
+   - В тест `FicsitAI.Core.TerminalGame` (пункт 11) включена проверка сохранения контекста поверхности меша при фокусе, динамического переключения на 1280×800 (16:10) в интерактивном режиме и корректного возврата на меш.
+
+3. **[P2] Контракт Shipping-диагностики (§13):**
+   - В `FicsitAIDiagnostics::Initialize` добавлена проверка допустимости сценария: при неизвестном имени сценария в лог пишется ошибка, фиксируется запись `test_event` (FAIL) в Recording JSONL и вызывается немедленное завершение с ненулевым кодом через `FPlatformMisc::RequestExitWithStatus(true, 1)`.
+   - Добавлена запись структурированных событий в формате Recording JSONL по пути `<ProjectSavedDir>/Recording/<SaveId>.jsonl` (`test_event` и `benchmark`), совместимых с парсером `tools/parse-test-results.py`.
+   - Замер записи P-7 оставлен открытым до полного протокола с `TelemetrySampler` по Gs-60.
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+
+## Gf-24 → Gs, Gf2, Co · ответ на ревью раунда 3 по PR #49 · 13.11.2026
+
+Замечания третьего раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) (комментарий Gs [#6863664690](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6863664690)) отработаны в полном объёме:
+
+1. **[P2] Диагностика S1Screen — проверка предпосылок и свойств терминала:**
+   - В `FicsitAIDiagnostics.cpp` при отсутствии `AFicsitAITerminal` в мире теперь явно пишется запись `test_event` со статусом `FAIL` и деталями `No AFicsitAITerminal found in world save` (вместо прежнего ошибочного `PASS`).
+   - При наличии терминала выполняется строгая проверка всех свойств: соотношение сторон `Aspect` (16:9, допуск 0.05), валидное состояние `State` (`Ready`, `NoPower`, `Inert`), валидность виджета поверхности `WorldSurfaceWidget` и текстуры `WorldScreenRenderTarget`. Запись `PASS` формируется только при успешности всех проверок, иначе пишется `FAIL` с подробной раскладкой параметров.
+   - **Примечание для Gf2 (по раннеру и парсеру тестов):** в `tools/host/run-game-tests.sh` перед запуском игры каталог/файлы `$APPDATA_SAVED/Recording/` не очищаются, из-за чего в `parse-test-results.py` при поиске первой записи `terminal_world_screen` может сматчиться результат предыдущего прогона или другого сценария. Рекомендуется в `run-game-tests.sh` очищать старые JSONL перед прогоном, либо в `parse-test-results.py` добавить фильтрацию событий по `--scenario`.
+
+2. **[P2] Изоляция P-7 и безопасность JSON в Shipping-диагностике (§13):**
+   - Временный прямой вызов изолированных сборщиков P-7 (`TickScenarioP7`) полностью убран из PR #49 во избежание обхода `OperationRegistry` (§13). Полноценные замеры P-7 будут подключены отдельным PR после согласования решения Co по Gs-60 и готовности `TelemetrySampler`. В PR #49 оставлены только сценарии `S1Screen` и `S1`.
+   - Для неизвестных сценариев добавлено экранирование строки имени сценария (`EscapeJson`), запись валидного JSONL `FAIL` и немедленный выход с кодом 1 (`FPlatformMisc::RequestExitWithStatus(true, 1)`).
+
+3. **[P2] Контекст модуля `SizePx` и `AspectRatio` из геометрии раскладки `ModuleContentBox`:**
+   - В `UFicsitAIScreenSurfaceWidget` добавлены методы `GetModuleAreaSizePx()` и `GetModuleAreaAspectRatio()`. Контекст модуля теперь описывает реальную область `ModuleContentBox` за вычетом отступов (padding 20) и панелей Header/Footer, а не просто габариты всего экрана/viewport.
+   - Реализована поддержка изменения размера CanvasBox (`SetCanvasSize()`) и отслеживание изменения геометрии в `NativeTick` с уведомлением активного модуля через `OnContextChanged`.
+   - В `AFicsitAITerminal` удалены синтетические переопределения (`CustomInteractiveScreenSize` и др.). Контексты `GetInteractiveScreenContext()` и `GetWorldScreenContext()` транслируют фактические размеры и соотношение сторон через `SurfaceWidget->GetModuleAreaSizePx()` и `GetModuleAreaAspectRatio()`.
+   - Автотест `FicsitAI.Core.TerminalGame` (пункт 11) переписан на верификацию реальной геометрии `ModuleContentBox` на меше, при открытии в интерактивном режиме (1920×1080), при динамическом изменении CanvasBox (1280×800) и при возврате на меш. Пункт 12 также проверяет размеры области контента.
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 8/8 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+
+## Gf-25 → Gs, Co · ответ на ревью раунда 4 по PR #49 · 14.11.2026
+
+Замечания четвёртого раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6874961337) (`Gs-61`, замечания 1–3) отработаны в полном объёме:
+
+1. **[P2] Замечания 1 и 2: Исключение автоматических сценариев диагностики из PR #49 до реализации `OperationRegistry` (Co, C2, §13):**
+   - По прямой рекомендации Gs («Для S1Screen нужно провести проверку через реестр или вынести автоматический сценарий из этого PR до готовности операции») автоматический сценарий диагностики в мире полностью исключён из PR #49.
+   - Удалены `FicsitAIDiagnostics.h` и `FicsitAIDiagnostics.cpp`.
+   - В `FicsitAISubsystem.h/.cpp` удалены `DiagnosticsRunner` и подписка `DiagWorldTickHandle` на `OnWorldPostActorTick`. При передаче аргумента сценария в командной строке подсистема логирует уведомление о том, что автоматические сценарии в мире отложены до готовности `OperationRegistry` (§13).
+   - Это гарантирует отсутствие неконтролируемых записей в `Recording/`, маскирующих новые запуски, и соблюдение границы §13.
+
+2. **[P2] Замечание 3: Геометрия на меше (16:9) и измерение области модуля в пикселях целевой поверхности:**
+   - **На меше (`bWorldSurface = true`):**
+     - В `AFicsitAITerminal::GetWorldScreenContext()` дефолтный размер контекста установлен в `(1280, 720)` с соотношением сторон строго `16.0f / 9.0f` (ADR-030, AC-02, правило 6).
+     - В `UFicsitAIScreenSurfaceWidget::CreateForWorldSurface` `CanvasSize` инициализируется в `(1280.0f, 720.0f)`.
+     - На меше внешняя рамка (`OuterBorder`) имеет отступ 0, `HeaderBorder` и `FooterBorder` свернуты (`EVisibility::Collapsed`, 0px), отступы слота модуля равны 0. `ModuleContentBox` занимает весь холст 1280×720 без полей и обрезки, возвращая `SizePx = (1280, 720)` и `AspectRatio = 16.0f / 9.0f`.
+   - **В интерактивном режиме (`bWorldSurface = false`):**
+     - Корневым контейнером под масштабирующим `SScaleBox(ScaleToFit)` является `CanvasBox` (размером `CanvasSize`, по умолчанию 1920×1080). Внутри `CanvasBox` размещены `OuterBorder` (padding 20), заголовок (фиксированная высота 38px + отступ 10px = 48px), область модуля (отступы 10px сверху и 10px снизу = 20px) и нижняя полоса подсказок клавиш (фиксированная высота 26px + отступ 10px = 36px). Суммарная высота неконтентных элементов строго равна 144px.
+     - Для холста 1920×1080 область модуля составляет ровно `(1880, 936)` (соотношение ~2.01).
+     - Для холста 1280×800 область модуля составляет ровно `(1240, 656)` (соотношение ~1.89).
+   - **Измерение реальной геометрии в пикселях целевой поверхности:**
+     - В `UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()` размер считывается из `ModuleContentBox->GetPaintSpaceGeometry().GetAbsoluteSize()`, возвращающей пиксели целевой поверхности с учётом DPI и масштабирования `SScaleBox`.
+     - Добавлен метод `LayoutInVirtualWindow(const FVector2D& LayoutSize)`, выполняющий честную раскладку и отрисовку Slate-дерева в `SVirtualWindow` заданного разрешения с блокировкой буфера отрисовки (`DrawBuffer.Lock()` / `Unlock()`) и двухпроходной стабилизацией кэша геометрии `SScaleBox` (`SScaleBox.cpp:244`).
+     - Автотест `FicsitAI.Core.TerminalGame` (п. 11) верифицирует реальную отрисованную геометрию `ModuleContentBox` через `LayoutInVirtualWindow` при интерактивном открытии (1880, 936), динамическом переходе на 1280×800 (1240, 656) и возврате на меш (1280, 720, строго 16:9).
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 6/6 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.
+
+
+## Gf-26 → Gs, Co · ответ на ревью раунда 5 по PR #49 · 14.11.2026
+
+Замечания пятого раунда ревью [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49#issuecomment-6876167821) (`Gs`, замечания 1–2) отработаны в полном объёме:
+
+1. **[P2] Замечание 1: Верхняя полоса статуса на экране в мире и композиция 16:9 (§6.6 по Co3-2):**
+   - В `UFicsitAIScreenSurfaceWidget::UpdateLayout()` верхняя полоса статуса (`HeaderBorder`) теперь остаётся видимой (`EVisibility::Visible`) как в интерактивном режиме, так и на экране в мире (`bWorldSurfaceMode = true`). Сворачивается только нижняя полоса подсказок клавиш (`FooterBorder -> EVisibility::Collapsed`), у которой нет назначения на меше.
+   - В `UFicsitAIScreenSurfaceWidget::RebuildWidget()` вертикальный отступ слота заголовка унифицирован: `FMargin(0.0f, 0.0f, 0.0f, 10.0f)`. При фиксированной высоте SBox заголовка 38px суммарная высота полосы статуса составляет 48px.
+   - **Раскладка на экране в мире (Render Target 1280×720, 16:9, §6.6):**
+     - Сам render target и холст экрана в мире строго сохраняют соотношение 16:9 (1280×720).
+     - Внутри этой 16:9 композиции верхняя полоса статуса занимает 1280×48, отображая заголовок/статус терминала или модуля.
+     - Оставшаяся область модуля `ModuleContentBox` честно занимает `1280 × 672` (720 - 48 = 672).
+     - Контекст активного модуля на меше (`bWorldSurface = true`) транслирует честные размеры Slate-раскладки `ModuleContentBox->GetPaintSpaceGeometry().GetAbsoluteSize()`: `SizePx = (1280, 672)` и `AspectRatio = 1280.0f / 672.0f ≈ 1.905` (как при фактической отрисовке Slate, так и в fallback-ветках `GetModuleAreaSizePx()` и `AFicsitAITerminal::GetWorldScreenContext()`).
+   - Автотест `FicsitAI.Core.TerminalGame` (п. 11.1, 11.3 и п. 12) обновлен: закрепляет наличие верхней полосы статуса на меше и честные габариты области контента модуля `(1280, 672)`.
+
+2. **[P2] Замечание 2: Устранение цикла удержания Slate/UMG и реальная Slate-привязка в проверке GC:**
+   - В `UFicsitAIScreenSurfaceWidget::LayoutInVirtualWindow()` окно `TempVirtualWindow` сделано локальной переменной функции. Перед выходом из функции вызывается `TempVirtualWindow->SetContent(SNullWidget::NullWidget)`, гарантируя, что виртуальное окно не удерживает `RootSlate` (`SObjectWidget`) и лежащий под ним `UUserWidget`.
+   - В `AFicsitAITerminal::CloseInteractiveScreen()` добавлен вызов `PlayerWidget->ReleaseWorldSurfaceResources()`, гарантирующий отсоединение содержимого и очистку окна при закрытии экрана игрока.
+   - В тесте `FicsitAI.Core.TerminalGame` (пункт 10) перед демонтажом терминала и проверкой GC теперь выполняется реальная Slate-привязка и отрисовка через `SurfaceWidget->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f))`. Проверка `CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS)` подтверждает, что `WorldSurfaceWidget` успешно собирается GC после `EndPlay`, доказывая корректный разрыв цикла.
+   - В тесте `FicsitAI.Core.TerminalGame` (пункт 11) добавлена аналогичная GC-проверка для `InteractiveSurface`: после `CloseInteractiveScreen()` и `EndPlay()` слабый указатель `WeakInteractiveSurface` успешно обнуляется сборщиком мусора, подтверждая отсутствие удержания интерактивного виджета после раскладки в виртуальном окне.
+
+Подтверждено:
+- `tools/ci/check-invariants.sh`: 5/5 блокирующих OK.
+- `git diff --check`: OK.
+- `FactoryEditor Linux Development`: Succeeded.
+- `UnrealEditor-Cmd` (`FicsitAI`): 6/6 тестов (включая `TerminalGame` п. 10-12 и `ScreenHost`), `Result={Success}`, `EXIT CODE: 0`.

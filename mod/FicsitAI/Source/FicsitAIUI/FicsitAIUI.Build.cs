@@ -20,6 +20,8 @@ public class FicsitAIUI : ModuleRules
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {
+            "RenderCore",
+            "RHI"
         });
     }
 }
