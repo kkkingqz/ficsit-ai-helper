@@ -13,7 +13,7 @@
 | `run-game.sh --mod <архив>...` | Запуск игры в личной копии роли с отдельным префиксом Proton; `--exclusive` — для замеров, один на машине |
 | `prepare-webruntime-cef.sh <архив BLUI>` | CEF для `FicsitAIWebRuntime` из архива релиза BLUI v5.1.0 со сверкой sha256: CEF в репозиторий не входит. Сборка после него — `build-mod.sh FicsitAIWebRuntime --keep ThirdParty --keep Web` |
 | `with-lock.sh build -- <команда>` | Любая другая тяжёлая команда под той же очередью: сборка редактора, `UnrealEditor-Cmd`, cook |
-| `selftest.sh` | Самопроверка без движка и игры: заглушки UAT и Flatpak, 32 проверки веток отказа и очередей |
+| `selftest.sh` | Самопроверка без движка и игры: заглушки UAT, Flatpak и 7z; ветки отказа и очереди сборки, запуска и подготовки CEF |
 | `lib.sh` | Общие функции |
 
 ## Настройка

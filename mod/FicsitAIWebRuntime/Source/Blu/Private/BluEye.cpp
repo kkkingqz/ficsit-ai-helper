@@ -513,6 +513,7 @@ UTexture2D* UBluEye::CropWindow(const int32 Y, const int32 X, const int32 NewWid
 	// Update our render handler
 	Renderer->Width = NewWidth;
 	Renderer->Height = NewHeight;
+	Renderer->OnResized(); // FicsitAI: кэш кадра старого размера (ревью #54, P2-4)
 
 	bValidTexture = false;
 

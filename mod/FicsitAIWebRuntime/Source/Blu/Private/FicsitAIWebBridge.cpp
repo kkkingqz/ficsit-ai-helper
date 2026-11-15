@@ -39,11 +39,15 @@ void FFicsitAIWebBridge::Detach()
 void FFicsitAIWebBridge::OnScriptEvent(const FString& Name, const FString& Data)
 {
 	if (Name != Channel()) { return; }
-	// Предел считается по символам UTF-16: для кириллицы это строже, чем байты UTF-8, — и проверка дешевле.
-	if (Data.Len() > MaxRequestBytes)
+	// FicsitAI (ревью #54, P2-5): предел — 64 КиБ в байтах UTF-8, как в контракте. Символ UTF-16 даёт в UTF-8
+	// от одного до трёх байт: строку длиннее предела можно отбросить сразу, короче трети — пропустить без подсчёта,
+	// остальное считается точно.
+	const int64 Utf8Bytes = Data.Len() > MaxRequestBytes ? int64(Data.Len())
+		: (Data.Len() * 3 <= MaxRequestBytes ? int64(Data.Len()) : int64(FPlatformString::ConvertedLength<UTF8CHAR>(*Data, Data.Len())));
+	if (Utf8Bytes > MaxRequestBytes)
 	{
 		++Stats.Malformed;
-		UE_LOG(LogBlu, Warning, TEXT("FicsitAI: bridge request dropped: %d chars"), Data.Len());
+		UE_LOG(LogBlu, Warning, TEXT("FicsitAI: bridge request dropped: %d chars, over %d bytes in UTF-8"), Data.Len(), MaxRequestBytes);
 		return;
 	}
 	TSharedPtr<FJsonObject> Envelope;

@@ -3,7 +3,8 @@
 // Клиент — образец для фасада Co2 (web/screens/api/): конверт { id, op, args } в blu_event("ficsitai.bridge"),
 // ответ { re, body } | { re, error } и события { event, data } — в window.__ficsitaiBridge.receive.
 (function () {
-  const MAX_REQUEST = 64 * 1024; // предел моста; больше — мод отбросит без ответа, поэтому отказ здесь
+  const MAX_REQUEST = 64 * 1024; // предел моста в байтах UTF-8; больше — мод отбросит без ответа, поэтому отказ здесь
+  const utf8 = new TextEncoder();
   const prefix = Math.random().toString(36).slice(2, 8); // ответы прежней страницы сюда не попадут
   let seq = 0;
   const pending = new Map();
@@ -14,7 +15,8 @@
     call(op, args) {
       const id = prefix + '-' + (++seq);
       const text = JSON.stringify({ id: id, op: op, args: args || {} });
-      if (text.length > MAX_REQUEST) {
+      // Предел — в байтах UTF-8: text.length считает символы UTF-16, и кириллица прошла бы вдвое больше.
+      if (utf8.encode(text).length > MAX_REQUEST) {
         return Promise.reject({ code: 'TOO_LARGE', message: 'bridge request over 64 KiB' });
       }
       return new Promise(function (resolve, reject) {
@@ -124,10 +126,13 @@
       try { await bridge.call('queryMetric', { metricId: 'no.such' }); expect('error.unknownMetric.thrown', false); } catch (e) { checkError(e, 'UNKNOWN_METRIC'); }
       // Фасад не отправляет конверт больше предела.
       try { await bridge.call('getStatus', { pad: 'x'.repeat(70000) }); expect('error.tooLarge.thrown', false); } catch (e) { checkError(e, 'TOO_LARGE'); }
-      // Мимо фасада: мод должен отбросить без ответа (проба сверяет счётчик Malformed = 3).
+      // 40 000 кириллических букв: 40 000 символов UTF-16, но больше 80 000 байт UTF-8.
+      try { await bridge.call('getStatus', { pad: 'ж'.repeat(40000) }); expect('error.tooLargeUtf8.thrown', false); } catch (e) { checkError(e, 'TOO_LARGE'); }
+      // Мимо фасада: мод должен отбросить без ответа (проба сверяет счётчик Malformed = 4).
       blu_event('ficsitai.bridge', '{not json');
       blu_event('ficsitai.bridge', '{"op":"getStatus"}');
       blu_event('ficsitai.bridge', JSON.stringify({ id: 'big', op: 'getStatus', args: { pad: 'x'.repeat(70000) } }));
+      blu_event('ficsitai.bridge', JSON.stringify({ id: 'big-utf8', op: 'getStatus', args: { pad: 'ж'.repeat(40000) } }));
     } catch (e) {
       r.ok = false;
       r.exception = String(e && (e.message || e.code) || e);

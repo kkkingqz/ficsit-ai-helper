@@ -17,9 +17,15 @@ void RenderHandler::GetViewRect(CefRefPtr<CefBrowser> Browser, CefRect &Rect)
 	Rect = CefRect(0, 0, Width, Height);
 }
 
-void RenderHandler::Upload(const void* Pixels, const RectList& Rects)
+void RenderHandler::Upload(const void* Pixels, int64 Bytes, const RectList& Rects)
 {
 	if (Rects.empty()) { return; }
+	// FicsitAI (ревью #54, P2-4): TextureUpdate копирует с шагом строки ViewSize. Буфер другого размера (кэш
+	// до смены размера, кадр в момент смены) прочитался бы за концом — такой кадр не загружается.
+	if (Bytes != (int64)ParentUI->Settings.ViewSize.X * (int64)ParentUI->Settings.ViewSize.Y * 4)
+	{
+		return;
+	}
 	FUpdateTextureRegion2D* UpdateRegions = static_cast<FUpdateTextureRegion2D*>(FMemory::Malloc(sizeof(FUpdateTextureRegion2D) * Rects.size()));
 	int32 RegionIndex = 0;
 	for (const CefRect& R : Rects)
@@ -48,7 +54,9 @@ const TArray<uint8>& RenderHandler::Compose()
 	const int32 VW = (int32)ParentUI->Settings.ViewSize.X;
 	Composite = ViewPixels;
 	const CefRect Dest = ClampToView(PopupRect);
-	if (Dest.IsEmpty() || PopupPixels.Num() == 0) { return Composite; }
+	// Кэш страницы не того размера (только что сменился размер) — слой не накладывается, Upload кадр отбросит.
+	const bool bViewFits = Composite.Num() == (int64)VW * (int64)ParentUI->Settings.ViewSize.Y * 4;
+	if (!bViewFits || Dest.IsEmpty() || PopupPixels.Num() == 0) { return Composite; }
 	// Части слоя за краем страницы не рисуются; смещение источника — на величину обрезки.
 	const int32 SrcX0 = Dest.x - PopupRect.x, SrcY0 = Dest.y - PopupRect.y;
 	const int32 Cols = FMath::Min(Dest.width, PopupWidth - SrcX0);
@@ -103,13 +111,14 @@ void RenderHandler::OnPaint(CefRefPtr<CefBrowser> Browser, PaintElementType Type
 		}
 		if (!bPopupShown)
 		{
-			Upload(Buffer, DirtyRects);
+			Upload(Buffer, (int64)InWidth * InHeight * 4, DirtyRects);
 			return;
 		}
 		RectList Rects = DirtyRects;
 		const CefRect Dest = ClampToView(PopupRect);
 		if (!Dest.IsEmpty()) { Rects.push_back(Dest); }
-		Upload(Compose().GetData(), Rects);
+		const TArray<uint8>& Frame = Compose();
+		Upload(Frame.GetData(), Frame.Num(), Rects);
 		return;
 	}
 
@@ -120,7 +129,7 @@ void RenderHandler::OnPaint(CefRefPtr<CefBrowser> Browser, PaintElementType Type
 	PopupPixels.SetNumUninitialized((int64)InWidth * InHeight * 4);
 	FMemory::Memcpy(PopupPixels.GetData(), Buffer, PopupPixels.Num());
 	const CefRect Dest = ClampToView(PopupRect);
-	if (!Dest.IsEmpty()) { Upload(Compose().GetData(), RectList{ Dest }); }
+	if (!Dest.IsEmpty()) { const TArray<uint8>& Frame = Compose(); Upload(Frame.GetData(), Frame.Num(), RectList{ Dest }); }
 }
 
 void RenderHandler::OnPopupShow(CefRefPtr<CefBrowser> Browser, bool bShow)
@@ -135,7 +144,7 @@ void RenderHandler::OnPopupShow(CefRefPtr<CefBrowser> Browser, bool bShow)
 	PopupPixels.Reset();
 	if (!Old.IsEmpty() && ViewPixels.Num() == (int64)ParentUI->Settings.ViewSize.X * ParentUI->Settings.ViewSize.Y * 4)
 	{
-		Upload(ViewPixels.GetData(), RectList{ Old });
+		Upload(ViewPixels.GetData(), ViewPixels.Num(), RectList{ Old });
 	}
 }
 
@@ -146,7 +155,7 @@ void RenderHandler::OnPopupSize(CefRefPtr<CefBrowser> Browser, const CefRect& Re
 	// Слой переехал — сначала вернуть кадр страницы на старом месте.
 	const CefRect Old = ClampToView(PopupRect);
 	PopupRect = Rect;
-	if (!Old.IsEmpty() && ViewPixels.Num() > 0) { Upload(ViewPixels.GetData(), RectList{ Old }); }
+	if (!Old.IsEmpty()) { Upload(ViewPixels.GetData(), ViewPixels.Num(), RectList{ Old }); }
 }
 
 void BrowserClient::OnAfterCreated(CefRefPtr<CefBrowser> Browser)

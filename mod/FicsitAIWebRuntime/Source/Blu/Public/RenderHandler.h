@@ -37,8 +37,21 @@ class RenderHandler : public CefRenderHandler
 		 */
 		void Detach() { ParentUI = nullptr; bPopupShown = false; ViewPixels.Empty(); PopupPixels.Empty(); Composite.Empty(); }
 
-		/** FicsitAI: размер браузера сменился — снова предупредить о первом кадре старого размера. */
-		void OnResized() { bWarnedSize = false; }
+		/**
+		 * FicsitAI: размер браузера сменился. Кэш кадра и слоя — старого размера, шаг строки у него другой
+		 * (ревью #54, P2-4): до первого кадра нового размера рисовать из него нельзя. Снова предупредить о кадре
+		 * старого размера.
+		 */
+		void OnResized()
+		{
+			bWarnedSize = false;
+			ViewPixels.Reset();
+			PopupPixels.Reset();
+			Composite.Reset();
+			PopupWidth = 0;
+			PopupHeight = 0;
+			PopupRect = CefRect();
+		}
 
 	private:
 		TArray<uint8> ViewPixels;     // последний полный кадр страницы
@@ -50,7 +63,8 @@ class RenderHandler : public CefRenderHandler
 		bool bPopupShown = false;
 		bool bWarnedSize = false;
 
-		void Upload(const void* Pixels, const RectList& Rects);
+		/** Bytes — размер буфера Pixels; загрузка идёт, только если это ровно кадр ViewSize. */
+		void Upload(const void* Pixels, int64 Bytes, const RectList& Rects);
 		const TArray<uint8>& Compose();
 		CefRect ClampToView(const CefRect& Rect) const;
 
