@@ -15,11 +15,26 @@
  * - время — секунды от начала сессии.
  */
 
-export const API_VERSION = "0.4.0";
+/**
+ * Версия контракта, на которой собран фасад.
+ *
+ * Поверхность запросов здесь — **подмножество** API 0.5.0: статус, каталог,
+ * области, значение и ряд. Запросы чата (`chatSend`, `chatCancel`,
+ * `chatHistory`) и события `chat.*` придут отдельным PR вместе с мостом
+ * (Co-82); типы состояния ассистента уже здесь, потому что их отдаёт
+ * `getStatus` и событие `api.status`.
+ */
+export const API_VERSION = "0.5.0";
 
 export type DataSource = "live" | "save" | "saveEstimated" | "recorded" | "fixture" | "planned";
 
 export type ValueState = "value" | "notApplicable";
+
+/**
+ * Состояние ассистента (0.5.0): `unavailable` — нет сайдкара или Foreman не
+ * отвечает, причина в `reason`.
+ */
+export type AssistantState = "unavailable" | "signingIn" | "ready" | "thinking";
 
 export type Unit =
   | "itemsPerMinute"
@@ -103,6 +118,10 @@ export interface ApiStatus {
   sidecarConnected: boolean;
   apiVersionMismatch: string;
   reason: string;
+  /** С 0.5.0: состояние ассистента для строки состояния и экрана чата. */
+  assistantState?: AssistantState;
+  /** С 0.5.0: имя модели — его показывает строка состояния (§5). */
+  assistantModel?: string;
 }
 
 export interface MetricValue {
@@ -194,6 +213,10 @@ export interface ApiEvents {
     inert: boolean;
     apiVersionMismatch: string;
     reason: string;
+    /** С 0.5.0. */
+    assistantState?: AssistantState;
+    /** С 0.5.0. */
+    assistantModel?: string;
   };
 }
 

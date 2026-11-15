@@ -55,54 +55,83 @@ export interface BridgeOptions {
   timeoutMs?: number;
 }
 
-export function createBridgeTransport(options: BridgeOptions = {}): Transport {
-  const timeoutMs = options.timeoutMs ?? 10_000;
-  const prefix = Math.random().toString(36).slice(2, 8);
-  const pending = new Map<
-    string,
-    { resolve: (value: unknown) => void; reject: (error: ApiErrorBody) => void; timer: ReturnType<typeof setTimeout> }
-  >();
-  const hub = new EventHub();
-  let seq = 0;
-  /** Сколько ответов пришло не к своему запросу — видно в отладке. */
-  let stray = 0;
+/**
+ * Один диспетчер ответов на страницу.
+ *
+ * `window.__ficsitaiBridge.receive` в странице ровно один, и второй фасад
+ * раньше его подменял: ответы первого уходили в никуда, а его промисы висели
+ * вечно (ревью Gs на #53). Поэтому диспетчер живёт в модуле, а фасады к нему
+ * подключаются и отключаются.
+ */
+interface Waiting {
+  resolve: (value: unknown) => void;
+  reject: (error: ApiErrorBody) => void;
+  timer: ReturnType<typeof setTimeout>;
+  owner: object;
+}
 
-  const receive = (message: BridgeInbound): void => {
-    if (message === null || typeof message !== "object") return;
+const pending = new Map<string, Waiting>();
+const hubs = new Set<EventHub>();
+let stray = 0;
 
-    if (typeof message.re === "string") {
-      const waiting = pending.get(message.re);
-      if (waiting === undefined) {
-        stray += 1;
-        return;
-      }
-      pending.delete(message.re);
-      clearTimeout(waiting.timer);
-      if (message.error !== undefined) {
-        waiting.reject(toErrorBody(message.error, "TRANSPORT_UNAVAILABLE"));
-      } else {
-        waiting.resolve(message.body);
-      }
+function receive(message: BridgeInbound): void {
+  if (message === null || typeof message !== "object") return;
+
+  if (typeof message.re === "string") {
+    const waiting = pending.get(message.re);
+    if (waiting === undefined) {
+      // Ответ после перезагрузки страницы или после срока — не ошибка.
+      stray += 1;
       return;
     }
-
-    if (typeof message.event === "string") {
-      hub.emit(message.event, message.data);
+    pending.delete(message.re);
+    clearTimeout(waiting.timer);
+    if (message.error !== undefined) {
+      waiting.reject(toErrorBody(message.error, "TRANSPORT_UNAVAILABLE"));
+    } else {
+      waiting.resolve(message.body);
     }
-  };
+    return;
+  }
 
-  // Мод зовёт именно это имя; оно же — признак, что фасад на странице есть.
+  if (typeof message.event === "string") {
+    for (const hub of hubs) hub.emit(message.event, message.data);
+  }
+}
+
+/**
+ * Ставит диспетчер, если его нет или он чужой. Проверка по самой функции, а
+ * не по флагу: страницу мог перезаписать другой сценарий, и тогда ответы
+ * уходили бы в никуда молча.
+ */
+function install(): void {
+  if (globals.__ficsitaiBridge?.receive === receive) return;
   globals.__ficsitaiBridge = {
     receive,
     get stray() {
       return stray;
     },
   };
+}
+
+export function createBridgeTransport(options: BridgeOptions = {}): Transport {
+  const timeoutMs = options.timeoutMs ?? 10_000;
+  const prefix = Math.random().toString(36).slice(2, 8);
+  const hub = new EventHub();
+  const owner = {};
+  let seq = 0;
+  let closed = false;
+
+  install();
+  hubs.add(hub);
 
   return {
     kind: "bridge",
 
     async call(op: string, args: Record<string, unknown>): Promise<unknown> {
+      if (closed) {
+        throw transportError("TRANSPORT_UNAVAILABLE", "фасад закрыт");
+      }
       const send = globals.blu_event;
       if (typeof send !== "function") {
         throw transportError("TRANSPORT_UNAVAILABLE", "мост недоступен: страница открыта не в игре");
@@ -122,7 +151,7 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
             transportError("TRANSPORT_UNAVAILABLE", `мод не ответил на «${op}» за ${timeoutMs} мс`),
           );
         }, timeoutMs);
-        pending.set(id, { resolve, reject, timer });
+        pending.set(id, { resolve, reject, timer, owner });
         send(CHANNEL, text);
       });
     },
@@ -132,9 +161,22 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
     },
 
     close(): void {
-      for (const [, waiting] of pending) clearTimeout(waiting.timer);
-      pending.clear();
+      closed = true;
+      hubs.delete(hub);
       hub.clear();
+      // Свои ожидающие запросы завершаем отказом: иначе страница ждала бы
+      // ответа, которого уже никто не примет.
+      for (const [id, waiting] of [...pending]) {
+        if (waiting.owner !== owner) continue;
+        pending.delete(id);
+        clearTimeout(waiting.timer);
+        waiting.reject(transportError("TRANSPORT_UNAVAILABLE", "фасад закрыт до ответа"));
+      }
     },
   };
+}
+
+/** Сколько ответов пришло не к своему запросу — видно в отладке страницы. */
+export function strayResponses(): number {
+  return stray;
 }

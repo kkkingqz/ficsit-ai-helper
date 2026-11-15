@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { isAbsolute, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { createDemoSource } from "./demo-source.js";
 import { startDevServer } from "./server.js";
 import type { DevSource } from "./source.js";
@@ -13,7 +15,13 @@ import type { DevSource } from "./source.js";
  */
 async function loadSource(spec: string): Promise<DevSource> {
   if (spec === "demo") return createDemoSource();
-  const module = (await import(spec)) as { createSource?: () => DevSource | Promise<DevSource> };
+  // Путь к файлу разрешается от каталога запуска, а не от `dist/dev/`, где
+  // лежит этот файл: иначе документированный `--source ./my-source.js` не
+  // находился (ревью Gs на #53). `pathToFileURL` нужен и для Windows, где
+  // голый путь с диском не является корректным URL.
+  const target =
+    spec.startsWith(".") || isAbsolute(spec) ? pathToFileURL(resolve(spec)).href : spec;
+  const module = (await import(target)) as { createSource?: () => DevSource | Promise<DevSource> };
   if (typeof module.createSource !== "function") {
     throw new Error(`модуль «${spec}» не экспортирует createSource()`);
   }

@@ -83,6 +83,18 @@ export function createHttpTransport(options: HttpOptions = {}): Transport {
         throw toErrorBody(err, "TRANSPORT_UNAVAILABLE");
       }
 
+      if (payload === null || typeof payload !== "object") {
+        throw transportError("TRANSPORT_UNAVAILABLE", "ответ dev-сервера не разобран");
+      }
+      // Ответ не к своему запросу принимать нельзя: на мосту это правило
+      // есть, а здесь его не было, и чужой `re` проходил как свой ответ
+      // (ревью Gs на #53).
+      if (payload.re !== id) {
+        throw transportError(
+          "TRANSPORT_UNAVAILABLE",
+          `ответ пришёл не к своему запросу (${String(payload.re)})`,
+        );
+      }
       if (payload.error !== undefined) {
         throw toErrorBody(payload.error, "TRANSPORT_UNAVAILABLE");
       }

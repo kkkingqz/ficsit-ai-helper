@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, realpath, stat } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import { SourceError, type DevSource } from "./source.js";
@@ -113,8 +113,28 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       return;
     }
 
+    // Форма конверта проверяется до обработки: тело `null` раньше давало 500
+    // вместо кода контракта (ревью Gs на #53).
+    if (envelope === null || typeof envelope !== "object" || Array.isArray(envelope)) {
+      sendJson(res, 400, {
+        error: { code: "INVALID_ARGUMENT", message: "конверт должен быть объектом" },
+      });
+      return;
+    }
+
     const { id, op } = envelope;
     const args = envelope.args ?? {};
+    if (id !== undefined && typeof id !== "string") {
+      sendJson(res, 400, { error: { code: "INVALID_ARGUMENT", message: "id — строка" } });
+      return;
+    }
+    if (typeof args !== "object" || args === null || Array.isArray(args)) {
+      sendJson(res, 400, {
+        re: id,
+        error: { code: "INVALID_ARGUMENT", message: "args должен быть объектом" },
+      });
+      return;
+    }
     if (typeof op !== "string" || !OPERATIONS.has(op)) {
       sendJson(res, 200, {
         re: id,
@@ -170,9 +190,20 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     try {
       const info = await stat(file);
       if (info.isDirectory()) file = join(file, "index.html");
-      const body = await readFile(file);
+      // Проверка строки пути не ловит символические ссылки: файл рядом с
+      // корнем отдавался по ссылке из корня (ревью Gs на #53). Поэтому
+      // смотрим фактический путь, уже разрешённый.
+      const real = await realpath(file);
+      const realRoot = await realpath(root);
+      if (!real.startsWith(realRoot + sep) && real !== realRoot) {
+        sendJson(res, 403, {
+          error: { code: "INVALID_ARGUMENT", message: "путь вне каталога после разрешения ссылок" },
+        });
+        return;
+      }
+      const body = await readFile(real);
       res.writeHead(200, {
-        "content-type": TYPES[extname(file)] ?? "application/octet-stream",
+        "content-type": TYPES[extname(real)] ?? "application/octet-stream",
         // Горячая перезагрузка бессмысленна поверх кэша браузера.
         "cache-control": "no-store",
       });

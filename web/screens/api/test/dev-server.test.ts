@@ -1,4 +1,4 @@
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -249,4 +249,68 @@ describe("события источника доходят до страницы
     expect(seen.sessionTimeSec).toBeGreaterThan(0);
     api.close();
   }, 10000);
+});
+
+describe("замечания ревью Gs на #53: dev-сервер", () => {
+  it("чужой re в ответе не принимается за свой", async () => {
+    const server = await serve();
+    const api = createApi({
+      transport: createHttpTransport({
+        baseUrl: server.url,
+        events: false,
+        // Подменяем ответ: сервер отвечает правильно, но посередине что-то
+        // перепутало корреляцию. На мосту это правило есть, и здесь должно быть.
+        fetchImpl: async () =>
+          new Response(JSON.stringify({ re: "чужой", body: { kind: "value", value: 99 } }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          }),
+      }),
+    });
+    await expect(api.queryMetric({ metricId: "power.production" })).rejects.toMatchObject({
+      code: "TRANSPORT_UNAVAILABLE",
+    });
+  });
+
+  it("тело null и чужое окно ряда получают код контракта", async () => {
+    const server = await serve();
+    const bad = await fetch(`${server.url}/api/v0`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: "null",
+    });
+    expect(bad.status).toBe(400);
+    expect(await bad.json()).toMatchObject({ error: { code: "INVALID_ARGUMENT" } });
+
+    const window = await fetch(`${server.url}/api/v0`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        id: "m-1",
+        op: "querySeries",
+        args: { metricId: "power.production", window: "за всё время" },
+      }),
+    });
+    // Браузерная отладка не должна пропускать то, что игровой API отклонит.
+    expect(await window.json()).toMatchObject({ error: { code: "INVALID_ARGUMENT" } });
+  });
+
+  it("символическая ссылка из корня наружу не отдаётся", async () => {
+    const outside = mkdtempSync(join(tmpdir(), "ficsitai-outside-"));
+    writeFileSync(join(outside, "secret.txt"), "чужое содержимое");
+    const root = mkdtempSync(join(tmpdir(), "ficsitai-screens-link-"));
+    symlinkSync(join(outside, "secret.txt"), join(root, "link.txt"));
+    const server = await startDevServer({
+      root,
+      source: createDemoSource(),
+      port: 0,
+      watch: false,
+      log: () => {},
+    });
+    servers.push(server);
+
+    const response = await fetch(`${server.url}/link.txt`);
+    expect(response.status).toBe(403);
+    expect(await response.text()).not.toContain("чужое содержимое");
+  });
 });

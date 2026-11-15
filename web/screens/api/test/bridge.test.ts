@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { bridgeAvailable, createBridgeTransport } from "../src/bridge.js";
 import { createApi } from "../src/facade.js";
-import { ApiError } from "../src/types.js";
+import { API_VERSION, ApiError } from "../src/types.js";
 
 /**
  * Мост в игре: конверт, корреляция и три правила, которые соблюдает фасад,
@@ -79,8 +79,10 @@ describe("транспорт моста", () => {
     const transport = createBridgeTransport();
     const call = transport.call("getStatus", {});
 
+    // Счётчик живёт на странице, а не на фасаде: считаем прирост.
+    const before = globals.__ficsitaiBridge?.stray ?? 0;
     globals.__ficsitaiBridge?.receive({ re: "чужой-7", body: { apiVersion: "0.4.0" } });
-    expect(globals.__ficsitaiBridge?.stray).toBe(1);
+    expect((globals.__ficsitaiBridge?.stray ?? 0) - before).toBe(1);
 
     answer(sent[0]?.payload.id as string, { apiVersion: "0.4.0" });
     expect(await call).toMatchObject({ apiVersion: "0.4.0" });
@@ -152,7 +154,7 @@ describe("фасад поверх моста", () => {
     });
     // По §5.5 ручные функции продолжают работать, поэтому расхождение —
     // это поле статуса, а не исключение: показать его решает экран.
-    expect((await status).apiVersionMismatch).toContain("0.4.0");
+    expect((await status).apiVersionMismatch).toContain(API_VERSION);
     api.close();
   });
 
@@ -163,6 +165,49 @@ describe("фасад поверх моста", () => {
     fail(sent[0]?.payload.id as string, { code: "UNKNOWN_METRIC", message: "нет такой" });
     await expect(call).rejects.toBeInstanceOf(ApiError);
     await expect(call).rejects.toMatchObject({ code: "UNKNOWN_METRIC" });
+    api.close();
+  });
+});
+
+describe("замечания ревью Gs на #53", () => {
+  it("два фасада на странице не забирают ответы друг у друга", async () => {
+    const sent = installMod();
+    const first = createApi({ checkApiVersion: false });
+    const second = createApi({ checkApiVersion: false });
+
+    const firstCall = first.getStatus();
+    const secondCall = second.queryMetric({ metricId: "power.production" });
+    expect(sent).toHaveLength(2);
+
+    // Отвечаем в обратном порядке: диспетчер на странице один, и каждый
+    // ответ должен найти своего ожидающего (раньше второй фасад подменял
+    // приёмник, и запрос первого висел вечно).
+    answer(sent[1]?.payload.id as string, { kind: "value", value: 7 });
+    answer(sent[0]?.payload.id as string, { apiVersion: "0.5.0", source: "live" });
+
+    expect((await secondCall).value).toBe(7);
+    expect((await firstCall).source).toBe("live");
+    first.close();
+    second.close();
+  });
+
+  it("закрытие фасада завершает его ожидающие запросы", async () => {
+    installMod();
+    const api = createApi({ checkApiVersion: false });
+    const call = api.getStatus();
+    api.close();
+    // Без этого страница ждала бы ответа, которого уже никто не примет.
+    await expect(call).rejects.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+  });
+
+  it("расхождение версии видно и когда мод не прислал поле", async () => {
+    const sent = installMod();
+    const api = createApi();
+    const status = api.getStatus();
+    // Ответ без `apiVersionMismatch`: подстановка раньше срабатывала только
+    // для пустой строки, и причина уезжала как undefined.
+    answer(sent[0]?.payload.id as string, { apiVersion: "1.0.0", source: "live" });
+    expect((await status).apiVersionMismatch).toContain("1.0.0");
     api.close();
   });
 });

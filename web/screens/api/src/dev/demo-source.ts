@@ -10,6 +10,7 @@ import type {
   QueryMetricArgs,
   QuerySeriesArgs,
   ScopeRef,
+  SeriesWindow,
 } from "../types.js";
 
 /**
@@ -91,6 +92,9 @@ const ITEMS: ScopeRef[] = Array.from({ length: 60 }, (_unused, index) => ({
 }));
 
 const MAX_INLINE_SCOPES = 50;
+
+/** Окна ряда из контракта: другое значение — `INVALID_ARGUMENT`. */
+const WINDOWS: ReadonlySet<string> = new Set<SeriesWindow>(["last5Min", "last15Min", "last60Min"]);
 
 function scopesOf(metricId: string): ScopeRef[] {
   if (metricId.startsWith("power.network.")) return NETWORKS;
@@ -257,6 +261,12 @@ export function createDemoSource(): DevSource {
     },
 
     querySeries(args: QuerySeriesArgs): MetricSeries {
+      // Недопустимое окно раньше возвращалось в успешном ответе как есть, и
+      // браузерная отладка пропускала то, что игровой API отклоняет
+      // (ревью Gs на #53).
+      if (!WINDOWS.has(args.window)) {
+        throw new SourceError("INVALID_ARGUMENT", `окно «${String(args.window)}» не из контракта`);
+      }
       const metric = definitionOf(args.metricId);
       if (!metric.hasSeries) {
         throw new SourceError("SERIES_NOT_AVAILABLE", `у «${metric.id}» нет ряда`);

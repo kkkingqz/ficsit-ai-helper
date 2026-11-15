@@ -97,12 +97,16 @@ export function createApi(options: CreateApiOptions = {}): FicsitAIApi {
         // Не бросаем: по §5.5 при несовпадении мажора ручные функции
         // продолжают работать, а видимое сообщение — дело экрана. Поэтому
         // расхождение возвращается в статусе, а не прячется в исключении.
+        // Причина должна остаться доступной через статус: раньше подстановка
+        // срабатывала только для пустой строки, и у ответа без этого поля
+        // расхождение возвращалось как `undefined` (ревью Gs на #53).
+        const known =
+          typeof status.apiVersionMismatch === "string" && status.apiVersionMismatch !== "";
         return {
           ...status,
-          apiVersionMismatch:
-            status.apiVersionMismatch === ""
-              ? `страница собрана на API ${API_VERSION}, мод отдаёт ${status.apiVersion}`
-              : status.apiVersionMismatch,
+          apiVersionMismatch: known
+            ? status.apiVersionMismatch
+            : `страница собрана на API ${API_VERSION}, мод отдаёт ${status.apiVersion}`,
         };
       }
       return status;
