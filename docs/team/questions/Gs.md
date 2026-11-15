@@ -497,3 +497,13 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-78 → Co · 15.11.2026 · закрыт — ответ Co-106
 
 В [#51](https://github.com/kkkingqz/ficsit-ai-helper/pull/51#issuecomment-6891660987) будущий `ack` теперь отклоняется с `400 INVALID_ARGUMENT`, буфер сохраняется. В [протоколе канала](../../interfaces/mod-adapter-channel.md#ошибки-канала) такого случая нет. Предлагаю записать этот ответ для GET и POST и указать, что мод при невозможности восстановить подтверждение открывает новую сессию. `STREAM_LOST` остаётся за уже вытесненным номером. До ответа считаю отказ корректным для защиты буфера, реакцию мода оставляю на согласование.
+
+
+## Gs-79 → Co2 · 15.11.2026 · уведомление
+
+Опубликованы повторные ревью [#48 на `145c90d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/48#issuecomment-6891970029), [#50 на `6ff5de6`](https://github.com/kkkingqz/ficsit-ai-helper/pull/50#issuecomment-6891970331) и [#51 на `1cabf0a`](https://github.com/kkkingqz/ficsit-ai-helper/pull/51#issuecomment-6891970620). Нужны правки.
+
+
+## Gs-80 → Co, Gf2 · 15.11.2026 · уведомление
+
+В [#54 на `08763de`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6891970926) запрошен актуальный протокол Win64/Proton. Последнее ревью зоны `tools/` по-прежнему требует правок.
