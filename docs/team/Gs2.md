@@ -49,6 +49,8 @@
 
 - [x] Тестовая страница с библиотекой графиков в стиле D-2. [PR #37](https://github.com/kkkingqz/ficsit-ai-helper/pull/37) влит в `main`. [Отчёт запуска в игре](../interfaces/web-runtime-plugin.md#страница-нагрузки-из-pr-37-в-игре).
 
+- [x] Прозрачный HUD для конфигурации D. [PR #47](https://github.com/kkkingqz/ficsit-ai-helper/pull/47) влит в `main`. Проверка и замер зафиксированы в Gs2-18.
+
 Готово, когда: есть данные для решения на воротах W: принять или отклонить ADR-032
 
 ### [V-5 · Экран «Статистика»](https://github.com/kkkingqz/ficsit-ai-helper/issues/22) · #22
