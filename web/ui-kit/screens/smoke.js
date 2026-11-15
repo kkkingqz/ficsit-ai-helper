@@ -89,11 +89,26 @@ try {
     target.textContent.includes("History unavailable") && target.textContent.includes("Stopped") &&
     draft.closest("form").hidden && draft.value === "A follow-up draft", "Disconnect retains displayed history and disables sending");
   assert(chat.handleBackAction() === false, "Idle Back is delegated to the host");
-  chat.update(chatFixture("error"));
-  target.querySelector("[data-retry]").focus();
-  target.querySelector("[data-retry]").click();
+  const retryable = chatFixture("error");
+  chat.update(retryable);
+  const retry = target.querySelector("[data-retry]");
+  retry.click();
   assert(events.some(([name]) => name === "retry"), "Errors delegate retry separately from chat text");
-  chat.update({ ...chatFixture("error"), error: null });
+  const retries = events.filter(([name]) => name === "retry").length;
+  retry.focus();
+  chat.update({ ...offline, error: retryable.error });
+  retry.click();
+  assert(events.filter(([name]) => name === "retry").length === retries,
+    "Retry cannot dispatch after disconnection");
+  assert(retry.disabled && target.textContent.includes(retryable.error.text) &&
+    document.activeElement === target.querySelector(".d2-chat-history"),
+    "Disconnect disables Retry, preserves the error and moves focus to history");
+  chat.update(retryable);
+  retry.click();
+  assert(events.filter(([name]) => name === "retry").length === retries + 1,
+    "Reconnection makes Retry available for the retained error");
+  retry.focus();
+  chat.update({ ...retryable, error: null });
   assert(document.activeElement === draft, "Focus moves to draft after the retry action is hidden");
   chat.unmount();
   assert(!target.children.length, "Destroy detaches both views");

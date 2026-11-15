@@ -122,6 +122,7 @@ export function mountChat(root, { presenter, copy, actions }) {
       const errorText = model.error?.text ?? "";
       if (problemText.textContent !== errorText) problemText.textContent = errorText;
       retry.hidden = !model.error?.canRetry;
+      retry.disabled = !model.connected;
       draft.disabled = !model.connected;
       if (draft.value !== model.draft) draft.value = model.draft;
       if (rateLimit.textContent !== (model.rateLimit ?? "")) rateLimit.textContent = model.rateLimit ?? "";
