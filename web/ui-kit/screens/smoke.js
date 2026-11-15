@@ -75,14 +75,20 @@ try {
   assert(target.querySelector('[data-role="assistant"]') === answer && answer.textContent.includes("second fragment") &&
     draft.value === "A follow-up draft", "A stream updates the same message and retains the draft");
   const offline = { ...chatFixture("offline"), draft: "A follow-up draft" };
+  target.querySelector("[data-stop]").focus();
   chat.update(offline);
+  assert(document.activeElement === target.querySelector(".d2-chat-history"),
+    "Focus moves to history after disconnection hides the active control");
   assert(target.querySelector('[data-role="assistant"]') === answer &&
     target.textContent.includes("History unavailable") && target.textContent.includes("Stopped") &&
     draft.closest("form").hidden && draft.value === "A follow-up draft", "Disconnect retains displayed history and disables sending");
   assert(chat.handleBackAction() === false, "Idle Back is delegated to the host");
   chat.update(chatFixture("error"));
+  target.querySelector("[data-retry]").focus();
   target.querySelector("[data-retry]").click();
   assert(events.some(([name]) => name === "retry"), "Errors delegate retry separately from chat text");
+  chat.update({ ...chatFixture("error"), error: null });
+  assert(document.activeElement === draft, "Focus moves to draft after the retry action is hidden");
   chat.destroy();
   assert(!target.children.length, "Destroy detaches both views");
   result.textContent = "Screen views smoke passed";

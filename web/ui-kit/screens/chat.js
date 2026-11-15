@@ -101,6 +101,7 @@ export function mountChat(root, { presenter, copy, actions }) {
 
   return {
     update(model) {
+      const focused = document.activeElement;
       const follow = history.scrollHeight - history.clientHeight - history.scrollTop < 8 || !current;
       current = model;
       const notice = copy.historyStates[model.history];
@@ -125,6 +126,9 @@ export function mountChat(root, { presenter, copy, actions }) {
       if (rateLimit.textContent !== (model.rateLimit ?? "")) rateLimit.textContent = model.rateLimit ?? "";
       rateLimit.hidden = !model.rateLimit;
       syncSend();
+      if (page.contains(focused) && (focused.disabled || focused.closest("[hidden]"))) {
+        (model.connected ? draft : history).focus({ preventScroll: true });
+      }
       sidebar.hidden = !sidePanels.some(({ key }) => model[key]);
       for (const { key, panel } of sidePanels) {
         panel.element.hidden = !model[key];
