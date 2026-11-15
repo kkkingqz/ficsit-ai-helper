@@ -63,6 +63,7 @@ const TArray<uint8>& RenderHandler::Compose()
 
 void RenderHandler::OnPaint(CefRefPtr<CefBrowser> Browser, PaintElementType Type, const RectList &DirtyRects, const void *Buffer, int InWidth, int InHeight)
 {
+	if (!ParentUI) { return; } // глаз закрыт (Detach)
 	const int32 VW = (int32)ParentUI->Settings.ViewSize.X;
 	const int32 VH = (int32)ParentUI->Settings.ViewSize.Y;
 	if (!Buffer || InWidth <= 0 || InHeight <= 0) { return; }
@@ -124,6 +125,7 @@ void RenderHandler::OnPaint(CefRefPtr<CefBrowser> Browser, PaintElementType Type
 
 void RenderHandler::OnPopupShow(CefRefPtr<CefBrowser> Browser, bool bShow)
 {
+	if (!ParentUI) { return; }
 	UE_LOG(LogBlu, Display, TEXT("FicsitAI: popup %s"), bShow ? TEXT("shown") : TEXT("hidden"));
 	if (bShow) { bPopupShown = true; return; }
 	bPopupShown = false;
@@ -139,6 +141,7 @@ void RenderHandler::OnPopupShow(CefRefPtr<CefBrowser> Browser, bool bShow)
 
 void RenderHandler::OnPopupSize(CefRefPtr<CefBrowser> Browser, const CefRect& Rect)
 {
+	if (!ParentUI) { return; }
 	UE_LOG(LogBlu, Display, TEXT("FicsitAI: popup rect %d,%d %dx%d"), Rect.x, Rect.y, Rect.width, Rect.height);
 	// Слой переехал — сначала вернуть кадр страницы на старом месте.
 	const CefRect Old = ClampToView(PopupRect);
@@ -154,20 +157,41 @@ void BrowserClient::OnAfterCreated(CefRefPtr<CefBrowser> Browser)
 		// Keep a reference to the main browser.
 		BrowserRef = Browser;
 		BrowserId = Browser->GetIdentifier();
+		// FicsitAI: цикл CEF не останавливается, пока этот браузер не подтвердит закрытие.
+		UBluEye::NoteBrowserCreated();
 	}
 }
 
 void BrowserClient::OnBeforeClose(CefRefPtr<CefBrowser> Browser)
 {
 	//CEF_REQUIRE_UI_THREAD();
-	if (BrowserId == Browser->GetIdentifier())
+	if (BrowserRef && BrowserId == Browser->GetIdentifier())
 	{
 		BrowserRef = nullptr;
+		UBluEye::NoteBrowserClosed();
+		UE_LOG(LogBlu, Log, TEXT("FicsitAI: browser %d closed, %d still open"), BrowserId, UBluEye::NumLiveBrowsers());
 	}
+	// Закрытие подтверждено: отложенный сторож и кадр больше не нужны.
+	PendingFrame = nullptr;
+	++PendingSerial;
+}
+
+void BrowserClient::Detach()
+{
+	bIsClosing = true;
+	EventEmitter = nullptr;
+	LogEmitter = nullptr;
+	NativeEmitter = nullptr;
+	RejectedCounter = nullptr;
+	// Сторож загрузки: уже поставленная задача увидит другой номер и ничего не сделает.
+	PendingFrame = nullptr;
+	bPendingCommitted = true;
+	++PendingSerial;
 }
 
 bool BrowserClient::OnConsoleMessage(CefRefPtr<CefBrowser> Browser, cef_log_severity_t Level, const CefString& Message, const CefString& source, int line)
 {
+	if (!LogEmitter) { return true; }
 	FString LogMessage = FString(Message.ToWString().c_str());
 	//UE_LOG(LogTemp, Log, TEXT("Console.log: %s"), *LogMessage);
 	LogEmitter->Broadcast(LogMessage);
@@ -181,6 +205,7 @@ void BrowserClient::OnFullscreenModeChange(CefRefPtr< CefBrowser > Browser, bool
 
 void BrowserClient::OnTitleChange(CefRefPtr< CefBrowser > Browser, const CefString& Title)
 {
+	if (!LogEmitter) { return; }
 	FString TitleMessage = FString(Title.ToWString().c_str());
 	LogEmitter->Broadcast(TitleMessage);
 }
@@ -192,6 +217,7 @@ CefRefPtr<CefBrowser> BrowserClient::GetCEFBrowser()
 
 bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> Browser, CefRefPtr<CefFrame> Frame, CefProcessId SourceProcess, CefRefPtr<CefProcessMessage> Message)
 {
+	if (bIsClosing || !EventEmitter) { return true; } // глаз закрыт (Detach)
 	FString Data;
 	FString Name = FString(UTF8_TO_TCHAR(Message->GetArgumentList()->GetString(0).ToString().c_str()));
 	FString Type = FString(UTF8_TO_TCHAR(Message->GetArgumentList()->GetString(2).ToString().c_str()));
@@ -222,7 +248,8 @@ bool BrowserClient::OnProcessMessageReceived(CefRefPtr<CefBrowser> Browser, CefR
 			Data = FString::SanitizeFloat(Message->GetArgumentList()->GetDouble(1));
 
 		if (NativeEmitter) { NativeEmitter->Broadcast(Name, Data); }
-		EventEmitter->Broadcast(Name, Data);
+		// Обработчик моста мог закрыть глаз (Detach обнулил указатели).
+		if (EventEmitter) { EventEmitter->Broadcast(Name, Data); }
 	}
 
 	return true;
@@ -291,6 +318,7 @@ void BrowserClient::OnDownloadUpdated(
 	
 	UE_LOG(LogClass, Log, TEXT("Download %s Updated: %d"), *Url , Percentage);
 
+	if (!RenderHandlerRef->ParentUI) { return; }
 	RenderHandlerRef->ParentUI->DownloadUpdated.Broadcast(Url, Percentage);
 
 	if (Percentage == 100 && DownloadItem->IsComplete()) {
@@ -319,7 +347,7 @@ namespace
 
 void BrowserClient::WatchPendingLoad(CefRefPtr<CefFrame> Frame, const CefString& Url)
 {
-	if (!FicsitAIWeb::IsAllowedNavigation(Url) || Url == "about:blank")
+	if (bIsClosing || !FicsitAIWeb::IsAllowedNavigation(Url) || Url == "about:blank")
 	{
 		return;
 	}

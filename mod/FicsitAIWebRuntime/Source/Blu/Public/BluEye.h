@@ -282,6 +282,14 @@ public:
 	bool IsShowingCurrentTexture() const { return bTexturePainted && GetDisplayTexture() == Texture; }
 	int32 NumRetiredTextures() const { return RetiredTextures.Num() + (PreviousTexture ? 1 : 0); }
 
+	/** FicsitAI: учёт браузеров, ещё не подтвердивших закрытие (OnAfterCreated / OnBeforeClose). Только GameThread. */
+	static void NoteBrowserCreated();
+	static void NoteBrowserClosed();
+	/** FicsitAI: для проверок закрытия. */
+	static int32 NumLiveBrowsers();
+	static bool IsEventLoopRunning();
+	bool IsBrowserReleased() const { return bBrowserReleased; }
+
 	/** Use this to pause the tick loop in the new system */
 	UFUNCTION(BlueprintCallable, Category = "Blu")
 	static void SetShouldTickEventLoop(bool ShouldTick = true);
@@ -318,6 +326,11 @@ protected:
 	UMaterialInstanceDynamic* MaterialInstance;
 
 private:
+
+	/** FicsitAI (ревью #54, P1-3): закрыть браузер и отключить его обратные вызовы. Повторный вызов ничего не делает. */
+	void ReleaseBrowser();
+	bool bBrowserReleased = false;
+	bool bCountedInEventLoop = false;
 
 	FBluTextureParams RenderParams;
 	FThreadSafeBool bValidTexture;

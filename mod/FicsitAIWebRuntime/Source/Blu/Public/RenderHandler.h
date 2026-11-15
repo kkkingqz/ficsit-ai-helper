@@ -31,6 +31,12 @@ class RenderHandler : public CefRenderHandler
 
 		/** FicsitAI: последний полный кадр страницы (BGRA, premultiplied alpha) — для проверок прозрачности. */
 		const TArray<uint8>& GetViewPixels() const { return ViewPixels; }
+		/**
+		 * FicsitAI (ревью #54, P1-3): глаз закрывается. CEF ещё может прислать кадр до OnBeforeClose — после этого
+		 * вызова он никуда не идёт. Только GameThread (он же поток UI CEF: цикл крутится из тикера игры).
+		 */
+		void Detach() { ParentUI = nullptr; bPopupShown = false; ViewPixels.Empty(); PopupPixels.Empty(); Composite.Empty(); }
+
 		/** FicsitAI: размер браузера сменился — снова предупредить о первом кадре старого размера. */
 		void OnResized() { bWarnedSize = false; }
 
@@ -254,6 +260,12 @@ class BrowserClient : public CefClient, public CefLifeSpanHandler, public CefDow
 		std::atomic<int32> CursorType{ CT_POINTER };
 
 		CefRefPtr<CefBrowser> GetCEFBrowser();
+
+		/**
+		 * FicsitAI (ревью #54, P1-3): глаз закрывается — отключить события страницы и лога, счётчик отклонённых
+		 * событий и сторож загрузки. Объект клиента живёт дальше, пока его держит CEF, но к UBluEye больше не ходит.
+		 */
+		void Detach();
 
 		// NOTE: Must be at bottom
 	public:

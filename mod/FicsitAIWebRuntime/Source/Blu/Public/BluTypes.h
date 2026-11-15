@@ -7,12 +7,14 @@ struct FTickEventLoopData
 {
 	FTSTicker::FDelegateHandle DelegateHandle;
 	int32 EyeCount;
+	int32 LiveBrowsers; // FicsitAI: созданы и ещё не прислали OnBeforeClose
 	bool bShouldTickEventLoop;
 
 	FTickEventLoopData()
 	{
 		DelegateHandle = FTSTicker::FDelegateHandle();
 		EyeCount = 0;
+		LiveBrowsers = 0;
 		bShouldTickEventLoop = true;
 	}
 };

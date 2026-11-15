@@ -45,6 +45,10 @@ class FBlu : public IBlu
 		BluManager::Settings.no_sandbox = true;
 		// FicsitAI: порт DevTools — входящий слушатель в процессе игры (§12 п. 1, п. 11). Выключен.
 		BluManager::Settings.remote_debugging_port = 0;
+		// FicsitAI (ревью #54, P1-2): аргументы командной строки игры не настраивают Chromium. Иначе
+		// FactoryGame.exe --remote-debugging-port=0 открыл бы DevTools в Shipping в обход настройки выше.
+		// Свои ключи задаём в BluManager::OnBeforeCommandLineProcessing — они действуют и при этом флаге.
+		BluManager::Settings.command_line_args_disabled = true;
 		BluManager::Settings.log_severity = LOGSEVERITY_WARNING;
 		const CefString FicsitCefLog = *(FicsitCefRoot / TEXT("cef.log"));
 		CefString(&BluManager::Settings.log_file).FromString(FicsitCefLog);

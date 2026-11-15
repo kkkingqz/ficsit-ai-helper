@@ -1,4 +1,5 @@
 #include "BluManager.h"
+#include "IBlu.h"
 
 BluManager::BluManager()
 {
@@ -55,6 +56,17 @@ void BluManager::OnBeforeCommandLineProcessing(const CefString& process_type,
 	CommandLine->AppendSwitch("disable-default-apps");
 	CommandLine->AppendSwitchWithValue("disable-features", "OptimizationHints,OptimizationGuideModelDownloading,OptimizationHintsFetching,OptimizationTargetPrediction,MediaRouter,Translate,AutofillServerCommunication");
 	CommandLine->AppendSwitchWithValue("host-resolver-rules", "MAP * ~NOTFOUND");
+
+	// FicsitAI (ревью #54, P1-2): при command_line_args_disabled ключей DevTools здесь быть не может. Если они есть —
+	// флаг не сработал, и это видно в логе (проба S8 ищет эту строку).
+	static const char* const DevToolsSwitches[] = { "remote-debugging-port", "remote-debugging-pipe", "remote-debugging-address" };
+	for (const char* Switch : DevToolsSwitches)
+	{
+		if (CommandLine->HasSwitch(Switch))
+		{
+			UE_LOG(LogBlu, Error, TEXT("FicsitAI: DevTools switch reached CEF (%s, process '%s')"), UTF8_TO_TCHAR(Switch), *FString(process_type.ToWString().c_str()));
+		}
+	}
 
 	if (AutoPlay)
 	{

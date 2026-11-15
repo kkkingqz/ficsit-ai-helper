@@ -26,4 +26,10 @@ namespace FicsitAIWeb
 
 	/** Ответ на запрос к нашему источнику: файл из каталога страниц либо 404/403/405. Вызывается на потоке IO. */
 	CefRefPtr<CefResourceHandler> MakeResourceHandler(CefRefPtr<CefRequest> Request);
+
+	/**
+	 * Байты файла страницы по пути адреса (/spikes/s8/bridge.html). 200, 403 — путь вне белого списка, ссылка или
+	 * фактический путь вне каталога страниц, 404 — нет файла или он больше 16 МиБ. Любой поток.
+	 */
+	BLU_API int32 ReadPageFile(const FString& UrlPath, TArray<uint8>& OutBytes, const char** OutMime = nullptr);
 }

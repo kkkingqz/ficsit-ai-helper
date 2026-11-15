@@ -2,6 +2,7 @@
 #include "BluEye.h"
 #include "IBlu.h"
 #include "RenderHandler.h"
+#include "UObject/GarbageCollection.h"
 
 FTickEventLoopData UBluEye::EventLoopData = FTickEventLoopData();
 
@@ -29,6 +30,12 @@ UBluEye::UBluEye(const class FObjectInitializer& PCIP)
 
 void UBluEye::Init()
 {
+	// FicsitAI (ревью #54, P1-3): второй Init потерял бы первый браузер, а закрытый глаз браузера больше не получает.
+	if (Browser || bBrowserReleased)
+	{
+		UE_LOG(LogBlu, Warning, TEXT("FicsitAI: Init ignored, browser %s"), bBrowserReleased ? TEXT("already closed") : TEXT("already created"));
+		return;
+	}
 
 	/** 
 	 * We don't want this running in editor unless it's PIE
@@ -139,34 +146,18 @@ void UBluEye::ResetTexture()
 
 void UBluEye::DestroyTexture()
 {
-	// Here we destroy the texture and its resource
+	// FicsitAI (ревью #54, P1-3): BLUI освобождал ресурс текстуры вручную (BeginReleaseResource + UpdateResource).
+	// Из BeginDestroy во время сборки мусора ресурс уже стоит в пакетном освобождении, и игра падала на
+	// «Invalid Resource State: BatchReleased» (прогон 15.11.2026). Ресурс освобождает сама текстура при уничтожении,
+	// с ожиданием рендер-потока, — как у текстур, заменённых сменой размера.
 	if (Texture)
 	{
 		Texture->RemoveFromRoot();
-
-		FTextureResource* Resource = Texture->GetResource();
-
-		if (Resource)
+		// Во время сборки мусора флаги не трогаем: текстура без корня уйдёт в следующую сборку.
+		if (!IsGarbageCollecting())
 		{
-			BeginReleaseResource(Resource);
-			Texture->UpdateResource();
-
-			//NB: these lines are the problem for 5.4 causes deadlock on game thread on exit
-			//StartBatchedRelease();
-			//BeginReleaseResource(Texture->GetResource());	// (FRenderCommandPipe*) &UE::RenderCommandPipe::GetPipes()[0]
-			//EndBatchedRelease();
-			//FlushRenderingCommands();
-
-			/* This is what that command does...
-			ENQUEUE_RENDER_COMMAND(UpdateBLUICommand)(
-			[Resource](FRHICommandList& CommandList)
-			{
-				Resource->ReleaseResource();
-			});*/
+			Texture->MarkAsGarbage();
 		}
-		Resource = nullptr;
-
-		Texture->MarkAsGarbage();
 		Texture = nullptr;
 	}
 	bValidTexture = false;
@@ -331,6 +322,8 @@ void UBluEye::ExecuteJSMethodWithParams(const FString& methodName, const TArray<
 
 void UBluEye::LoadURL(const FString& newURL)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	FString FinalUrl = newURL;
 
 	//Detect chrome-devtools, and re-target them to regular devtools
@@ -372,32 +365,44 @@ void UBluEye::LoadURL(const FString& newURL)
 
 FString UBluEye::GetCurrentURL()
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return FString(); }
 	return FString(Browser->GetMainFrame()->GetURL().ToWString().c_str());
 }
 
 void UBluEye::SetZoom(const float Scale /*= 1*/)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	Browser->GetHost()->SetZoomLevel(Scale);
 }
 
 float UBluEye::GetZoom()
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return 0.f; }
 	return Browser->GetHost()->GetZoomLevel();
 }
 
 void UBluEye::DownloadFile(const FString& FileUrl)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	Browser->GetHost()->StartDownload(*FileUrl);
 	//Todo: ensure downloading works in some way, shape or form?
 }
 
 bool UBluEye::IsBrowserLoading()
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return false; }
 	return Browser->IsLoading();
 }
 
 void UBluEye::ReloadBrowser(bool IgnoreCache)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	if (IgnoreCache)
 	{
@@ -410,6 +415,8 @@ void UBluEye::ReloadBrowser(bool IgnoreCache)
 
 void UBluEye::NavBack()
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	if (Browser->CanGoBack())
 	{
@@ -420,6 +427,8 @@ void UBluEye::NavBack()
 
 void UBluEye::NavForward()
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	if (Browser->CanGoForward())
 	{
@@ -547,6 +556,8 @@ UBluEye* UBluEye::SetProperties(const int32 SetWidth,
 
 void UBluEye::TriggerMouseMove(const FVector2D& Pos, const float Scale)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	MouseEvent.x = Pos.X / Scale;
 	MouseEvent.y = Pos.Y / Scale;
@@ -570,6 +581,8 @@ void UBluEye::TriggerRightClick(const FVector2D& Pos, const float Scale)
 
 void UBluEye::TriggerLeftMouseDown(const FVector2D& Pos, const float Scale)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	MouseEvent.x = Pos.X / Scale;
 	MouseEvent.y = Pos.Y / Scale;
 
@@ -578,6 +591,8 @@ void UBluEye::TriggerLeftMouseDown(const FVector2D& Pos, const float Scale)
 
 void UBluEye::TriggerRightMouseDown(const FVector2D& Pos, const float Scale)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	MouseEvent.x = Pos.X / Scale;
 	MouseEvent.y = Pos.Y / Scale;
 
@@ -586,6 +601,8 @@ void UBluEye::TriggerRightMouseDown(const FVector2D& Pos, const float Scale)
 
 void UBluEye::TriggerLeftMouseUp(const FVector2D& Pos, const float Scale)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	MouseEvent.x = Pos.X / Scale;
 	MouseEvent.y = Pos.Y / Scale;
 
@@ -594,6 +611,8 @@ void UBluEye::TriggerLeftMouseUp(const FVector2D& Pos, const float Scale)
 
 void UBluEye::TriggerRightMouseUp(const FVector2D& Pos, const float Scale)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	MouseEvent.x = Pos.X / Scale;
 	MouseEvent.y = Pos.Y / Scale;
 
@@ -602,6 +621,8 @@ void UBluEye::TriggerRightMouseUp(const FVector2D& Pos, const float Scale)
 
 void UBluEye::TriggerMouseWheel(const float MouseWheelDelta, const FVector2D& Pos, const float Scale)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	MouseEvent.x = Pos.X / Scale;
 	MouseEvent.y = Pos.Y / Scale;
 
@@ -610,6 +631,8 @@ void UBluEye::TriggerMouseWheel(const float MouseWheelDelta, const FVector2D& Po
 
 void UBluEye::KeyDown(FKeyEvent InKey)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	ProcessKeyMods(InKey);
 	ProcessKeyCode(InKey);
@@ -621,6 +644,8 @@ void UBluEye::KeyDown(FKeyEvent InKey)
 
 void UBluEye::KeyUp(FKeyEvent InKey)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	ProcessKeyMods(InKey);
 	ProcessKeyCode(InKey);
@@ -647,6 +672,8 @@ void UBluEye::ProcessKeyCode(FKeyEvent InKey)
 
 void UBluEye::CharKeyInput(FCharacterEvent CharEvent)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	// Process keymods like usual
 	ProcessKeyMods(CharEvent);
@@ -666,6 +693,8 @@ void UBluEye::CharKeyInput(FCharacterEvent CharEvent)
 
 void UBluEye::CharKeyDownUp(FCharacterEvent CharEvent)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 	// Process keymods like usual
 	ProcessKeyMods(CharEvent);
 
@@ -725,6 +754,8 @@ void UBluEye::SpecialKeyPress(EBluSpecialKeys Key, bool LeftShiftDown,
 	bool RightCommandDown,
 	bool CapsLocksOn)
 {
+	// FicsitAI: браузер закрыт или не создан (ревью #54, P1-3).
+	if (!Browser) { return; }
 
 	int32 KeyValue = Key;
 
@@ -770,30 +801,52 @@ void UBluEye::ProcessKeyMods(FInputEvent InKey)
 
 void UBluEye::SpawnTickEventLoopIfNeeded()
 {
+	// FicsitAI (ревью #54, P1-3): лямбда BLUI захватывала this первого глаза и читала его Settings после уничтожения.
+	// Теперь она ничего не захватывает. Цикл CEF крутится, пока есть живые глаза или браузеры, которые ещё не
+	// подтвердили закрытие (OnBeforeClose приходит только из цикла), и снимает себя сам.
 	if (!EventLoopData.DelegateHandle.IsValid())
 	{
-		EventLoopData.DelegateHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([&](float DeltaTime)
+		EventLoopData.DelegateHandle = FTSTicker::GetCoreTicker().AddTicker(FTickerDelegate::CreateLambda([](float DeltaTime)
 		{
 			if (EventLoopData.bShouldTickEventLoop)
 			{
-				if (Settings.bDebugLogTick)
-				{
-					UE_LOG(LogTemp, Log, TEXT("Delta: %1.2f"), DeltaTime);
-				}
-
-				//NB: this wrapper doesn't crash, but will fail to render
-				//Async(EAsyncExecution::ThreadPool, [this] 
-				//{
-					BluManager::DoBluMessageLoop();
-				//});
-				
+				BluManager::DoBluMessageLoop();
 			}
-			
+			if (EventLoopData.EyeCount <= 0 && EventLoopData.LiveBrowsers <= 0)
+			{
+				EventLoopData.DelegateHandle = FTSTicker::FDelegateHandle();
+				UE_LOG(LogBlu, Log, TEXT("FicsitAI: last browser closed, CEF message loop stopped"));
+				return false;
+			}
 			return true;
 		}));
 	}
 
-	EventLoopData.EyeCount++;
+	if (!bCountedInEventLoop)
+	{
+		bCountedInEventLoop = true;
+		EventLoopData.EyeCount++;
+	}
+}
+
+void UBluEye::NoteBrowserCreated()
+{
+	EventLoopData.LiveBrowsers++;
+}
+
+void UBluEye::NoteBrowserClosed()
+{
+	EventLoopData.LiveBrowsers--;
+}
+
+int32 UBluEye::NumLiveBrowsers()
+{
+	return EventLoopData.LiveBrowsers;
+}
+
+bool UBluEye::IsEventLoopRunning()
+{
+	return EventLoopData.DelegateHandle.IsValid();
 }
 
 UTexture2D* UBluEye::GetTexture() const
@@ -844,45 +897,35 @@ void UBluEye::ResetMatInstance()
 
 void UBluEye::CloseBrowser()
 {
-	BeginDestroy();
-
-	/*if (Browser)
-	{
-		// Close up the browser
-		Browser->GetHost()->SetAudioMuted(true);
-		Browser->GetMainFrame()->LoadURL("about:blank");
-		//browser->GetMainFrame()->Delete();
-		Browser->GetHost()->CloseDevTools();
-		Browser->GetHost()->CloseBrowser(true);
-		Browser = nullptr;
-
-		UE_LOG(LogBlu, Warning, TEXT("Browser Closing"));
-	}
-
-	DestroyTexture();
-
-	//Remove our auto-ticking setup
-	EventLoopData.EyeCount--;
-	if (EventLoopData.EyeCount <= 0)
-	{
-		FTSTicker::GetCoreTicker().RemoveTicker(EventLoopData.DelegateHandle);
-		EventLoopData.DelegateHandle = FTSTicker::FDelegateHandle();
-	}*/
+	// FicsitAI (ревью #54, P1-3): BLUI вызывал здесь BeginDestroy — второй раз его вызывал сборщик мусора,
+	// счётчик глаз уходил в минус и цикл CEF останавливался под живыми браузерами.
+	ReleaseBrowser();
 }
 
-void UBluEye::BeginDestroy()
+void UBluEye::ReleaseBrowser()
 {
+	if (bBrowserReleased)
+	{
+		return;
+	}
+	bBrowserReleased = true;
+
+	// Сначала отключить обратные вызовы CEF от этого объекта: браузер закрывается асинхронно, и до OnBeforeClose
+	// CEF ещё может прислать кадр, сообщение страницы или сработавший сторож загрузки.
+	if (ClientHandler)
+	{
+		ClientHandler->Detach();
+	}
+	if (Renderer)
+	{
+		Renderer->Detach();
+	}
 	if (Browser)
 	{
-		// Close up the browser
 		Browser->GetHost()->SetAudioMuted(true);
-		Browser->GetMainFrame()->LoadURL("about:blank");
-		//Browser->GetMainFrame()->Delete();
-		Browser->GetHost()->CloseDevTools();
 		Browser->GetHost()->CloseBrowser(true);
 		Browser = nullptr;
-
-		UE_LOG(LogBlu, Warning, TEXT("Browser Closing"));
+		UE_LOG(LogBlu, Log, TEXT("FicsitAI: browser closing"));
 	}
 
 	DestroyTexture();
@@ -890,15 +933,18 @@ void UBluEye::BeginDestroy()
 	if (PreviousTexture) { PreviousTexture->RemoveFromRoot(); PreviousTexture = nullptr; }
 	for (const TPair<UTexture2D*, uint64>& Old : RetiredTextures) { Old.Key->RemoveFromRoot(); }
 	RetiredTextures.Reset();
-	SetFlags(RF_BeginDestroyed);
 
-	//Remove our auto-ticking setup
-	EventLoopData.EyeCount--;
-	if (EventLoopData.EyeCount <= 0)
+	// Глаз больше не держит цикл. Сам цикл остановится, когда закрытие подтвердит последний браузер.
+	if (bCountedInEventLoop)
 	{
-		FTSTicker::GetCoreTicker().RemoveTicker(EventLoopData.DelegateHandle);
-		EventLoopData.DelegateHandle = FTSTicker::FDelegateHandle();
+		bCountedInEventLoop = false;
+		EventLoopData.EyeCount--;
 	}
+}
+
+void UBluEye::BeginDestroy()
+{
+	ReleaseBrowser();
 	Super::BeginDestroy();
 }
 
