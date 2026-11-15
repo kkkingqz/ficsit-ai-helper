@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>FICSIT AI · Screen views</title>
+  <link rel="stylesheet" href="../../../third_party/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="../ui-kit.css">
+  <link rel="stylesheet" href="screens.css">
+  <link rel="stylesheet" href="preview.css">
+  <script defer src="../../../third_party/uplot/uPlot.iife.min.js"></script>
+  <script type="module" src="preview.js"></script>
+</head>
+<body class="d2 d2-preview">
+  <header class="preview-host">
+    <span class="d2-label">FICSIT AI / FIXTURE</span>
+    <h1 id="screen-title"></h1>
+    <nav aria-label="Screen">
+      <a href="?view=statistics" data-view="statistics">Statistics</a>
+      <a href="?view=chat" data-view="chat">Chat</a>
+    </nav>
+  </header>
+  <main id="screen"></main>
+</body>
+</html>

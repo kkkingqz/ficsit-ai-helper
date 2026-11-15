@@ -321,7 +321,7 @@ function setTrendCell(cell, { trend, trendLabel }, formatted) {
 
 let nextTableId = 0;
 
-export function metricTable(presenter, { title, columns, emptyCellLabel }) {
+export function metricTable(presenter, { title, columns, emptyCellLabel, onSelect }) {
   const panel = node("section", "d2-panel d2-table-panel");
   const heading = node("h3", "d2-panel-heading", title);
   heading.id = `d2-table-${++nextTableId}`;
@@ -344,7 +344,7 @@ export function metricTable(presenter, { title, columns, emptyCellLabel }) {
   panel.append(heading, viewport, notice.element);
   const bodies = new Map();
 
-  function setCells(row, values, rowGroup = false) {
+  function setCells(row, values, rowGroup = false, selection) {
     columns.forEach((column, index) => {
       let cell = row.cells[index];
       if (!cell) {
@@ -356,8 +356,20 @@ export function metricTable(presenter, { title, columns, emptyCellLabel }) {
       const reading = value?.trend ? value.reading : value;
       const formatted = typeof reading === "object" || reading == null ? presenter.reading(reading) : String(reading);
       const hasTrend = value?.trend?.values.some(Number.isFinite);
-      if (hasTrend) setTrendCell(cell, value, formatted);
-      else if (cell.firstElementChild) cell.textContent = formatted;
+      if (index === 0 && selection) {
+        let control = cell.querySelector(".d2-row-button");
+        if (!control) {
+          control = node("button", "d2-row-button");
+          control.type = "button";
+          cell.replaceChildren(control);
+        }
+        control.onclick = () => onSelect(selection.id);
+        control.setAttribute("aria-pressed", String(Boolean(selection.selected)));
+        setText(control, formatted);
+      } else if (hasTrend) {
+        if (cell.firstElementChild?.className !== "d2-trend-cell") cell.replaceChildren();
+        setTrendCell(cell, value, formatted);
+      } else if (cell.firstElementChild) cell.textContent = formatted;
       else setText(cell, formatted);
       if (formatted === "—" && emptyCellLabel && !hasTrend) cell.setAttribute("aria-label", emptyCellLabel);
       else cell.removeAttribute("aria-label");
@@ -396,14 +408,14 @@ export function metricTable(presenter, { title, columns, emptyCellLabel }) {
       }), (group, record) => {
         if (record.summary) {
           if (group.summary.parentNode !== group.element) group.element.prepend(group.summary);
-          setCells(group.summary, record.summary, true);
+          setCells(group.summary, record.summary, true, onSelect && record.selectable ? record : null);
         } else group.summary.remove();
         reconcile(group.element, record.rows, group.rows, () => {
           const row = node("tr");
           row.dataset.row = "";
           return { element: row };
         }, (entry, row) => {
-          setCells(entry.element, row.cells);
+          setCells(entry.element, row.cells, false, onSelect && row.selectable ? row : null);
           entry.element.classList.toggle("d2-selected", Boolean(row.selected));
         }, record.summary ? group.summary : null);
       }, empty);
