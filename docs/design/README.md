@@ -6,6 +6,8 @@ UX-поставки Co3 по задаче [D-1 (#33)](https://github.com/kkkingq
 |---|---|---|
 | [D-1-frame.md](D-1-frame.md) | Каркас терминала: меню, полосы, состояния, ввод, токены для D-2 | неделя 1 — сдан |
 | [D-1-screens.md](D-1-screens.md) | «Статистика» (энергия и ресурсы) и «Чат с ИИ» | неделя 2 — сдан |
+| [D-1-icons.md](D-1-icons.md) | Иконки бокового меню: система, набор v1.0, размеры, экспорт | неделя 4 — сдан |
+| [D-1-world-screen.md](D-1-world-screen.md) | Экран на меше: композиция 16:9, заглушка v0.1, состояния, два ракурса для S7 | неделя 4 — сдан |
 | [asset-command-center-check.md](asset-command-center-check.md) | Проверка надписей и локализации в ассете `art/command-center` | 10.11.2026 — закрыт |
 | [D-1-states.md](D-1-states.md) | Лист состояний: пять состояний панели на одной сетке, переходы, пустые данные, сайдкар не подключён, два вида пустой истории, действие «назад» | неделя 3 — сдан |
 
@@ -21,6 +23,9 @@ UX-поставки Co3 по задаче [D-1 (#33)](https://github.com/kkkingq
 | [`wireframes/states-panel.svg`](wireframes/states-panel.svg) | Пять состояний панели на одной сетке и отдельный пример `0 MW` |
 | [`wireframes/states-screens.svg`](wireframes/states-screens.svg) | «Статистика» без телеметрии и на пустой фабрике; «Чат» без сайдкара и два вида пустой истории |
 | [`wireframes/states-back.svg`](wireframes/states-back.svg) | Действие «назад» в чате: три ступени и возврат `HandleBackAction()` |
+| [`wireframes/icons.svg`](wireframes/icons.svg) | Одиннадцать иконок рельса с сеткой, натуральный размер, четыре состояния пункта |
+| [`wireframes/icons/`](wireframes/icons) | Мастера иконок по одной на файл, `viewBox 0 0 24 24`, `currentColor` |
+| [`wireframes/world-screen.svg`](wireframes/world-screen.svg) | Экран в мире: композиция с размерами, заглушка v0.1, два ракурса, состояния |
 
 ## Правила этих документов
 
