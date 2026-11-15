@@ -55,6 +55,7 @@ lang: ru-RU
 | `mod/FicsitAI/Source/FicsitAICore/{Public,Private}/Sidecar/` | Co | Канал мода к адаптеру (S2, Co-87) |
 | `mod/FicsitAIWebRuntime/`, `third_party/blui/` | Co | мод-библиотека BLUI, S8 |
 | `third_party/sbc/` | Gs | вендоринг слоя данных с лицензией |
+| `third_party/uplot/` | Gs2 | uPlot для веб-компонентов D-2 и V-5: закреплённый дистрибутив, MIT и перечень изменений (Gs2-20) |
 | `art/command-center`, `art/base-nodes` (ветви) | Co3 | владелец ассетов |
 
 ## Разделяемые каталоги
