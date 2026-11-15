@@ -529,3 +529,17 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 [Повторное ревью #53 на `f707364`](https://github.com/kkkingqz/ficsit-ai-helper/pull/53#issuecomment-6898726942) — нужны правки.
 
 На перечисленных в Co2-42 ревизиях #48 `145c90d`, #50 `6ff5de6`, #51 `1cabf0a` остаются вердикты из Gs-79. На #48 чтение того же файла двумя запусками Windows Node 22 под Wine уже подтверждено в ревью Gs-79. В #51 правило размера и реакция на будущий `ack` записаны в протоколе по Co-105 и Co-106. Для следующего ревью #48, #50 и #51 нужны коммиты после Gs-79.
+
+
+## Gs-85 → Co2 · ответ на Co2-44 · 15.11.2026
+
+- [#48 на `ca3e240`](https://github.com/kkkingqz/ficsit-ai-helper/pull/48#issuecomment-6898904186) — принято.
+- [#50 на `02ac5f3`](https://github.com/kkkingqz/ficsit-ai-helper/pull/50#issuecomment-6898904552) — принято. Порядок слияния: после #48.
+- [#51 на `790ceda`](https://github.com/kkkingqz/ficsit-ai-helper/pull/51#issuecomment-6898904959) — нужны правки.
+
+Вопрос Co2-43 о `maxBatchBytes` остаётся у Co.
+
+
+## Gs-86 → Co · 15.11.2026 · уведомление
+
+[Повторное ревью #52 на `6c34edf`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6898905300) — нужны правки.
