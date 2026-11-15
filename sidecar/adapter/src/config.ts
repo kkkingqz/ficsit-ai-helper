@@ -21,8 +21,23 @@ const schema = z.object({
   port: z.coerce.number().int().min(1).max(65535).default(8730),
   /** Токен из query MCP_URL: Foreman передаёт его в строке запроса. */
   token: z.string().min(16, "ADAPTER_TOKEN короче 16 символов — генерирует лаунчер"),
-  /** Куда адаптер ходит за чатом и playthrough. */
-  foremanBaseUrl: z.string().url().default("http://127.0.0.1:8724"),
+  /**
+   * Куда адаптер ходит за чатом и playthrough.
+   *
+   * Только петля и только http(s): в этих запросах ездят пароль аккаунта и
+   * cookie сессии, и уйти они должны ровно туда, где стоит наш Foreman.
+   * Непетлевой адрес — отказ запуска, а не предупреждение (ревью Gs #48, та
+   * же логика, что у `ADAPTER_HOST`).
+   */
+  foremanBaseUrl: z
+    .string()
+    .url()
+    .refine(isLoopbackHttpUrl, {
+      message:
+        "FOREMAN_BASE_URL должен быть http(s) на петле (127.0.0.1, ::1, localhost): " +
+        "в запросах входа ездит пароль аккаунта",
+    })
+    .default("http://127.0.0.1:8724"),
   /** MCP-сервер Foreman: наружу модели не выставляется, прячется белым списком. */
   sfMcpUrl: z.string().url().default("http://127.0.0.1:8723/mcp"),
   /**
@@ -42,8 +57,35 @@ const schema = z.object({
    */
   llmUpstreamBaseUrl: z.string().url().optional(),
   normalizerPort: z.coerce.number().int().min(1).max(65535).default(8731),
+  /**
+   * Файл с учётными данными локального аккаунта Foreman (S2). Создаётся
+   * адаптером при первом запуске с правами 600 и лежит рядом с базой Foreman,
+   * вне репозитория. Путь задаёт лаунчер: сам адаптер каталог данных не
+   * выбирает, иначе их стало бы два.
+   */
+  accountPath: z.string().min(1).default(defaultAccountPath()),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
+
+/** Петлевой http(s)-адрес: схема наша, host — из того же списка, что у слушателя. */
+function isLoopbackHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return false;
+    return LOOPBACK.has(url.hostname === "[::1]" ? "::1" : url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** `~/.local/share/ficsitai/foreman/adapter-account.json` по умолчанию XDG. */
+function defaultAccountPath(): string {
+  const base =
+    process.env.XDG_DATA_HOME !== undefined && process.env.XDG_DATA_HOME.length > 0
+      ? process.env.XDG_DATA_HOME
+      : `${process.env.HOME ?? "."}/.local/share`;
+  return `${base}/ficsitai/foreman/adapter-account.json`;
+}
 
 export type Config = z.infer<typeof schema>;
 
@@ -57,6 +99,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     apiVersion: env.FICSITAI_API_VERSION,
     llmUpstreamBaseUrl: env.LLM_UPSTREAM_BASE_URL,
     normalizerPort: env.NORMALIZER_PORT,
+    accountPath: env.FOREMAN_ACCOUNT_PATH,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 
