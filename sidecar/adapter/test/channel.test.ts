@@ -6,7 +6,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
-import { LIMITS, type ModChannel } from "../src/channel.js";
+import { LIMITS, rawEnvelopeSizes, type ModChannel } from "../src/channel.js";
 import { loadConfig } from "../src/config.js";
 import { playthroughIdFor } from "../src/foreman.js";
 import { createApp } from "../src/index.js";
@@ -1057,5 +1057,52 @@ describe("третий круг ревью Gs на #51", () => {
     await mod.openStream(0);
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(mod.lines.filter((line) => line.type === "tool.call")).toHaveLength(2);
+  });
+});
+
+describe("четвёртый круг ревью Gs на #51", () => {
+  const sendRaw = (base: string, body: string) =>
+    fetch(`${base}/mod/send`, { method: "POST", headers: auth, body });
+
+  const heavy = (key: string, seq: number): string =>
+    `{"seq":${seq},"type":"mod.status","body":{"saveId":"${SAVE_ID}","inert":false},"${key}":"${"x".repeat(1_100_000)}"}`;
+
+  it("экранированное имя ключа считается так же, как его видит JSON.parse", async () => {
+    const { base } = await adapterFor(await quietForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    // `messages` для JSON.parse — тот же `messages`. Сканер, сравнивавший
+    // сырые байты, проходил мимо и возвращал «не разобрал», а дальше размер
+    // считался по разобранному, где неизвестного поля уже нет.
+    const body = `{"session":"${mod.session}","mess\\u0061ges":[${heavy("будущее", 1)}]}`;
+    const response = await sendRaw(base, body);
+    expect(response.status).toBe(413);
+    expect(await response.json()).toMatchObject({ code: "TOO_LARGE" });
+  });
+
+  it("повтор ключа messages — отказ, а не выбор одного из двух массивов", async () => {
+    const { base } = await adapterFor(await quietForeman());
+    const mod = new ModClient(base);
+    await mod.hello();
+
+    // JSON.parse берёт последний массив, сканер считал первый — пустой.
+    const body = `{"session":"${mod.session}","messages":[],"messages":[${heavy("будущее", 1)}]}`;
+    const response = await sendRaw(base, body);
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ code: "INVALID_ARGUMENT" });
+  });
+
+  it("сканер различает «ключа нет» и «разбор оборвался»", () => {
+    expect(rawEnvelopeSizes('{"session":"s","ack":1}')).toEqual({ kind: "sizes", sizes: [] });
+    expect(rawEnvelopeSizes('{"session":"s","messages":[{"seq":1}]}')).toEqual({
+      kind: "sizes",
+      sizes: [Buffer.byteLength('{"seq":1}')],
+    });
+    // Оборванное тело не должно выглядеть пустой пачкой: отсюда брался
+    // возврат к счёту по разобранному.
+    expect(rawEnvelopeSizes('{"session":"s","messages":[{"seq":1}')).toEqual({ kind: "unreadable" });
+    expect(rawEnvelopeSizes('{"messages":[],"messages":[]}')).toEqual({ kind: "ambiguous" });
+    expect(rawEnvelopeSizes("[1,2]")).toEqual({ kind: "unreadable" });
   });
 });

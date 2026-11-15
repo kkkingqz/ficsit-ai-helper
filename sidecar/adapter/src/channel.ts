@@ -53,6 +53,19 @@ export const LIMITS = {
 } as const;
 
 /**
+ * Результат разбора исходного тела: длины конвертов сообщений в байтах UTF-8,
+ * либо причина, по которой считать нельзя.
+ *
+ * `ambiguous` — ключ `messages` встретился дважды: `JSON.parse` возьмёт
+ * последний массив, и любой выбор сканера был бы догадкой.
+ * `unreadable` — разбор оборвался, и границы конвертов неизвестны.
+ */
+export type RawBatch =
+  | { kind: "sizes"; sizes: number[] }
+  | { kind: "ambiguous" }
+  | { kind: "unreadable" };
+
+/**
  * Длины конвертов сообщений в исходном теле запроса, в байтах UTF-8.
  *
  * Считать по разобранному объекту нельзя (третий круг ревью Gs на #51): zod
@@ -61,39 +74,64 @@ export const LIMITS = {
  * считает длину конверта «как он сериализован в теле: объект целиком, от
  * `{` до `}`», а обёртку `POST` в пачку не включает.
  *
- * `undefined` — тело не похоже на ожидаемый конверт; тогда зовущий считает
- * по разобранным сообщениям, как раньше.
+ * Имя ключа декодируется, а не сравнивается посимвольно: `"mess\u0061ges"`
+ * для `JSON.parse` — тот же `messages`, и сканер, сравнивавший сырые байты,
+ * проходил мимо такого ключа и возвращал «не разобрал» (четвёртый круг ревью
+ * Gs на #51). Повтор ключа — отказ, а не выбор одного из двух массивов.
  */
-export function rawEnvelopeSizes(raw: string): number[] | undefined {
+export function rawEnvelopeSizes(raw: string): RawBatch {
   let i = 0;
   const isSpace = (ch: string): boolean => ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
   const skipSpace = (): void => {
     while (i < raw.length && isSpace(raw[i] as string)) i += 1;
   };
-  const skipString = (): void => {
-    i += 1; // открывающая кавычка
+  /** Читает строку JSON от текущей кавычки, раскрывая escape-последовательности. */
+  const readString = (): string | undefined => {
+    if (raw[i] !== '"') return undefined;
+    i += 1;
+    let out = "";
     while (i < raw.length) {
       const ch = raw[i] as string;
-      if (ch === "\\") {
-        i += 2;
+      if (ch === '"') {
+        i += 1;
+        return out;
+      }
+      if (ch !== "\\") {
+        out += ch;
+        i += 1;
         continue;
       }
-      i += 1;
-      if (ch === '"') return;
+      const esc = raw[i + 1];
+      if (esc === undefined) return undefined;
+      if (esc === "u") {
+        const hex = raw.slice(i + 2, i + 6);
+        if (!/^[0-9a-fA-F]{4}$/.test(hex)) return undefined;
+        out += String.fromCharCode(Number.parseInt(hex, 16));
+        i += 6;
+        continue;
+      }
+      const simple: Record<string, string> = {
+        '"': '"',
+        "\\": "\\",
+        "/": "/",
+        b: "\b",
+        f: "\f",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+      };
+      const decoded = simple[esc];
+      if (decoded === undefined) return undefined;
+      out += decoded;
+      i += 2;
     }
+    return undefined;
   };
-  const readKey = (): string => {
-    const start = i;
-    skipString();
-    return raw.slice(start + 1, i - 1);
-  };
-  const skipValue = (): void => {
+  /** Пропускает значение целиком; `false` — разбор оборвался. */
+  const skipValue = (): boolean => {
     skipSpace();
     const ch = raw[i];
-    if (ch === '"') {
-      skipString();
-      return;
-    }
+    if (ch === '"') return readString() !== undefined;
     if (ch === "{" || ch === "[") {
       const open = ch;
       const close = ch === "{" ? "}" : "]";
@@ -101,62 +139,81 @@ export function rawEnvelopeSizes(raw: string): number[] | undefined {
       while (i < raw.length) {
         const c = raw[i] as string;
         if (c === '"') {
-          skipString();
+          if (readString() === undefined) return false;
           continue;
         }
         if (c === open) depth += 1;
         else if (c === close) {
           depth -= 1;
           i += 1;
-          if (depth === 0) return;
+          if (depth === 0) return true;
           continue;
         }
         i += 1;
       }
-      return;
+      return false;
     }
+    const start = i;
     while (i < raw.length && !",}] \t\n\r".includes(raw[i] as string)) i += 1;
+    return i > start;
   };
 
   skipSpace();
-  if (raw[i] !== "{") return undefined;
+  if (raw[i] !== "{") return { kind: "unreadable" };
   i += 1;
+  let sizes: number[] | undefined;
+  skipSpace();
+  if (raw[i] === "}") return { kind: "sizes", sizes: [] };
   for (;;) {
     skipSpace();
-    if (raw[i] === "}") return undefined; // ключа `messages` нет
-    if (raw[i] !== '"') return undefined;
-    const key = readKey();
+    const key = readString();
+    if (key === undefined) return { kind: "unreadable" };
     skipSpace();
-    if (raw[i] !== ":") return undefined;
+    if (raw[i] !== ":") return { kind: "unreadable" };
     i += 1;
     skipSpace();
     if (key === "messages") {
-      if (raw[i] !== "[") return undefined;
+      // Второй `messages` в том же объекте: `JSON.parse` возьмёт последний,
+      // и сканер не вправе угадывать, какой считать.
+      if (sizes !== undefined) return { kind: "ambiguous" };
+      if (raw[i] !== "[") return { kind: "unreadable" };
       i += 1;
-      const sizes: number[] = [];
-      for (;;) {
-        skipSpace();
-        if (raw[i] === "]") return sizes;
-        const start = i;
-        skipValue();
-        if (i <= start) return undefined;
-        sizes.push(Buffer.byteLength(raw.slice(start, i), "utf8"));
-        skipSpace();
-        if (raw[i] === ",") {
-          i += 1;
-          continue;
+      const found: number[] = [];
+      skipSpace();
+      if (raw[i] === "]") {
+        i += 1;
+        sizes = found;
+      } else {
+        for (;;) {
+          skipSpace();
+          const from = i;
+          if (!skipValue()) return { kind: "unreadable" };
+          found.push(Buffer.byteLength(raw.slice(from, i), "utf8"));
+          skipSpace();
+          if (raw[i] === ",") {
+            i += 1;
+            continue;
+          }
+          if (raw[i] === "]") {
+            i += 1;
+            sizes = found;
+            break;
+          }
+          return { kind: "unreadable" };
         }
-        if (raw[i] === "]") return sizes;
-        return undefined;
       }
+    } else if (!skipValue()) {
+      return { kind: "unreadable" };
     }
-    skipValue();
     skipSpace();
     if (raw[i] === ",") {
       i += 1;
       continue;
     }
-    return undefined;
+    if (raw[i] === "}") {
+      return { kind: "sizes", sizes: sizes ?? [] };
+    }
+    return { kind: "unreadable" };
   }
 }
 
@@ -624,12 +681,26 @@ export class ModChannel {
       // исходному телу: zod выбрасывает неизвестные поля, а повторная
       // сериализация убирает пробелы, и конверт на 1,1 МиБ приезжал сюда
       // коротким (третий круг ревью Gs на #51).
+      //
+      // Не разобрали исходные байты — отказ, а не счёт по разобранному:
+      // возврат к пересериализации и был лазейкой (четвёртый круг ревью Gs
+      // на #51). Число найденных конвертов обязано совпасть с числом
+      // сообщений у парсера — иначе сканер смотрел не на тот массив.
       const raw = (req as Request & { rawBody?: Buffer }).rawBody;
-      const sizes =
-        (raw === undefined ? undefined : rawEnvelopeSizes(raw.toString("utf8"))) ??
-        messages.map((message) => Buffer.byteLength(JSON.stringify(message)));
+      const scanned: RawBatch =
+        raw === undefined ? { kind: "unreadable" } : rawEnvelopeSizes(raw.toString("utf8"));
+      if (scanned.kind !== "sizes" || scanned.sizes.length !== messages.length) {
+        res.status(400).json({
+          code: "INVALID_ARGUMENT",
+          message:
+            scanned.kind === "ambiguous"
+              ? "в конверте пачки ключ messages повторяется"
+              : "размер пачки не проверить: исходный конверт не разобран",
+        });
+        return;
+      }
       let batchBytes = 0;
-      for (const bytes of sizes) {
+      for (const bytes of scanned.sizes) {
         if (bytes > LIMITS.maxMessageBytes) {
           res.status(413).json({ code: "TOO_LARGE", message: "сообщение больше предела" });
           return;
