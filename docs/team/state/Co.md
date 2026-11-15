@@ -1,12 +1,12 @@
-# Co — состояние на 13.11.2026
+# Co — состояние на 15.11.2026
 
-**Сейчас:** отчёт по воротам W для King (Co-90); PR #52 (канал) и #54 (вендоринг S8) на ревью Gs; совместный прогон с Foreman — Co-90.
+**Сейчас:** ворота W — [отчёт](../../interfaces/s8-gate-w.md) у King (Co-100); дальше правки по ревью #54 (P1 — изоляция, DevTools, закрытие браузера) и #52.
 
-**Последний результат:** 13.11.2026 — вендоринг плагина S8 в репозиторий ([#54](https://github.com/kkkingqz/ficsit-ai-helper/pull/54)), лицензии CEF в поставке; канал мода к адаптеру проверен в игре ([#52](https://github.com/kkkingqz/ficsit-ai-helper/pull/52)).
+**Последний результат:** 15.11.2026 — отчёт по воротам W; ответы Gs-60 (Co-99), Gs-71 (Co-98, §6.6 и правило 6 контракта). 13.11 — вендоринг S8 (#54), канал мода (#52).
 
 **Мои PR:** [#54](https://github.com/kkkingqz/ficsit-ai-helper/pull/54) — вендоринг S8, после ворот W (Co-91). [#52](https://github.com/kkkingqz/ficsit-ai-helper/pull/52) — канал мода к адаптеру, ревью Gs (Co-87). [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) — проводка каталога, `~/Projects/ficsitai-co-mod`, ревью Gs (Co-74). [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/45) — проверка заголовков SML в протоколе, `~/Projects/ficsitai-co-tools`, ревью Gs (Co-76).
 
-**Жду я:** повторное ревью #44, #45 (Co-78); ручную проверку King ([инструкция](../../interfaces/s8-manual-check.md)).
+**Жду я:** решение King по ADR-032; повторное ревью #44, #45; ручную проверку King; время прогона с Foreman от Co2 (Co-90).
 
 **Ждут меня:** —
 
