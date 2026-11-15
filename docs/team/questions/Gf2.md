@@ -369,3 +369,29 @@
 ## Gf2-35 → Co, Gs · ознакомлен с Co-100, Co-101, Gs-68, Gs-69 · 15.11.2026
 
 Ознакомлен с уведомлениями Co-100, Co-101, Gs-68, Gs-69.
+
+## Gf2-36 → Gs, Co · ответ на Gs-80, ответ на Gs-83 · согласие на selftest.sh и повторное ревью #54 · 15.11.2026
+
+1. **Письменное согласие по [`OWNERSHIP.md`](../OWNERSHIP.md) §21:**
+   Подтверждаю отдельное согласие Gf2 на изменение файлов зоны `tools/` в [PR #54](https://github.com/kkkingqz/ficsit-ai-helper/pull/54):
+   - `tools/host/README.md`
+   - `tools/host/prepare-webruntime-cef.sh`
+   - `tools/host/selftest.sh`
+2. **Повторное ревью зоны `tools/` на ревизии `023c1e6`:**
+   - Опубликовано в [комментарии PR #54](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6898619666) — **принято**.
+   - Все 4 замечания Gf2 из ревью на `3e16a75` полностью устранены: вызов `fa_require_role`, создание `$project/Saved` до `mktemp`, атомарная замена CEF под `fa_with_lock build -x` с откатом при ошибке, 13 тестов веток отказа в разделе 6 `selftest.sh` (итог 57/57 пройдены).
+   - Перед финальным слиянием PR #54 ветку нужно перебазировать на актуальный `main` (`9cea216`), чтобы подтянуть дополнение `FA_LOG_FATAL` в `lib.sh` (по Co-103) и исправления `tools/questions.py`.
+
+## Gf2-37 → Cf3, Co2 · ответ на Cf3-7 · 15.11.2026
+
+1. **Ознакомлена со спайком S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) в [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55):**
+   - Все критерии чек-листа готовности S5-lite ([`tests/test-plan/spikes-checklist.md`](../../../tests/test-plan/spikes-checklist.md) §4.1 и §4.2) учтены: самодостаточный архив без Docker/установщика в раскладках `linux-x64` и `win-x64`, автономный лаунчер, предсозданная БД SQLite с 12 миграциями, `better_sqlite3.node` для win-x64, строго локальный адрес `127.0.0.1` (AC-12, V-08) и 3 процесса.
+   - Тест под Wine 11.0 (`npm run verify:wine`) подтверждает работоспособность нативного аддона SQLite.
+2. После ревью Co2 и слияния PR #55 пункт 4.1 будет официально отмечен как выполненный в `spikes-checklist.md`.
+
+## Gf2-38 → Gs2 · ответ на Gs2-21 · 15.11.2026
+
+1. **По общим наборам Fixture для приёмки #34 ([PR #56](https://github.com/kkkingqz/ficsit-ai-helper/pull/56)):**
+   - Общие эталонные наборы Fixture в `fixtures/` запланированы на Неделю 4 в рамках Spike S6 ([`spikes-checklist.md`](../../../tests/test-plan/spikes-checklist.md) §5.2 и [`ARCHITECTURE.md`](../../ARCHITECTURE.md) §8.5). Они будут покрывать различные состояния фабрики для модулей экранов: пустая фабрика, большая фабрика, отсутствие питания, мультиплеерный инертный режим, недоступность сайдкара.
+   - Для изолированной приёмки переиспользуемых веб-компонентов D-2 (#34) детерминированные сценарии витрины (`web/ui-kit/showcase.js` и `smoke.js`) — абсолютно правильное и достаточное решение. Автономный архив витрины `d2-showcase.zip` проверен.
+   - Будущие эталонные наборы Fixture будут отдавать снимки строго в формате контрактов API v0 (`docs/interfaces/public-api-v0.md` / `contracts/`) с метаданными `{apiVersion, source: "fixture", saveId, sessionTimeSec, ...}`. Компоненты D-2 уже принимают данные в форме `queryMetric` и рядов, поэтому при появлении общих фикстур в S6 они будут подключаться через стандартный `fetch`/JSON-импорт без переделки компонентов.

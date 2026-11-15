@@ -101,12 +101,16 @@ def parse_questions(repo_root: Path):
             if in_code_block:
                 continue
 
-            # Поиск блоков ответов («ответ на <ID>»)
-            for m in re.finditer(r"ответ на ([A-Za-z0-9]+-\d+)", stripped):
-                ans_id = m.group(1)
-                answered_ids.add(ans_id)
-                if file_role:
-                    answered_by[ans_id].add(file_role)
+            # Поиск блоков ответов («ответ на <ID>», включая списки «ответ на A, B» / «ответ на A и B»)
+            for m in re.finditer(
+                r"ответ на\s+(?:вопрос[а-я]*\s+)?([A-Za-z0-9]+-\d+(?:\s*(?:,|и)\s*[A-Za-z0-9]+-\d+)*)",
+                stripped,
+                re.IGNORECASE,
+            ):
+                for ans_id in re.findall(r"\b([A-Za-z0-9]+-\d+)\b", m.group(1)):
+                    answered_ids.add(ans_id)
+                    if file_role:
+                        answered_by[ans_id].add(file_role)
 
             # Поиск отметок об ознакомлении в файле конкретной роли
             if file_role:
