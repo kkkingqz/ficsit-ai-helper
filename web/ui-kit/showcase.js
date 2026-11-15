@@ -1,5 +1,6 @@
 import {
-  chatMessage, createPresenter, metricState, metricTable, metricTile, segmentedControl, statusStrip, timeChart,
+  chatMessage, createPresenter, fillBar, metricState, metricTable, metricTile,
+  objectCard, promptChip, segmentedControl, statusStrip, timeChart,
 } from "./components.js";
 
 // Replace this catalog with strings from UE Localization when mounting an actual screen.
@@ -29,6 +30,7 @@ const english = {
   groups: ["Coal", "Fuel", "Geothermal"],
   running: "Running",
   standby: "Standby",
+  trendLabel: "Generator output trend",
   groupStatus: (running, total) => `${running} / ${total} running`,
   chat: "Chat messages",
   operator: "Operator",
@@ -39,6 +41,12 @@ const english = {
   sidecar: "Sidecar",
   close: "Back",
   export: "Export CSV",
+  battery: "Battery charge",
+  selected: "Selected generator",
+  output: "Output",
+  prompt: "Summarize grid power",
+  promptText: "Summarize the current power balance and available headroom.",
+  draft: "Message draft",
 };
 
 const root = document.querySelector("#showcase");
@@ -57,10 +65,10 @@ function add(parent, tag, content, className) {
   return element;
 }
 
-function addTile(parent, label, value, state) {
+function addTile(parent, label, value, state, source) {
   const component = metricTile(presenter);
   parent.append(component.element);
-  component.update({ label, reading: value, state });
+  component.update({ label, reading: value, state, source });
 }
 
 const header = add(root, "header", null, "lab-head");
@@ -107,6 +115,7 @@ function renderHistory(minutes) {
     id: index ? "power.consumption" : "power.production",
     label: english.metrics[index],
     timestamps: samples,
+    intervalSec: 5,
     values: samples.map(time => {
       const wave = index ? Math.sin(time / 240) * 23 : Math.sin(time / 170) * 34;
       return current[index] + Math.round(wave + Math.sin(time / 56) * 13);
@@ -134,7 +143,15 @@ table.update({
       return {
         id,
         selected: id === 2,
-        cells: [`GEN-${String(id).padStart(2, "0")}`, output ? english.running : english.standby, reading(output)],
+        cells: [
+          `GEN-${String(id).padStart(2, "0")}`,
+          output ? english.running : english.standby,
+          {
+            reading: reading(output),
+            trend: { timestamps: [0, 5, 10, 15, 20], values: output ? [61, 63, 62, 65, output] : [0, 0, 0, 0, 0], intervalSec: 5 },
+            trendLabel: english.trendLabel,
+          },
+        ],
       };
     }),
   })),
@@ -178,3 +195,28 @@ sources.update([
 const keyboard = statusStrip();
 keyboard.update([{ key: "Esc", label: english.close }, { key: "C", label: english.export }]);
 bindings.append(sources.element, keyboard.element);
+
+const extras = add(root, "div", null, "lab-extras");
+const battery = fillBar(presenter, english.battery);
+battery.update({
+  value: 72, max: 100,
+  reading: { value: 72, unit: "percent", state: "value" },
+});
+const selected = objectCard(presenter);
+selected.update({
+  title: english.selected,
+  fields: [{ label: "GEN-02", value: english.groups[0] }, { label: english.output, value: reading(64) }],
+});
+const composer = add(extras, "section", null, "d2-panel lab-composer");
+const draftLabel = add(composer, "label", english.draft, "d2-label");
+const input = add(draftLabel, "textarea");
+input.rows = 2;
+composer.prepend(promptChip({
+  label: english.prompt,
+  prompt: english.promptText,
+  onSelect(value) {
+    input.value = value;
+    input.focus();
+  },
+}));
+extras.prepend(battery.element, selected.element);

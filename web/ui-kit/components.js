@@ -73,21 +73,26 @@ export function metricState(reading, sessionTimeSec, sampleIntervalSec) {
 
 export function metricTile(presenter) {
   const tile = node("article", "d2-panel d2-tile");
+  const heading = node("header", "d2-tile-heading");
   const title = node("h3", "d2-label");
+  const source = node("span", "d2-label");
+  heading.append(title, source);
   const reading = node("p", "d2-reading");
   const amount = node("span", "d2-amount");
   const unit = node("span", "d2-unit");
   const notice = panelNotice();
   const separator = document.createTextNode(" ");
   reading.append(amount, separator, unit);
-  tile.append(title, reading, notice.element);
+  tile.append(heading, reading, notice.element);
 
   return {
     element: tile,
-    update({ label, reading: value, state }) {
+    update({ label, reading: value, state, source: origin }) {
       const visible = state.kind === "loading" || state.kind === "empty" ? null : value;
       const parts = presenter.parts(visible);
       setText(title, label);
+      setText(source, origin);
+      source.hidden = !origin;
       setText(amount, parts.amount);
       setText(unit, parts.unit);
       unit.hidden = !parts.unit;
@@ -98,11 +103,41 @@ export function metricTile(presenter) {
   };
 }
 
+function seriesPoints({ timestamps, values, intervalSec }) {
+  const points = new Map();
+  timestamps.forEach((time, index) => {
+    const previous = timestamps[index - 1];
+    // A midpoint marks a missing cadence, while keeping the acquired timestamps intact.
+    if (intervalSec > 0 && time - previous > intervalSec * 1.5) {
+      points.set(previous + (time - previous) / 2, null);
+    }
+    points.set(time, values[index]);
+  });
+  return points;
+}
+
 export function alignSeries(series) {
-  const bySeries = series.map(({ timestamps, values }) =>
-    new Map(timestamps.map((timestamp, index) => [timestamp, values[index]])));
-  const timestamps = [...new Set(series.flatMap(item => item.timestamps))].sort((a, b) => a - b);
+  const bySeries = series.map(seriesPoints);
+  const timestamps = [...new Set(bySeries.flatMap(points => [...points.keys()]))].sort((a, b) => a - b);
   return [timestamps, ...bySeries.map(points => timestamps.map(timestamp => points.get(timestamp)))];
+}
+
+function isolatedPoints(plot, index) {
+  const isolated = [];
+  let loneIndex = -1;
+  let count = 0;
+  plot.data[index].forEach((value, sample) => {
+    if (value === undefined) return;
+    if (value === null) {
+      if (count === 1) isolated.push(loneIndex);
+      count = 0;
+    } else {
+      loneIndex = sample;
+      count += 1;
+    }
+  });
+  if (count === 1) isolated.push(loneIndex);
+  return isolated.length ? isolated : null;
 }
 
 export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, windowControl }) {
@@ -113,6 +148,7 @@ export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, window
   const legend = node("ul", "d2-legend");
   const surface = node("div", "d2-plot");
   const notice = panelNotice();
+  const measuring = node("canvas").getContext("2d");
   figure.append(heading, legend, surface, notice.element);
   surface.setAttribute("aria-hidden", "true");
 
@@ -147,6 +183,11 @@ export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, window
         grid: { stroke: color("stroke"), width: 1 },
         ticks: { stroke: color("stroke"), width: 1 },
       };
+      measuring.font = font;
+      const yAxisSize = (_plot, labels) => {
+        const widths = (labels ?? []).map(label => measuring.measureText(label ?? "").width);
+        return Math.ceil(Math.max(52 * scale, 18 * scale + Math.max(0, ...widths)));
+      };
       const data = alignSeries(series);
       plot?.destroy();
       plot = new Plot({
@@ -155,18 +196,18 @@ export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, window
           x: { time: false, range: () => [model.start, model.end] },
           y: { range: (_plot, min, max) => {
             if (!Number.isFinite(min) || !Number.isFinite(max)) return [0, 1];
-            return [Math.min(0, min), Math.max(1, max) * 1.12];
+            return [Math.min(0, min * 1.05), Math.max(1, max) * 1.12];
           } },
         },
         axes: [
           { ...axis, size: Math.ceil(31 * scale), values: (_plot, values) => values.map(value => timeLabel(value - model.end)) },
-          { ...axis, size: Math.ceil(52 * scale), values: (_plot, values) => values.map(axisLabel) },
+          { ...axis, size: yAxisSize, values: (_plot, values) => values.map(axisLabel) },
         ],
         series: [{}, ...series.map(item => {
           const slot = slots.get(item.id);
           return {
             label: item.label, stroke: color(seriesColors[slot]), dash: seriesDashes[slot],
-            width: 2, points: { show: (chart, index) => chart.data[index].filter(Number.isFinite).length === 1 },
+            width: 2, points: { show: false, filter: isolatedPoints },
           };
         })],
         legend: { show: false },
@@ -224,6 +265,60 @@ export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, window
   };
 }
 
+function trendPath(trend) {
+  const points = [...seriesPoints(trend)];
+  let min = Infinity;
+  let max = -Infinity;
+  for (const value of trend.values) {
+    if (!Number.isFinite(value)) continue;
+    min = Math.min(min, value);
+    max = Math.max(max, value);
+  }
+  const span = max - min;
+  const start = points[0][0];
+  const duration = points.at(-1)[0] - start;
+  let previous = false;
+  let path = "";
+  for (const [time, value] of points) {
+    if (!Number.isFinite(value)) {
+      previous = false;
+      continue;
+    }
+    const x = duration ? 2 + 52 * (time - start) / duration : 28;
+    const y = span ? 16 - 14 * (value - min) / span : 9;
+    path += `${previous ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+    if (!previous) path += "h0.1";
+    previous = true;
+  }
+  return path;
+}
+
+function setTrendCell(cell, { trend, trendLabel }, formatted) {
+  const namespace = "http://www.w3.org/2000/svg";
+  let content = cell.firstElementChild;
+  if (!content) {
+    content = node("span", "d2-trend-cell");
+    const sparkline = document.createElementNS(namespace, "svg");
+    sparkline.setAttribute("viewBox", "0 0 56 18");
+    sparkline.setAttribute("focusable", "false");
+    sparkline.append(document.createElementNS(namespace, "path"));
+    content.append(sparkline, node("span"));
+    cell.replaceChildren(content);
+  }
+  const [sparkline, amount] = content.children;
+  if (trendLabel) {
+    sparkline.setAttribute("role", "img");
+    sparkline.setAttribute("aria-label", trendLabel);
+    sparkline.removeAttribute("aria-hidden");
+  } else {
+    sparkline.removeAttribute("role");
+    sparkline.removeAttribute("aria-label");
+    sparkline.setAttribute("aria-hidden", "true");
+  }
+  sparkline.firstElementChild.setAttribute("d", trendPath(trend));
+  setText(amount, formatted);
+}
+
 let nextTableId = 0;
 
 export function metricTable(presenter, { title, columns, emptyCellLabel }) {
@@ -258,9 +353,13 @@ export function metricTable(presenter, { title, columns, emptyCellLabel }) {
         row.append(cell);
       }
       const value = values[index];
-      const formatted = typeof value === "object" || value == null ? presenter.reading(value) : String(value);
-      setText(cell, formatted);
-      if (formatted === "—" && emptyCellLabel) cell.setAttribute("aria-label", emptyCellLabel);
+      const reading = value?.trend ? value.reading : value;
+      const formatted = typeof reading === "object" || reading == null ? presenter.reading(reading) : String(reading);
+      const hasTrend = value?.trend?.values.some(Number.isFinite);
+      if (hasTrend) setTrendCell(cell, value, formatted);
+      else if (cell.firstElementChild) cell.textContent = formatted;
+      else setText(cell, formatted);
+      if (formatted === "—" && emptyCellLabel && !hasTrend) cell.setAttribute("aria-label", emptyCellLabel);
       else cell.removeAttribute("aria-label");
     });
   }
@@ -354,6 +453,51 @@ export function statusStrip() {
       }));
     },
   };
+}
+
+export function fillBar(presenter, label) {
+  const panel = node("section", "d2-panel d2-fill");
+  const heading = node("h3", "d2-label", label);
+  const value = node("span", "d2-reading");
+  const progress = node("progress");
+  progress.setAttribute("aria-label", label);
+  panel.append(heading, value, progress);
+  return {
+    element: panel,
+    update(model) {
+      const available = Number.isFinite(model.value) && Number.isFinite(model.max) && model.max > 0;
+      progress.hidden = !available;
+      if (available) {
+        progress.max = model.max;
+        progress.value = model.value;
+      }
+      setText(value, presenter.reading(model.reading));
+    },
+  };
+}
+
+export function objectCard(presenter) {
+  const card = node("section", "d2-panel d2-object");
+  const title = node("h3", "d2-panel-heading");
+  const details = node("dl");
+  card.append(title, details);
+  return {
+    element: card,
+    update({ title: label, fields }) {
+      setText(title, label);
+      details.replaceChildren(...fields.flatMap(field => [
+        node("dt", "d2-label", field.label),
+        node("dd", "d2-reading", typeof field.value === "string" ? field.value : presenter.reading(field.value)),
+      ]));
+    },
+  };
+}
+
+export function promptChip({ label, prompt, onSelect }) {
+  const button = node("button", "d2-chip", label);
+  button.type = "button";
+  button.addEventListener("click", () => onSelect(prompt));
+  return button;
 }
 
 export function segmentedControl({ label, options, selected, onChange }) {

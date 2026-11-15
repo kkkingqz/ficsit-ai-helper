@@ -51,14 +51,21 @@
 }
 .d2-panel-heading h3 { font: inherit; }
 .d2-label { color: var(--d2-text-muted); font: var(--d2-label); overflow-wrap: anywhere; }
-.d2-unit { color: var(--d2-text-muted); font: var(--d2-label); white-space: nowrap; }
+.d2-unit { color: var(--d2-text-muted); font: var(--d2-label); }
 .d2-reading { font: var(--d2-value); overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
 .d2-tile {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto minmax(calc(24px * var(--d2-scale)), 1fr) auto;
   align-content: start;
   gap: var(--d2-space-1);
   padding: var(--d2-space-3);
+}
+.d2-tile-heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 var(--d2-space-2);
 }
 .d2-tile :where(.d2-reading) { align-self: start; }
 .d2-notice {
@@ -209,4 +216,50 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+.d2-trend-cell {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--d2-space-1) var(--d2-space-2);
+}
+.d2-trend-cell svg {
+  inline-size: calc(56px * var(--d2-scale));
+  block-size: calc(18px * var(--d2-scale));
+  color: var(--d2-info);
+}
+.d2-trend-cell path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+}
+
+.d2-fill, .d2-object {
+  display: grid;
+  align-content: start;
+  gap: var(--d2-space-2);
+  padding: var(--d2-space-3);
+}
+.d2-fill { grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; }
+.d2-fill progress { grid-column: 1 / -1; inline-size: 100%; accent-color: var(--d2-info); }
+.d2-object dl {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--d2-space-1) var(--d2-space-2);
+  margin: 0;
+}
+.d2-object dd { margin: 0; text-align: end; }
+.d2-chip {
+  max-inline-size: 100%;
+  border: 1px solid var(--d2-stroke-strong);
+  background: var(--d2-surface-raised);
+  color: var(--d2-text);
+  padding: var(--d2-space-1) var(--d2-space-2);
+  font: var(--d2-label);
+  overflow-wrap: anywhere;
+  cursor: pointer;
 }

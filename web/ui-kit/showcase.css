@@ -70,3 +70,20 @@ body { margin: 0; }
 @media (max-width: 420px) {
   .lab-states { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+.lab-extras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  gap: var(--d2-space-4);
+}
+.lab-composer { display: grid; justify-items: start; gap: var(--d2-space-2); padding: var(--d2-space-3); }
+.lab-composer label { display: grid; gap: var(--d2-space-1); inline-size: 100%; }
+.lab-composer textarea {
+  inline-size: 100%;
+  border: 1px solid var(--d2-stroke-strong);
+  background: var(--d2-bg-base);
+  color: var(--d2-text);
+  padding: var(--d2-space-2);
+  font: var(--d2-body);
+  resize: vertical;
+}

@@ -7,11 +7,14 @@
 | Компонент | Данные |
 |---|---|
 | `createPresenter(locale, units)` | Локаль и таблица `unit → переведённая подпись`. Для плитки, легенды и ячеек используется одна функция форматирования `reading`. |
-| `metricTile(presenter)` | `{label, reading, state}`. Значение в формате `queryMetric`: `{value, unit, precisionDigits, state, sessionTimeSec}`. |
-| `timeChart(presenter, Plot, options)` | `{start, end, series, state}`. В каждом ряду `{id, label, timestamps, values, current}`; времена в секундах той же шкалы, что и границы. Передайте локализованные функции `timeLabel(deltaSeconds)` и `axisLabel(value)`. Вызовите `destroy()` при удалении графика. |
-| `metricTable(presenter, options)` | `{groups, state}`, группы `{id, summary?, rows}`, строки `{id, cells, selected?}`. Используйте стабильные `id` групп и строк. В ячейке допустимы строка, число и значение метрики. Заголовок панели находится над прокруткой, шапка таблицы закреплена. |
+| `metricTile(presenter)` | `{label, reading, state, source?}`. Значение в формате `queryMetric`: `{value, unit, precisionDigits, state, sessionTimeSec}`. |
+| `timeChart(presenter, Plot, options)` | `{start, end, series, state}`. В каждом ряду `{id, label, timestamps, values, intervalSec, current}`; времена в секундах той же шкалы, что и границы. Пропуск отображается разрывом, если соседние точки разнесены больше чем на полтора номинальных интервала. Передайте локализованные функции `timeLabel(deltaSeconds)` и `axisLabel(value)`. Вызовите `destroy()` при удалении графика. |
+| `metricTable(presenter, options)` | `{groups, state}`, группы `{id, summary?, rows}`, строки `{id, cells, selected?}`. Используйте стабильные `id` групп и строк. В ячейке допустимы строка, число, значение метрики и `{reading, trend, trendLabel}`. В последнем случае число стоит рядом со спарклайном. Заголовок панели находится над прокруткой, шапка таблицы закреплена. |
 | `chatMessage()` | `{role, author, time, dateTime?, text, status?}`. Для фрагментов потока обновляйте экземпляр того же сообщения. |
 | `statusStrip()` | Массив `{name?, key?, label, kind?}`. Телеметрия, сайдкар и клавиши подаются отдельными элементами. |
+| `fillBar(presenter, label)` | `{value, max, reading}`. Полоса дополняется числом в единицах метрики. |
+| `objectCard(presenter)` | `{title, fields: [{label, value}]}`. Значение может быть метрикой или локализованным текстом. |
+| `promptChip(options)` | `{label, prompt, onSelect}`. Нажатие передаёт текст шаблона в модуль чата. |
 | `segmentedControl(options)` | `{label, options: [{value, label}], selected, onChange?}`. Управляется как группа кнопок выбора, с клавиатуры работают Tab и стрелки. |
 
 Для панелей `state = {kind, label, detail?}`. Компоненты понимают `fresh`, `loading`, `stale`, `empty` и `error`. `metricState(reading, sessionTimeSec, sampleIntervalSec)` сравнивает возраст одного доступного значения с порогом §8.2. Модуль экрана определяет момент завершения загрузки и добавляет возраст и причину в локализованные подписи. Строки в `showcase.js` относятся к демонстрации.
