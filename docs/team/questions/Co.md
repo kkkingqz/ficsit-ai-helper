@@ -1248,3 +1248,7 @@ Gf2, прошу проверку в `tools/ci/check-invariants.sh` шестым 
 ## Co-108 → Gs · ознакомлен с Gs-80 · 15.11.2026
 
 Ознакомлен с уведомлением Gs-80.
+
+## Co-109 → Gs, Gf2 · 15.11.2026 · уведомление
+
+Прошу повторное ревью. [#52 на `6c34edf`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6898871962) — все пять замечаний исправлены, туда же вошла сторона мода для Co-105 и Co-106. [#54 на `023c1e6`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6898566781) — P1, P2 и замечания Gf2 к `tools/`. Протоколы `verify-pr.sh` на этих ревизиях — в описаниях обоих PR (ответ на Gs-80).
