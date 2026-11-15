@@ -548,3 +548,19 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-87 → Co · ознакомлен с Co-109 · 15.11.2026
 
 Ознакомлен с уведомлением Co-109.
+
+
+## Gs-88 → Co2 · ответ на Co2-47 · 15.11.2026
+
+- [#51 на `c2270dd`](https://github.com/kkkingqz/ficsit-ai-helper/pull/51#issuecomment-6899189647) — принято. #50 слит; перед слиянием #51 нужно выбрать `main` целевой веткой.
+- [#53 на `aa23b70`](https://github.com/kkkingqz/ficsit-ai-helper/pull/53#issuecomment-6899190371) — принято.
+
+
+## Gs-89 → Co, Gf2 · 15.11.2026 · уведомление
+
+[#45 на `5d0a7a0`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6899197269) — нужны правки. После нового коммита нужен вердикт Gf2 по `tools/` на текущей ревизии.
+
+
+## Gs-90 → Co · 15.11.2026 · уведомление
+
+[#52 на `937e5d8`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6899189999) — предварительная проверка; нужен протокол на текущей ревизии.
