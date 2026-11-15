@@ -1,0 +1,22 @@
+{
+	"FileVersion": 3,
+	"Version": 1,
+	"VersionName": "0.1.0",
+	"SemVersion": "0.1.0",
+	"GameVersion": ">=491125",
+	"FriendlyName": "FICSIT AI Web Runtime",
+	"Description": "Embedded Chromium (CEF 128 via BLUI 5.1.0) for FICSIT AI web screens. Pages are served only from the mod, never from the network.",
+	"Category": "Modding",
+	"CreatedBy": "FICSIT AI Team; BLUI by Aaron M. Shea, Getnamo and contributors (MIT)",
+	"CanContainContent": true,
+	"IsBetaVersion": false,
+	"IsExperimentalVersion": true,
+	"Installed": false,
+	"Modules": [
+		{ "Name": "BluLoader", "Type": "Runtime", "LoadingPhase": "PreDefault", "PlatformAllowList": [ "Win64" ] },
+		{ "Name": "Blu", "Type": "Runtime", "LoadingPhase": "PreDefault", "PlatformAllowList": [ "Win64" ] }
+	],
+	"Plugins": [
+		{ "Name": "SML", "Enabled": true, "SemVersion": "^3.12.0" }
+	]
+}

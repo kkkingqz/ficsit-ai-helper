@@ -6,7 +6,8 @@
 #
 # Подменяет UAT, Flatpak, wine и установку Steam заглушками во временном каталоге и проверяет ветки отказа,
 # найденные на ревью #42: ошибка копирования исходников, устаревший архив, зависание до главного меню,
-# критическая ошибка в журнале, неполученная блокировка, неопределённая роль, два запуска одной роли.
+# критическая ошибка в журнале, неполученная блокировка, неопределённая роль, два запуска одной роли;
+# ветки отказа подготовки CEF (ревью #54).
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -185,6 +186,39 @@ rm -f "$T/bin/flock"
 check "без роли скрипт останавливается" "$(FICSITAI_ROLE= run "$W" build -- touch "$T/ran-without-role")" 2
 check "файл не создан" "$([[ -e "$T/ran-without-role" ]] && echo yes || echo no)" no
 check "общий каталог ролей не создан" "$([[ -e "$S/Projects/ficsitai-" ]] && echo yes || echo no)" no
+
+echo "6. Подготовка CEF для FicsitAIWebRuntime (ревью #54: Gs 6, Gf2 1–3)"
+C="$T/repo/tools/host/prepare-webruntime-cef.sh"
+CW="$T/fresh/Mods/FicsitAIWebRuntime/ThirdParty/cef/Win"
+mkdir -p "$T/fresh/Mods"
+echo 'not a release' > "$T/blui.7z"
+FAKE_SHA="$(sha256sum "$T/blui.7z" | cut -d' ' -f1)"
+# Заглушка 7z: раскладывает Plugins/BLUI-Unreal/ThirdParty/cef/Win/{include,lib,shipping} в каталог -o; STUB_7Z=fail — код 2.
+cat > "$T/bin/7z" <<'STUB'
+#!/usr/bin/env bash
+out=""; for a in "$@"; do case "$a" in -o*) out="${a#-o}";; esac; done
+[[ "${STUB_7Z:-ok}" == fail ]] && exit 2
+d="$out/Plugins/BLUI-Unreal/ThirdParty/cef/Win"; mkdir -p "$d/include" "$d/lib" "$d/shipping" && echo new > "$d/shipping/libcef.dll"
+STUB
+chmod +x "$T/bin/7z"
+check "нет архива — отказ" "$(run "$C" "$T/missing.7z" --project "$T/fresh")" 2
+check "причина названа" "$(grep -c 'нет архива' "$T/out.txt")" 1
+check "чужой sha256 — отказ" "$(run "$C" "$T/blui.7z" --project "$T/fresh")" 2
+check "причина названа" "$(grep -c 'не тот релиз BLUI' "$T/out.txt")" 1
+check "без роли — отказ" "$(FICSITAI_ROLE= run "$C" "$T/blui.7z" --project "$T/fresh")" 2
+check "проект без Saved: CEF распакован" "$(FICSITAI_BLUI_SHA256="$FAKE_SHA" run "$C" "$T/blui.7z" --project "$T/fresh")" 0
+check "Saved создан, CEF на месте" "$([[ -d "$T/fresh/Saved" && -f "$CW/shipping/libcef.dll" ]] && echo yes || echo no)" yes
+check "временный каталог убран" "$(ls "$T/fresh/Saved" | grep -c blui-cef)" 0
+echo old > "$CW/shipping/libcef.dll"
+check "сбой распаковщика — отказ" "$(STUB_7Z=fail FICSITAI_BLUI_SHA256="$FAKE_SHA" run "$C" "$T/blui.7z" --project "$T/fresh")" 2
+check "прежний CEF не тронут" "$(cat "$CW/shipping/libcef.dll")" old
+( "$T/repo/tools/host/with-lock.sh" build -- sleep 2 > /dev/null 2>&1 ) &
+sleep 0.7
+check "замена ждёт очередь сборки" "$(FICSITAI_BLUI_SHA256="$FAKE_SHA" run "$C" "$T/blui.7z" --project "$T/fresh")" 0
+wait
+check "в выводе — ожидание очереди" "$(grep -c "очередь 'build' занята" "$T/out.txt")" 1
+check "CEF заменён" "$(cat "$CW/shipping/libcef.dll")" new
+rm -f "$T/bin/7z"
 
 echo; echo "Итог: пройдено $pass, не пройдено $fail"
 [[ $fail -eq 0 ]]
