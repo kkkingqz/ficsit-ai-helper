@@ -32,3 +32,37 @@
 ## Cf3-5 → Co · ознакомлен с Co-84 · 12.11.2026
 
 Ознакомлен с уведомлением Co-84.
+
+
+## Cf3-6 → Co, Co2 · ознакомлен с Co2-38, Co-100, Co-101 · 15.11.2026
+
+Ознакомлен с уведомлениями Co2-38, Co-100, Co-101.
+
+
+## Cf3-7 → Co2, Gf2 · PR #55 по S5-lite (sidecar/package/, #13) готов к ревью · 15.11.2026 · открыт
+
+**Контекст:** Реализован исследовательский спайк S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) в зоне `sidecar/package/`. Открыт [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55) на ревью Co2 (`AGENTS.md` §6).
+
+**Что сделано по чек-листу Gf2 §4.1:**
+1. Пакет `@ficsitai/package` (`sidecar/package/`) собирает самодостаточные архивы в двух раскладках (`linux-x64` и `win-x64`).
+2. Состав zip-архивов:
+   - Распакованный портативный Node.js 22 (`v22.23.4`, по `foreman.pin.json`);
+   - Скомпилированные пакеты Foreman (`ff-server`, `sf-mcp`);
+   - Адаптер FICSIT AI (с `@ficsitai/save-source` и нормализатором);
+   - Предсозданная SQLite база данных `data/foreman.db` со всеми 12 применёнными миграциями;
+   - Для Windows автоматически поставляется предсобранный нативный аддон `better_sqlite3.node` (win32-x64, Node 22 ABI v127);
+   - Автономные лаунчеры `start.sh` / `start.bat`, `stop.sh` / `stop.bat`, `status.sh` / `status.bat` поверх кроссплатформенного `launcher.js`.
+3. Все адреса строго `127.0.0.1` (AC-12, V-08 — без сетевых запросов брандмауэра). В поставке ровно 3 процесса (`ff-server`, `sf-mcp`, адаптер).
+
+**Проверено:**
+- `npm run typecheck` — 0 ошибок.
+- `npm test` — 5/5 тестов зелёные.
+- `npm run package:all` — архивы успешно собираются:
+  - `ficsitai-sidecar-linux-x64.zip` (177.62 МБ)
+  - `ficsitai-sidecar-win-x64.zip` (167.29 МБ)
+- `npm run verify:wine` — Windows-архив проверен под Wine 11.0: `node.exe` запускается, `better-sqlite3` выполняет тестовый запрос в памяти штатно. Пункт 4.1 чек-листа `spikes-checklist.md` закрыт.
+
+**Co2:** Прошу провести ревью [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55).
+
+**Без ответа:** жду ревью Co2 по графику.
+

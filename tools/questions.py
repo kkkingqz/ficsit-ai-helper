@@ -101,12 +101,16 @@ def parse_questions(repo_root: Path):
             if in_code_block:
                 continue
 
-            # Поиск блоков ответов («ответ на <ID>»)
-            for m in re.finditer(r"ответ на ([A-Za-z0-9]+-\d+)", stripped):
-                ans_id = m.group(1)
-                answered_ids.add(ans_id)
-                if file_role:
-                    answered_by[ans_id].add(file_role)
+            # Поиск блоков ответов («ответ на <ID>», включая списки «ответ на A, B» / «ответ на A и B»)
+            for m in re.finditer(
+                r"ответ на\s+(?:вопрос[а-я]*\s+)?([A-Za-z0-9]+-\d+(?:\s*(?:,|и)\s*[A-Za-z0-9]+-\d+)*)",
+                stripped,
+                re.IGNORECASE,
+            ):
+                for ans_id in re.findall(r"\b([A-Za-z0-9]+-\d+)\b", m.group(1)):
+                    answered_ids.add(ans_id)
+                    if file_role:
+                        answered_by[ans_id].add(file_role)
 
             # Поиск отметок об ознакомлении в файле конкретной роли
             if file_role:
@@ -159,22 +163,32 @@ def parse_questions(repo_root: Path):
                 date_m = re.search(r"\b\d{2}\.\d{2}\.\d{4}\b", rest)
                 date_str = date_m.group(0) if date_m else ""
 
-                if (
-                    "ответ на" in rest
-                    or "ознакомлен" in rest
-                    or "ознакомил" in rest
-                    or "прочитан" in rest
-                    or "принят" in rest
-                ):
+                parts = [p.strip() for p in rest.split("·")]
+                parts_lower = [p.lower() for p in parts]
+
+                is_notification = any("уведомление" in p for p in parts_lower)
+                is_closed = any("закрыт" in p for p in parts_lower)
+                is_open = any(
+                    "открыт" in p
+                    or p.strip() == "вопрос"
+                    or p.strip().startswith("вопрос ")
+                    for p in parts_lower
+                )
+                is_ack_or_reply = (not is_notification and not is_closed and not is_open) and any(
+                    p.startswith(("ответ на", "ознакомлен", "ознакомил", "прочитан", "ack"))
+                    for p in parts_lower
+                )
+
+                if is_ack_or_reply:
                     current_q = None
                     continue
-                elif "уведомление" in rest:
+                elif is_notification:
                     kind = "notification"
                     status = "уведомление"
-                elif "закрыт" in rest:
+                elif is_closed:
                     kind = "question"
                     status = "закрыт"
-                elif "открыт" in rest:
+                elif is_open:
                     kind = "question"
                     status = "открыт"
                 else:

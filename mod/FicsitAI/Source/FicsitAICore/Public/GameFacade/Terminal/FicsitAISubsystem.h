@@ -19,6 +19,7 @@ class FICSITAICORE_API AFicsitAISubsystem : public AModSubsystem, public IFGSave
 
 public:
     AFicsitAISubsystem();
+    virtual ~AFicsitAISubsystem();
 
     virtual void BeginPlay() override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

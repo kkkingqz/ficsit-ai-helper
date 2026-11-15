@@ -15,8 +15,10 @@
   font: 400 16px/1.5 system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   color: var(--text);
-  background: var(--bg-base);
 }
+
+:root.terminal { background: var(--bg-base); }
+:root:not(.terminal) :is(.topbar, .details) { display: none; }
 
 * { box-sizing: border-box; }
 body, h1, h2, p { margin: 0; }
@@ -123,4 +125,11 @@ tbody th[scope="row"] { color: var(--text); font-weight: 400; padding-left: 20px
   .details { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; }
   .charts { max-block-size: none; }
   .details { --scroll-panel-limit: 65dvh; }
+}
+
+.hud { pointer-events: none; }
+.hud .workload { display: block; block-size: auto; }
+.hud .metrics {
+  inline-size: min(100%, 456px);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 128px), 1fr));
 }

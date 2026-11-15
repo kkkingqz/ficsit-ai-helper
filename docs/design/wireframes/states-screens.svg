@@ -1,0 +1,156 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1200" width="1920" height="1200" font-family="DejaVu Sans, Verdana, sans-serif">
+  <title>FICSIT AI - screen states: no data, empty factory, sidecar offline, history (D-1)</title>
+  <defs><style>
+    .bg{fill:#071320}
+    .panel{fill:#0E2032;stroke:#1E3D59;stroke-width:2}
+    .inner{fill:#0A1724;stroke:#1E3D59;stroke-width:1.5}
+    .slot{fill:#122A40;stroke:#1E3D59;stroke-width:2}
+    .sep{fill:#1E3D59}
+    .h{fill:#E6F0F7;font-size:21px;font-weight:bold;letter-spacing:1px}
+    .cap{fill:#E6F0F7;font-size:15px;letter-spacing:2px;font-weight:bold}
+    .capo{fill:#F5871F;font-size:16px;font-weight:bold;letter-spacing:2px}
+    .t{fill:#E6F0F7;font-size:17px}
+    .tm{fill:#8FA9BF;font-size:15px}
+    .ts{fill:#8FA9BF;font-size:13px;letter-spacing:1px}
+    .tt{fill:#6F8CA3;font-size:12px;letter-spacing:1px}
+    .ann{fill:#9CC4DB;font-size:14px}
+    .annd{fill:#6F8CA3;font-size:13px}
+    .big{fill:#E6F0F7;font-size:44px;font-weight:bold}
+    .bigd{fill:#7E99AE;font-size:44px;font-weight:bold}
+    .ok{fill:#46C46B;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .stale{fill:#E8C33C;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .err{fill:#E06B5A;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .neu{fill:#8FA9BF;font-size:13px;font-weight:bold;letter-spacing:1px}
+    .icon{fill:none;stroke:#9CC4DB;stroke-width:2.2}
+    .grid{stroke:#16304A;stroke-width:1}
+</style></defs>
+  <rect class="bg" x="0" y="0" width="1920" height="1200"/>
+  <text class="h" x="80" y="48">СОСТОЯНИЯ ЭКРАНОВ: НЕТ ДАННЫХ, ПУСТАЯ ФАБРИКА, НЕТ САЙДКАРА, ИСТОРИЯ</text>
+  <text class="ann" x="80" y="78">Область модуля 1740 x 960 показана схематично. Каркас вокруг не рисуется: он свой и описан в D-1-frame; два полноэкранных состояния каркаса — в frame-states.svg.</text>
+  <text class="capo" x="80" y="120">A · «СТАТИСТИКА» — ТЕЛЕМЕТРИИ ЕЩЁ НЕТ</text>
+  <rect class="panel" x="80" y="138" width="840" height="430"/>
+  <text class="ann" x="80" y="598">Сбор начинается с загрузки сохранения (§8.2). Это информационное</text>
+  <text class="ann" x="80" y="620">сообщение, а не ошибка: V-02 требует именно такой формулировки.</text>
+  <rect class="slot" x="100" y="158" width="140" height="32"/>
+  <rect class="" x="100" y="188" width="140" height="3" fill="#F5871F" stroke="none"/>
+  <text class="ts" x="116" y="180">ENERGY</text>
+  <rect class="inner" x="250" y="158" width="140" height="32"/>
+  <text class="ts" x="266" y="180">RESOURCES</text>
+  <rect class="inner" x="420" y="158" width="84" height="32"/>
+  <text class="ts" x="434" y="180">5 MIN</text>
+  <rect class="slot" x="512" y="158" width="84" height="32"/>
+  <text class="ts" x="526" y="180">15 MIN</text>
+  <rect class="inner" x="604" y="158" width="84" height="32"/>
+  <text class="ts" x="618" y="180">60 MIN</text>
+  <text class="neu" x="900" y="180" text-anchor="end">NO DATA</text>
+  <rect class="inner" x="100" y="206" width="180" height="62"/>
+  <text class="tt" x="112" y="228">PRODUCTION</text>
+  <text class="bigd" x="112" y="256" font-size="20" font-weight="bold">—</text>
+  <rect class="inner" x="296" y="206" width="180" height="62"/>
+  <text class="tt" x="308" y="228">CONSUMPTION</text>
+  <text class="bigd" x="308" y="256" font-size="20" font-weight="bold">—</text>
+  <rect class="inner" x="492" y="206" width="180" height="62"/>
+  <text class="tt" x="504" y="228">HEADROOM</text>
+  <text class="bigd" x="504" y="256" font-size="20" font-weight="bold">—</text>
+  <rect class="inner" x="688" y="206" width="180" height="62"/>
+  <text class="tt" x="700" y="228">SESSION PEAK</text>
+  <text class="bigd" x="700" y="256" font-size="20" font-weight="bold">—</text>
+  <rect class="inner" x="100" y="284" width="800" height="208"/>
+  <rect class="inner" x="116" y="300" width="768" height="128"/>
+  <line class="grid" x1="117" y1="332" x2="883" y2="332"/>
+  <line class="grid" x1="117" y1="364" x2="883" y2="364"/>
+  <line class="grid" x1="117" y1="396" x2="883" y2="396"/>
+  <line class="grid" x1="212" y1="301" x2="212" y2="427"/>
+  <line class="grid" x1="308" y1="301" x2="308" y2="427"/>
+  <line class="grid" x1="404" y1="301" x2="404" y2="427"/>
+  <line class="grid" x1="500" y1="301" x2="500" y2="427"/>
+  <line class="grid" x1="596" y1="301" x2="596" y2="427"/>
+  <line class="grid" x1="692" y1="301" x2="692" y2="427"/>
+  <line class="grid" x1="788" y1="301" x2="788" y2="427"/>
+  <text class="cap" x="500" y="358" text-anchor="middle" font-size="18">NO DATA YET</text>
+  <text class="tm" x="500" y="384" text-anchor="middle">Collection starts with the save — session data only</text>
+  <text class="tt" x="116" y="458">Session data only — 24 h history arrives in v1.1</text>
+  <text class="capo" x="1000" y="120">B · «СТАТИСТИКА» — ПУСТАЯ ФАБРИКА</text>
+  <rect class="panel" x="1000" y="138" width="840" height="430"/>
+  <text class="ann" x="1000" y="598">Данные есть и свежие, фабрики нет. Поэтому ноль, а не прочерк,</text>
+  <text class="ann" x="1000" y="620">и зелёная метка: это ответ, а не отсутствие ответа.</text>
+  <rect class="inner" x="1020" y="158" width="140" height="32"/>
+  <text class="ts" x="1036" y="180">ENERGY</text>
+  <rect class="slot" x="1170" y="158" width="140" height="32"/>
+  <rect class="" x="1170" y="188" width="140" height="3" fill="#F5871F" stroke="none"/>
+  <text class="ts" x="1186" y="180">RESOURCES</text>
+  <rect class="inner" x="1340" y="158" width="84" height="32"/>
+  <text class="ts" x="1354" y="180">5 MIN</text>
+  <rect class="slot" x="1432" y="158" width="84" height="32"/>
+  <text class="ts" x="1446" y="180">15 MIN</text>
+  <rect class="inner" x="1524" y="158" width="84" height="32"/>
+  <text class="ts" x="1538" y="180">60 MIN</text>
+  <text class="ok" x="1820" y="180" text-anchor="end">UPDATED 2 s AGO</text>
+  <rect class="inner" x="1020" y="206" width="180" height="62"/>
+  <text class="tt" x="1032" y="228">EXTRACTION</text>
+  <text class="t" x="1032" y="256" font-size="20" font-weight="bold">0 items/min</text>
+  <rect class="inner" x="1216" y="206" width="180" height="62"/>
+  <text class="tt" x="1228" y="228">CONSUMPTION</text>
+  <text class="t" x="1228" y="256" font-size="20" font-weight="bold">0 items/min</text>
+  <rect class="inner" x="1412" y="206" width="180" height="62"/>
+  <text class="tt" x="1424" y="228">BALANCE</text>
+  <text class="t" x="1424" y="256" font-size="20" font-weight="bold">0 items/min</text>
+  <rect class="inner" x="1608" y="206" width="180" height="62"/>
+  <text class="tt" x="1620" y="228">STOCK</text>
+  <text class="t" x="1620" y="256" font-size="20" font-weight="bold">0</text>
+  <rect class="inner" x="1020" y="284" width="800" height="208"/>
+  <text class="cap" x="1036" y="310" font-size="13">BALANCE</text>
+  <line class="" x1="1036" y1="322" x2="1804" y2="322" stroke="#1E3D59" stroke-width="1.5"/>
+  <text class="tt" x="1036" y="342">RESOURCE</text>
+  <text class="tt" x="1232" y="342">PRODUCTION</text>
+  <text class="tt" x="1428" y="342">CONSUMPTION</text>
+  <text class="tt" x="1624" y="342">BALANCE</text>
+  <line class="" x1="1036" y1="354" x2="1804" y2="354" stroke="#16304A" stroke-width="1.5"/>
+  <text class="tm" x="1036" y="386">Nothing is running yet</text>
+  <text class="tt" x="1036" y="414">Build an extractor to see production here</text>
+  <rect class="inner" x="1036" y="426" width="768" height="52"/>
+  <line class="grid" x1="1037" y1="452" x2="1803" y2="452"/>
+  <line class="grid" x1="1112.8" y1="427" x2="1112.8" y2="477"/>
+  <line class="grid" x1="1189.6" y1="427" x2="1189.6" y2="477"/>
+  <line class="grid" x1="1266.4" y1="427" x2="1266.4" y2="477"/>
+  <line class="grid" x1="1343.2" y1="427" x2="1343.2" y2="477"/>
+  <line class="grid" x1="1420" y1="427" x2="1420" y2="477"/>
+  <line class="grid" x1="1496.8" y1="427" x2="1496.8" y2="477"/>
+  <line class="grid" x1="1573.6" y1="427" x2="1573.6" y2="477"/>
+  <line class="grid" x1="1650.4" y1="427" x2="1650.4" y2="477"/>
+  <line class="grid" x1="1727.2" y1="427" x2="1727.2" y2="477"/>
+  <polyline points="1036.0,475.9 1076.4,475.9 1116.8,475.9 1157.3,475.9 1197.7,475.9 1238.1,475.9 1278.5,475.9 1318.9,475.9 1359.4,475.9 1399.8,475.9 1440.2,475.9 1480.6,475.9 1521.1,475.9 1561.5,475.9 1601.9,475.9 1642.3,475.9 1682.7,475.9 1723.2,475.9 1763.6,475.9 1804.0,475.9" fill="none" stroke="#2FB8DE" stroke-width="2.4" opacity="1"/>
+  <text class="capo" x="80" y="660">C · «ЧАТ» — САЙДКАР НЕ ПОДКЛЮЧЁН</text>
+  <rect class="panel" x="80" y="678" width="840" height="430"/>
+  <text class="ann" x="80" y="1138">Инструкция вместо пустого поля (V-03). Игра не блокируется,</text>
+  <text class="ann" x="80" y="1160">«Статистика» рядом работает: телеметрию собирает мод (FR-10).</text>
+  <text class="cap" x="100" y="718" font-size="14">CHAT WITH AI</text>
+  <text class="err" x="900" y="718" text-anchor="end">SIDECAR  NOT CONNECTED</text>
+  <rect class="inner" x="100" y="734" width="800" height="246"/>
+  <circle cx="500" cy="806" r="26" fill="none" stroke="#6A8398" stroke-width="2.4"/>
+  <line class="" x1="482" y1="824" x2="518" y2="788" stroke="#6A8398" stroke-width="2.4"/>
+  <text class="cap" x="500" y="872" text-anchor="middle" font-size="18">NOT CONNECTED</text>
+  <text class="tm" x="500" y="900" text-anchor="middle">Start the FICSIT AI sidecar, then open the chat again</text>
+  <text class="tt" x="500" y="926" text-anchor="middle">Launcher: FICSIT AI / start.sh  ·  retries automatically</text>
+  <rect class="inner" x="100" y="996" width="680" height="48"/>
+  <text class="tt" x="116" y="1026">Chat is unavailable while the sidecar is offline</text>
+  <rect class="inner" x="792" y="996" width="108" height="48"/>
+  <text class="ts" x="846" y="1026" text-anchor="middle" style="fill:#55728A">SEND</text>
+  <text class="capo" x="1000" y="660">D · «ЧАТ» — ДВА ВИДА ПУСТОЙ ИСТОРИИ</text>
+  <rect class="panel" x="1000" y="678" width="840" height="430"/>
+  <text class="ann" x="1000" y="1138">Недоступная история и пустая история — разные состояния: §10 хранит</text>
+  <text class="ann" x="1000" y="1160">переписку в БД Foreman, и «не загрузили» нельзя показывать как «пусто».</text>
+  <text class="ts" x="1020" y="718" style="fill:#E8C33C">D1 · ИСТОРИЯ НЕ ЗАГРУЖЕНА</text>
+  <rect class="inner" x="1020" y="730" width="800" height="150"/>
+  <rect class="" x="1032" y="742" width="776" height="34" fill="#1C2A1F" stroke="#E8C33C" stroke-width="1.5"/>
+  <text class="ts" x="1046" y="764" style="fill:#E8C33C">HISTORY UNAVAILABLE — sidecar offline, earlier messages are not loaded</text>
+  <rect class="slot" x="1032" y="790" width="420" height="32"/>
+  <text class="tm" x="1046" y="811">How much power do I produce?</text>
+  <rect class="" x="1384" y="830" width="420" height="32" fill="#0C2030" stroke="#1E3D59" stroke-width="1.5"/>
+  <text class="tm" x="1398" y="851">Current production is 1.20 GW.</text>
+  <text class="ts" x="1020" y="904" style="fill:#8FA9BF">D2 · ИСТОРИЯ ЗАГРУЖЕНА И ПУСТА</text>
+  <rect class="inner" x="1020" y="916" width="800" height="150"/>
+  <text class="cap" x="1420" y="984" text-anchor="middle" font-size="17">No messages yet</text>
+  <text class="tm" x="1420" y="1010" text-anchor="middle">Ask the first question — the answer is saved to this playthrough</text>
+  <text class="annd" x="80" y="1176">Подписи интерфейса английские и окончательные — это строки для UE Localization. Пояснения на макете русские и в интерфейс не попадают.</text>
+</svg>

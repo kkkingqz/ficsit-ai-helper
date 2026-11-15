@@ -43,6 +43,9 @@ public:
 
     void SetInputFocus(bool bFocus) { bHasFocus = bFocus; }
 
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Test")
+    const FFicsitAIScreenContext& GetCurrentContext() const { return CurrentContext; }
+
 protected:
     virtual TSharedRef<SWidget> RebuildWidget() override;
 
