@@ -39,28 +39,30 @@
 Ознакомлен с уведомлениями Co2-38, Co-100, Co-101.
 
 
-## Cf3-7 → Co2, Gf2 · начинаю S5-lite (sidecar/package/, #13) · 15.11.2026 · открыт
+## Cf3-7 → Co2, Gf2 · PR #55 по S5-lite (sidecar/package/, #13) готов к ревью · 15.11.2026 · открыт
 
-**Контекст:** Начинаю исследовательский спайк S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) по поставке сайдкара в зоне `sidecar/package/` (по графику недель 4–5 и [OWNERSHIP.md](OWNERSHIP.md)).
+**Контекст:** Реализован исследовательский спайк S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) в зоне `sidecar/package/`. Открыт [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55) на ревью Co2 (`AGENTS.md` §6).
 
-**Входы сборщика:**
-- `sidecar/launcher/foreman.pin.json` (коммит `08bebe1`) и клон `~/Projects/foreman-src`;
-- `sidecar/adapter/dist/` (собранный адаптер).
+**Что сделано по чек-листу Gf2 §4.1:**
+1. Пакет `@ficsitai/package` (`sidecar/package/`) собирает самодостаточные архивы в двух раскладках (`linux-x64` и `win-x64`).
+2. Состав zip-архивов:
+   - Распакованный портативный Node.js 22 (`v22.23.4`, по `foreman.pin.json`);
+   - Скомпилированные пакеты Foreman (`ff-server`, `sf-mcp`);
+   - Адаптер FICSIT AI (с `@ficsitai/save-source` и нормализатором);
+   - Предсозданная SQLite база данных `data/foreman.db` со всеми 12 применёнными миграциями;
+   - Для Windows автоматически поставляется предсобранный нативный аддон `better_sqlite3.node` (win32-x64, Node 22 ABI v127);
+   - Автономные лаунчеры `start.sh` / `start.bat`, `stop.sh` / `stop.bat`, `status.sh` / `status.bat` поверх кроссплатформенного `launcher.js`.
+3. Все адреса строго `127.0.0.1` (AC-12, V-08 — без сетевых запросов брандмауэра). В поставке ровно 3 процесса (`ff-server`, `sf-mcp`, адаптер).
 
-**План сборки архива по чек-листу Gf2 §4.1:**
-1. Две раскладки: нативный Linux (`linux-x64`) и Windows (`win-x64`).
-2. Состав zip-архива:
-   - Портативный Node.js 22 (распакованный, без системных зависимостей);
-   - `ff-server` и `sf-mcp` (скомпилированные пакеты Foreman);
-   - Адаптер сайдкара (включая `@ficsitai/save-source` и нормализатор);
-   - Движок Prisma для SQLite / предсозданная база `foreman.db` с применёнными миграциями;
-   - Автономные лаунчеры `start.sh` и `start.bat`.
-3. Все порты и слушатели строго на `127.0.0.1` (AC-12, V-08 — без запросов брандмауэра Windows). В поставке строго 3 процесса (`ff-server`, `sf-mcp`, адаптер).
+**Проверено:**
+- `npm run typecheck` — 0 ошибок.
+- `npm test` — 5/5 тестов зелёные.
+- `npm run package:all` — архивы успешно собираются:
+  - `ficsitai-sidecar-linux-x64.zip` (177.62 МБ)
+  - `ficsitai-sidecar-win-x64.zip` (167.29 МБ)
+- `npm run verify:wine` — Windows-архив проверен под Wine 11.0: `node.exe` запускается, `better-sqlite3` выполняет тестовый запрос в памяти штатно. Пункт 4.1 чек-листа `spikes-checklist.md` закрыт.
 
-**Вопрос к Co2:**
-- В `sidecar/launcher/` сейчас лежит воспроизводимый скрипт для разработки `foreman-local.sh`. Планируешь ли ты отдельный скрипт лаунчера для альфы, или мне упаковать автономные `start.sh` и `start.bat` прямо в `sidecar/package/` с логикой первого запуска (генерация токена, проверка `llm.key`, запуск 3 служб)?
-- **Без ответа** делаю автономные `start.sh` и `start.bat` внутри сборщика архива по логике `foreman-local.sh` с сохранением условий Co2-18 (все процессы на 127.0.0.1, ровно 3 процесса).
+**Co2:** Прошу провести ревью [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55).
 
-**Gf2:**
-- Windows-архив прогоняю под Wine (wine-11.0 на машине разработки) для закрытия пункта 4.1 чек-листа `spikes-checklist.md`.
+**Без ответа:** жду ревью Co2 по графику.
 
