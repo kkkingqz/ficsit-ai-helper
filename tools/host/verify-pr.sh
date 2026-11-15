@@ -37,17 +37,18 @@ for mod in "${mods[@]}"; do
     if fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"; then
         lines+=("- Сборка Win64 Shipping, \`$mod\`: успешно; исходники — $FA_BUILD_ORIGIN; архив ${FA_BUILD_SIZE_MB} МБ, sha256 \`${FA_BUILD_SHA}…\`")
         zips+=("$FA_BUILD_ARCHIVE")
-        if [[ -z "$hcl_problem" && -n "$FA_BUILD_HCL_PROBLEM" ]]; then hcl_problem="$FA_BUILD_HCL_PROBLEM"
-        elif [[ -z "$hcl_problem" && -n "$hcl_rev$hcl" && ( "$FA_BUILD_PROJECT_REV" != "$hcl_rev" || "$FA_BUILD_HCL" != "$hcl" ) ]]; then
-            hcl_problem="архивы собраны на разных состояниях проекта SML: коммит ${hcl_rev:0:8} и ${FA_BUILD_PROJECT_REV:0:8}"
-        fi
-        [[ -z "$hcl$hcl_rev" ]] && { hcl="$FA_BUILD_HCL"; hcl_src="$FA_BUILD_HCL_SRC"; hcl_rev="$FA_BUILD_PROJECT_REV"; }
         d="$(_fa_mod_descriptor "$FA_BUILD_ARCHIVE" 2>/dev/null)" && want[$mod]="${d##*$'\t'}"
     else
         ok=0
         first="$(grep -m1 -E 'error [A-Z]+[0-9]+|ERROR:' "$FA_BUILD_LOG" 2>/dev/null | cut -c1-160)"
         lines+=("- Сборка Win64 Shipping, \`$mod\`: **не выполнена** — $FA_BUILD_STAGE; исходники — $FA_BUILD_ORIGIN${first:+; первая ошибка: \`$first\`}")
     fi
+    # Заголовки и ревизия проекта — из проверки под блокировкой этой сборки; все архивы — на одном состоянии.
+    if [[ -z "$hcl_problem" && -n "$FA_BUILD_HCL_PROBLEM" ]]; then hcl_problem="$FA_BUILD_HCL_PROBLEM"
+    elif [[ -z "$hcl_problem" && -n "$hcl_rev$hcl" && ( "$FA_BUILD_PROJECT_REV" != "$hcl_rev" || "$FA_BUILD_HCL" != "$hcl" ) ]]; then
+        hcl_problem="архивы собраны на разных состояниях проекта SML: коммит ${hcl_rev:0:8} и ${FA_BUILD_PROJECT_REV:0:8}"
+    fi
+    [[ -z "$hcl$hcl_rev" ]] && { hcl="$FA_BUILD_HCL"; hcl_src="$FA_BUILD_HCL_SRC"; hcl_rev="$FA_BUILD_PROJECT_REV"; }
 done
 
 if [[ $ok -eq 1 ]]; then
