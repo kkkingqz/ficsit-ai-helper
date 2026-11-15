@@ -22,7 +22,10 @@ struct FICSITAICORE_API FFicsitAISidecarConfig
 {
 	FString BaseUrl;  // http://127.0.0.1:<порт>, без завершающей косой черты
 	FString Token;
-	bool IsValid() const { return BaseUrl.StartsWith(TEXT("http://127.0.0.1:")) && !Token.IsEmpty(); }
+	bool IsValid() const { return IsLoopbackUrl(BaseUrl) && !Token.IsEmpty(); }
+
+	/** Ровно http://127.0.0.1:<порт 1–65535>: без userinfo, пути, запроса и фрагмента. Токен уходит только на петлю. */
+	static bool IsLoopbackUrl(const FString& Url);
 
 	/** Saved/FicsitAI/adapter.json: { "url": "...", "token": "..." }. Нет файла или не петля — канал выключен. */
 	static FFicsitAISidecarConfig LoadFromSaved(FString* OutWhy = nullptr);
@@ -69,6 +72,9 @@ struct FFicsitAIChannelStats
 	int64 LinesIn = 0, MessagesIn = 0, Duplicates = 0, Pings = 0, BytesIn = 0;
 	int64 MessagesOut = 0, Posts = 0, PostFailures = 0, AckOnlyPosts = 0;
 	int64 ToolCalls = 0, ToolResults = 0;
+	int64 CallsRefused = 0;     // MOD_INERT, SAVE_MISMATCH: отказано до обработчика
+	int64 TooLarge = 0;         // сообщение больше maxMessageBytes: номер не выдан, отправитель получил TOO_LARGE
+	int64 SessionRestarts = 0;  // новое рукопожатие из-за отказа адаптера (410, 413, 400)
 	double GameThreadSeconds = 0.0; // разбор очереди на GameThread
 };
 
@@ -108,7 +114,7 @@ public:
 	const FFicsitAIChannelStats& GetStats() const { return Stats; }
 
 private:
-	struct FOutgoing { int64 Seq; FString Json; };
+	struct FOutgoing { int64 Seq; TArray<uint8> Utf8; }; // конверт уже в UTF-8: его длина и есть размер по протоколу
 	struct FIncoming { int64 Seq; FString Session; TSharedPtr<FJsonObject> Message; };
 	struct FPendingRequest { FReplyHandler OnReply; };
 
@@ -125,9 +131,14 @@ private:
 	void HandleMessage(const TSharedPtr<FJsonObject>& Message);
 	void MaybePost();
 	void OnPostDone(FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bOk, uint64 Generation, int64 SentAck);
-	void Enqueue(const TSharedRef<FJsonObject>& Envelope);
+	/** Номер выдаётся, только если конверт укладывается в maxMessageBytes; иначе false и номер не тратится. */
+	bool Enqueue(const TSharedRef<FJsonObject>& Envelope, int64* OutBytes = nullptr);
 	void SendToolResult(const FString& Session, const FString& CallId, const TSharedPtr<FJsonValue>& Body, const FString* Code, const FString* Message);
 	void ResetSession(const FString& Why);
+	/** Сессию не восстановить на месте: ждущие получают CHANNEL_RESET, дальше новое рукопожатие. */
+	void RestartSession(const FString& Why);
+	/** Смена поколения потока — под StreamLock, вместе с буфером, входящим seq и StreamSession. */
+	void BumpStreamGenerationLocked();
 	void SetState(EFicsitAIChannelState NewState, const FString& Reason);
 	void ScheduleRetry(double Delay);
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> MakeRequest(const FString& Verb, const FString& Path) const;
@@ -141,7 +152,8 @@ private:
 	EFicsitAIChannelState State = EFicsitAIChannelState::Stopped;
 	FString Session;              // GameThread
 	FString AdapterApiVersion;
-	uint64 Generation = 0;        // растёт на каждом рукопожатии: ответы прежних сессий отбрасываются
+	uint64 Generation = 0;        // растёт на каждом рукопожатии и на Stop(): ответы прежних сессий отбрасываются
+	TSharedPtr<IHttpRequest, ESPMode::ThreadSafe> HelloRequest, PostRequest; // в полёте; Stop() их отменяет
 	double RetryAt = 0.0;
 	int32 Failures = 0;
 

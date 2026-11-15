@@ -42,6 +42,36 @@ namespace
 		if (Body.IsValid()) { Body->TryGetStringField(TEXT("code"), Code); }
 		return Code;
 	}
+
+	/** Запрос в полёте больше не нужен: его завершение не должно ничего сделать, и он не должен висеть. */
+	void CancelHttp(TSharedPtr<IHttpRequest, ESPMode::ThreadSafe>& Req)
+	{
+		if (!Req.IsValid()) { return; }
+		Req->OnProcessRequestComplete().Unbind();
+		Req->CancelRequest();
+		Req.Reset();
+	}
+
+	void AppendUtf8(TArray<uint8>& Out, const FString& Text)
+	{
+		const FTCHARToUTF8 Conv(*Text, Text.Len());
+		Out.Append(reinterpret_cast<const uint8*>(Conv.Get()), Conv.Length());
+	}
+}
+
+bool FFicsitAISidecarConfig::IsLoopbackUrl(const FString& Url)
+{
+	// Сверяется вся строка, а не префикс: «http://127.0.0.1:1@host:2» libcurl отправит на host вместе с токеном.
+	static const TCHAR Prefix[] = TEXT("http://127.0.0.1:");
+	if (!Url.StartsWith(Prefix, ESearchCase::CaseSensitive)) { return false; }
+	const FString Port = Url.Mid(UE_ARRAY_COUNT(Prefix) - 1);
+	if (Port.IsEmpty() || Port.Len() > 5) { return false; }
+	for (const TCHAR C : Port)
+	{
+		if (C < TEXT('0') || C > TEXT('9')) { return false; }
+	}
+	const int32 N = FCString::Atoi(*Port);
+	return N >= 1 && N <= 65535;
 }
 
 const TCHAR* LexToString(EFicsitAIChannelState State)
@@ -114,7 +144,9 @@ TSharedRef<FFicsitAISidecarChannel, ESPMode::ThreadSafe> FFicsitAISidecarChannel
 FFicsitAISidecarChannel::~FFicsitAISidecarChannel()
 {
 	if (TickHandle.IsValid()) { FTSTicker::GetCoreTicker().RemoveTicker(TickHandle); }
-	if (StreamRequest.IsValid()) { StreamRequest->OnProcessRequestComplete().Unbind(); StreamRequest->CancelRequest(); }
+	CancelHttp(StreamRequest);
+	CancelHttp(HelloRequest);
+	CancelHttp(PostRequest);
 }
 
 void FFicsitAISidecarChannel::Start()
@@ -135,6 +167,12 @@ void FFicsitAISidecarChannel::Stop()
 {
 	check(IsInGameThread());
 	if (TickHandle.IsValid()) { FTSTicker::GetCoreTicker().RemoveTicker(TickHandle); TickHandle.Reset(); }
+	// Ответы рукопожатия и пачки, ушедших до остановки, не должны снова поднять канал: поколение сменено,
+	// запросы отменены вместе с обработчиками завершения.
+	++Generation;
+	CancelHttp(HelloRequest);
+	CancelHttp(PostRequest);
+	bHelloInFlight = false;
 	ResetSession(TEXT("stopped"));
 	Session.Empty();
 	SetState(EFicsitAIChannelState::Stopped, TEXT("stop"));
@@ -197,13 +235,15 @@ void FFicsitAISidecarChannel::SendHello()
 	{
 		if (auto C = Weak.Pin()) { C->OnHelloDone(Rq, Rs, bOk, Gen); }
 	});
+	HelloRequest = Req;
 	Req->ProcessRequest();
 }
 
 void FFicsitAISidecarChannel::OnHelloDone(FHttpRequestPtr, FHttpResponsePtr Resp, bool bOk, uint64 Gen)
 {
-	bHelloInFlight = false;
 	if (Gen != Generation || State == EFicsitAIChannelState::Stopped) { return; }
+	bHelloInFlight = false;
+	HelloRequest.Reset();
 	const int32 Code = Resp.IsValid() ? Resp->GetResponseCode() : 0;
 	if (!bOk || Code == 0)
 	{
@@ -272,19 +312,36 @@ void FFicsitAISidecarChannel::ResetSession(const FString& Why)
 	NextSeqOut = 1;
 	AckedIn = 0;
 	LastAckAt = FPlatformTime::Seconds();
+	CancelHttp(PostRequest);
 	bPostInFlight = false;
 	PostRetryAt = 0.0;
-	if (StreamRequest.IsValid())
 	{
+		// Поколение меняется под той же блокировкой, что буфер и номер сессии: поток, уже прошедший первую
+		// проверку, после захвата блокировки увидит новое поколение и ничего не запишет (ревью #52, п. 3).
+		FScopeLock Lock(&StreamLock);
 		StreamGenerationAtomic.store(++StreamGeneration);
-		StreamRequest->CancelRequest();
-		StreamRequest.Reset();
+		LastSeqIn = 0;
+		LineBuffer.Reset();
+		StreamSession.Empty();
+		while (!Incoming.IsEmpty()) { Incoming.Pop(); }
 	}
+	CancelHttp(StreamRequest);
+}
+
+void FFicsitAISidecarChannel::RestartSession(const FString& Why)
+{
+	UE_LOG(LogFicsitAIChannel, Warning, TEXT("FicsitAI channel: %s, opening a new session"), *Why);
+	++Stats.SessionRestarts;
+	ResetSession(Why);
+	Session.Empty();
+	SetState(EFicsitAIChannelState::Connecting, Why);
+	SendHello();
+}
+
+void FFicsitAISidecarChannel::BumpStreamGenerationLocked()
+{
 	FScopeLock Lock(&StreamLock);
-	LastSeqIn = 0;
-	LineBuffer.Reset();
-	StreamSession.Empty();
-	while (!Incoming.IsEmpty()) { Incoming.Pop(); }
+	StreamGenerationAtomic.store(++StreamGeneration);
 }
 
 // --- поток адаптер → мод ----------------------------------------------------------------------------------
@@ -292,11 +349,12 @@ void FFicsitAISidecarChannel::ResetSession(const FString& Why)
 void FFicsitAISidecarChannel::OpenStream()
 {
 	if (Session.IsEmpty()) { return; }
-	const uint64 Gen = ++StreamGeneration;
-	StreamGenerationAtomic.store(Gen);
+	uint64 Gen = 0;
 	int64 Ack = 0;
 	{
 		FScopeLock Lock(&StreamLock);
+		Gen = ++StreamGeneration;
+		StreamGenerationAtomic.store(Gen);
 		Ack = LastSeqIn;
 		LineBuffer.Reset();
 	}
@@ -326,6 +384,8 @@ void FFicsitAISidecarChannel::OnStreamBytes(const uint8* Data, int64 Length, uin
 	// Поток HTTP. Сюда приходит и тело ответа с ошибкой (410, 409): у него нет поля type, и оно пропускается.
 	if (Gen != StreamGenerationAtomic.load() || Length <= 0) { return; }
 	FScopeLock Lock(&StreamLock);
+	// Повтор под блокировкой: между первой проверкой и захватом GameThread мог сменить сессию и очистить буфер.
+	if (Gen != StreamGenerationAtomic.load()) { return; }
 	Stats.BytesIn += Length;
 	LineBuffer.Append(Data, Length);
 	int32 Start = 0;
@@ -380,15 +440,13 @@ void FFicsitAISidecarChannel::OnStreamDone(FHttpRequestPtr, FHttpResponsePtr Res
 {
 	if (Gen != StreamGeneration || State == EFicsitAIChannelState::Stopped) { return; }
 	StreamRequest.Reset();
-	StreamGenerationAtomic.store(++StreamGeneration);
+	BumpStreamGenerationLocked();
 	const int32 Code = Resp.IsValid() ? Resp->GetResponseCode() : 0;
-	if (Code == 410 || Code == 409)
+	if (Code == 410 || Code == 409 || Code == 400)
 	{
-		// Сессии нет (адаптер перезапущен, вытеснена) или нужные номера вытеснены: только новое рукопожатие.
-		UE_LOG(LogFicsitAIChannel, Display, TEXT("FicsitAI channel: stream refused with HTTP %d, new hello"), Code);
-		Session.Empty();
-		SetState(EFicsitAIChannelState::Connecting, FString::Printf(TEXT("stream HTTP %d"), Code));
-		SendHello();
+		// 410 — сессии нет (адаптер перезапущен, вытеснена), 409 — нужные номера вытеснены, 400 — наш ack впереди
+		// отправленного, то есть счётчик испорчен (Co-106). Во всех трёх случаях — только новое рукопожатие.
+		RestartSession(FString::Printf(TEXT("stream refused with HTTP %d %s"), Code, *CodeOf(Resp)));
 		return;
 	}
 	if (Code == 401)
@@ -432,9 +490,8 @@ bool FFicsitAISidecarChannel::Tick(float)
 		{
 			// Тишина дольше трёх ping или пропуск в номерах: поток переоткрывается с той же сессией и своим ack.
 			UE_LOG(LogFicsitAIChannel, Warning, TEXT("FicsitAI channel: %s, reopening stream"), bSilent ? TEXT("stream silent") : TEXT("stream broken"));
-			StreamGenerationAtomic.store(++StreamGeneration);
-			StreamRequest->CancelRequest();
-			StreamRequest.Reset();
+			BumpStreamGenerationLocked();
+			CancelHttp(StreamRequest);
 			++Stats.StreamBreaks;
 			SetState(EFicsitAIChannelState::Reconnecting, bSilent ? TEXT("silent") : TEXT("broken"));
 			RetryAt = Now;
@@ -491,6 +548,20 @@ void FFicsitAISidecarChannel::HandleMessage(const TSharedPtr<FJsonObject>& Messa
 		Respond.CallId = Id;
 		Respond.Session = Session;
 		Respond.bDone = MakeShared<FThreadSafeBool, ESPMode::ThreadSafe>(false);
+		// Сверка до обработчика (протокол, «Чьё сохранение»): иначе дочитываемый ход сохранения A получил бы данные B.
+		// Пустой saveId — фоновый вызов, отвечаем по текущему.
+		if (bInert)
+		{
+			++Stats.CallsRefused;
+			Respond.Fail(TEXT("MOD_INERT"), TEXT("mod is inert: multiplayer session"));
+			return;
+		}
+		if (!ExpectedSave.IsEmpty() && ExpectedSave != SaveId)
+		{
+			++Stats.CallsRefused;
+			Respond.Fail(TEXT("SAVE_MISMATCH"), TEXT("call is for a save that is not loaded"));
+			return;
+		}
 		if (!ToolHandler) { Respond.Fail(TEXT("SOURCE_UNAVAILABLE"), TEXT("no API behind the channel")); return; }
 		ToolHandler(Name, Args, ExpectedSave, Respond);
 		return;
@@ -560,12 +631,17 @@ void FFicsitAISidecarChannel::Request(const FString& Type, const TSharedRef<FJso
 		return;
 	}
 	const FString Id = FString::Printf(TEXT("m-%lld"), NextRequestId++);
-	Pending.Add(Id, { MoveTemp(OnReply) });
 	const TSharedRef<FJsonObject> Message = MakeShared<FJsonObject>();
 	Message->SetStringField(TEXT("type"), Type);
 	Message->SetStringField(TEXT("id"), Id);
 	Message->SetObjectField(TEXT("body"), Body);
-	Enqueue(Message);
+	int64 Bytes = 0;
+	if (!Enqueue(Message, &Bytes))
+	{
+		if (OnReply) { OnReply(nullptr, TEXT("TOO_LARGE"), FString::Printf(TEXT("%s is %lld bytes, channel limit %d"), *Type, Bytes, MaxMessageBytes)); }
+		return;
+	}
+	Pending.Add(Id, { MoveTemp(OnReply) });
 }
 
 void FFicsitAISidecarChannel::SendToolResult(const FString& CallSession, const FString& CallId, const TSharedPtr<FJsonValue>& Body, const FString* Code, const FString* Message)
@@ -588,16 +664,42 @@ void FFicsitAISidecarChannel::SendToolResult(const FString& CallSession, const F
 	{
 		Out->SetField(TEXT("body"), Body);
 	}
-	Enqueue(Out);
+	int64 Bytes = 0;
+	if (Enqueue(Out, &Bytes)) { return; }
+	// Результат не влезает в сообщение: адаптер всё равно должен получить ответ на вызов, иначе модель ждёт до срока.
+	const TSharedRef<FJsonObject> Fail = MakeShared<FJsonObject>();
+	Fail->SetStringField(TEXT("type"), TEXT("tool.result"));
+	Fail->SetStringField(TEXT("re"), CallId);
+	const TSharedRef<FJsonObject> Error = MakeShared<FJsonObject>();
+	Error->SetStringField(TEXT("code"), TEXT("TOO_LARGE"));
+	Error->SetStringField(TEXT("message"), FString::Printf(TEXT("tool result is %lld bytes, channel limit %d"), Bytes, MaxMessageBytes));
+	Fail->SetObjectField(TEXT("error"), Error);
+	Enqueue(Fail);
 }
 
-void FFicsitAISidecarChannel::Enqueue(const TSharedRef<FJsonObject>& Envelope)
+bool FFicsitAISidecarChannel::Enqueue(const TSharedRef<FJsonObject>& Envelope, int64* OutBytes)
 {
-	const int64 Seq = NextSeqOut++;
+	// Размер — длина конверта в UTF-8 (протокол, «Как считается размер»). Проверка до выдачи номера: сообщение,
+	// которое адаптер отверг бы с 413, не должно оставить дыру в seq (ревью #52, п. 1).
+	const int64 Seq = NextSeqOut;
 	Envelope->SetNumberField(TEXT("seq"), Seq);
-	Outgoing.Add({ Seq, ToJson(Envelope) });
+	FOutgoing Out;
+	Out.Seq = Seq;
+	AppendUtf8(Out.Utf8, ToJson(Envelope));
+	if (OutBytes) { *OutBytes = Out.Utf8.Num(); }
+	if (Out.Utf8.Num() > MaxMessageBytes)
+	{
+		++Stats.TooLarge;
+		FString Type;
+		Envelope->TryGetStringField(TEXT("type"), Type);
+		UE_LOG(LogFicsitAIChannel, Warning, TEXT("FicsitAI channel: %s is %d bytes, over the %d byte limit, not sent"), *Type, Out.Utf8.Num(), MaxMessageBytes);
+		return false;
+	}
+	++NextSeqOut;
+	Outgoing.Add(MoveTemp(Out));
 	++Stats.MessagesOut;
 	MaybePost();
+	return true;
 }
 
 void FFicsitAISidecarChannel::MaybePost()
@@ -615,43 +717,58 @@ void FFicsitAISidecarChannel::MaybePost()
 	const bool bAckDue = Ack > AckedIn && (Ack - AckedIn >= BufferMessages / 4 || Now - LastAckAt > 5.0);
 	if (Outgoing.Num() == 0 && !bAckDue) { return; }
 
-	FString Messages;
+	// Пачка: не больше MaxBatch сообщений и не больше 1 МиБ по сумме длин конвертов в UTF-8, без обёртки POST
+	// (протокол, «Как считается размер»). Отдельного поля для байтов пачки в рукопожатии нет: предел пачки
+	// равен maxMessageBytes. Каждый конверт в очереди уже не больше него, поэтому первый всегда помещается.
+	TArray<uint8> Payload;
+	AppendUtf8(Payload, FString::Printf(TEXT("{\"session\":\"%s\",\"ack\":%lld,\"messages\":["), *Session, Ack));
 	int32 Count = 0;
 	int64 Bytes = 0;
 	for (const FOutgoing& O : Outgoing)
 	{
-		if (Count >= MaxBatch || (Count > 0 && Bytes + O.Json.Len() > MaxMessageBytes)) { break; }
-		if (Count > 0) { Messages += TEXT(","); }
-		Messages += O.Json;
-		Bytes += O.Json.Len();
+		if (Count >= MaxBatch || (Count > 0 && Bytes + O.Utf8.Num() > MaxMessageBytes)) { break; }
+		if (Count > 0) { Payload.Add(','); }
+		Payload.Append(O.Utf8);
+		Bytes += O.Utf8.Num();
 		++Count;
 	}
-	const FString Body = FString::Printf(TEXT("{\"session\":\"%s\",\"ack\":%lld,\"messages\":[%s]}"), *Session, Ack, *Messages);
+	Payload.Add(']');
+	Payload.Add('}');
 	if (Count == 0) { ++Stats.AckOnlyPosts; }
 	++Stats.Posts;
 	bPostInFlight = true;
 	const uint64 Gen = Generation;
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Req = MakeRequest(TEXT("POST"), TEXT("/mod/send"));
-	Req->SetContentAsString(Body);
+	Req->SetContent(MoveTemp(Payload));
 	Req->SetTimeout(10.f);
 	TWeakPtr<FFicsitAISidecarChannel, ESPMode::ThreadSafe> Weak = AsShared();
 	Req->OnProcessRequestComplete().BindLambda([Weak, Gen, Ack](FHttpRequestPtr Rq, FHttpResponsePtr Rs, bool bOk)
 	{
 		if (auto C = Weak.Pin()) { C->OnPostDone(Rq, Rs, bOk, Gen, Ack); }
 	});
+	PostRequest = Req;
 	Req->ProcessRequest();
 }
 
 void FFicsitAISidecarChannel::OnPostDone(FHttpRequestPtr, FHttpResponsePtr Resp, bool bOk, uint64 Gen, int64 SentAck)
 {
-	if (Gen != Generation) { return; }
+	// После Stop() поколение другое и запрос отменён; проверка состояния — на случай, если завершение уже в очереди.
+	if (Gen != Generation || State == EFicsitAIChannelState::Stopped) { return; }
+	PostRequest.Reset();
 	bPostInFlight = false;
 	const int32 Code = Resp.IsValid() ? Resp->GetResponseCode() : 0;
 	if (Code == 410)
 	{
-		Session.Empty();
-		SetState(EFicsitAIChannelState::Connecting, TEXT("send: SESSION_UNKNOWN"));
-		SendHello();
+		RestartSession(TEXT("send: SESSION_UNKNOWN"));
+		return;
+	}
+	if (Code == 413 || Code == 400)
+	{
+		// Пачка собрана по правилам протокола, а адаптер её отверг: пределы разошлись (413) или наш ack впереди
+		// отправленного (400, Co-106). Выбросить сообщение нельзя — останется дыра в seq, и адаптер будет ждать
+		// её вечно. Поэтому новая сессия: ждущие запросы видят CHANNEL_RESET, а не тишину (ревью #52, п. 1).
+		UE_LOG(LogFicsitAIChannel, Error, TEXT("FicsitAI channel: send refused with HTTP %d %s, first seq %lld"), Code, *CodeOf(Resp), Outgoing.Num() ? Outgoing[0].Seq : 0);
+		RestartSession(FString::Printf(TEXT("send refused with HTTP %d"), Code));
 		return;
 	}
 	if (Code == 200 || Code == 409)
@@ -668,13 +785,6 @@ void FFicsitAISidecarChannel::OnPostDone(FHttpRequestPtr, FHttpResponsePtr Resp,
 			AckedIn = FMath::Max(AckedIn, SentAck);
 			LastAckAt = FPlatformTime::Seconds();
 		}
-		MaybePost();
-		return;
-	}
-	if (Code == 413 && Outgoing.Num() > 0)
-	{
-		UE_LOG(LogFicsitAIChannel, Error, TEXT("FicsitAI channel: message seq %lld over adapter limit, dropped"), Outgoing[0].Seq);
-		Outgoing.RemoveAt(0);
 		MaybePost();
 		return;
 	}
