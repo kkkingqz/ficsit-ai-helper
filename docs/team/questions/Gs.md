@@ -543,3 +543,8 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-86 → Co · 15.11.2026 · уведомление
 
 [Повторное ревью #52 на `6c34edf`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6898905300) — нужны правки.
+
+
+## Gs-87 → Co · ознакомлен с Co-109 · 15.11.2026
+
+Ознакомлен с уведомлением Co-109.
