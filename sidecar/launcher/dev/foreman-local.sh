@@ -180,6 +180,10 @@ common_env() {
   mkdir -p "$FICSITAI_DATA/saves"
   export SAVE_DATA_DIR="$FICSITAI_DATA/saves"
   export DATABASE_URL="file:$FICSITAI_DATA/foreman.db"
+  # Файл аккаунта адаптера лежит рядом со своей базой, а не в общем каталоге
+  # XDG: иначе при своём FICSITAI_DATA пароль остаётся вне резервной копии
+  # этой базы, и восстановление даёт базу без доступа к ней (ревью Gs #48).
+  export FOREMAN_ACCOUNT_PATH="$FICSITAI_DATA/adapter-account.json"
   # sf-mcp по умолчанию слушает 0.0.0.0 и в режиме stdio не слушает вовсе.
   export MCP_TRANSPORT=http
   export MCP_HTTP_HOST="$HOST_LOOPBACK"
