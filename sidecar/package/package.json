@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.test.json",
     "package": "tsx src/cli.ts",
     "package:linux": "tsx src/cli.ts --target=linux-x64",
     "package:win": "tsx src/cli.ts --target=win-x64",

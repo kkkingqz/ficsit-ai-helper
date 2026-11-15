@@ -1,14 +1,17 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
+import * as crypto from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
   BETTER_SQLITE3_WIN_URL,
+  EXPECTED_SHA256,
   getDefaultConfig,
   LOOPBACK,
   NODE_DOWNLOAD_URLS,
+  REPO_ROOT,
 } from "./config.js";
 import {
-  getLauncherJsCode,
+  getLauncherCjsCode,
   getReadmeTxt,
   getStartBat,
   getStartSh,
@@ -19,13 +22,50 @@ import {
 } from "./launcher-code.js";
 import type { PackageConfig, PackageResult, TargetPlatform } from "./types.js";
 
-function downloadFile(url: string, destPath: string): void {
+export function computeSha256(filePath: string): string {
+  const hash = crypto.createHash("sha256");
+  const data = fs.readFileSync(filePath);
+  hash.update(data);
+  return hash.digest("hex");
+}
+
+export function downloadFile(
+  url: string,
+  destPath: string,
+  expectedSha256?: string
+): void {
   fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  const baseName = path.basename(destPath);
+  const expectedHash = expectedSha256 ?? EXPECTED_SHA256[baseName];
+
   if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
-    return;
+    if (expectedHash) {
+      const actual = computeSha256(destPath);
+      if (actual === expectedHash) {
+        return;
+      }
+      console.warn(
+        `[WARN] Cached file ${baseName} SHA-256 mismatch (got ${actual}, expected ${expectedHash}), re-downloading...`
+      );
+      fs.unlinkSync(destPath);
+    } else {
+      return;
+    }
   }
+
   const tmpPath = `${destPath}.tmp.${Date.now()}`;
   execFileSync("curl", ["-sSL", "-f", "-o", tmpPath, url], { stdio: "inherit" });
+
+  if (expectedHash) {
+    const actual = computeSha256(tmpPath);
+    if (actual !== expectedHash) {
+      fs.unlinkSync(tmpPath);
+      throw new Error(
+        `SHA-256 verification failed for ${baseName}. Expected ${expectedHash}, got ${actual}`
+      );
+    }
+  }
+
   fs.renameSync(tmpPath, destPath);
 }
 
@@ -140,37 +180,141 @@ export function stageForemanPackages(
   }
 }
 
+/**
+ * Collects production runtime dependencies transitively starting from
+ * ff-server, sf-mcp, and adapter. Excludes dev-only tools (prisma CLI, @types,
+ * typescript, test frameworks, etc.) to keep archive minimal and secure.
+ */
+export function collectProductionDependencies(
+  foremanSrcDir: string,
+  adapterDir: string
+): string[] {
+  const nmDir = path.join(foremanSrcDir, "node_modules");
+  const visited = new Set<string>();
+  const queue: string[] = [];
+
+  function addDependenciesFromPkg(pkgJsonPath: string): void {
+    if (!fs.existsSync(pkgJsonPath)) return;
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgJsonPath, "utf-8"));
+      if (pkg.dependencies && typeof pkg.dependencies === "object") {
+        for (const dep of Object.keys(pkg.dependencies)) {
+          // Skip dev-only packages and TypeScript type definitions
+          if (dep.startsWith("@types/")) continue;
+          if (
+            dep === "prisma" ||
+            dep.startsWith("@prisma/studio") ||
+            dep.startsWith("@prisma/dev") ||
+            dep.startsWith("@prisma/engines")
+          ) {
+            continue;
+          }
+
+          if (dep.startsWith("@foreman/")) {
+            const internalDir = path.join(
+              foremanSrcDir,
+              "packages",
+              dep.replace("@foreman/", ""),
+              "package.json"
+            );
+            addDependenciesFromPkg(internalDir);
+          } else if (!visited.has(dep)) {
+            visited.add(dep);
+            queue.push(dep);
+          }
+        }
+      }
+    } catch {
+      // Ignore unparseable package.json
+    }
+  }
+
+  // Seed strictly from the backend packages and adapter
+  addDependenciesFromPkg(path.join(foremanSrcDir, "packages/ff-server/package.json"));
+  addDependenciesFromPkg(path.join(foremanSrcDir, "packages/sf-mcp/package.json"));
+  addDependenciesFromPkg(path.join(adapterDir, "package.json"));
+
+  // Also check sf-core, sf-flow, sf-game-data, sf-save-data
+  const internalNames = [
+    "sf-core",
+    "sf-present",
+    "sf-game-data",
+    "sf-game-data-graph",
+    "sf-save-data",
+    "sf-save-data-graph",
+    "sf-flow",
+  ];
+  for (const name of internalNames) {
+    addDependenciesFromPkg(
+      path.join(foremanSrcDir, "packages", name, "package.json")
+    );
+  }
+
+  // Transitively resolve all child dependencies
+  while (queue.length > 0) {
+    const dep = queue.shift()!;
+    const depPkgJson = path.join(nmDir, dep, "package.json");
+    if (fs.existsSync(depPkgJson)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(depPkgJson, "utf-8"));
+        if (pkg.dependencies && typeof pkg.dependencies === "object") {
+          for (const nextDep of Object.keys(pkg.dependencies)) {
+            if (nextDep.startsWith("@types/")) continue;
+            if (
+              nextDep === "prisma" ||
+              nextDep.startsWith("@prisma/studio") ||
+              nextDep.startsWith("@prisma/dev") ||
+              nextDep.startsWith("@prisma/engines")
+            ) {
+              continue;
+            }
+            if (!visited.has(nextDep) && !nextDep.startsWith("@foreman/")) {
+              visited.add(nextDep);
+              queue.push(nextDep);
+            }
+          }
+        }
+      } catch {
+        // Ignore unparseable package.json
+      }
+    }
+  }
+
+  return Array.from(visited).sort();
+}
+
 export function stageProductionModules(
   foremanSrcDir: string,
   appNodeModulesDir: string,
   target: TargetPlatform,
-  cacheDir: string
+  cacheDir: string,
+  adapterDir?: string
 ): void {
   const srcNm = path.join(foremanSrcDir, "node_modules");
   fs.mkdirSync(appNodeModulesDir, { recursive: true });
 
-  const EXCLUDED_DIRS = new Set([
-    "typescript",
-    "@typescript",
-    "vitest",
-    "@vitest",
-    "eslint",
-    "@eslint",
-    "prettier",
-    "tsx",
-    "esbuild",
-    "@esbuild",
-    "@rolldown",
-    "@foreman",
-    ".bin",
-    ".cache",
-  ]);
+  const effectiveAdapterDir =
+    adapterDir || path.resolve(REPO_ROOT, "sidecar/adapter");
+  const productionPackages = collectProductionDependencies(
+    foremanSrcDir,
+    effectiveAdapterDir
+  );
 
-  for (const entry of fs.readdirSync(srcNm)) {
-    if (EXCLUDED_DIRS.has(entry)) continue;
-    const srcPath = path.join(srcNm, entry);
-    const destPath = path.join(appNodeModulesDir, entry);
+  for (const dep of productionPackages) {
+    const srcPath = path.join(srcNm, dep);
+    if (!fs.existsSync(srcPath)) continue;
+
+    const destPath = path.join(appNodeModulesDir, dep);
+    fs.mkdirSync(path.dirname(destPath), { recursive: true });
     fs.cpSync(srcPath, destPath, { recursive: true });
+  }
+
+  // Copy generated .prisma runtime client (required by @prisma/client)
+  const srcPrismaClient = path.join(foremanSrcDir, "node_modules", ".prisma");
+  if (fs.existsSync(srcPrismaClient)) {
+    const destPrismaClient = path.join(appNodeModulesDir, ".prisma");
+    fs.mkdirSync(destPrismaClient, { recursive: true });
+    fs.cpSync(srcPrismaClient, destPrismaClient, { recursive: true });
   }
 
   // Note: better-sqlite3 native addon replacement for Windows
@@ -199,6 +343,41 @@ export function stageProductionModules(
       path.join(targetReleaseDir, "better_sqlite3.node")
     );
     fs.rmSync(tmpExtract, { recursive: true, force: true });
+  }
+}
+
+export function verifyAdapterDependencies(
+  adapterDir: string,
+  appNodeModulesDir: string
+): void {
+  const adapterPkgPath = path.join(adapterDir, "package.json");
+  if (!fs.existsSync(adapterPkgPath)) {
+    throw new Error(`adapter/package.json not found at ${adapterPkgPath}`);
+  }
+  const adapterPkg = JSON.parse(fs.readFileSync(adapterPkgPath, "utf-8"));
+  const requiredDeps: Record<string, string> = adapterPkg.dependencies || {};
+
+  for (const [dep, reqRange] of Object.entries(requiredDeps)) {
+    const installedPkgPath = path.join(appNodeModulesDir, dep, "package.json");
+    if (!fs.existsSync(installedPkgPath)) {
+      throw new Error(
+        `Adapter dependency '${dep}' is missing from staged node_modules (${installedPkgPath})`
+      );
+    }
+    const installedPkg = JSON.parse(fs.readFileSync(installedPkgPath, "utf-8"));
+    const installedVersion: string = installedPkg.version || "";
+
+    const reqMajorMatch = reqRange.match(/\d+/);
+    const instMajorMatch = installedVersion.match(/\d+/);
+    if (
+      reqMajorMatch &&
+      instMajorMatch &&
+      reqMajorMatch[0] !== instMajorMatch[0]
+    ) {
+      throw new Error(
+        `Adapter dependency '${dep}' version mismatch: requested range ${reqRange}, installed ${installedVersion}`
+      );
+    }
   }
 }
 
@@ -251,6 +430,49 @@ export function deployCleanDatabase(
   );
 }
 
+export function verifyLinuxNode(
+  stageDir: string
+): { success: boolean; details: string } {
+  const nodeBin = path.join(stageDir, "runtime", "node");
+  if (!fs.existsSync(nodeBin)) {
+    return { success: false, details: `runtime/node not found in ${stageDir}` };
+  }
+
+  try {
+    const verOutput = execFileSync(nodeBin, ["-v"], {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    }).trim();
+
+    const appDir = path.join(stageDir, "app");
+    const testScript =
+      "const db = require('better-sqlite3')(':memory:'); const row = db.prepare('SELECT 1 + 1 as res').get(); if (row.res !== 2) throw new Error('mismatch'); console.log('LINUX_SQLITE_OK_RES_' + row.res);";
+
+    const testOutput = execFileSync(nodeBin, ["-e", testScript], {
+      cwd: appDir,
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+
+    if (testOutput.includes("LINUX_SQLITE_OK_RES_2")) {
+      return {
+        success: true,
+        details: `Linux portable Node verified successfully: Node ${verOutput}, SQLite in-memory query OK`,
+      };
+    } else {
+      return {
+        success: false,
+        details: `Linux verification output mismatch: ${testOutput}`,
+      };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      details: `Linux portable Node verification failed: ${err.message || String(err)}`,
+    };
+  }
+}
+
 export function stagePackage(
   target: TargetPlatform,
   customConfig?: Partial<PackageConfig>
@@ -281,12 +503,13 @@ export function stagePackage(
   // 2. Foreman packages
   stageForemanPackages(config.foremanSrcDir, appNodeModulesDir);
 
-  // 3. Production node_modules
+  // 3. Production node_modules (whitelist-based, no dev tools)
   stageProductionModules(
     config.foremanSrcDir,
     appNodeModulesDir,
     target,
-    config.cacheDir
+    config.cacheDir,
+    config.adapterDir
   );
 
   // 4. Adapter and save-source
@@ -301,8 +524,45 @@ export function stagePackage(
   const destDb = path.join(dataDir, "foreman.db");
   deployCleanDatabase(config.foremanSrcDir, destDb);
 
-  // 6. Scripts and launchers
-  fs.writeFileSync(path.join(stageDir, "launcher.js"), getLauncherJsCode());
+  // 6. Copy system prompt template
+  const systemPromptSrc = path.resolve(
+    REPO_ROOT,
+    "third_party/foreman/SYSTEM_PROMPT.md"
+  );
+  if (!fs.existsSync(systemPromptSrc)) {
+    throw new Error(`SYSTEM_PROMPT.md not found at ${systemPromptSrc}`);
+  }
+  const promptDestForeman = path.join(stageDir, "app/foreman/SYSTEM_PROMPT.md");
+  fs.mkdirSync(path.dirname(promptDestForeman), { recursive: true });
+  fs.copyFileSync(systemPromptSrc, promptDestForeman);
+
+  const promptDestServerPkg = path.join(
+    appNodeModulesDir,
+    "@foreman/ff-server/SYSTEM_PROMPT.md"
+  );
+  fs.mkdirSync(path.dirname(promptDestServerPkg), { recursive: true });
+  fs.copyFileSync(systemPromptSrc, promptDestServerPkg);
+
+  fs.copyFileSync(systemPromptSrc, path.join(stageDir, "app/SYSTEM_PROMPT.md"));
+
+  // 7. Validate adapter dependencies against staged node_modules
+  verifyAdapterDependencies(config.adapterDir, appNodeModulesDir);
+
+  // 8. Root package.json declaring CommonJS module scope
+  const rootPkg = {
+    name: "ficsitai-sidecar",
+    version: "0.1.0",
+    private: true,
+    type: "commonjs",
+    description: "FICSIT AI Sidecar self-contained runtime",
+  };
+  fs.writeFileSync(
+    path.join(stageDir, "package.json"),
+    JSON.stringify(rootPkg, null, 2) + "\n"
+  );
+
+  // 9. Scripts and launchers
+  fs.writeFileSync(path.join(stageDir, "launcher.cjs"), getLauncherCjsCode());
   fs.writeFileSync(path.join(stageDir, "start.sh"), getStartSh());
   fs.writeFileSync(path.join(stageDir, "stop.sh"), getStopSh());
   fs.writeFileSync(path.join(stageDir, "status.sh"), getStatusSh());
@@ -314,6 +574,14 @@ export function stagePackage(
   fs.chmodSync(path.join(stageDir, "start.sh"), 0o755);
   fs.chmodSync(path.join(stageDir, "stop.sh"), 0o755);
   fs.chmodSync(path.join(stageDir, "status.sh"), 0o755);
+
+  // 10. Self-verify native addon loading for Linux
+  if (target === "linux-x64") {
+    const linuxVerify = verifyLinuxNode(stageDir);
+    if (!linuxVerify.success) {
+      throw new Error(`Linux verification failed: ${linuxVerify.details}`);
+    }
+  }
 
   return stageDir;
 }
@@ -370,7 +638,8 @@ export function verifyWine(stageDir: string): { success: boolean; details: strin
 
     // 2. Verify better-sqlite3 loads under wine by redirecting to log file
     const appDir = path.join(stageDir, "app");
-    const testScript = "const db = require('better-sqlite3')(':memory:'); const row = db.prepare('SELECT 1 + 1 as res').get(); if (row.res !== 2) throw new Error('mismatch'); console.log('WINE_SQLITE_OK_RES_' + row.res);";
+    const testScript =
+      "const db = require('better-sqlite3')(':memory:'); const row = db.prepare('SELECT 1 + 1 as res').get(); if (row.res !== 2) throw new Error('mismatch'); console.log('WINE_SQLITE_OK_RES_' + row.res);";
 
     execFileSync(
       "bash",

@@ -1,8 +1,13 @@
 export function getLauncherJsCode(): string {
+  return getLauncherCjsCode();
+}
+
+export function getLauncherCjsCode(): string {
   return `#!/usr/bin/env node
 /**
  * FICSIT AI Sidecar Launcher (S5-lite)
  * Manages the 3 sidecar processes strictly on loopback (127.0.0.1).
+ * CommonJS format (.cjs) guarantees compatibility across ES module and CommonJS parent packages.
  * Cross-platform: runs on Linux and Windows (and Wine) via bundled portable Node 22.
  */
 const fs = require('node:fs');
@@ -185,10 +190,11 @@ async function cmdStart() {
     LLM_API_KEY: apiKey,
     DATABASE_URL: \`file:\${DB_FILE}\`,
     SAVE_DATA_DIR: SAVES_DIR,
+    SYSTEM_PROMPT_PATH: path.join(ROOT_DIR, 'app/foreman/SYSTEM_PROMPT.md'),
+    FOREMAN_ACCOUNT_PATH: path.join(DATA_DIR, 'adapter-account.json'),
     MCP_URL: \`http://\${HOST}:\${ADAPTER_PORT}/mcp?token=\${token}\`,
     SF_MCP_URL: \`http://\${HOST}:\${SF_MCP_PORT}/mcp\`,
     FOREMAN_BASE_URL: \`http://\${HOST}:\${FF_SERVER_PORT}\`,
-    NODE_PATH: path.join(ROOT_DIR, 'app/node_modules'),
   };
 
   console.log('Starting FICSIT AI Sidecar processes on 127.0.0.1...');
@@ -295,7 +301,11 @@ export function getStartSh(): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
 DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-exec "$DIR/runtime/node" "$DIR/launcher.js" start "$@"
+if [ $# -eq 0 ]; then
+  exec "$DIR/runtime/node" "$DIR/launcher.cjs" start
+else
+  exec "$DIR/runtime/node" "$DIR/launcher.cjs" "$@"
+fi
 `;
 }
 
@@ -303,7 +313,7 @@ export function getStopSh(): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
 DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-exec "$DIR/runtime/node" "$DIR/launcher.js" stop "$@"
+exec "$DIR/runtime/node" "$DIR/launcher.cjs" stop "$@"
 `;
 }
 
@@ -311,28 +321,35 @@ export function getStatusSh(): string {
   return `#!/usr/bin/env bash
 set -euo pipefail
 DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
-exec "$DIR/runtime/node" "$DIR/launcher.js" status "$@"
+exec "$DIR/runtime/node" "$DIR/launcher.cjs" status "$@"
 `;
 }
 
 export function getStartBat(): string {
   return `@echo off
+setlocal
 set "DIR=%~dp0"
-"%DIR%runtime\\node.exe" "%DIR%launcher.js" start %*
+if "%~1"=="" (
+  "%DIR%runtime\\node.exe" "%DIR%launcher.cjs" start
+) else (
+  "%DIR%runtime\\node.exe" "%DIR%launcher.cjs" %*
+)
 `;
 }
 
 export function getStopBat(): string {
   return `@echo off
+setlocal
 set "DIR=%~dp0"
-"%DIR%runtime\\node.exe" "%DIR%launcher.js" stop %*
+"%DIR%runtime\\node.exe" "%DIR%launcher.cjs" stop %*
 `;
 }
 
 export function getStatusBat(): string {
   return `@echo off
+setlocal
 set "DIR=%~dp0"
-"%DIR%runtime\\node.exe" "%DIR%launcher.js" status %*
+"%DIR%runtime\\node.exe" "%DIR%launcher.cjs" status %*
 `;
 }
 
@@ -347,7 +364,7 @@ Includes portable Node.js 22, Foreman (ff-server + sf-mcp), and FICSIT AI adapte
 Quick Start:
 1. Windows:
    - Run: start.bat
-   - To configure LLM key: run "runtime\\node.exe launcher.js set-key"
+   - To configure LLM key: run "start.bat set-key"
      (or place your key into data\\llm.key)
    - To stop: run stop.bat
    - To check status: run status.bat

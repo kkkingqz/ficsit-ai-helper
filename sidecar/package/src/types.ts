@@ -20,9 +20,14 @@ export interface PackageResult {
 }
 
 export interface ForemanPin {
+  $comment?: string;
   repository: string;
   commit: string;
   commitDate: string;
+  commitSubject?: string;
+  pinnedAt?: string;
+  pinnedBy?: string;
+  license: string;
   runtime: {
     node: string;
     nodeVerified: string;
@@ -35,4 +40,6 @@ export interface ForemanPin {
     "ff-server": number;
     "ff-client": number;
   };
+  localCheckout?: string;
+  updatePolicy?: string;
 }
