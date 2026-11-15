@@ -88,12 +88,14 @@
   <text class="big" x="682" y="923.5" text-anchor="middle" font-size="34">1.20 GW</text>
   <text class="annd" x="116" y="1164">Одинаковые данные на обоих ракурсах — иначе сверка проверяет не читаемость, а совпадение чисел.</text>
   <text class="capo" x="1000" y="706">D · СОСТОЯНИЯ ЭКРАНА В МИРЕ</text>
-  <text class="ann" x="1000" y="1224">Без питания меш не рендерит экран вовсе — это не чёрная картинка,</text>
-  <text class="ann" x="1000" y="1246">а отсутствие обновления render target (§6.6). Кэш переживает перезапуск (§10.1).</text>
+  <text class="ann" x="1000" y="1224">На резервном питании экран показывает статичную картинку с ошибкой на</text>
+  <text class="ann" x="1000" y="1246">приглушённой яркости: один рендер, без полосы статуса и без живого браузера.</text>
   <rect class="panel" x="1000" y="720" width="840" height="472"/>
   <text class="ts" x="1030" y="786">НЕТ ПИТАНИЯ</text>
-  <rect class="" x="1030" y="800" width="240" height="135" fill="#050C14" stroke="#16304A" stroke-width="2"/>
-  <text class="bigd" x="1150" y="872.5" text-anchor="middle" font-size="30">—</text>
+  <rect class="" x="1030" y="800" width="240" height="135" fill="#0A1724" stroke="#16304A" stroke-width="2"/>
+  <text class="cap" x="1150" y="855.5" text-anchor="middle" font-size="19" style="fill:#8FA9BF">NO POWER</text>
+  <text class="tt" x="1150" y="879.5" text-anchor="middle">This terminal requires 10 MW</text>
+  <text class="tt" x="1150" y="901.5" text-anchor="middle" font-size="10">Notes and screens are not lost</text>
   <text class="ts" x="1292" y="786">ИНЕРТЕН</text>
   <rect class="inner" x="1292" y="800" width="240" height="135"/>
   <rect class="" x="1292" y="800" width="240" height="12" fill="#0E2032" stroke="none"/>
@@ -104,10 +106,10 @@
   <rect class="" x="1554" y="800" width="240" height="12" fill="#0E2032" stroke="none"/>
   <text class="cap" x="1674" y="867.5" text-anchor="middle" font-size="14">NO CONTENT YET</text>
   <text class="tt" x="1674" y="889.5" text-anchor="middle">open with E to start</text>
-  <text class="ann" x="1030" y="988">Кэш по ключу saveId + screenId + renderRevision (§10.1): после перезапуска игры терминал</text>
-  <text class="ann" x="1030" y="1010">показывает последнюю картинку до первого снимка телеметрии, а метка свежести в полосе</text>
-  <text class="ann" x="1030" y="1032">статуса честно говорит её возраст. Пустого терминала без объяснения не бывает.</text>
-  <text class="annd" x="1030" y="1072">Яркость и контраст в мире выше, чем в окне: экран светится в тёмном цеху и читается</text>
-  <text class="annd" x="1030" y="1094">под углом. Это настройка материала, а не второй набор токенов.</text>
+  <text class="ann" x="1030" y="988">Последняя рабочая картинка на обесточенном терминале не показывается: кэш §10.1 — для</text>
+  <text class="ann" x="1030" y="1010">терминала, который ещё не получал содержимого. Показать кэш вместо NO POWER значит</text>
+  <text class="ann" x="1030" y="1032">оставить старые цифры на мёртвом экране, и игрок прочитает их как живые.</text>
+  <text class="annd" x="1030" y="1072">Яркость и контраст в мире выше, чем в окне: экран светится в тёмном цеху и читается под углом.</text>
+  <text class="annd" x="1030" y="1094">На резерве яркость наоборот ниже рабочей. И то и другое — настройка материала, а не второй набор токенов.</text>
   <text class="annd" x="80" y="1266">Сверка с ассетом art/command-center — S7, неделя 5. Проверяется посадка композиции на меш, а не содержимое экрана.</text>
 </svg>

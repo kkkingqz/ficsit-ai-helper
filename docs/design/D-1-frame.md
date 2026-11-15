@@ -117,7 +117,7 @@ lang: ru-RU
 
 Оба состояния уже есть в эскизе интерфейсов как `EFicsitAIHostState::NoPower` и `::Inert`, и в обоих `OpenModule` возвращает `false` — то есть каркас с его рельсом и полосами в этих состояниях не рисуется вообще, а не показывается пустым.
 
-**A. Нет питания** (§6.1). Терминал потребляет 10 MW; без питания экран в мире не рендерится, а по `E` открывается только статус. Текст: `NO POWER` / `This terminal requires 10 MW` / `Connect it to a powered grid to use the screens`, мелкой строкой — `Notes, screens and work orders are not lost`. Последняя строка обязательна: игрок, у которого погас терминал, должен сразу знать, что его заметки и экраны целы.
+**A. Нет питания** (§6.1). Терминал потребляет 10 MW; без питания по `E` открывается только статус, а экран в мире показывает ту же картинку статично, на приглушённой яркости — у терминала есть минимальное резервное питание (решение King 15.11.2026, [D-1-world-screen §3.1](D-1-world-screen.md)). Текст: `NO POWER` / `This terminal requires 10 MW` / `Connect it to a powered grid to use the screens`, мелкой строкой — `Notes, screens and work orders are not lost`. Последняя строка обязательна: игрок, у которого погас терминал, должен сразу знать, что его заметки и экраны целы.
 
 **B. Инертный режим** (§4.2, AC-10). Сессия загружена как мультиплеерная или вошёл удалённый игрок: UI закрыт, связь с адаптером разорвана. Текст: `UNAVAILABLE IN MULTIPLAYER` / `Another player is in this session` / `The mod is inert: screens are closed and the sidecar link is dropped`, мелкой строкой — `Work resumes on its own once remote players leave`. Кнопки «повторить» нет: режим снимается уходом игроков, а не действием игрока.
 
