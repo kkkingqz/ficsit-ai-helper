@@ -14,7 +14,7 @@ if (selectedView === "statistics") {
   let tab = params.get("tab") === "resources" ? "resources" : "energy";
   let window = 15;
   let selected = "GEN-02";
-  const toggled = new Map();
+  const selectedMetrics = new Map();
   let notice;
   const statistics = mountStatistics(root, {
     ...statisticsOptions,
@@ -23,8 +23,10 @@ if (selectedView === "statistics") {
       tab(value) { tab = value; selected = value === "energy" ? "GEN-02" : "iron"; render(); },
       window(value) { window = value; render(); },
       selectMetric(id) {
-        const metric = statisticsFixture(tab, window).metrics.find(metric => metric.id === id);
-        toggled.set(id, !(toggled.get(id) ?? metric.selected));
+        const items = statisticsFixture(tab, window, selected, selectedMetrics.get(tab)).metrics;
+        const chosen = items.find(item => item.id === id);
+        const kept = items.filter(item => item.id !== id && item.selected && item.unit === chosen.unit);
+        selectedMetrics.set(tab, [...kept.map(item => item.id), ...(chosen.selected ? [] : [id])]);
         render();
       },
       selectObject(id) { selected = id; render(); },
@@ -32,12 +34,8 @@ if (selectedView === "statistics") {
     },
   });
   function render() {
-    const model = statisticsFixture(tab, window, selected);
-    statistics.update({
-      ...model,
-      notice,
-      metrics: model.metrics.map(metric => ({ ...metric, selected: toggled.get(metric.id) ?? metric.selected })),
-    });
+    const model = statisticsFixture(tab, window, selected, selectedMetrics.get(tab));
+    statistics.update({ ...model, notice });
   }
   render();
 } else {

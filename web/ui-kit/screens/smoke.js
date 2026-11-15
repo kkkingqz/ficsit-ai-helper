@@ -31,10 +31,11 @@ try {
     target.textContent.includes("35 min of session history available"),
     "Resources shows liquids and the partial session");
   target.querySelector("[data-export]").click();
-  const metricQuery = target.querySelector("[data-metric-search]");
+  const visibleReport = target.querySelector(".d2-stats-report:not([hidden])");
+  const metricQuery = visibleReport.querySelector("[data-metric-search]");
   metricQuery.value = "water";
   metricQuery.dispatchEvent(new Event("input", { bubbles: true }));
-  const metric = [...target.querySelectorAll("[data-metric]")].find(item => !item.hidden);
+  const metric = [...visibleReport.querySelectorAll("[data-metric]")].find(item => !item.hidden);
   assert(metric?.textContent.includes("Water"), "Metrics can be searched");
   metric.querySelector("button").click();
   assert(events.some(([name, value]) => name === "window" && value === 60) &&
@@ -63,6 +64,11 @@ try {
   assert(!events.some(([name]) => name === "send"), "Shift+Enter and IME composition preserve editing");
   pressEnter();
   assert(events.some(([name, value]) => name === "send" && value === draft.value), "Enter delegates send");
+  const sends = events.filter(([name]) => name === "send").length;
+  chat.update({ ...chatFixture("empty"), draft: draft.value, sending: true });
+  pressEnter();
+  assert(events.filter(([name]) => name === "send").length === sends &&
+    target.querySelector("[data-stop]").hidden, "Pending sends cannot be repeated and cannot be cancelled yet");
   const streaming = chatFixture("streaming");
   chat.update(streaming);
   const answer = target.querySelector('[data-role="assistant"]');

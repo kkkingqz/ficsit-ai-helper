@@ -74,7 +74,11 @@
   --d2-scroll-height: 160px;
 }
 .d2-metric-options button { inline-size: 100%; text-align: start; }
-.d2-metric-options button[aria-pressed="true"] { border-color: var(--d2-accent); }
+.d2-metric-options button[aria-pressed="true"] {
+  border-color: var(--d2-accent);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .d2-chat-view {
   display: grid;

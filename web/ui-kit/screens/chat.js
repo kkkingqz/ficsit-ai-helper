@@ -75,7 +75,7 @@ export function mountChat(root, { presenter, copy, actions }) {
   let current;
 
   function syncSend() {
-    send.disabled = !current?.connected || current.streaming || Boolean(current.rateLimit) || !draft.value.trim();
+    send.disabled = !current?.connected || current.sending || current.streaming || Boolean(current.rateLimit) || !draft.value.trim();
   }
 
   function onDraft() {
@@ -113,9 +113,10 @@ export function mountChat(root, { presenter, copy, actions }) {
 
       composer.hidden = !model.connected;
       offline.hidden = model.connected;
-      stream.hidden = !model.streaming;
+      stream.hidden = !model.streaming && !model.sending;
+      stop.hidden = !model.streaming;
       stop.disabled = !model.streaming;
-      const streamingLabel = model.streaming ? copy.streaming(model.backKey) : "";
+      const streamingLabel = model.streaming ? copy.streaming(model.backKey) : model.sending ? copy.sending : "";
       if (streamText.textContent !== streamingLabel) streamText.textContent = streamingLabel;
       problem.hidden = !model.error;
       const errorText = model.error?.text ?? "";

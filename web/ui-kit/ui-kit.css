@@ -274,4 +274,7 @@
   font: inherit;
   cursor: pointer;
 }
-.d2-row-button[aria-pressed="true"] { border-block-end-color: var(--d2-accent); }
+.d2-row-button[aria-pressed="true"] {
+  border-block-end-color: var(--d2-accent);
+  font-weight: 700;
+}

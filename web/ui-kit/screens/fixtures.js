@@ -65,14 +65,23 @@ function generatorGroups(selected) {
   }));
 }
 
-const catalog = [
-  { id: "power.production", label: "Power production", hasSeries: true, selected: true },
-  { id: "power.consumption", label: "Power consumption", hasSeries: true, selected: true },
-  { id: "iron.production", label: "Iron ore production", hasSeries: true, selected: false },
-  { id: "water.production", label: "Water production", hasSeries: true, selected: false },
-];
+const catalog = {
+  energy: [
+    { id: "power.production", label: "Power production", unit: "megawatt", selected: true },
+    { id: "power.consumption", label: "Power consumption", unit: "megawatt", selected: true },
+  ],
+  resources: [
+    { id: "iron.production", label: "Iron ore production", unit: "itemsPerMinute", selected: true },
+    { id: "copper.production", label: "Copper ore production", unit: "itemsPerMinute", selected: true },
+    { id: "water.production", label: "Water production", unit: "cubicMetersPerMinute", selected: false },
+  ],
+};
 
-export function statisticsFixture(tab, window, selected = "GEN-02") {
+export function statisticsFixture(tab, window, selected = "GEN-02", selectedMetrics) {
+  const metrics = catalog[tab].map(metric => ({
+    ...metric, hasSeries: true, selected: selectedMetrics?.includes(metric.id) ?? metric.selected,
+  }));
+  const active = id => metrics.some(metric => metric.id === id && metric.selected);
   const end = 2100;
   const start = end - window * 60;
   const samples = Array.from({ length: (end - Math.max(0, start)) / 5 + 1 }, (_, index) =>
@@ -81,7 +90,7 @@ export function statisticsFixture(tab, window, selected = "GEN-02") {
     start, end, series, state: start < 0 ? { ...fresh, detail: "35 min of session history available" } : fresh,
   });
   const base = {
-    tab, window, canExport: true, freshness: [{ label: fresh.label, kind: fresh.kind }], metrics: catalog,
+    tab, window, canExport: true, freshness: [{ label: fresh.label, kind: fresh.kind }], metrics,
   };
 
   if (tab === "energy") {
@@ -94,10 +103,10 @@ export function statisticsFixture(tab, window, selected = "GEN-02") {
         ].map(([id, label]) => tile(id, label, power[id])),
         tile("generators", "Generators online", read(9, "items"))],
       charts: [chart([
-        series("production", "Generation", power.generation, samples, 39),
-        series("consumption", "Consumption", power.consumption, samples, 22),
+        active("power.production") && series("production", "Generation", power.generation, samples, 39),
+        active("power.consumption") && series("consumption", "Consumption", power.consumption, samples, 22),
         series("capacity", "Capacity", power.capacity, samples, 0),
-      ])],
+      ].filter(Boolean))],
       tables: [
         panel(generatorGroups(selected)),
         panel(groups("grid", [
@@ -129,7 +138,7 @@ export function statisticsFixture(tab, window, selected = "GEN-02") {
       tile("stock", "Iron ore stock", read(iron.stock, "items")),
     ],
     charts: [
-      chart(resources.slice(0, 2).map(item =>
+      chart(resources.filter(item => active(`${item.id}.production`)).map(item =>
         series(item.id, item.name, read(item.production, item.unit), samples, 28))),
       chart(resources.slice(0, 2).map(item =>
         series(item.id, item.name, read(item.consumption, item.unit), samples, 18))),
@@ -167,6 +176,7 @@ export const chatOptions = {
     offlineDetail: "Start the sidecar and reopen Chat. Connection retries automatically.",
     offlineScope: "Statistics, Notes, Screens and Lines keep working.",
     streaming: backKey => `Streaming… ${backKey} stops the answer`,
+    sending: "Sending request…",
     stop: "Stop", retry: "Retry", draftLabel: "Message", send: "Send",
     sendHint: "Enter to send · Shift+Enter for a new line",
     prompts: [
