@@ -99,13 +99,26 @@ try {
     "Empty charts retain the plotting area");
   cases.style.setProperty("--d2-scale", "1.5");
   draw(5, "fresh", [{ ...series[0], values: [1_000_000, 2_000_000, 3_000_000] }]);
-  await new Promise(resolve => requestAnimationFrame(resolve));
+  await Promise.resolve();
   const measure = document.createElement("canvas").getContext("2d");
   measure.font = getComputedStyle(chart.element.querySelector(".d2-plot")).font;
   const tickWidth = measure.measureText(localized.number(3_000_000, 0)).width;
   assert(plot.bbox.left / window.devicePixelRatio >= tickWidth + 10,
     `A scaled chart reserves enough room for large localized axis labels (${plot.bbox.left} vs ${tickWidth})`);
   cases.style.removeProperty("--d2-scale");
+  draw(15);
+  await Promise.resolve();
+  const chartCanvas = chart.element.querySelector("canvas");
+  const chartHeight = chart.element.offsetHeight;
+  const chartBounds = [chartCanvas.width, chartCanvas.height];
+  for (const phase of ["stale", "fresh"]) {
+    draw(15, phase);
+    await Promise.resolve();
+    assert(chart.element.dataset.state === phase && chart.element.offsetHeight === chartHeight &&
+      chart.element.querySelector("canvas") === chartCanvas &&
+      chartCanvas.width === chartBounds[0] && chartCanvas.height === chartBounds[1],
+      "Freshness changes must preserve chart geometry and canvas");
+  }
   chart.destroy();
 
   const table = metricTable(presenter, { title: "Generators by type", columns: [
@@ -126,6 +139,16 @@ try {
     "A snapshot must preserve scroll, focus and row identity");
   assert(Math.abs(table.element.querySelector("thead").getBoundingClientRect().top -
     viewport.getBoundingClientRect().top) < 2, "The column header must stick to the scroller");
+
+  const tableHeight = table.element.offsetHeight;
+  const viewportHeight = viewport.clientHeight;
+  for (const next of [{ kind: "stale", label: "Updated 48 s ago" }, state]) {
+    table.update({ state: next, groups: [group] });
+    assert(table.element.dataset.state === next.kind && table.element.offsetHeight === tableHeight &&
+      viewport.clientHeight === viewportHeight && viewport.scrollTop === 100 &&
+      document.activeElement === viewport && first === table.element.querySelector("tr[data-row]"),
+      "Freshness changes must preserve table layout, scroll, focus and rows");
+  }
 
   table.update({ state, groups: [{ ...group, rows: [
     { ...rows[0], cells: ["Generator 0", { reading, trend: {
