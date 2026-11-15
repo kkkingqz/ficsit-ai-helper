@@ -590,7 +590,7 @@ describe("замечания ревью Gs на #50", () => {
   });
 });
 
-describe("повторное ревью Gs на #50", () => {
+describe("третий круг ревью Gs на #50", () => {
   const healthOf = async (base: string): Promise<{ hiddenTools: string[] }> =>
     (await (await fetch(`${base}/health`)).json()) as { hiddenTools: string[] };
 
@@ -601,21 +601,15 @@ describe("повторное ревью Gs на #50", () => {
       res.end(JSON.stringify({ id: playthroughIdFor(SAVE_ID) }));
     });
 
-  it("FICSITAI_WHITELIST=off доходит до настроек, а не теряется по пути", () => {
-    const env = { ADAPTER_TOKEN: TOKEN } as NodeJS.ProcessEnv;
-    // Поле в схеме было, чтения из окружения — нет: штатный запуск со штатным
-    // промптом Foreman всё равно шёл с белым списком.
-    expect(loadConfig({ ...env, FICSITAI_WHITELIST: "off" }).whitelist).toBe(false);
-    expect(loadConfig({ ...env, FICSITAI_WHITELIST: "on" }).whitelist).toBe(true);
-    expect(loadConfig(env).whitelist).toBe(true);
-    expect(() => loadConfig({ ...env, FICSITAI_WHITELIST: "может быть" })).toThrow(/whitelist/);
-  });
+  it("белый список не выключается окружением (Co-104)", async () => {
+    const config = loadConfig({
+      ADAPTER_TOKEN: TOKEN,
+      FICSITAI_WHITELIST: "off",
+    } as NodeJS.ProcessEnv);
+    // Поля больше нет: у штатного адаптера фильтр не отключается ничем.
+    expect((config as Record<string, unknown>).whitelist).toBeUndefined();
 
-  it("при выключенном списке адаптер не прячет инструменты", async () => {
-    const off = await adapterFor(await idle(), { FICSITAI_WHITELIST: "off" });
-    expect((await healthOf(off)).hiddenTools).toEqual([]);
-
-    const on = await adapterFor(await idle());
-    expect((await healthOf(on)).hiddenTools.length).toBeGreaterThan(0);
+    const base = await adapterFor(await idle(), { FICSITAI_WHITELIST: "off" });
+    expect((await healthOf(base)).hiddenTools.length).toBeGreaterThan(0);
   });
 });
