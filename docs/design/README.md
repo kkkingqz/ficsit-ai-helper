@@ -7,7 +7,7 @@ UX-поставки Co3 по задаче [D-1 (#33)](https://github.com/kkkingq
 | [D-1-frame.md](D-1-frame.md) | Каркас терминала: меню, полосы, состояния, ввод, токены для D-2 | неделя 1 — сдан |
 | [D-1-screens.md](D-1-screens.md) | «Статистика» (энергия и ресурсы) и «Чат с ИИ» | неделя 2 — сдан |
 | [asset-command-center-check.md](asset-command-center-check.md) | Проверка надписей и локализации в ассете `art/command-center` | 10.11.2026 — закрыт |
-| `D-1-states.md` | Лист состояний: пять состояний панели на одной сетке, сайдкар не подключён, пустые данные, недоступная история чата | неделя 3 — решения уже в [D-1-screens §1.1](D-1-screens.md), в работе макеты |
+| [D-1-states.md](D-1-states.md) | Лист состояний: пять состояний панели на одной сетке, переходы, пустые данные, сайдкар не подключён, два вида пустой истории, действие «назад» | неделя 3 — сдан |
 
 Макеты — SVG в [`wireframes/`](wireframes): текстовый формат, читается в diff и открывается на GitHub без конвертации.
 
@@ -18,6 +18,9 @@ UX-поставки Co3 по задаче [D-1 (#33)](https://github.com/kkkingq
 | [`wireframes/statistics-energy.svg`](wireframes/statistics-energy.svg) | «Статистика», вкладка ENERGY |
 | [`wireframes/statistics-resources.svg`](wireframes/statistics-resources.svg) | «Статистика», вкладка RESOURCES, данные устарели |
 | [`wireframes/chat.svg`](wireframes/chat.svg) | «Чат с ИИ»: поток, отмена, карточки, шаблоны |
+| [`wireframes/states-panel.svg`](wireframes/states-panel.svg) | Пять состояний панели на одной сетке и отдельный пример `0 MW` |
+| [`wireframes/states-screens.svg`](wireframes/states-screens.svg) | «Статистика» без телеметрии и на пустой фабрике; «Чат» без сайдкара и два вида пустой истории |
+| [`wireframes/states-back.svg`](wireframes/states-back.svg) | Действие «назад» в чате: три ступени и возврат `HandleBackAction()` |
 
 ## Правила этих документов
 
