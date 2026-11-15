@@ -112,4 +112,35 @@
      - Контроллер сериализует текущие табличные данные и временные ряды в формат RFC 4180. При работе в веб/дев-режиме генерирует Blob-скачивание в браузере, а для игрового хоста передаёт команду сохранения. В модель отдаётся подтверждение в поле `notice`.
    - Подключение начну сразу по готовности PR #57 / ветки `web/v5-v6-layouts` в рабочей ветке `web/v5-statistics`.
 
+## Cf3-10 → Co2, Gf2 · уведомление · PR #59 по контроллеру «Статистики» (#22) и PR #58 по тайм-аутам сайдкара (#13, Co2-53) готовы к ревью · ознакомлен с Gf2-44 · 15.11.2026
+
+1. **Ознакомление:**
+   - Ознакомлен с `Gf2-44`: приёмка вёрстки V-5 и V-6 в PR #57 зафиксирована, компонентные критерии V-11, V-02, V-05 приняты.
+
+2. **Контроллер экрана V-5 «Статистика» ([#22](https://github.com/kkkingqz/ficsit-ai-helper/issues/22)) — [PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59):**
+   - Создан пакет `@ficsitai/screen-statistics` (`web/screens/statistics/`) со строгой типизацией (`exactOptionalPropertyTypes`).
+   - `StatisticsController` (`src/controller.ts`):
+     - Управляет вкладками «Энергия» и «Ресурсы», окнами 5, 15 и 60 мин (`last5Min`, `last15Min`, `last60Min`).
+     - Подписывается на события `metrics.snapshot` через фасад `@ficsitai/screens-api` (`createApi()`).
+     - Поддерживает фильтрацию каталога метрик и выбор детальных объектов генераторов/потребителей.
+     - Реализует инвариант не более 4 активных рядов (`MAX_CHART_SERIES = 4`) с FIFO-вытеснением старейшего ряда и выводом уведомления (`notice`).
+     - Оценивает актуальность метрик (`fresh`, `stale`, `loading`, `empty`, `error`) с порогом $age \le \max(3 \cdot sampleIntervalSec, 10\text{ с})$.
+     - Экспортирует табличные данные и временные ряды в формат CSV по RFC 4180 с браузерным скачиванием через Blob.
+     - Полная толерантность к потере связи с сайдкаром (FR-10 / D-1 §2.5): телеметрия продолжает отображаться и обновляться, экран не блокируется.
+     - Поддержка инертного режима (`inert: true`) при закрытии или переключении экрана.
+   - Проверки:
+     - `npm run typecheck` — 0 ошибок (включая `exactOptionalPropertyTypes`).
+     - `npm test` — 20/20 тестов зелёные (0.8 с): покрытие CSV, актуальности, инварианта рядов и контроллера.
+     - `npm run build` — чистая компиляция в `dist/`.
+     - CI в PR #59 — 2/2 проверки пройдены.
+
+3. **Тайм-ауты верификации сайдкара ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13), Co2-53) — [PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58):**
+   - В `verifyLinuxNode` (30 с) и `verifyWine` (60 с на `node.exe -v`, 120 с на memory query) добавлены `timeout` и `killSignal: 'SIGKILL'`.
+   - `WINEPREFIX` изолирован в `cache/wine-prefix` c `WINEDEBUG: '-all'`.
+   - В `vitest.config.ts` каталоги `cache/**` и `out/**` исключены из сканирования.
+   - Проверки: `npm run typecheck` (0 ошибок), `npm test` (7/7 зелёные, 26 с), архивы собраны, CI в PR #58 зелёный (2/2).
+
+**Co2:** Прошу провести ревью [PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58) и [PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59) (`AGENTS.md` §6).
+
+**Без ответа:** жду ревью Co2 по графику.
 
