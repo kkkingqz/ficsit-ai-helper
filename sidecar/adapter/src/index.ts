@@ -45,7 +45,7 @@ const SERVER_VERSION = "0.0.1";
  */
 const MOD_TOOL_NAMES = new Set<string>();
 
-export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
+export function createMcpServer(upstream: UpstreamMcp, log: Logger, whitelist = true): Server {
   // Низкоуровневый Server, а не McpServer с сахаром: список инструментов должен
   // приходить из реестра операций (S2, V-3), а не собираться из регистраций в
   // коде адаптера. Возможность `tools` объявляется сразу и пустым списком —
@@ -62,7 +62,7 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
   // заканчивается без ответа — поэтому промпт и список правятся только вместе.
   server.setRequestHandler(ListToolsRequestSchema, async () => {
     const all = (await upstream.listTools()).filter((tool) => !MOD_TOOL_NAMES.has(tool.name));
-    const passthrough = applyWhitelist(all);
+    const passthrough = whitelist ? applyWhitelist(all) : all;
     log.debug(
       `tools/list: инструментов мода ${MOD_TOOL_NAMES.size}, ` +
         `проброшено из sf-mcp ${passthrough.length}, скрыто ${all.length - passthrough.length}`,
@@ -76,7 +76,7 @@ export function createMcpServer(upstream: UpstreamMcp, log: Logger): Server {
     // Скрытый инструмент модель по списку не видит, но может позвать по памяти
     // о чужом промпте. Отказ с причиной лучше тихого проброса: иначе белый
     // список выглядит соблюдённым, а данные всё равно уходят в ответ.
-    const refusal = hiddenCallRefusal(name);
+    const refusal = whitelist ? hiddenCallRefusal(name) : undefined;
     if (refusal !== undefined) {
       log.warn(`вызов скрытого инструмента «${name}» отклонён`);
       throw new McpError(ErrorCode.InvalidRequest, refusal);
@@ -127,7 +127,7 @@ export async function createApp(config: Config, log: Logger) {
       foremanBaseUrl: config.foremanBaseUrl,
       sfMcpUrl: config.sfMcpUrl,
       foreman: { signedIn: foreman.authenticated },
-      hiddenTools: hiddenToolNames(),
+      hiddenTools: config.whitelist ? hiddenToolNames() : [],
       mod: { connected: false, reason: "канал вызова инструментов мода появится вместе с реестром" },
     });
   });
@@ -143,7 +143,7 @@ export async function createApp(config: Config, log: Logger) {
       return;
     }
 
-    const server = createMcpServer(upstream, log);
+    const server = createMcpServer(upstream, log, config.whitelist);
     const transport = new StreamableHTTPServerTransport({});
     res.on("close", () => {
       void transport.close();

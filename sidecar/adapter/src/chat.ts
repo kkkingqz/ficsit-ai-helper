@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Router, type Request, type Response } from "express";
 import { z } from "zod";
-import { ForemanError, type ForemanSession } from "./foreman.js";
+import { ForemanError, playthroughIdFor, type ForemanSession } from "./foreman.js";
 import type { Logger } from "./log.js";
 import { encodeFrame, parseSse } from "./stream.js";
 import { bearerToken, tokenMatches } from "./token.js";
@@ -147,8 +147,15 @@ export function createChatRouter(deps: ChatDeps): Router {
     const playthroughId = await playthroughOr502(req, res, parsed.data.saveName);
     if (playthroughId === undefined) return;
 
-    const running = turns.get(playthroughId);
-    if (running !== undefined) {
+    // Слот сохранения занимается сразу после ожидания и с повторной
+    // проверкой: два запроса, ждавшие один и тот же `drained`, иначе
+    // просыпались вместе и оба занимали один слот, а завершение любого
+    // снимало запись второго (ревью Gs на #50).
+    const deadline = Date.now() + DRAIN_WAIT_MS;
+    for (;;) {
+      const running = turns.get(playthroughId);
+      if (running === undefined) break;
+
       if (!running.cancelled) {
         res.status(409).json({
           error: "turn_in_progress",
@@ -157,14 +164,18 @@ export function createChatRouter(deps: ChatDeps): Router {
         });
         return;
       }
+
       // Предыдущий ход отменён и дочитывается. Ждём его, а не отказываем:
       // отказ заставил бы игрока нажимать «отправить» ещё раз, а начать
       // раньше нельзя — ответ брошенного хода ещё не лёг в историю.
-      const waited = await Promise.race([
-        running.drained.then(() => true),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), DRAIN_WAIT_MS)),
-      ]);
-      if (!waited) {
+      const left = deadline - Date.now();
+      const freed =
+        left > 0 &&
+        (await Promise.race([
+          running.drained.then(() => true),
+          new Promise<boolean>((resolve) => setTimeout(() => resolve(false), left)),
+        ]));
+      if (!freed) {
         res.status(409).json({
           error: "turn_draining",
           message: "отменённый ход всё ещё дописывается в историю",
@@ -253,7 +264,9 @@ export function createChatRouter(deps: ChatDeps): Router {
         return;
       }
 
+      let finished = false;
       for await (const event of parseSse(upstream.body)) {
+        if (event.event === "done" || event.event === "error") finished = true;
         // Поток дочитывается и после отмены: `send` сам промолчит, а история у
         // Foreman допишется в правильном порядке.
         let data: unknown = event.data;
@@ -265,9 +278,16 @@ export function createChatRouter(deps: ChatDeps): Router {
         send(event.event, data);
       }
       if (turn.cancelled) log.info(`отменённый ход ${turn.id} дочитан`);
+      else if (!finished) {
+        // Поток Foreman кончился без `done` и без `error`: мод получил бы
+        // ход без конца и ждал бы его вечно (ревью Gs на #50).
+        log.warn(`поток чата оборвался без конца хода (${turn.id})`);
+        send("error", { message: "Foreman закрыл поток, не закончив ход" });
+      }
     } catch (err: unknown) {
       if (turn.controller.signal.aborted) {
         log.warn(`ход ${turn.id} брошен по пределу ожидания`);
+        send("error", { message: "ход прерван: Foreman не закончил его за отведённое время" });
       } else {
         log.error("ход чата сорвался", err);
         send("error", { message: err instanceof Error ? err.message : String(err) });
@@ -275,7 +295,8 @@ export function createChatRouter(deps: ChatDeps): Router {
     } finally {
       clearInterval(keepalive);
       clearTimeout(limit);
-      turns.delete(playthroughId);
+      // Снимаем только свою запись: чужой ход, успевший занять слот, не наш.
+      if (turns.get(playthroughId) === turn) turns.delete(playthroughId);
       release();
       res.end();
     }
@@ -290,8 +311,17 @@ export function createChatRouter(deps: ChatDeps): Router {
       return;
     }
 
-    const playthroughId = await playthroughOr502(req, res);
-    if (playthroughId === undefined) return;
+    // Отмена — целиком наша и не зависит от Foreman: идентификатор считается
+    // из `saveId`, а идущий ход лежит в памяти. Раньше здесь был GET
+    // playthrough, и при недоступном Foreman отмена отвечала 502, оставляя
+    // поток мода открытым (ревью Gs на #50).
+    const raw = req.params.saveId;
+    const saveId = typeof raw === "string" ? raw : "";
+    if (saveId.length === 0) {
+      res.status(400).json({ error: "bad_request", message: "saveId пустой" });
+      return;
+    }
+    const playthroughId = playthroughIdFor(saveId);
 
     const turn = turns.get(playthroughId);
     if (turn === undefined) {

@@ -64,6 +64,16 @@ const schema = z.object({
    * выбирает, иначе их стало бы два.
    */
   accountPath: z.string().min(1).default(defaultAccountPath()),
+  /**
+   * Белый список инструментов модели. Выключается только вместе со штатным
+   * системным промптом Foreman: промпт и список — одна настройка на две
+   * стороны, и порознь они дают модель, которой обещан отсутствующий
+   * инструмент (ревью Gs на #50). Лаунчер выставляет оба значения разом.
+   */
+  whitelist: z
+    .enum(["on", "off"])
+    .default("on")
+    .transform((value) => value === "on"),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 

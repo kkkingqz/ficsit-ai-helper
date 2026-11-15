@@ -494,3 +494,97 @@ describe("API чата: история", () => {
     expect(response.status).toBe(401);
   });
 });
+
+describe("замечания ревью Gs на #50", () => {
+  const cancel = (base: string, body: unknown) =>
+    fetch(`${base}/mod/saves/${encodeURIComponent(SAVE_ID)}/chat/cancel`, {
+      method: "POST",
+      headers: { "content-type": "application/json", ...auth },
+      body: JSON.stringify(body),
+    });
+
+  it("два запроса после отмены не занимают один слот", async () => {
+    let held: { send: (event: string, data: unknown) => void; end: () => void } | undefined;
+    const fake = await fakeForeman((req, res) => {
+      if (req.method === "GET") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ id: playthroughIdFor(SAVE_ID) }));
+        return;
+      }
+      const stream = sse(res);
+      stream.send("text", { delta: "начал" });
+      if (held === undefined) held = stream;
+    });
+    const base = await adapterFor(fake);
+
+    const first = await postChat(base, { message: "долгий" });
+    const stream = frameStream(first);
+    const started = await stream.until((f) => f.some((frame) => frame.event === "text"));
+    await cancel(base, { turnId: (started[0]?.data as { turnId: string }).turnId });
+    await stream.until((f) => f.some((frame) => frame.event === "cancelled"));
+
+    // Оба ждут один `drained`. Раньше просыпались вместе и оба получали 200.
+    const second = postChat(base, { message: "второй" });
+    const third = postChat(base, { message: "третий" });
+    await new Promise((resolve) => setTimeout(resolve, 40));
+    held?.send("done", { ok: true });
+    held?.end();
+
+    const codes = [(await second).status, (await third).status].sort();
+    expect(codes).toEqual([200, 409]);
+    // До Foreman дошёл ровно один новый ход, а не два.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(fake.seen.filter((entry) => entry.url.endsWith("/chat"))).toHaveLength(2);
+  });
+
+  it("поток Foreman без done и error заканчивается кадром error", async () => {
+    const fake = await fakeForeman((req, res) => {
+      if (req.method === "GET") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ id: playthroughIdFor(SAVE_ID) }));
+        return;
+      }
+      const stream = sse(res);
+      stream.send("text", { delta: "начал и пропал" });
+      stream.end();
+    });
+    const base = await adapterFor(fake);
+
+    const response = await postChat(base, { message: "?" });
+    const frames = await frameStream(response).until((f) =>
+      f.some((frame) => frame.event === "error"),
+    );
+    // Мод не должен остаться с ходом без конца.
+    expect(frames.map((frame) => frame.event)).toEqual(["accepted", "text", "error"]);
+  });
+
+  it("отмена работает, когда Foreman уже не отвечает", async () => {
+    let brokeDown = false;
+    const fake = await fakeForeman((req, res) => {
+      if (req.method === "GET") {
+        if (brokeDown) {
+          res.writeHead(503, { "content-type": "application/json" });
+          res.end(JSON.stringify({ error: "упал" }));
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ id: playthroughIdFor(SAVE_ID) }));
+        return;
+      }
+      const stream = sse(res);
+      stream.send("text", { delta: "начал" });
+    });
+    const base = await adapterFor(fake);
+
+    const response = await postChat(base, { message: "долгий" });
+    const stream = frameStream(response);
+    const started = await stream.until((f) => f.some((frame) => frame.event === "text"));
+    const turnId = (started[0]?.data as { turnId: string }).turnId;
+
+    brokeDown = true;
+    // Идентификатор считается из saveId, ход лежит в памяти — Foreman не нужен.
+    expect((await cancel(base, { turnId })).status).toBe(202);
+    const rest = await stream.until((f) => f.some((frame) => frame.event === "cancelled"));
+    expect(rest.some((frame) => frame.event === "cancelled")).toBe(true);
+  });
+});
