@@ -156,6 +156,7 @@ export async function createApp(config: Config, log: Logger) {
     config.foremanBaseUrl,
     loadOrCreateAccount(config.accountPath),
     log,
+    config.accountPath,
   );
   const turns = new ChatTurns(foreman, log);
   const channel = new ModChannel({

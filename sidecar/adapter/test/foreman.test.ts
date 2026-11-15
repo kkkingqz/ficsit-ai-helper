@@ -1,11 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { loadConfig } from "../src/config.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
 import { describe, expect, it } from "vitest";
 import {
+  ForemanError,
   ForemanSession,
   loadOrCreateAccount,
   playthroughIdFor,
@@ -507,5 +508,57 @@ describe("замечания ревью Gs на #48", () => {
         FOREMAN_BASE_URL: "http://10.0.0.5:8724",
       } as NodeJS.ProcessEnv),
     ).toThrow(/петле/);
+  });
+});
+
+describe("повторное ревью Gs на #48", () => {
+  it("на Windows свой же файл аккаунта читается при втором запуске", () => {
+    // Windows: `mode: 0o600` при записи даёт `666` — в режиме живёт только бит
+    // «только чтение». Прежняя проверка видела биты для других и отказывала
+    // сайдкару читать свой файл после перезапуска.
+    const path = join(mkdtempSync(join(tmpdir(), "ficsitai-acc-")), "account.json");
+    const first = loadOrCreateAccount(path, "win32");
+    chmodSync(path, 0o666);
+
+    expect(loadOrCreateAccount(path, "win32").password).toBe(first.password);
+    // Там, где права настоящие, отказ остаётся.
+    expect(() => loadOrCreateAccount(path, "linux")).toThrow(/доступен не только владельцу/);
+  });
+
+  it("`null` в файле аккаунта — диагностика, а не сырой TypeError", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "ficsitai-acc-")), "account.json");
+    writeFileSync(path, "null", { mode: 0o600 });
+    try {
+      loadOrCreateAccount(path);
+      throw new Error("ожидался отказ");
+    } catch (err: unknown) {
+      expect(err).toBeInstanceOf(ForemanError);
+      expect((err as Error).message).toMatch(/не объект/);
+    }
+  });
+
+  it("ошибка входа ведёт к копии рядом с базой, а не по кругу к удалению файла", async () => {
+    // Запись в базе есть, пароль другой: именно это видит игрок, потерявший
+    // файл аккаунта. Подсказка «удалите файл» заводила бы тот же email заново.
+    const fake = await fakeForeman((_seen, req, res) => {
+      if (req.url === "/api/auth/sign-in/email") {
+        json(res, 401, { code: "INVALID_EMAIL_OR_PASSWORD" });
+        return;
+      }
+      json(res, 422, { code: "USER_ALREADY_EXISTS" });
+    });
+
+    try {
+      const session = new ForemanSession(
+        `http://127.0.0.1:${fake.port}`,
+        account,
+        silent,
+        "/данные/adapter-account.json",
+      );
+      await expect(session.authenticate()).rejects.toThrow(/восстановите файл \/данные\/adapter-account\.json/);
+      await expect(session.authenticate()).rejects.not.toThrow(/удалите файл аккаунта адаптера и перезапустите/);
+    } finally {
+      await fake.close();
+    }
   });
 });
