@@ -331,7 +331,7 @@ LAUNCH
 # Главное меню считается достигнутым только по двум строкам настоящего журнала CL 517554:
 # движок закончил загрузку карты меню и виджет главного меню начал работать.
 # Сборка игры, под которую сделаны заголовки проекта SML ($1). В файлах заголовков номера нет, поэтому он берётся
-# из последнего коммита «Update headers to CL<номер>» в истории проекта. FICSITAI_SML_HEADERS_CL — запасной путь
+# из последнего коммита с заголовком ровно «Update headers to CL<номер>» в истории проекта. FICSITAI_SML_HEADERS_CL — запасной путь
 # для обрезанной истории: при известной истории он должен с ней совпасть. Заголовки игры (Source/) и SML
 # (Mods/SML/Source/) не должны отличаться от коммита: правка в рабочем дереве меняет ABI при том же номере.
 # Дерево заголовков игры (Source/FactoryGame) сверяется ещё и с самим коммитом «Update headers»: замена заголовка
@@ -347,9 +347,12 @@ fa_sml_headers() {
         FA_HCL_PROBLEM="FICSITAI_SML_HEADERS_CL — не номер сборки: $manual"; return 0
     fi
     local line hcommit
-    line="$("$FA_GIT" -C "$proj" log -E -i --grep='headers to CL ?[0-9]+' -1 --format='%H %s' 2>/dev/null || true)"
+    # Коммит выбирается по точному заголовку: «Revert "Update headers to CL…"» и упоминание в теле
+    # постороннего коммита не подходят (ревью #45). Номер берётся из того же заголовка.
+    line="$("$FA_GIT" -C "$proj" log --format='%H %s' 2>/dev/null \
+        | awk '/^[0-9a-f]+ Update headers to CL[0-9]+$/ { print; exit }' || true)"
     hcommit="${line%% *}"
-    hist="$(grep -oiE 'CL ?[0-9]+' <<<"${line#* }" | head -1 | grep -oE '[0-9]+' || true)"
+    hist="${line##*CL}"
     if [[ -n "$hist" ]]; then
         FA_HCL="$hist"; FA_HCL_SRC="история проекта"
         if [[ -n "$manual" && "$manual" != "$hist" ]]; then

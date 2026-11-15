@@ -234,6 +234,27 @@ if [[ -n "$GIT" ]]; then
     rm -f "$P/Mods/SML/Source/B.h"; echo '# local' >> "$P/Mods/WwisePatches/applyPatches.sh"
     check "правка Mods/WwisePatches допустима" "$(HCL= GV)" 0
     pgit checkout -- Mods; rm -rf "$P/.git" "$P/.gitignore" "$P/Source" "$P/Mods/WwisePatches" "$P/Mods/SML"
+    # Ревью #45, второй круг: коммит заголовков ищется по точному заголовку. Обычный revert коммита
+    # «Update headers» и упоминание в теле постороннего коммита номер не дают.
+    newproj() {
+        rm -rf "$P/.git" "$P/Source"; mkdir -p "$P/Source/FactoryGame/Public"
+        echo 'class A { virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
+        pgit init -q && pgit add -A && pgit commit -q -m "Update headers to CL491125"
+    }
+    newproj
+    echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
+    pgit commit -qam "Update headers to CL517554"
+    check "заголовки CL 517554 изменены коммитом «Update headers» — пройдено" "$(HCL= GV)" 0
+    pgit revert --no-edit HEAD
+    check "обычный revert «Update headers to CL517554» — не пройдено" "$(HCL= GV)" 1
+    check "названы файл и коммит заголовков, а не revert" "$(grep -c 'изменены коммитами после «Update headers to CL517554»: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1
+    newproj
+    pgit commit -q --allow-empty -m "Notes" -m "Next: Update headers to CL517554"
+    check "номер в теле постороннего коммита не учитывается — не пройдено" "$(HCL= GV)" 1
+    check "протокол называет CL 491125 из заголовка коммита" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
+    pgit commit -q --allow-empty -m "Update headers to CL517554 (partial)"
+    check "заголовок с хвостом не учитывается — не пройдено" "$(HCL= GV)" 1
+    rm -rf "$P/.git" "$P/.gitignore" "$P/Source"
 fi
 
 echo "5. Блокировка и роль (замечание 5)"
