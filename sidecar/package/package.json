@@ -1,0 +1,32 @@
+{
+  "name": "@ficsitai/package",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Сборка самодостаточного архива сайдкара FICSIT AI для альфы (S5-lite, задача #13)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "ficsitai-package": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "package": "tsx src/cli.ts",
+    "package:linux": "tsx src/cli.ts --target=linux-x64",
+    "package:win": "tsx src/cli.ts --target=win-x64",
+    "package:all": "tsx src/cli.ts --target=all",
+    "verify:wine": "tsx src/cli.ts --verify-wine",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}

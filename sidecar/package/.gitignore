@@ -1,0 +1,7 @@
+node_modules/
+dist/
+out/
+cache/
+*.zip
+*.tar.xz
+*.tar.gz
