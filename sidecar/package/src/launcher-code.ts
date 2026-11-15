@@ -150,8 +150,15 @@ async function cmdStart() {
   const token = ensureToken();
 
   // 1. Check if already running
-  if (await checkPort(ADAPTER_PORT) || await checkPort(FF_SERVER_PORT) || await checkPort(SF_MCP_PORT)) {
-    console.error('Error: Sidecar or another process is already listening on ports 8723/8724/8730. Run "stop" first.');
+  if (
+    (await checkPort(ADAPTER_PORT)) ||
+    (await checkPort(FF_SERVER_PORT)) ||
+    (await checkPort(SF_MCP_PORT)) ||
+    (await checkPort(NORMALIZER_PORT))
+  ) {
+    console.error(
+      'Error: Sidecar or another process is already listening on ports 8723/8724/8730/8731. Run "stop" first.'
+    );
     process.exit(1);
   }
 
@@ -380,5 +387,12 @@ Network & Security Note:
 All services listen strictly on 127.0.0.1 (loopback).
 No network ports are exposed to the public internet or local LAN.
 Windows Firewall will NOT prompt for network access.
+
+Updating & Clean Installation:
+- Always extract new versions into an empty folder.
+- If upgrading an existing installation or resetting data/foreman.db,
+  delete data/adapter-account.json together with data/foreman.db.
+  The database and adapter account are paired; keeping an old account
+  file with a new database leads to authentication errors (401/422).
 `;
 }

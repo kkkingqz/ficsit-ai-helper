@@ -52,13 +52,10 @@ export const BETTER_SQLITE3_WIN_URL =
 
 /**
  * Official SHA-256 checksums for external binary dependencies.
- * Node hashes from official https://nodejs.org/dist/v<version>/SHASUMS256.txt.
+ * Node hashes are dynamically fetched and verified against official SHASUMS256.txt from nodejs.org.
+ * Fixed addon releases are pinned here.
  */
 export const EXPECTED_SHA256: Record<string, string> = {
-  "node-v22.23.4-linux-x64.tar.xz":
-    "1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce",
-  "node-v22.23.4-win-x64.exe":
-    "dccc52de28d8df2ee22d2062424f8c563070d95d8ad70c54c4bf01d590dec14f",
   "better-sqlite3-v12.11.1-node-v127-win32-x64.tar.gz":
     "927b34496e946dc7c9a45636a03a039df72f10191ccc4960b8616d1a9319e45b",
 };

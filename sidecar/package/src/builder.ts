@@ -29,6 +29,35 @@ export function computeSha256(filePath: string): string {
   return hash.digest("hex");
 }
 
+/**
+ * Dynamically resolves official SHA-256 from Node.js SHASUMS256.txt for the given version.
+ * Caches SHASUMS256.txt locally.
+ */
+export function getNodeSha256(
+  version: string,
+  targetRelPath: string,
+  cacheDir: string
+): string {
+  const shasumsUrl = `https://nodejs.org/dist/v${version}/SHASUMS256.txt`;
+  const cachedShasums = path.join(cacheDir, `SHASUMS256-v${version}.txt`);
+  if (!fs.existsSync(cachedShasums) || fs.statSync(cachedShasums).size === 0) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+    execFileSync("curl", ["-sSL", "-f", "-o", cachedShasums, shasumsUrl], {
+      stdio: "inherit",
+    });
+  }
+  const content = fs.readFileSync(cachedShasums, "utf-8");
+  for (const line of content.split("\n")) {
+    const parts = line.trim().split(/\s+/);
+    if (parts.length >= 2 && parts[1] === targetRelPath) {
+      return parts[0]!;
+    }
+  }
+  throw new Error(
+    `SHA-256 for ${targetRelPath} not found in Node v${version} SHASUMS256.txt`
+  );
+}
+
 export function downloadFile(
   url: string,
   destPath: string,
@@ -38,32 +67,32 @@ export function downloadFile(
   const baseName = path.basename(destPath);
   const expectedHash = expectedSha256 ?? EXPECTED_SHA256[baseName];
 
+  if (!expectedHash) {
+    throw new Error(
+      `No SHA-256 checksum configured for ${baseName}. Downloading unverified external files is prohibited.`
+    );
+  }
+
   if (fs.existsSync(destPath) && fs.statSync(destPath).size > 0) {
-    if (expectedHash) {
-      const actual = computeSha256(destPath);
-      if (actual === expectedHash) {
-        return;
-      }
-      console.warn(
-        `[WARN] Cached file ${baseName} SHA-256 mismatch (got ${actual}, expected ${expectedHash}), re-downloading...`
-      );
-      fs.unlinkSync(destPath);
-    } else {
+    const actual = computeSha256(destPath);
+    if (actual === expectedHash) {
       return;
     }
+    console.warn(
+      `[WARN] Cached file ${baseName} SHA-256 mismatch (got ${actual}, expected ${expectedHash}), re-downloading...`
+    );
+    fs.unlinkSync(destPath);
   }
 
   const tmpPath = `${destPath}.tmp.${Date.now()}`;
   execFileSync("curl", ["-sSL", "-f", "-o", tmpPath, url], { stdio: "inherit" });
 
-  if (expectedHash) {
-    const actual = computeSha256(tmpPath);
-    if (actual !== expectedHash) {
-      fs.unlinkSync(tmpPath);
-      throw new Error(
-        `SHA-256 verification failed for ${baseName}. Expected ${expectedHash}, got ${actual}`
-      );
-    }
+  const actual = computeSha256(tmpPath);
+  if (actual !== expectedHash) {
+    fs.unlinkSync(tmpPath);
+    throw new Error(
+      `SHA-256 verification failed for ${baseName}. Expected ${expectedHash}, got ${actual}`
+    );
   }
 
   fs.renameSync(tmpPath, destPath);
@@ -97,18 +126,26 @@ export function stagePortableNode(
       `node-v${config.nodeVersion}-win-x64.exe`
     );
     const url = NODE_DOWNLOAD_URLS["win-x64"](config.nodeVersion);
-    downloadFile(url, cachedNodeExe);
+    const expectedSha = getNodeSha256(
+      config.nodeVersion,
+      "win-x64/node.exe",
+      config.cacheDir
+    );
+    downloadFile(url, cachedNodeExe, expectedSha);
 
     const destExe = path.join(runtimeDir, "node.exe");
     fs.copyFileSync(cachedNodeExe, destExe);
     return destExe;
   } else {
-    const cachedTar = path.join(
-      config.cacheDir,
-      `node-v${config.nodeVersion}-linux-x64.tar.xz`
-    );
+    const tarName = `node-v${config.nodeVersion}-linux-x64.tar.xz`;
+    const cachedTar = path.join(config.cacheDir, tarName);
     const url = NODE_DOWNLOAD_URLS["linux-x64"](config.nodeVersion);
-    downloadFile(url, cachedTar);
+    const expectedSha = getNodeSha256(
+      config.nodeVersion,
+      tarName,
+      config.cacheDir
+    );
+    downloadFile(url, cachedTar, expectedSha);
 
     const destNode = path.join(runtimeDir, "node");
     execFileSync(
@@ -346,6 +383,74 @@ export function stageProductionModules(
   }
 }
 
+interface SemVer {
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+function parseSemver(v: string): SemVer | null {
+  const m = v.match(/(\d+)\.(\d+)(?:\.(\d+))?/);
+  if (!m || !m[1] || !m[2]) return null;
+  return {
+    major: parseInt(m[1], 10),
+    minor: parseInt(m[2], 10),
+    patch: parseInt(m[3] || "0", 10),
+  };
+}
+
+export function isSemverCompatible(
+  reqRange: string,
+  installedVersion: string
+): boolean {
+  if (
+    reqRange === "*" ||
+    reqRange === "latest" ||
+    reqRange.startsWith("workspace:")
+  ) {
+    return true;
+  }
+  const req = parseSemver(reqRange);
+  const inst = parseSemver(installedVersion);
+  if (!req || !inst) return true;
+
+  if (reqRange.startsWith("^")) {
+    if (req.major === 0) {
+      // For 0.x releases, minor bump is breaking
+      return (
+        inst.major === 0 &&
+        inst.minor === req.minor &&
+        inst.patch >= req.patch
+      );
+    }
+    return (
+      inst.major === req.major &&
+      (inst.minor > req.minor ||
+        (inst.minor === req.minor && inst.patch >= req.patch))
+    );
+  }
+
+  if (reqRange.startsWith("~")) {
+    return (
+      inst.major === req.major &&
+      inst.minor === req.minor &&
+      inst.patch >= req.patch
+    );
+  }
+
+  if (reqRange.startsWith(">=")) {
+    if (inst.major !== req.major) return inst.major > req.major;
+    if (inst.minor !== req.minor) return inst.minor > req.minor;
+    return inst.patch >= req.patch;
+  }
+
+  return (
+    inst.major === req.major &&
+    inst.minor === req.minor &&
+    inst.patch === req.patch
+  );
+}
+
 export function verifyAdapterDependencies(
   adapterDir: string,
   appNodeModulesDir: string
@@ -367,13 +472,7 @@ export function verifyAdapterDependencies(
     const installedPkg = JSON.parse(fs.readFileSync(installedPkgPath, "utf-8"));
     const installedVersion: string = installedPkg.version || "";
 
-    const reqMajorMatch = reqRange.match(/\d+/);
-    const instMajorMatch = installedVersion.match(/\d+/);
-    if (
-      reqMajorMatch &&
-      instMajorMatch &&
-      reqMajorMatch[0] !== instMajorMatch[0]
-    ) {
+    if (!isSemverCompatible(reqRange, installedVersion)) {
       throw new Error(
         `Adapter dependency '${dep}' version mismatch: requested range ${reqRange}, installed ${installedVersion}`
       );
@@ -473,6 +572,88 @@ export function verifyLinuxNode(
   }
 }
 
+/**
+ * Smoke-tests starting ff-server from the staged directory using portable Node.
+ * Verifies system prompt loading, SQLite connection, and HTTP listener startup.
+ */
+export function verifyForemanStartup(
+  stageDir: string
+): { success: boolean; details: string } {
+  const nodeBin = path.join(stageDir, "runtime/node");
+  const ffScript = path.join(
+    stageDir,
+    "app/node_modules/@foreman/ff-server/dist/index.js"
+  );
+  const promptPath = path.join(stageDir, "app/foreman/SYSTEM_PROMPT.md");
+  const dbPath = path.join(stageDir, "data/foreman.db");
+  const appDir = path.join(stageDir, "app");
+
+  if (!fs.existsSync(nodeBin) || !fs.existsSync(ffScript)) {
+    return {
+      success: false,
+      details: `Required binaries missing for smoke test in ${stageDir}`,
+    };
+  }
+
+  const runnerCode = `
+const { spawn } = require("child_process");
+const proc = spawn(process.execPath, [${JSON.stringify(ffScript)}], {
+  cwd: ${JSON.stringify(appDir)},
+  env: {
+    ...process.env,
+    HOST: "127.0.0.1",
+    PORT: "28724",
+    SYSTEM_PROMPT_PATH: ${JSON.stringify(promptPath)},
+    DATABASE_URL: "file:" + ${JSON.stringify(dbPath)},
+    LLM_API_KEY: "smoke-test-key",
+  },
+  stdio: ["ignore", "pipe", "pipe"],
+});
+
+let out = "";
+proc.stdout.on("data", (d) => {
+  out += d.toString();
+  if (out.includes("Listening on")) {
+    proc.kill("SIGTERM");
+    process.exit(0);
+  }
+});
+proc.stderr.on("data", (d) => {
+  out += d.toString();
+});
+
+proc.on("exit", (code) => {
+  if (code !== 0 && code !== null) {
+    console.error("Exited with code", code, out);
+    process.exit(1);
+  }
+});
+
+setTimeout(() => {
+  proc.kill("SIGTERM");
+  console.error("Smoke test timeout. Output:", out);
+  process.exit(1);
+}, 6000);
+`;
+
+  try {
+    execFileSync(nodeBin, ["-e", runnerCode], {
+      cwd: appDir,
+      encoding: "utf-8",
+      timeout: 10000,
+    });
+    return {
+      success: true,
+      details: "Foreman ff-server startup verified successfully",
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      details: `Foreman ff-server startup failed: ${err.message || String(err)}`,
+    };
+  }
+}
+
 export function stagePackage(
   target: TargetPlatform,
   customConfig?: Partial<PackageConfig>
@@ -524,7 +705,7 @@ export function stagePackage(
   const destDb = path.join(dataDir, "foreman.db");
   deployCleanDatabase(config.foremanSrcDir, destDb);
 
-  // 6. Copy system prompt template
+  // 6. Copy system prompt template to exactly the two active locations
   const systemPromptSrc = path.resolve(
     REPO_ROOT,
     "third_party/foreman/SYSTEM_PROMPT.md"
@@ -532,18 +713,18 @@ export function stagePackage(
   if (!fs.existsSync(systemPromptSrc)) {
     throw new Error(`SYSTEM_PROMPT.md not found at ${systemPromptSrc}`);
   }
+  // 6a. Main copy for SYSTEM_PROMPT_PATH
   const promptDestForeman = path.join(stageDir, "app/foreman/SYSTEM_PROMPT.md");
   fs.mkdirSync(path.dirname(promptDestForeman), { recursive: true });
   fs.copyFileSync(systemPromptSrc, promptDestForeman);
 
+  // 6b. Fallback copy at ff-server package root
   const promptDestServerPkg = path.join(
     appNodeModulesDir,
     "@foreman/ff-server/SYSTEM_PROMPT.md"
   );
   fs.mkdirSync(path.dirname(promptDestServerPkg), { recursive: true });
   fs.copyFileSync(systemPromptSrc, promptDestServerPkg);
-
-  fs.copyFileSync(systemPromptSrc, path.join(stageDir, "app/SYSTEM_PROMPT.md"));
 
   // 7. Validate adapter dependencies against staged node_modules
   verifyAdapterDependencies(config.adapterDir, appNodeModulesDir);
@@ -575,11 +756,20 @@ export function stagePackage(
   fs.chmodSync(path.join(stageDir, "stop.sh"), 0o755);
   fs.chmodSync(path.join(stageDir, "status.sh"), 0o755);
 
-  // 10. Self-verify native addon loading for Linux
+  // 10. Self-verify native addon loading and smoke tests
   if (target === "linux-x64") {
     const linuxVerify = verifyLinuxNode(stageDir);
     if (!linuxVerify.success) {
       throw new Error(`Linux verification failed: ${linuxVerify.details}`);
+    }
+    const smokeVerify = verifyForemanStartup(stageDir);
+    if (!smokeVerify.success) {
+      throw new Error(`Foreman startup verification failed: ${smokeVerify.details}`);
+    }
+  } else if (target === "win-x64") {
+    const wineVerify = verifyWine(stageDir);
+    if (!wineVerify.success) {
+      throw new Error(`Wine verification failed: ${wineVerify.details}`);
     }
   }
 

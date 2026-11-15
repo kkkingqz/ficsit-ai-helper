@@ -22,8 +22,11 @@ import {
   stagePackage,
   verifyWine,
   verifyLinuxNode,
+  verifyForemanStartup,
   verifyAdapterDependencies,
   computeSha256,
+  getNodeSha256,
+  isSemverCompatible,
 } from "../src/builder.js";
 
 describe("S5-lite Sidecar Packager", () => {
@@ -35,13 +38,16 @@ describe("S5-lite Sidecar Packager", () => {
     expect(pin.defaultPorts["ff-server"]).toBe(8724);
   });
 
-  it("ensures AC-12, SYSTEM_PROMPT_PATH and FOREMAN_ACCOUNT_PATH in launcher.cjs", () => {
+  it("ensures AC-12, SYSTEM_PROMPT_PATH, FOREMAN_ACCOUNT_PATH and 8731 in launcher.cjs", () => {
     const launcherCjs = getLauncherCjsCode();
     expect(launcherCjs).toContain(`HOST = '${LOOPBACK}'`);
     expect(launcherCjs).toContain(`SF_MCP_PORT = ${PORTS.sfMcp}`);
     expect(launcherCjs).toContain(`FF_SERVER_PORT = ${PORTS.ffServer}`);
     expect(launcherCjs).toContain(`ADAPTER_PORT = ${PORTS.adapter}`);
     expect(launcherCjs).toContain(`NORMALIZER_PORT = ${PORTS.normalizer}`);
+
+    // Pre-flight port checks must include NORMALIZER_PORT (8731)
+    expect(launcherCjs).toContain("checkPort(NORMALIZER_PORT)");
 
     // System prompt & account path explicitly defined
     expect(launcherCjs).toContain("SYSTEM_PROMPT_PATH");
@@ -79,18 +85,37 @@ describe("S5-lite Sidecar Packager", () => {
     expect(statusBat).toContain("runtime\\node.exe");
   });
 
-  it("validates SHA-256 checksums of cached external binaries", () => {
+  it("validates dynamic Node SHA-256 resolution from SHASUMS256.txt", () => {
     const config = getDefaultConfig();
-    for (const [file, expectedSha] of Object.entries(EXPECTED_SHA256)) {
-      const cached = path.join(config.cacheDir, file);
-      if (fs.existsSync(cached)) {
-        const actualSha = computeSha256(cached);
-        expect(actualSha).toBe(expectedSha);
-      }
-    }
+    const winSha = getNodeSha256(config.nodeVersion, "win-x64/node.exe", config.cacheDir);
+    expect(winSha).toBe("dccc52de28d8df2ee22d2062424f8c563070d95d8ad70c54c4bf01d590dec14f");
+
+    const linuxSha = getNodeSha256(
+      config.nodeVersion,
+      `node-v${config.nodeVersion}-linux-x64.tar.xz`,
+      config.cacheDir
+    );
+    expect(linuxSha).toBe("1805bcd35e6815559bd2eb97db438d3fdb0eb3a5e6a977b7c1badca76337e9ce");
   });
 
-  it("stages linux-x64 layout, validates prompt, excludes dev tools, and verifies node execution", { timeout: 45000 }, () => {
+  it("validates semver compatibility logic for 0.x and 1.x+", () => {
+    // 0.x minor bump is breaking
+    expect(isSemverCompatible("^0.21.0", "0.21.0")).toBe(true);
+    expect(isSemverCompatible("^0.21.0", "0.21.4")).toBe(true);
+    expect(isSemverCompatible("^0.21.0", "0.22.0")).toBe(false);
+    expect(isSemverCompatible("^0.21.0", "1.0.0")).toBe(false);
+
+    // 1.x+ major bump is breaking
+    expect(isSemverCompatible("^5.3.0", "5.3.0")).toBe(true);
+    expect(isSemverCompatible("^5.3.0", "5.4.1")).toBe(true);
+    expect(isSemverCompatible("^5.3.0", "6.0.0")).toBe(false);
+
+    // Wildcards
+    expect(isSemverCompatible("*", "1.2.3")).toBe(true);
+    expect(isSemverCompatible("latest", "2.0.0")).toBe(true);
+  });
+
+  it("stages linux-x64 layout, validates prompt, smoke-tests ff-server, and verifies node execution", { timeout: 45000 }, () => {
     const config = getDefaultConfig();
     const stageDir = stagePackage("linux-x64", config);
 
@@ -107,10 +132,10 @@ describe("S5-lite Sidecar Packager", () => {
     expect(fs.existsSync(path.join(stageDir, "data/foreman.db"))).toBe(true);
     expect(fs.statSync(path.join(stageDir, "data/foreman.db")).size).toBeGreaterThan(100000);
 
-    // 4. System prompt
+    // 4. System prompt: exactly 2 active copies, dead third copy removed
     expect(fs.existsSync(path.join(stageDir, "app/foreman/SYSTEM_PROMPT.md"))).toBe(true);
     expect(fs.existsSync(path.join(stageDir, "app/node_modules/@foreman/ff-server/SYSTEM_PROMPT.md"))).toBe(true);
-    expect(fs.statSync(path.join(stageDir, "app/foreman/SYSTEM_PROMPT.md")).size).toBeGreaterThan(1000);
+    expect(fs.existsSync(path.join(stageDir, "app/SYSTEM_PROMPT.md"))).toBe(false);
 
     // 5. CommonJS launcher and root package.json
     expect(fs.existsSync(path.join(stageDir, "launcher.cjs"))).toBe(true);
@@ -136,9 +161,13 @@ describe("S5-lite Sidecar Packager", () => {
     // 9. Linux native addon test
     const linuxRes = verifyLinuxNode(stageDir);
     expect(linuxRes.success).toBe(true);
+
+    // 10. Smoke test ff-server startup
+    const smokeRes = verifyForemanStartup(stageDir);
+    expect(smokeRes.success).toBe(true);
   });
 
-  it("stages win-x64 layout, validates prompt, and passes Wine verification", { timeout: 45000 }, () => {
+  it("stages win-x64 layout, validates prompt, and passes Wine verification directly in stagePackage", { timeout: 45000 }, () => {
     const config = getDefaultConfig();
     const stageDir = stagePackage("win-x64", config);
 
@@ -146,6 +175,7 @@ describe("S5-lite Sidecar Packager", () => {
     expect(fs.existsSync(path.join(stageDir, "start.bat"))).toBe(true);
     expect(fs.existsSync(path.join(stageDir, "launcher.cjs"))).toBe(true);
     expect(fs.existsSync(path.join(stageDir, "app/foreman/SYSTEM_PROMPT.md"))).toBe(true);
+    expect(fs.existsSync(path.join(stageDir, "app/SYSTEM_PROMPT.md"))).toBe(false);
     expect(fs.existsSync(path.join(stageDir, "data/foreman.db"))).toBe(true);
 
     const wineRes = verifyWine(stageDir);

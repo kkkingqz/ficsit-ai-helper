@@ -76,17 +76,6 @@ async function main(): Promise<void> {
       console.log(`Process count: ${res.processCount} (ff-server, sf-mcp, adapter)`);
       console.log(`Loopback bind address: ${res.bindAddress}`);
     }
-
-    if (t === "win-x64") {
-      console.log("\nRunning Wine verification on Windows build...");
-      const stageDir = `${config.outputDir}/staging/win-x64`;
-      const wineRes = verifyWine(stageDir);
-      if (wineRes.success) {
-        console.log(`[OK] Wine verification: ${wineRes.details}`);
-      } else {
-        console.warn(`[WARN] Wine verification: ${wineRes.details}`);
-      }
-    }
   }
 
   console.log("\n[SUCCESS] Sidecar packaging complete.");
