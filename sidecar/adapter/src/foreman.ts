@@ -306,10 +306,30 @@ export class ForemanSession {
       "unavailable",
       `вход не удался: sign-in ${signIn.status}, sign-up ${signUp.status}`,
     );
+    //
+    // Что именно случилось, видно по паре кодов, и путать эти случаи дорого
+    // (третий круг ревью Gs на #48): на `503` адаптер советовал убрать файл
+    // аккаунта вместе с базой, то есть предлагал стереть разговоры из-за
+    // того, что Foreman не поднялся.
+    if (signIn.status >= 500 || signUp.status >= 500) {
+      throw new ForemanError(
+        `Foreman не отвечает: sign-in ${signIn.status}, sign-up ${signUp.status}. ` +
+          "Учётные данные целы, вход повторится сам, когда Foreman поднимется",
+        signUp.status,
+      );
+    }
+    // Конфликт существующей записи: вход отвергнут, а регистрация говорит,
+    // что пользователь уже есть. Только здесь подсказка про копию уместна.
+    if (signIn.status === 401 && (signUp.status === 422 || signUp.status === 409)) {
+      throw new ForemanError(
+        `вход в Foreman не удался: sign-in ${signIn.status}, sign-up ${signUp.status}. ` +
+          `Запись ${this.account.email} в базе Foreman заведена с другим паролем. ` +
+          accountRecoveryHint(this.accountPath),
+        signUp.status,
+      );
+    }
     throw new ForemanError(
-      `вход в Foreman не удался: sign-in ${signIn.status}, sign-up ${signUp.status}. ` +
-        `Запись ${this.account.email} в базе Foreman заведена с другим паролем. ` +
-        accountRecoveryHint(this.accountPath),
+      `вход в Foreman не удался: sign-in ${signIn.status}, sign-up ${signUp.status}`,
       signUp.status,
     );
   }

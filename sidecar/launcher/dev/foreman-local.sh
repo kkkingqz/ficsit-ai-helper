@@ -12,8 +12,6 @@
 #   FICSITAI_DATA данные сайдкара: база, саквояж саveов, токен, логи, pid
 #                 (по умолчанию ~/.local/share/ficsitai/foreman)
 #   FICSITAI_LLM  gemini (по умолчанию, решение King 10.11.2026), anthropic или openai
-#   FICSITAI_SYSTEM_PROMPT own (по умолчанию) — свой промпт и действующий белый список;
-#                 stock — штатный промпт Foreman и выключенный белый список, только для проверок
 #   LLM_MODEL     модель чата; для gemini по умолчанию gemini-3.5-flash-lite
 #   LLM_API_KEY   ключ провайдера; если не задан, берётся из <FICSITAI_DATA>/llm.key
 #                 (кладётся командой set-key, права 600). Без ключа поднимается всё,
@@ -198,21 +196,14 @@ common_env() {
   export MCP_URL="http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=$ADAPTER_TOKEN"
   # Свой системный промпт (S2): штатный обещает модели инструменты, которые
   # адаптер скрывает белым списком, а обещание несуществующего инструмента
-  # заканчивается ходом без ответа. Поэтому промпт и белый список включаются
-  # только вместе; FICSITAI_SYSTEM_PROMPT=stock возвращает промпт Foreman —
-  # тогда и белый список надо выключить, иначе чат будет рваться.
-  # Промпт и белый список — одна настройка на две стороны. По умолчанию наш
-  # промпт и действующий список; FICSITAI_SYSTEM_PROMPT=stock возвращает
-  # промпт Foreman и **одновременно** выключает список у адаптера. Порознь
-  # эти две половины дают модель, которой обещан скрытый инструмент: ход
-  # заканчивается без ответа (ревью Gs на #50).
-  if [ "${FICSITAI_SYSTEM_PROMPT:-own}" = "stock" ]; then
-    export FICSITAI_WHITELIST=off
-    echo "предупреждение: штатный промпт Foreman и выключенный белый список — только для проверок" >&2
-  else
-    export SYSTEM_PROMPT_PATH="$REPO_ROOT/third_party/foreman/SYSTEM_PROMPT.md"
-    export FICSITAI_WHITELIST="${FICSITAI_WHITELIST:-on}"
-  fi
+  # заканчивается ходом без ответа. Промпт и список — одна настройка на две
+  # стороны, и обе половины здесь включены всегда.
+  #
+  # Переключателя «штатный промпт» тут нет: по Co-104 фильтр штатного
+  # адаптера не отключается ничем во время работы, а сравнение со штатным
+  # Foreman живёт на отдельном стенде — свой Foreman, свой playthrough, без
+  # мода и без этого лаунчера.
+  export SYSTEM_PROMPT_PATH="$REPO_ROOT/third_party/foreman/SYSTEM_PROMPT.md"
   export ADAPTER_HOST="$HOST_LOOPBACK"
   export ADAPTER_PORT
   export SF_MCP_URL="http://$HOST_LOOPBACK:$SF_MCP_PORT/mcp"

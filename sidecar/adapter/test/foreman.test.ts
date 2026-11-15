@@ -562,3 +562,55 @@ describe("повторное ревью Gs на #48", () => {
     }
   });
 });
+
+describe("третий круг ревью Gs на #48", () => {
+  const failing = (status: number) =>
+    fakeForeman((_seen, _req, res) => json(res, status, { error: "не сейчас" }));
+
+  it("на 503 говорит о недоступности и не зовёт убирать базу", async () => {
+    const fake = await failing(503);
+    try {
+      const session = new ForemanSession(
+        `http://127.0.0.1:${fake.port}`,
+        account,
+        silent,
+        "/данные/adapter-account.json",
+      );
+      // Прежде сюда попадала диагностика «пароль другой» и совет убрать файл
+      // вместе с базой Foreman — то есть стереть разговоры из-за того, что
+      // сервер не поднялся.
+      await expect(session.authenticate()).rejects.toThrow(/Foreman не отвечает/);
+      await expect(session.authenticate()).rejects.not.toThrow(/восстановите файл/);
+      await expect(session.authenticate()).rejects.not.toThrow(/базой Foreman: /);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  it("подсказка про копию остаётся там, где она верна: 401 и 422", async () => {
+    const fake = await fakeForeman((_seen, req, res) => {
+      if (req.url === "/api/auth/sign-in/email") {
+        json(res, 401, { code: "INVALID_EMAIL_OR_PASSWORD" });
+        return;
+      }
+      json(res, 422, { code: "USER_ALREADY_EXISTS" });
+    });
+    try {
+      const session = new ForemanSession(`http://127.0.0.1:${fake.port}`, account, silent);
+      await expect(session.authenticate()).rejects.toThrow(/заведена с другим паролем/);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  it("прочие отказы остаются без догадок о причине", async () => {
+    const fake = await failing(400);
+    try {
+      const session = new ForemanSession(`http://127.0.0.1:${fake.port}`, account, silent);
+      await expect(session.authenticate()).rejects.toThrow(/вход в Foreman не удался/);
+      await expect(session.authenticate()).rejects.not.toThrow(/другим паролем/);
+    } finally {
+      await fake.close();
+    }
+  });
+});

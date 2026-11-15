@@ -957,15 +957,33 @@ describe("повторное ревью Gs на #51", () => {
   });
 });
 
-describe("повторное ревью Gs на #50 (тот же код здесь)", () => {
-  it("FICSITAI_WHITELIST=off доходит до настроек", async () => {
-    const env = { ADAPTER_TOKEN: TOKEN } as NodeJS.ProcessEnv;
-    expect(loadConfig({ ...env, FICSITAI_WHITELIST: "off" }).whitelist).toBe(false);
-    expect(loadConfig(env).whitelist).toBe(true);
-    expect(() => loadConfig({ ...env, FICSITAI_WHITELIST: "может быть" })).toThrow(/whitelist/);
+describe("третий круг ревью Gs на #50 (тот же код здесь)", () => {
+  /** Клиент MCP, как ходит Foreman. */
+  async function withClient<T>(base: string, body: (client: Client) => Promise<T>): Promise<T> {
+    const client = new Client({ name: "test-foreman", version: "0" });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${base}/mcp?token=${TOKEN}`)));
+    try {
+      return await body(client);
+    } finally {
+      await client.close();
+    }
+  }
 
-    const off = await adapterFor(await quietForeman(), { FICSITAI_WHITELIST: "off" });
-    const health = (await (await fetch(`${off.base}/health`)).json()) as { hiddenTools: string[] };
-    expect(health.hiddenTools).toEqual([]);
+  it("белый список не выключается окружением (Co-104)", async () => {
+    // Поля в настройках больше нет: фильтр штатного адаптера не отключается
+    // ничем во время работы.
+    const config = loadConfig({ ADAPTER_TOKEN: TOKEN, FICSITAI_WHITELIST: "off" } as NodeJS.ProcessEnv);
+    expect((config as unknown as Record<string, unknown>).whitelist).toBeUndefined();
+
+    const { base } = await adapterFor(await quietForeman(), { FICSITAI_WHITELIST: "off" });
+    const health = (await (await fetch(`${base}/health`)).json()) as { hiddenTools: string[] };
+    const hidden = health.hiddenTools[0] as string;
+    expect(hidden).toBeTypeOf("string");
+
+    await withClient(base, async (client) => {
+      // Оба обработчика: скрытого имени нет в списке и его вызов отклоняется.
+      expect((await client.listTools()).tools.map((tool) => tool.name)).not.toContain(hidden);
+      await expect(client.callTool({ name: hidden, arguments: {} })).rejects.toThrow();
+    });
   });
 });

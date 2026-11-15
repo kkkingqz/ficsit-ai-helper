@@ -70,16 +70,6 @@ const schema = z.object({
    * модель в строке состояния ассистента, а Foreman её не отдаёт (Co2-25).
    */
   model: z.string().default(""),
-  /**
-   * Белый список инструментов модели. Выключается только вместе со штатным
-   * системным промптом Foreman: промпт и список — одна настройка на две
-   * стороны, и порознь они дают модель, которой обещан отсутствующий
-   * инструмент (ревью Gs на #50). Лаунчер выставляет оба значения разом.
-   */
-  whitelist: z
-    .enum(["on", "off"])
-    .default("on")
-    .transform((value) => value === "on"),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -117,10 +107,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     normalizerPort: env.NORMALIZER_PORT,
     accountPath: env.FOREMAN_ACCOUNT_PATH,
     model: env.LLM_MODEL,
-    // Без этой строки поле оставалось при значении по умолчанию, и штатный
-    // запуск с `FICSITAI_WHITELIST=off` всё равно шёл с белым списком
-    // (повторное ревью Gs на #50): схема была, чтения не было.
-    whitelist: env.FICSITAI_WHITELIST,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 
