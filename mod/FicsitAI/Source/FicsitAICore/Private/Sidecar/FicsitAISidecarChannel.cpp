@@ -160,7 +160,11 @@ void FFicsitAISidecarChannel::Start()
 		TSharedPtr<FFicsitAISidecarChannel, ESPMode::ThreadSafe> C = Weak.Pin();
 		return C.IsValid() && C->Tick(Dt);
 	}), 0.0f);
+	// Подписчик OnStateChanged может остановить канал прямо из уведомления Connecting (ревью #52, третий круг):
+	// тогда рукопожатие не отправляется, иначе адаптер закрыл бы прежнюю сессию ради отброшенного ответа.
+	const uint64 Run = RunId;
 	SetState(EFicsitAIChannelState::Connecting, TEXT("start"));
+	if (Run != RunId || State == EFicsitAIChannelState::Stopped) { return; }
 	SendHello();
 }
 
@@ -207,7 +211,7 @@ TSharedRef<IHttpRequest, ESPMode::ThreadSafe> FFicsitAISidecarChannel::MakeReque
 
 void FFicsitAISidecarChannel::SendHello()
 {
-	if (bHelloInFlight) { return; }
+	if (bHelloInFlight || State == EFicsitAIChannelState::Stopped) { return; }
 	bHelloInFlight = true;
 	++Stats.Hellos;
 	const uint64 Gen = ++Generation;
