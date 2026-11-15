@@ -167,7 +167,7 @@ describe("S5-lite Sidecar Packager", () => {
     expect(smokeRes.success).toBe(true);
   });
 
-  it("stages win-x64 layout, validates prompt, and passes Wine verification directly in stagePackage", { timeout: 45000 }, () => {
+  it("stages win-x64 layout, validates prompt, and passes Wine verification directly in stagePackage", { timeout: 90000 }, () => {
     const config = getDefaultConfig();
     const stageDir = stagePackage("win-x64", config);
 

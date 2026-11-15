@@ -541,6 +541,8 @@ export function verifyLinuxNode(
     const verOutput = execFileSync(nodeBin, ["-v"], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30000,
+      killSignal: "SIGKILL",
     }).trim();
 
     const appDir = path.join(stageDir, "app");
@@ -551,6 +553,8 @@ export function verifyLinuxNode(
       cwd: appDir,
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: 30000,
+      killSignal: "SIGKILL",
     });
 
     if (testOutput.includes("LINUX_SQLITE_OK_RES_2")) {
@@ -767,7 +771,7 @@ export function stagePackage(
       throw new Error(`Foreman startup verification failed: ${smokeVerify.details}`);
     }
   } else if (target === "win-x64") {
-    const wineVerify = verifyWine(stageDir);
+    const wineVerify = verifyWine(stageDir, config.cacheDir);
     if (!wineVerify.success) {
       throw new Error(`Wine verification failed: ${wineVerify.details}`);
     }
@@ -810,7 +814,10 @@ export function buildTarget(
   };
 }
 
-export function verifyWine(stageDir: string): { success: boolean; details: string } {
+export function verifyWine(
+  stageDir: string,
+  cacheDir?: string
+): { success: boolean; details: string } {
   const nodeExe = path.join(stageDir, "runtime", "node.exe");
   if (!fs.existsSync(nodeExe)) {
     return { success: false, details: `runtime/node.exe not found in ${stageDir}` };
@@ -819,11 +826,25 @@ export function verifyWine(stageDir: string): { success: boolean; details: strin
   const logFile = path.join(stageDir, "run", "wine-verify.log");
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
 
+  const winePrefix = cacheDir
+    ? path.join(cacheDir, "wine-prefix")
+    : path.resolve(stageDir, "../../cache/wine-prefix");
+  fs.mkdirSync(winePrefix, { recursive: true });
+
+  const wineEnv = {
+    ...process.env,
+    WINEPREFIX: winePrefix,
+    WINEDEBUG: "-all",
+  };
+
   try {
-    // 1. Verify portable node runs under wine
+    // 1. Verify portable node runs under wine with timeout and isolated WINEPREFIX
     const verOutput = execFileSync("wine", [nodeExe, "-v"], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
+      timeout: 60000,
+      killSignal: "SIGKILL",
+      env: wineEnv,
     }).trim();
 
     // 2. Verify better-sqlite3 loads under wine by redirecting to log file
@@ -837,7 +858,12 @@ export function verifyWine(stageDir: string): { success: boolean; details: strin
         "-c",
         `cd "${appDir}" && wine "${nodeExe}" -e "${testScript}" > "${logFile}" 2>&1`,
       ],
-      { encoding: "utf-8" }
+      {
+        encoding: "utf-8",
+        timeout: 120000,
+        killSignal: "SIGKILL",
+        env: wineEnv,
+      }
     );
 
     const output = fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf-8") : "";
@@ -845,7 +871,7 @@ export function verifyWine(stageDir: string): { success: boolean; details: strin
     if (output.includes("WINE_SQLITE_OK_RES_2")) {
       return {
         success: true,
-        details: `Wine 11.0 verified successfully: Node ${verOutput}, SQLite in-memory query OK`,
+        details: `Wine 11.0 verified successfully: Node ${verOutput}, SQLite in-memory query OK (prefix: ${winePrefix})`,
       };
     } else {
       return { success: false, details: `Wine output mismatch: ${output}` };
