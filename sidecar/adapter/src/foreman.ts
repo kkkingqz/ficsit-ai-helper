@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import type { Logger } from "./log.js";
 
@@ -62,11 +62,39 @@ export function playthroughIdFor(saveId: string): string {
   return `${PLAYTHROUGH_PREFIX}${digest.slice(0, 32)}`;
 }
 
-/** Создаёт файл аккаунта, если его ещё нет, и возвращает учётные данные. */
+/**
+ * Создаёт файл аккаунта, если его ещё нет, и возвращает учётные данные.
+ *
+ * Два правила про секрет, оба — по ревью Gs на #48:
+ *
+ * - **текст ошибки не несёт содержимого файла.** `JSON.parse` кладёт в
+ *   `SyntaxError.message` кусок разбираемой строки, то есть при повреждённом
+ *   файле — кусок пароля, а это сообщение уходит в стартовый лог;
+ * - **права существующего файла проверяются.** Файл, созданный чужой рукой с
+ *   режимом 0644, читается молча, и пароль доступен любому процессу
+ *   пользователя. Мы его не чиним сами: это чужое решение, но отказываемся
+ *   работать и говорим, что сделать.
+ */
 export function loadOrCreateAccount(path: string): ForemanAccount {
+  let raw: string | undefined;
   try {
-    const raw = readFileSync(path, "utf8");
-    const parsed = JSON.parse(raw) as Partial<ForemanAccount>;
+    raw = readFileSync(path, "utf8");
+  } catch (err: unknown) {
+    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
+  }
+
+  if (raw !== undefined) {
+    assertPrivateMode(path);
+    let parsed: Partial<ForemanAccount>;
+    try {
+      parsed = JSON.parse(raw) as Partial<ForemanAccount>;
+    } catch {
+      // Сообщение разбора сюда не попадает — в нём бывает кусок пароля.
+      throw new ForemanError(
+        `файл аккаунта ${path} не разобран как JSON. Удалите его и перезапустите сайдкар: ` +
+          "аккаунт заведётся заново",
+      );
+    }
     if (
       typeof parsed.email === "string" &&
       typeof parsed.password === "string" &&
@@ -76,8 +104,6 @@ export function loadOrCreateAccount(path: string): ForemanAccount {
       return { email: parsed.email, name: parsed.name ?? "FICSIT AI", password: parsed.password };
     }
     throw new ForemanError(`файл аккаунта ${path} есть, но в нём нет email и пароля`);
-  } catch (err: unknown) {
-    if ((err as NodeJS.ErrnoException).code !== "ENOENT") throw err;
   }
 
   // Пароль видит только этот файл: в лог, в аргументы команд и в ответы API он
@@ -91,6 +117,20 @@ export function loadOrCreateAccount(path: string): ForemanAccount {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, `${JSON.stringify(account, undefined, 2)}\n`, { mode: 0o600 });
   return account;
+}
+
+/**
+ * Отказ, если файл с паролем доступен не только владельцу. На системах без
+ * POSIX-прав (режим без бит доступа) проверка пропускается: там права файла
+ * задаются иначе, и выдумывать их здесь нечего.
+ */
+function assertPrivateMode(path: string): void {
+  const mode = statSync(path).mode & 0o777;
+  if ((mode & 0o077) === 0) return;
+  throw new ForemanError(
+    `файл аккаунта ${path} доступен не только владельцу (права ${mode.toString(8)}). ` +
+      `Исправьте: chmod 600 ${path}`,
+  );
 }
 
 /** Склеивает cookie из ответа Better Auth в строку заголовка `cookie`. */
@@ -122,6 +162,20 @@ export class ForemanSession {
    * «сайдкар не отвечает», а узнать это можно только здесь.
    */
   public onState: ((state: "ready" | "signingIn" | "unavailable", reason?: string) => void) | undefined;
+
+  /**
+   * Один полёт на операцию: вход, создание персоны и разрешение одного
+   * сохранения выполняются по разу, сколько бы запросов их ни попросило.
+   *
+   * Без этого (ревью Gs на #48) фоновый вход при старте и первый запрос мода
+   * шли в регистрацию вдвоём, и один получал `422` при уже выданной сессии;
+   * два `resolvePlaythrough` подряд создавали две одноимённые персоны, а у
+   * закреплённого Foreman проверка существования и вставка идут отдельно,
+   * так что вторая вставка могла вернуть `500`.
+   */
+  private signingIn: Promise<void> | undefined;
+  private ensuringForeman: Promise<string> | undefined;
+  private readonly resolving = new Map<string, Promise<string>>();
 
   /**
    * Свой `Origin` в каждом запросе.
@@ -162,16 +216,32 @@ export class ForemanSession {
    * только попыткой регистрации: она вернёт 422, если пользователь уже есть.
    */
   public async authenticate(): Promise<void> {
+    // Второй вызов не повторяет вход, а ждёт первого.
+    const inFlight = this.signingIn;
+    if (inFlight !== undefined) return await inFlight;
+
+    const attempt = this.signIn().finally(() => {
+      this.signingIn = undefined;
+    });
+    this.signingIn = attempt;
+    return await attempt;
+  }
+
+  private async signIn(): Promise<void> {
     this.onState?.("signingIn");
     const body = JSON.stringify({
       email: this.account.email,
       password: this.account.password,
       name: this.account.name,
     });
+    // Переход по `Location` здесь запрещён так же, как в запросах API: на
+    // `307` тело запроса повторяется целиком, то есть пароль уходит на чужой
+    // origin, а его `Set-Cookie` мы бы приняли за свою сессию (ревью Gs #48).
     const signIn = await fetch(this.url("/api/auth/sign-in/email"), {
       method: "POST",
       headers: { "content-type": "application/json", origin: this.origin },
       body,
+      redirect: "manual",
     });
     if (signIn.ok) {
       this.cookie = cookieHeaderFrom(signIn, this.cookie);
@@ -184,6 +254,7 @@ export class ForemanSession {
       method: "POST",
       headers: { "content-type": "application/json", origin: this.origin },
       body,
+      redirect: "manual",
     });
     if (signUp.ok) {
       this.cookie = cookieHeaderFrom(signUp, this.cookie);
@@ -245,7 +316,17 @@ export class ForemanSession {
   /** Персона, под которой работает мод: ищется по имени, создаётся один раз. */
   public async ensureForeman(): Promise<string> {
     if (this.foremanId !== undefined) return this.foremanId;
+    const inFlight = this.ensuringForeman;
+    if (inFlight !== undefined) return await inFlight;
 
+    const attempt = this.findOrCreateForeman().finally(() => {
+      this.ensuringForeman = undefined;
+    });
+    this.ensuringForeman = attempt;
+    return await attempt;
+  }
+
+  private async findOrCreateForeman(): Promise<string> {
     const existing = await this.json<{ id: string; name: string }[]>("/api/foremen");
     const found = existing.find((foreman) => foreman.name === FOREMAN_NAME);
     if (found !== undefined) {
@@ -273,6 +354,23 @@ export class ForemanSession {
     if (saveId.length === 0) throw new ForemanError("saveId пустой");
     const id = playthroughIdFor(saveId);
 
+    // Один полёт на сохранение: два одновременных запроса одного saveId
+    // создавали playthrough дважды.
+    const inFlight = this.resolving.get(id);
+    if (inFlight !== undefined) return await inFlight;
+
+    const attempt = this.findOrCreatePlaythrough(id, saveId, saveName).finally(() => {
+      this.resolving.delete(id);
+    });
+    this.resolving.set(id, attempt);
+    return await attempt;
+  }
+
+  private async findOrCreatePlaythrough(
+    id: string,
+    saveId: string,
+    saveName?: string,
+  ): Promise<string> {
     const existing = await this.request(`/api/playthroughs/${id}`);
     if (existing.ok) return id;
     if (existing.status !== 404) {
@@ -285,11 +383,19 @@ export class ForemanSession {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ id, foremanId, name: saveName ?? saveId }),
     });
-    // 409 — тот же playthrough успели создать параллельно: это не ошибка,
-    // идентификатор всё равно наш.
-    if (created.ok || created.status === 409) {
-      if (created.ok) this.log.info(`playthrough для сохранения создан (${id})`);
+    if (created.ok) {
+      this.log.info(`playthrough для сохранения создан (${id})`);
       return id;
+    }
+
+    // Чужая вставка того же идентификатора. У закреплённого Foreman проверка
+    // существования и вставка идут отдельными запросами, поэтому конфликт
+    // виден и как `409`, и как `500` от уникального ограничения. Гадать не
+    // надо: спрашиваем ещё раз, и если playthrough на месте — он наш
+    // (ревью Gs #48).
+    if (created.status === 409 || created.status >= 500) {
+      const again = await this.request(`/api/playthroughs/${id}`);
+      if (again.ok) return id;
     }
     throw new ForemanError(`POST /api/playthroughs → ${created.status}`, created.status);
   }

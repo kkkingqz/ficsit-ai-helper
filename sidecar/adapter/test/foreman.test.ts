@@ -1,5 +1,6 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { loadConfig } from "../src/config.js";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { AddressInfo } from "node:net";
@@ -281,6 +282,10 @@ describe("сохранение игры → playthrough", () => {
 
   it("гонка двух запусков: 409 на создании — это не ошибка", async () => {
     const id = playthroughIdFor("save-C");
+    // Чужой запуск успел создать playthrough между нашим GET и POST: первый
+    // GET отвечает 404, POST — 409, а подтверждающий GET уже 200. Так это и
+    // выглядит у настоящего Foreman, где проверка и вставка — разные запросы.
+    let createdElsewhere = false;
     const fake = await fakeForeman((_seen, req, res) => {
       if (req.url?.startsWith("/api/auth/") === true) {
         res.writeHead(200, { "set-cookie": "better-auth.session_token=ok" });
@@ -288,6 +293,10 @@ describe("сохранение игры → playthrough", () => {
         return;
       }
       if (req.url === `/api/playthroughs/${id}`) {
+        if (createdElsewhere) {
+          json(res, 200, { id });
+          return;
+        }
         json(res, 404, {});
         return;
       }
@@ -295,6 +304,7 @@ describe("сохранение игры → playthrough", () => {
         json(res, 200, [{ id: "foreman-1", name: "FICSIT AI" }]);
         return;
       }
+      createdElsewhere = true;
       json(res, 409, { error: `Playthrough '${id}' already exists.` });
     });
 
@@ -352,7 +362,150 @@ describe("файл аккаунта", () => {
   it("битый файл — отказ с понятной причиной, а не молчаливый новый аккаунт", () => {
     const dir = mkdtempSync(join(tmpdir(), "ficsitai-account-"));
     const path = join(dir, "adapter-account.json");
-    writeFileSync(path, '{"email":"есть","password":""}');
+    writeFileSync(path, '{"email":"есть","password":""}', { mode: 0o600 });
     expect(() => loadOrCreateAccount(path)).toThrow(/нет email и пароля/);
+  });
+});
+
+describe("замечания ревью Gs на #48", () => {
+  it("вход не идёт за редиректом: пароль не уходит на чужой origin", async () => {
+    // Второй сервер — «чужой origin». Он не должен увидеть ни тела, ни того,
+    // что его cookie приняли за нашу сессию.
+    const other = await fakeForeman((_seen, _req, res) => {
+      res.writeHead(200, { "set-cookie": "better-auth.session_token=чужая; Path=/" });
+      res.end("{}");
+    });
+    const foreman = await fakeForeman((_seen, req, res) => {
+      if (req.url?.startsWith("/api/auth/")) {
+        // 307 повторяет метод и тело целиком — именно так пароль и уезжает.
+        res.writeHead(307, { location: `http://127.0.0.1:${other.port}${req.url}` });
+        res.end();
+        return;
+      }
+      json(res, 500, { error: "сюда ходить было не нужно" });
+    });
+
+    try {
+      const session = sessionOf(foreman);
+      await expect(session.authenticate()).rejects.toThrow(/вход в Foreman не удался/);
+      expect(session.authenticated).toBe(false);
+      expect(other.seen).toHaveLength(0);
+    } finally {
+      await foreman.close();
+      await other.close();
+    }
+  });
+
+  it("повреждённый файл аккаунта не выносит содержимое в ошибку", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "ficsitai-acc-")), "account.json");
+    // Пароль в повреждённом JSON: сообщение разбора процитировало бы его.
+    writeFileSync(path, '{"email":"a@b","password":"сЕкРеТ-123456', { mode: 0o600 });
+    try {
+      loadOrCreateAccount(path);
+      throw new Error("ожидался отказ");
+    } catch (err: unknown) {
+      const message = (err as Error).message;
+      expect(message).toContain("не разобран");
+      expect(message).not.toContain("сЕкРеТ");
+    }
+  });
+
+  it("файл аккаунта с чужими правами не читается молча", async () => {
+    const path = join(mkdtempSync(join(tmpdir(), "ficsitai-acc-")), "account.json");
+    writeFileSync(path, JSON.stringify({ email: "a@b", password: "пароль" }), { mode: 0o644 });
+    expect(() => loadOrCreateAccount(path)).toThrow(/доступен не только владельцу/);
+  });
+
+  it("два одновременных входа дают один запрос к Foreman", async () => {
+    const fake = await fakeForeman((_seen, req, res) => {
+      if (req.url === "/api/auth/sign-in/email") {
+        res.writeHead(200, { "set-cookie": "better-auth.session_token=live; Path=/" });
+        res.end("{}");
+        return;
+      }
+      json(res, 500, { error: "регистрация была не нужна" });
+    });
+    try {
+      const session = sessionOf(fake);
+      await Promise.all([session.authenticate(), session.authenticate(), session.authenticate()]);
+      expect(fake.seen.filter((entry) => entry.url.startsWith("/api/auth/"))).toHaveLength(1);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  it("два одновременных запроса одного сохранения создают playthrough один раз", async () => {
+    const fake = await fakeForeman((_seen, req, res) => {
+      if (req.url === "/api/auth/sign-in/email") {
+        res.writeHead(200, { "set-cookie": "better-auth.session_token=live; Path=/" });
+        res.end("{}");
+        return;
+      }
+      if (req.method === "GET" && req.url === "/api/foremen") {
+        json(res, 200, [{ id: "f-1", name: "FICSIT AI" }]);
+        return;
+      }
+      if (req.method === "GET" && req.url?.startsWith("/api/playthroughs/")) {
+        json(res, 404, { error: "нет" });
+        return;
+      }
+      if (req.method === "POST" && req.url === "/api/playthroughs") {
+        json(res, 201, { id: "создан" });
+        return;
+      }
+      json(res, 500, { error: req.url });
+    });
+    try {
+      const session = sessionOf(fake);
+      const [first, second] = await Promise.all([
+        session.resolvePlaythrough("Сейв"),
+        session.resolvePlaythrough("Сейв"),
+      ]);
+      expect(first).toBe(second);
+      expect(fake.seen.filter((entry) => entry.url === "/api/playthroughs")).toHaveLength(1);
+    } finally {
+      await fake.close();
+    }
+  });
+
+  it("чужая вставка того же идентификатора подтверждается повторным GET", async () => {
+    let created = false;
+    const fake = await fakeForeman((_seen, req, res) => {
+      if (req.url === "/api/auth/sign-in/email") {
+        res.writeHead(200, { "set-cookie": "better-auth.session_token=live; Path=/" });
+        res.end("{}");
+        return;
+      }
+      if (req.method === "GET" && req.url === "/api/foremen") {
+        json(res, 200, [{ id: "f-1", name: "FICSIT AI" }]);
+        return;
+      }
+      if (req.method === "GET" && req.url?.startsWith("/api/playthroughs/")) {
+        json(res, created ? 200 : 404, created ? { id: "есть" } : { error: "нет" });
+        return;
+      }
+      if (req.method === "POST" && req.url === "/api/playthroughs") {
+        // Уникальное ограничение базы: у закреплённого Foreman это 500.
+        created = true;
+        json(res, 500, { error: "unique constraint" });
+        return;
+      }
+      json(res, 500, { error: req.url });
+    });
+    try {
+      const session = sessionOf(fake);
+      await expect(session.resolvePlaythrough("Сейв")).resolves.toBe(playthroughIdFor("Сейв"));
+    } finally {
+      await fake.close();
+    }
+  });
+
+  it("не-петлевой адрес Foreman — отказ запуска", () => {
+    expect(() =>
+      loadConfig({
+        ADAPTER_TOKEN: "x".repeat(32),
+        FOREMAN_BASE_URL: "http://10.0.0.5:8724",
+      } as NodeJS.ProcessEnv),
+    ).toThrow(/петле/);
   });
 });

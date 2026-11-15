@@ -12,8 +12,8 @@
 #   FICSITAI_DATA данные сайдкара: база, саквояж саveов, токен, логи, pid
 #                 (по умолчанию ~/.local/share/ficsitai/foreman)
 #   FICSITAI_LLM  gemini (по умолчанию, решение King 10.11.2026), anthropic или openai
-#   FICSITAI_SYSTEM_PROMPT own (по умолчанию) — свой промпт под белый список адаптера;
-#                 stock — штатный промпт Foreman (тогда белый список надо выключить)
+#   FICSITAI_SYSTEM_PROMPT own (по умолчанию) — свой промпт и действующий белый список;
+#                 stock — штатный промпт Foreman и выключенный белый список, только для проверок
 #   LLM_MODEL     модель чата; для gemini по умолчанию gemini-3.5-flash-lite
 #   LLM_API_KEY   ключ провайдера; если не задан, берётся из <FICSITAI_DATA>/llm.key
 #                 (кладётся командой set-key, права 600). Без ключа поднимается всё,
@@ -183,6 +183,10 @@ common_env() {
   mkdir -p "$FICSITAI_DATA/saves"
   export SAVE_DATA_DIR="$FICSITAI_DATA/saves"
   export DATABASE_URL="file:$FICSITAI_DATA/foreman.db"
+  # Файл аккаунта адаптера лежит рядом со своей базой, а не в общем каталоге
+  # XDG: иначе при своём FICSITAI_DATA пароль остаётся вне резервной копии
+  # этой базы, и восстановление даёт базу без доступа к ней (ревью Gs #48).
+  export FOREMAN_ACCOUNT_PATH="$FICSITAI_DATA/adapter-account.json"
   # sf-mcp по умолчанию слушает 0.0.0.0 и в режиме stdio не слушает вовсе.
   export MCP_TRANSPORT=http
   export MCP_HTTP_HOST="$HOST_LOOPBACK"
@@ -197,8 +201,17 @@ common_env() {
   # заканчивается ходом без ответа. Поэтому промпт и белый список включаются
   # только вместе; FICSITAI_SYSTEM_PROMPT=stock возвращает промпт Foreman —
   # тогда и белый список надо выключить, иначе чат будет рваться.
-  if [ "${FICSITAI_SYSTEM_PROMPT:-own}" = "own" ]; then
+  # Промпт и белый список — одна настройка на две стороны. По умолчанию наш
+  # промпт и действующий список; FICSITAI_SYSTEM_PROMPT=stock возвращает
+  # промпт Foreman и **одновременно** выключает список у адаптера. Порознь
+  # эти две половины дают модель, которой обещан скрытый инструмент: ход
+  # заканчивается без ответа (ревью Gs на #50).
+  if [ "${FICSITAI_SYSTEM_PROMPT:-own}" = "stock" ]; then
+    export FICSITAI_WHITELIST=off
+    echo "предупреждение: штатный промпт Foreman и выключенный белый список — только для проверок" >&2
+  else
     export SYSTEM_PROMPT_PATH="$REPO_ROOT/third_party/foreman/SYSTEM_PROMPT.md"
+    export FICSITAI_WHITELIST="${FICSITAI_WHITELIST:-on}"
   fi
   export ADAPTER_HOST="$HOST_LOOPBACK"
   export ADAPTER_PORT

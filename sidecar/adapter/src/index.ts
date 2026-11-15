@@ -38,7 +38,12 @@ import { applyWhitelist, hiddenCallRefusal, hiddenToolNames } from "./whitelist.
 const SERVER_NAME = "ficsitai-adapter";
 const SERVER_VERSION = "0.0.1";
 
-export function createMcpServer(upstream: UpstreamMcp, channel: ModChannel, log: Logger): Server {
+export function createMcpServer(
+  upstream: UpstreamMcp,
+  channel: ModChannel,
+  log: Logger,
+  whitelist = true,
+): Server {
   // Низкоуровневый Server, а не McpServer с сахаром: список инструментов должен
   // приходить из реестра операций (S2, V-3), а не собираться из регистраций в
   // коде адаптера. Возможность `tools` объявляется сразу и пустым списком —
@@ -73,7 +78,7 @@ export function createMcpServer(upstream: UpstreamMcp, channel: ModChannel, log:
       log.warn("sf-mcp не отвечает — отдаю только инструменты мода", err);
     }
 
-    const passthrough = applyWhitelist(all);
+    const passthrough = whitelist ? applyWhitelist(all) : all;
     log.debug(
       `tools/list: инструментов мода ${modTools.length}, ` +
         `проброшено из sf-mcp ${passthrough.length}, скрыто ${all.length - passthrough.length}`,
@@ -114,7 +119,7 @@ export function createMcpServer(upstream: UpstreamMcp, channel: ModChannel, log:
     // Скрытый инструмент модель по списку не видит, но может позвать по памяти
     // о чужом промпте. Отказ с причиной лучше тихого проброса: иначе белый
     // список выглядит соблюдённым, а данные всё равно уходят в ответ.
-    const refusal = hiddenCallRefusal(name);
+    const refusal = whitelist ? hiddenCallRefusal(name) : undefined;
     if (refusal !== undefined) {
       log.warn(`вызов скрытого инструмента «${name}» отклонён`);
       throw new McpError(ErrorCode.InvalidRequest, refusal);
@@ -168,7 +173,7 @@ export async function createApp(config: Config, log: Logger) {
       foremanBaseUrl: config.foremanBaseUrl,
       sfMcpUrl: config.sfMcpUrl,
       foreman: { signedIn: foreman.authenticated },
-      hiddenTools: hiddenToolNames(),
+      hiddenTools: config.whitelist ? hiddenToolNames() : [],
       mod: {
         connected: channel.connected,
         session: channel.sessionId ?? "",
@@ -188,7 +193,7 @@ export async function createApp(config: Config, log: Logger) {
       return;
     }
 
-    const server = createMcpServer(upstream, channel, log);
+    const server = createMcpServer(upstream, channel, log, config.whitelist);
     const transport = new StreamableHTTPServerTransport({});
     res.on("close", () => {
       void transport.close();
