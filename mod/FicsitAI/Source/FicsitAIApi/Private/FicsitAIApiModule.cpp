@@ -1,6 +1,6 @@
 #include "FicsitAIApiModule.h"
 
-DEFINE_LOG_CATEGORY_STATIC(LogFicsitAIApi, Log, All);
+#include "FicsitAIApiCore.h"
 
 void FFicsitAIApiModule::StartupModule()
 {
