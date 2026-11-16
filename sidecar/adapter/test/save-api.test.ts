@@ -58,6 +58,8 @@ function config(overrides: Partial<Config> = {}): Config {
 interface Started {
   url: string;
   port: number;
+  /** Слушатель уже закрыт самой проверкой. */
+  closed?: boolean;
   api: SaveApi;
   server: Server;
   /** Чем библиотеку позвали. */
@@ -71,6 +73,7 @@ afterEach(async () => {
   while (started.length > 0) {
     const item = started.pop();
     item?.api.close();
+    if (item?.closed === true) continue;
     await new Promise<void>((done) => item?.server.close(() => done()));
   }
 });
@@ -442,18 +445,31 @@ describe("замечания ревью Gs на #67", () => {
     expect(seen[0]).toEqual({ metricId: "x", "будущее": "поле" });
   });
 
-  it("close() закрывает открытый поток событий, а не ждёт клиента", async () => {
-    // Иначе `server.close()` не доходит до своего callback, пока клиент сам
-    // не отключится, и адаптер висит на остановке.
-    const { url, api } = await serve();
-    const response = await fetch(`${url}/api/v0/events`);
+  it("close() закрывает открытый поток, и слушатель успевает остановиться", async () => {
+    // Проба Gs: `saveApi.close()` зачищал таймер, но поток оставался открыт,
+    // и callback `server.close()` не вызывался до отключения клиента —
+    // адаптер висел на остановке.
+    const started = await serve();
+    const response = await fetch(`${started.url}/api/v0/events`);
     const reader = response.body?.getReader();
     const first = await reader?.read();
     expect(new TextDecoder().decode(first?.value)).toContain("event: ready");
 
-    api.close();
+    started.api.close();
     const next = await reader?.read();
     expect(next?.done).toBe(true);
+
+    // И слушатель закрывается, не дожидаясь клиента.
+    const closed = await new Promise<boolean>((done) => {
+      const timer = setTimeout(() => done(false), 2000);
+      started.server.close(() => {
+        clearTimeout(timer);
+        done(true);
+      });
+    });
+    expect(closed).toBe(true);
+    // Закрыт — повторное закрытие в afterEach не нужно.
+    started.closed = true;
   });
 });
 
