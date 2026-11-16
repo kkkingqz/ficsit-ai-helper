@@ -555,10 +555,12 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         return;
     }
 
-    // В состоянии Ready переключаем открытие терминала
+    // В состоянии Ready переключаем открытие терминала. По умолчанию — «Статистика» (веб, ADR-032, S8 3.4);
+    // где браузера нет (фабрика её не регистрирует), — тестовый модуль Notes, как раньше.
     if (ActiveModuleId == NAME_None)
     {
-        OpenModule(FName(TEXT("Notes")));
+        const FName Statistics(TEXT("Statistics"));
+        OpenModule(GetAvailableModules().Contains(Statistics) ? Statistics : FName(TEXT("Notes")));
     }
 
     UFicsitAIScreenSurfaceWidget* Widget = UFicsitAIScreenSurfaceWidget::OpenForPlayer(PC, this, HostContext.HostState, nullptr);

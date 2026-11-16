@@ -39,6 +39,11 @@
 			"Name": "SML",
 			"Enabled": true,
 			"SemVersion": "^3.12.0"
+		},
+		{
+			"Name": "FicsitAIWebRuntime",
+			"Enabled": true,
+			"SemVersion": "^0.1.0"
 		}
 	]
 }
