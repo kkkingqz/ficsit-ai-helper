@@ -47,6 +47,12 @@
         "id": {
           "type": "string",
           "pattern": "^[a-z][a-z0-9_.]{0,63}$"
+        },
+        "scopeId": {
+          "description": "Область метрики: className предмета, id сети, тип машины (ScopeId в public-api-v0). При другом kind — отказ INVALID_ARGUMENT при проверке карточки. Метрика с областью без scopeId — отказ SCOPE_REQUIRED, области по умолчанию нет (Co2-56).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
         }
       }
     },

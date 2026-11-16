@@ -32,7 +32,11 @@
             "required": ["kind", "id"],
             "properties": {
               "kind": { "enum": ["plan", "metric", "line", "work_orders", "notes", "static"] },
-              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{0,63}$" }
+              "id": { "type": "string", "pattern": "^[a-z][a-z0-9_.]{0,63}$" },
+              "scopeId": {
+                "description": "Область метрики (ScopeId в public-api-v0), при другом kind — отказ INVALID_ARGUMENT; как у карточки чата (Co2-56).",
+                "type": "string", "minLength": 1, "maxLength": 128
+              }
             }
           },
           "options": {
