@@ -1,4 +1,4 @@
-import { mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -313,6 +313,66 @@ describe("замечания ревью Gs на #53: dev-сервер", () => {
     const response = await fetch(`${server.url}/link.txt`);
     expect(response.status).toBe(403);
     expect(await response.text()).not.toContain("чужое содержимое");
+  });
+});
+
+describe("врезки каталогов", () => {
+  /**
+   * Экран может ссылаться за пределы корня страниц: «Статистика» просит
+   * uPlot из `third_party/` рядом с `web/`. С одним корнем либо он, либо
+   * `ui-kit/` отдавал 404 — на это ушёл мой прогон на ревью #59.
+   */
+  it("файл из врезки отдаётся, а корень страниц остаётся корнем", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ficsitai-screens-mount-"));
+    const vendor = mkdtempSync(join(tmpdir(), "ficsitai-vendor-"));
+    writeFileSync(join(root, "index.html"), "<!doctype html><title>страница</title>");
+    writeFileSync(join(vendor, "uPlot.min.css"), ".uplot{}");
+    const server = await startDevServer({
+      root,
+      mounts: { "/third_party/uplot": vendor },
+      source: createDemoSource(),
+      port: 0,
+      watch: false,
+      log: () => {},
+    });
+    servers.push(server);
+
+    const vendored = await fetch(`${server.url}/third_party/uplot/uPlot.min.css`);
+    expect(vendored.status).toBe(200);
+    expect(await vendored.text()).toContain(".uplot");
+
+    const page = await fetch(`${server.url}/index.html`);
+    expect(page.status).toBe(200);
+    expect(await page.text()).toContain("страница");
+
+    // Мимо врезки — обычный 404 из корня страниц, а не файл вендора.
+    expect((await fetch(`${server.url}/third_party/other/uPlot.min.css`)).status).toBe(404);
+  });
+
+  it("выход за каталог врезки закрыт так же, как выход за корень", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ficsitai-screens-mount-esc-"));
+    const outside = mkdtempSync(join(tmpdir(), "ficsitai-outside-mount-"));
+    const vendor = join(outside, "vendor");
+    mkdirSync(vendor);
+    writeFileSync(join(outside, "secret.txt"), "чужое содержимое");
+    symlinkSync(join(outside, "secret.txt"), join(vendor, "link.txt"));
+    const server = await startDevServer({
+      root,
+      mounts: { "/vendor": vendor },
+      source: createDemoSource(),
+      port: 0,
+      watch: false,
+      log: () => {},
+    });
+    servers.push(server);
+
+    // Путь строкой: `..` из врезки.
+    const climbed = await fetch(`${server.url}/vendor/../secret.txt`);
+    expect(await climbed.text()).not.toContain("чужое содержимое");
+    // И ссылкой — защита, которую Gs нашёл на #53, работает и во врезке.
+    const linked = await fetch(`${server.url}/vendor/link.txt`);
+    expect(linked.status).toBe(403);
+    expect(await linked.text()).not.toContain("чужое содержимое");
   });
 });
 
