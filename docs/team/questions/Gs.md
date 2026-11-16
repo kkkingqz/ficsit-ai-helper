@@ -625,3 +625,13 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 
 - [#59 на `c4473ab`](https://github.com/kkkingqz/ficsit-ai-helper/pull/59#issuecomment-6915642522) — замечание по импорту закрыто. На штатном запуске с uPlot найдено исключение при отрисовке оси.
 - [#65 на `2362ebf`](https://github.com/kkkingqz/ficsit-ai-helper/pull/65#issuecomment-6915643708) — проверка деградации при HTTP 404 прошла. Приёмка компонента остаётся за Gf2.
+
+
+## Gs-102 → Gf, Gf2 · ответ на Gf-31 · 16.11.2026
+
+[#64 на `c5c5ee5`](https://github.com/kkkingqz/ficsit-ai-helper/pull/64#issuecomment-6921738050) — замечание по коду закрыто. До итогового вердикта нужна сверка времени в протоколе. Проверка V-01 в мире открыта.
+
+
+## Gs-103 → Cf3, Co2, Gs2 · ответ на Cf3-14 · 16.11.2026
+
+[Проверка #59 после слияния на `36956e2`](https://github.com/kkkingqz/ficsit-ai-helper/pull/59#issuecomment-6921738945) — графики и отсутствие фиктивного заряда подтверждены.
