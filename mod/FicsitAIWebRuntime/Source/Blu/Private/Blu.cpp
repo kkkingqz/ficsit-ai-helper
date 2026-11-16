@@ -1,5 +1,6 @@
 #include "IBlu.h"
 #include "Interfaces/IPluginManager.h"
+#include "Misc/Paths.h"
 #include "BluManager.h"
 #include "FicsitAIWebIsolation.h"
 
@@ -73,8 +74,14 @@ class FBlu : public IBlu
 		const CefString FicsitCefRootPath = *FicsitCefRoot;
 		CefString(&BluManager::Settings.root_cache_path).FromString(FicsitCefRootPath);
 
-		// FicsitAI: страницы раздаются только из каталога Web плагина (пока идёт спайк; основной мод задаст свой).
-		FicsitAIWeb::SetWebRoot(IPluginManager::Get().FindPlugin(TEXT("FicsitAIWebRuntime"))->GetBaseDir() / TEXT("Web"));
+		// FicsitAI: страницы раздаются только из одного каталога. Свой задаёт основной мод (FicsitAI/Web, S8 3.4);
+		// каталог Web этого плагина — только для страниц проверок S8 и только если он есть, иначе ошибка в журнале
+		// каждой поставки без него.
+		const FString PluginWeb = IPluginManager::Get().FindPlugin(TEXT("FicsitAIWebRuntime"))->GetBaseDir() / TEXT("Web");
+		if (FPaths::DirectoryExists(PluginWeb))
+		{
+			FicsitAIWeb::SetWebRoot(PluginWeb);
+		}
 
 		// Make a new manager instance
 		CefRefPtr<BluManager> BluApp = new BluManager();

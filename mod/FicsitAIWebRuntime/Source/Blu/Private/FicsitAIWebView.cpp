@@ -67,6 +67,8 @@ void SFicsitAIWebView::Construct(const FArguments& InArgs)
 	Eye = InArgs._Eye;
 	Brush.DrawAs = ESlateBrushDrawType::Image;
 	bFollowPixelSize = InArgs._FollowPixelSize;
+	HostKeys = InArgs._HostKeys;
+	bHostEscape = HostKeys.Contains(EKeys::Escape);
 	// Желаемый размер не следует за размером страницы: иначе при FollowPixelSize размер виджета зависел бы
 	// от размера браузера, а тот — от размера виджета.
 	const FIntPoint Size = PageSize();
@@ -232,6 +234,7 @@ namespace
 
 FReply SFicsitAIWebView::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
 {
+	if (IsHostKey(Event)) { return FReply::Unhandled(); }
 	CefRefPtr<CefBrowserHost> Host = Eye.IsValid() ? Eye->GetBrowserHost() : nullptr;
 	const int32 Vk = VirtualKeyOf(Event);
 	if (!Host || Vk == 0) { return FReply::Unhandled(); }
@@ -248,6 +251,7 @@ FReply SFicsitAIWebView::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& E
 
 FReply SFicsitAIWebView::OnKeyUp(const FGeometry& Geometry, const FKeyEvent& Event)
 {
+	if (IsHostKey(Event)) { return FReply::Unhandled(); }
 	CefRefPtr<CefBrowserHost> Host = Eye.IsValid() ? Eye->GetBrowserHost() : nullptr;
 	const int32 Vk = VirtualKeyOf(Event);
 	if (!Host || Vk == 0) { return FReply::Unhandled(); }
@@ -267,6 +271,8 @@ FReply SFicsitAIWebView::OnKeyChar(const FGeometry& Geometry, const FCharacterEv
 	CefRefPtr<CefBrowserHost> Host = Eye.IsValid() ? Eye->GetBrowserHost() : nullptr;
 	if (!Host) { return FReply::Unhandled(); }
 	const TCHAR Ch = Event.GetCharacter();
+	// Windows присылает Esc ещё и символом 0x1B: его тоже оставляем хосту.
+	if (bHostEscape && Ch == 0x1B) { return FReply::Unhandled(); }
 	CefKeyEvent Key;
 	Key.type = KEYEVENT_CHAR;
 	Key.windows_key_code = static_cast<int>(Ch);

@@ -21,6 +21,9 @@ class UBluEye;
  * Прозрачность: кадр CEF приходит с premultiplied alpha и так и смешивается, поэтому прозрачная страница поверх игры
  * (HUD) не даёт тёмной каймы. Пропускать ли ввод в игру, решает владелец: HUD ставит виджету HitTestInvisible
  * и не даёт ему фокус.
+ *
+ * Клавиши хоста (HostKeys): странице не передаются ни нажатие, ни символ, событие всплывает к владельцу.
+ * Экран терминала оставляет себе Esc — им управляет хост через HandleBackAction (S8 3.4).
  */
 class BLU_API SFicsitAIWebView : public SLeafWidget
 {
@@ -31,6 +34,8 @@ public:
 		SLATE_ARGUMENT(bool, FollowPixelSize)
 		/** Желаемый размер в единицах Slate; ноль — размер страницы при создании виджета. */
 		SLATE_ARGUMENT(FVector2D, DesiredSize)
+		/** Клавиши, которые остаются владельцу: в страницу не идут, событие не обрабатывается. */
+		SLATE_ARGUMENT(TArray<FKey>, HostKeys)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -75,6 +80,10 @@ private:
 	FVector2D DesiredSize = FVector2D::ZeroVector;
 	FIntPoint PendingSize = FIntPoint::ZeroValue;
 	double PendingSince = 0.0;
+	TArray<FKey> HostKeys;
+	bool bHostEscape = false;
+
+	bool IsHostKey(const FKeyEvent& Event) const { return HostKeys.Contains(Event.GetKey()); }
 
 	FReply SendButton(const FGeometry& Geometry, const FPointerEvent& Event, bool bUp, int32 ClickCount);
 	FIntPoint PageSize() const;
