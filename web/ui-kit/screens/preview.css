@@ -1,0 +1,22 @@
+.d2-preview {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  block-size: 100dvh;
+  margin: 0;
+}
+.preview-host {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--d2-space-3) var(--d2-space-5);
+  padding: var(--d2-space-3) var(--d2-space-5);
+  border-block-end: 1px solid var(--d2-stroke);
+  border-inline-start: 5px solid var(--d2-accent);
+  background: var(--d2-surface);
+}
+.preview-host h1 { margin: 0; font: var(--d2-title); }
+.preview-host > span { color: var(--d2-accent-edge); }
+.preview-host nav { display: flex; gap: var(--d2-space-2); margin-inline-start: auto; }
+.preview-host a { color: var(--d2-text); text-decoration: none; }
+.preview-host a[aria-current="page"] { color: var(--d2-accent-edge); text-decoration: underline; text-underline-offset: 4px; }
+.d2-preview main { min-block-size: 0; min-inline-size: 0; }
