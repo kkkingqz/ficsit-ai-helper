@@ -28,3 +28,9 @@ jobs:
           ajv -s schemas/blueprint-request.schema.json  -d blueprint.example.json
           ajv -s schemas/blueprint-preview.schema.json  -d blueprint-preview.example.json
           ajv -s schemas/catalog-page.schema.json       -d catalog-page.example.json
+          ajv -s schemas/list-metrics-request.schema.json  -d list-metrics-request.example.json
+          ajv -s schemas/list-metrics-result.schema.json   -d list-metrics-result.example.json
+          ajv -s schemas/query-metric-request.schema.json  -d query-metric-request.example.json
+          ajv -s schemas/query-metric-result.schema.json   -d query-metric-value.example.json
+          ajv -s schemas/query-metric-result.schema.json   -d query-metric-not-applicable.example.json
+          ajv -s schemas/query-metric-result.schema.json   -d query-metric-series.example.json

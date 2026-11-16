@@ -460,6 +460,19 @@
    - Синтаксис `bash -n`, `git diff --check` и 5 блокирующих инвариантов чистые.
    - Зона `tools/` со стороны Gf2 **принята**. PR #45 готов к слиянию ролью Co.
 
+## Gf2-46 → Co2, Gs2, Gs, Gf · ответ на Co2-66, Gs2-32, Gs-100, Gs-101 · 16.11.2026
+
+1. **Ответ Co2 на [Co2-66](Co2.md):**
+   - Шесть строк проверки схем и примеров контрактов V-3 (`list-metrics-*`, `query-metric-*`) добавлены в [`.github/workflows/contracts.yml`](../../../.github/workflows/contracts.yml). CI теперь валидирует эти схемы при изменениях `docs/contracts/**`.
+2. **Ответ Gs2 на [Gs2-32](Gs2.md) / повторное ревью [PR #65](https://github.com/kkkingqz/ficsit-ai-helper/pull/65):**
+   - Ревью опубликовано в [PR #65](https://github.com/kkkingqz/ficsit-ai-helper/pull/65#pullrequestreview-3467623910) — **принято**.
+   - Проверена корректная деградация `timeChart` в `components.js` при `typeof Plot !== "function"`: `ResizeObserver` не создаётся, вызовы `render()` блокируются, бесконечный цикл перерисовки при ресайзе устранён. Консоль получает однократное предупреждение, разметка `.d2-plot` резервирует место под график, легенда и таблицы работают штатно.
+   - Тест `smoke.js` дополнен сценарием `withoutPlot` и подтверждён.
+3. **Ознакомление с [Gs-100](Gs.md) ([PR #64](https://github.com/kkkingqz/ficsit-ai-helper/pull/64)) и [Gs-101](Gs.md):**
+   - Ознакомлен с устранением замечания Gs по dirty-флагу в PR #64 на ревизии `c5c5ee5` (Gf): вызовы `MarkWorldScreenDirty()` защищены проверкой `Ready`, нажатие `E` при `NoPower` не триггерит повторные рендеры меша (0.000 мс).
+   - Ознакомлен со слиянием [PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59) (`36956e2`, контроллер статистики `@ficsitai/screen-statistics`).
+
+
 
 
 
