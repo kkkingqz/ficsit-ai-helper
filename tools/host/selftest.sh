@@ -7,7 +7,7 @@
 # Подменяет UAT, Flatpak, wine и установку Steam заглушками во временном каталоге и проверяет ветки отказа,
 # найденные на ревью #42: ошибка копирования исходников, устаревший архив, зависание до главного меню,
 # критическая ошибка в журнале, неполученная блокировка, неопределённая роль, два запуска одной роли;
-# ветки отказа подготовки CEF (ревью #54).
+# ветки отказа подготовки CEF (ревью #54); раскладка страниц веб-экранов (S8 3.4).
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -300,6 +300,24 @@ wait
 check "в выводе — ожидание очереди" "$(grep -c "очередь 'build' занята" "$T/out.txt")" 1
 check "CEF заменён" "$(cat "$CW/shipping/libcef.dll")" new
 rm -f "$T/bin/7z"
+
+# --- страницы веб-экранов (S8 3.4) ------------------------------------------------------------------
+W="$T/webrepo"; WD="$T/webdst"
+mkdir -p "$W/web/screens/statistics/dist" "$W/web/screens/chat/src" "$W/web/screens/api/dist" "$W/web/ui-kit/screens" "$W/third_party/uplot"
+echo '<html>' > "$W/web/screens/statistics/index.html"; echo 'export{}' > "$W/web/screens/statistics/dist/main.js"
+echo '<html>' > "$W/web/screens/chat/index.html"; echo 'x' > "$W/web/screens/chat/src/main.ts"
+echo 'export{}' > "$W/web/screens/api/dist/index.js"; echo 'x' > "$W/web/ui-kit/screens/statistics.js"; echo 'x' > "$W/third_party/uplot/uPlot.iife.min.js"
+mkdir -p "$WD/stale" && echo old > "$WD/stale/old.html"
+mkdir -p "$T/webextra/spikes" && echo probe > "$T/webextra/spikes/probe.html"
+stage() { ( source "$T/repo/tools/host/lib.sh" >/dev/null 2>&1; fa_stage_web "$W" "$WD" || exit 1; echo "$FA_WEB_PAGES|$FA_WEB_MISSING" ); }
+check "раскладка: собранные и несобранные экраны" "$(stage)" "statistics|chat"
+check "страница и dist на месте" "$([[ -f "$WD/screens/statistics/index.html" && -f "$WD/screens/statistics/dist/main.js" ]] && echo yes || echo no)" yes
+check "фасад без index.html — только dist" "$([[ -f "$WD/screens/api/dist/index.js" && ! -e "$WD/screens/api/index.html" ]] && echo yes || echo no)" yes
+check "исходники TypeScript не едут" "$([[ -e "$WD/screens/chat/src" ]] && echo yes || echo no)" no
+check "ui-kit и uPlot на месте" "$([[ -f "$WD/ui-kit/screens/statistics.js" && -f "$WD/third_party/uplot/uPlot.iife.min.js" ]] && echo yes || echo no)" yes
+check "старое содержимое Web/ убрано" "$([[ -e "$WD/stale" ]] && echo yes || echo no)" no
+check "FICSITAI_WEB_EXTRA кладётся поверх" "$(FICSITAI_WEB_EXTRA="$T/webextra" stage >/dev/null; cat "$WD/spikes/probe.html" 2>/dev/null)" probe
+check "несуществующий FICSITAI_WEB_EXTRA — отказ" "$(FICSITAI_WEB_EXTRA="$T/nowhere" stage >/dev/null 2>&1; echo $?)" 1
 
 echo; echo "Итог: пройдено $pass, не пройдено $fail"
 [[ $fail -eq 0 ]]
