@@ -30,8 +30,11 @@ import type {
  *
  * Семантика хода — из контракта, и она не та, которую подсказывает интуиция:
  * отмена останавливает показ, а Foreman дочитывает ход и кладёт ответ в
- * историю. Поэтому после отмены контроллер перечитывает историю перед
- * следующим ходом: иначе отменённый ответ выглядел бы пропавшим.
+ * историю. Поэтому после отмены контроллер перечитывает историю — но не
+ * перед отправкой, а после принятия следующего хода: раньше Foreman ещё
+ * пишет, и перечитанная история вернула бы тот же обрубок. Номер нового
+ * хода мод называет только после того, как прежний допишется, и это
+ * единственный рубеж, на котором история полна (ревью Gs на #62).
  */
 
 export interface ChatControllerOptions {
@@ -93,6 +96,17 @@ export function createChatController(options: ChatControllerOptions): ChatContro
   /** Ход отменён — историю надо перечитать, там окажется дочитанный ответ. */
   let historyStale = false;
   let destroyed = false;
+  /** Отправка в полёте: мод ещё не назвал номер хода, а события уже идут. */
+  let awaitingTurn = false;
+  /**
+   * События хода, пришедшие раньше его номера.
+   *
+   * Ответ на `chatSend` и поток событий идут разными соединениями, и на HTTP
+   * первый кусок обгоняет ответ на отправку. Отбрасывать такие события
+   * нельзя: экран показал бы пустое сообщение и остался бы «в потоке»
+   * навсегда (ревью Gs на #62, P2-3).
+   */
+  const buffered: { turnId: string; apply: () => void }[] = [];
 
   const unsubscribes: (() => void)[] = [];
   let view: ChatViewHandle | undefined = options.view;
@@ -214,6 +228,28 @@ export function createChatController(options: ChatControllerOptions): ChatContro
     }
   };
 
+  /**
+   * Пропускает событие хода.
+   *
+   * Своё — применяем и перерисовываем. Раннее (номер хода ещё не известен) —
+   * складываем до присвоения. Чужое — молча мимо: ход у сохранения один, и
+   * событие с другим номером относится к уже закрытому ходу.
+   */
+  const gate = (incomingTurn: string, apply: () => void): void => {
+    if (turnId !== null && incomingTurn === turnId) {
+      apply();
+      render();
+      return;
+    }
+    if (awaitingTurn) buffered.push({ turnId: incomingTurn, apply });
+  };
+
+  /** Применяет события, дождавшиеся номера хода, в порядке прихода. */
+  const flushBuffered = (): void => {
+    const early = buffered.splice(0, buffered.length);
+    for (const item of early) if (item.turnId === turnId) item.apply();
+  };
+
   const start = async (): Promise<void> => {
     try {
       const status = await api.getStatus();
@@ -228,40 +264,36 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       render();
     }));
     unsubscribes.push(api.on("chat.text", (data) => {
-      if (data.turnId !== turnId) return;
-      appendToTurn(data.text);
-      render();
+      gate(data.turnId, () => appendToTurn(data.text));
     }));
     unsubscribes.push(api.on("chat.tool", (data) => {
-      if (data.turnId !== turnId) return;
-      setTurnStatus(host.messageStatus.tool(data.name));
-      render();
+      gate(data.turnId, () => setTurnStatus(host.messageStatus.tool(data.name)));
     }));
     unsubscribes.push(api.on("chat.done", (data) => {
-      if (data.turnId !== turnId) return;
-      if (data.model !== "") assistantModel = data.model;
-      setTurnStatus(undefined);
-      streaming = false;
-      turnId = null;
-      render();
+      gate(data.turnId, () => {
+        if (data.model !== "") assistantModel = data.model;
+        setTurnStatus(undefined);
+        streaming = false;
+        turnId = null;
+      });
     }));
     unsubscribes.push(api.on("chat.failed", (data) => {
-      if (data.turnId !== turnId) return;
-      setTurnStatus(host.messageStatus.failed);
-      streaming = false;
-      turnId = null;
-      fail(new ApiError({ code: data.code, message: data.message }));
-      render();
+      gate(data.turnId, () => {
+        setTurnStatus(host.messageStatus.failed);
+        streaming = false;
+        turnId = null;
+        fail(new ApiError({ code: data.code, message: data.message }));
+      });
     }));
     unsubscribes.push(api.on("chat.cancelled", (data) => {
-      if (data.turnId !== turnId) return;
-      setTurnStatus(host.messageStatus.stopped);
-      streaming = false;
-      turnId = null;
-      // Ход продолжается у Foreman, и его ответ ляжет в историю. Пометить
-      // историю устаревшей — единственный способ не соврать игроку позже.
-      historyStale = true;
-      render();
+      gate(data.turnId, () => {
+        setTurnStatus(host.messageStatus.stopped);
+        streaming = false;
+        turnId = null;
+        // Ход продолжается у Foreman, и его ответ ляжет в историю. Пометить
+        // историю устаревшей — единственный способ не соврать игроку позже.
+        historyStale = true;
+      });
     }));
 
     await loadHistory();
@@ -291,6 +323,23 @@ export function createChatController(options: ChatControllerOptions): ChatContro
     });
   };
 
+  /**
+   * Лента после рубежа принятия хода: история плюс свой вопрос, если мод
+   * ещё не записал его сам.
+   *
+   * Дочитанный ответ отменённого хода появляется только в истории, и она же
+   * источник истины для всего, что было до нового хода. Но записи истории не
+   * несут номера хода (вопрос Co2-69), связать запись с ходом не на чем, и
+   * свой вопрос отличается от записанного модом только текстом. Поэтому: мод
+   * успел записать вопрос — показываем его запись, не успел — свою. Удвоить
+   * вопрос игрока хуже, чем показать его из истории.
+   */
+  const feedAfterAccept = (ask: ChatMessage): ChatMessage[] => {
+    const last = messages[messages.length - 1];
+    const recorded = last !== undefined && last.role === "operator" && last.text === ask.text;
+    return recorded ? messages : [...messages, ask];
+  };
+
   const send = async (text: string): Promise<void> => {
     const trimmed = text.trim();
     if (destroyed || trimmed === "") return;
@@ -301,34 +350,47 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       return;
     }
 
-    // Отменённый ход дочитался у Foreman — перечитываем историю, иначе в
-    // ленте останется обрубок, а в истории будет полный ответ.
-    if (historyStale) await refreshHistory();
-
+    // Замок ставится до первого `await`. Между проверкой выше и ответом мода
+    // есть ожидание — после отмены до 30 с, пока прежний ход дописывается, —
+    // и два Enter подряд уходили двумя ходами: второй получал
+    // `TURN_IN_PROGRESS` и сбивал первый, уже принятый (ревью Gs на #62).
     sending = true;
     error = null;
     rateLimit = null;
+    lastAttempt = trimmed;
+    awaitingTurn = true;
+    buffered.length = 0;
     render();
 
-    lastAttempt = trimmed;
+    // Историю до отправки читать рано: Foreman ещё дописывает отменённый
+    // ход, и в ленте остался бы обрубок. Рубеж — принятие следующего хода:
+    // мод назвал номер, значит прежний ход уже лёг в историю целиком.
+    const wasStale = historyStale;
     try {
       const sent = await api.chatSend({ text: trimmed });
+      if (wasStale) await loadHistory();
       draft = "";
       turnId = sent.turnId;
       const at = now();
+      const ask = message(`${sent.turnId}-ask`, "operator", trimmed, at);
       messages = [
-        ...messages,
-        message(`${sent.turnId}-ask`, "operator", trimmed, at),
+        ...(wasStale ? feedAfterAccept(ask) : [...messages, ask]),
         message(sent.turnId, "assistant", "", at),
       ];
       history = "ready";
       sending = false;
       streaming = true;
+      // Куски, обогнавшие ответ на отправку, применяем сразу — иначе
+      // сообщение осталось бы пустым, а поток незакрытым.
+      flushBuffered();
     } catch (err: unknown) {
+      // `turnId` здесь не присваивался, и чужой стирать нельзя: после Stop
+      // он ещё хранит отменённый ход, которому придёт `chat.cancelled`.
       sending = false;
-      streaming = false;
-      turnId = null;
       fail(err);
+    } finally {
+      awaitingTurn = false;
+      buffered.length = 0;
     }
     render();
   };

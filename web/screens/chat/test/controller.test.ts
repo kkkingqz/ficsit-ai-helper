@@ -26,6 +26,12 @@ interface FakeApi {
   setHistory(messages: ChatHistoryResult["messages"]): void;
   failNextSend(error: ApiError): void;
   failHistory(error: ApiError): void;
+  /** Порядок вызовов фасада: `send:<текст>` и `history`. */
+  calls: string[];
+  /** Задержать ответ на отправку; вернувшаяся функция его отпускает. */
+  holdSend(): () => void;
+  /** Что делает мод в тот момент, когда принимает ход (Foreman дописал). */
+  onSend(hook: () => void): void;
 }
 
 function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
@@ -36,6 +42,10 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
   let sendError: ApiError | null = null;
   let historyError: ApiError | null = null;
   let turns = 0;
+  const calls: string[] = [];
+  let gate: Promise<void> | null = null;
+  let openGate: (() => void) | null = null;
+  let sendHook: (() => void) | null = null;
 
   const api = {
     transport: "http" as const,
@@ -57,6 +67,7 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
     queryMetric: vi.fn(),
     querySeries: vi.fn(),
     chatSend: async ({ text }: { text: string }) => {
+      calls.push(`send:${text}`);
       if (sendError !== null) {
         const err = sendError;
         sendError = null;
@@ -64,13 +75,19 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
       }
       sent.push(text);
       turns += 1;
-      return { turnId: `t-${turns}` };
+      const turnId = `t-${turns}`;
+      // Ход принят: к этому моменту мод уже дождался, пока отменённый
+      // допишется в историю, — здесь это и происходит.
+      sendHook?.();
+      if (gate !== null) await gate;
+      return { turnId };
     },
     chatCancel: async ({ turnId }: { turnId: string }) => {
       cancelled.push(turnId);
       return { state: "cancelled" as const };
     },
     chatHistory: async (): Promise<ChatHistoryResult> => {
+      calls.push("history");
       if (historyError !== null) throw historyError;
       return { messages: history };
     },
@@ -101,6 +118,20 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
     },
     failHistory(error) {
       historyError = error;
+    },
+    calls,
+    holdSend() {
+      gate = new Promise<void>((resolve) => {
+        openGate = resolve;
+      });
+      return () => {
+        openGate?.();
+        gate = null;
+        openGate = null;
+      };
+    },
+    onSend(hook) {
+      sendHook = hook;
     },
   };
 }
@@ -222,7 +253,7 @@ describe("контроллер чата", () => {
     expect(controller.getModel().messages[1]?.text).toBe("");
   });
 
-  it("отмена помечает сообщение и перечитывает историю перед следующим ходом", async () => {
+  it("отмена помечает сообщение и перечитывает историю после принятия хода", async () => {
     const fake = createFakeApi();
     const controller = create(fake, createFakeView());
     await settle();
@@ -255,6 +286,127 @@ describe("контроллер чата", () => {
     const texts = controller.getModel().messages.map((m) => m.text);
     expect(texts).toContain("полный ответ из истории");
     expect(texts).toContain("следующий");
+    // Рубеж: история читается после принятия хода, а не до отправки.
+    expect(fake.calls).toEqual(["history", "send:вопрос", "send:следующий", "history"]);
+  });
+
+  describe("замечания ревью Gs на #62", () => {
+    /** Экран после отмены: ход помечен, история ждёт дочитывания. */
+    const afterStop = async (fake: FakeApi): Promise<ChatController> => {
+      const controller = create(fake, createFakeView());
+      await settle();
+      controller.actions.send("вопрос");
+      await settle();
+      controller.actions.stop();
+      await settle();
+      fake.emit("chat.cancelled", { turnId: "t-1" });
+      return controller;
+    };
+
+    it("дочитанный ответ ищется в истории после рубежа принятия хода", async () => {
+      const fake = createFakeApi();
+      const controller = await afterStop(fake);
+
+      // Foreman дописывает ход ровно в тот момент, когда мод принимает
+      // следующий: до этого в истории обрубок, и чтение до отправки его бы и
+      // вернуло.
+      fake.onSend(() => {
+        fake.setHistory([
+          { id: "h-1", role: "user", text: "вопрос", createdAt: "2026-11-16T09:41:00.000Z" },
+          {
+            id: "h-2",
+            role: "assistant",
+            text: "дочитанный ответ",
+            createdAt: "2026-11-16T09:41:03.000Z",
+          },
+        ]);
+      });
+
+      controller.actions.send("следующий");
+      await settle();
+
+      const texts = controller.getModel().messages.map((item) => item.text);
+      expect(texts).toContain("дочитанный ответ");
+      expect(texts.filter((text) => text === "следующий")).toHaveLength(1);
+    });
+
+    it("два Enter подряд во время ожидания мода уходят одним ходом", async () => {
+      const fake = createFakeApi();
+      const controller = await afterStop(fake);
+
+      // После отмены мод вправе держать отправку до 30 с. Замок до первого
+      // `await` — единственное, что мешает уйти второму ходу.
+      const release = fake.holdSend();
+      controller.actions.send("второй");
+      controller.actions.send("третий");
+      await settle();
+      expect(controller.getModel().sending).toBe(true);
+      release();
+      await settle();
+
+      expect(fake.sent).toEqual(["вопрос", "второй"]);
+      expect(controller.getModel().streaming).toBe(true);
+    });
+
+    it("отказ отправки не стирает ход, который ещё ждёт отмены", async () => {
+      const fake = createFakeApi();
+      const controller = create(fake, createFakeView());
+      await settle();
+      controller.actions.send("вопрос");
+      await settle();
+      controller.actions.stop();
+      await settle();
+
+      // `chat.cancelled` ещё в пути, а отправка уже получила отказ: мод не
+      // дождался дочитывания. Номер отменённого хода стирать нельзя, иначе
+      // его событие пройдёт мимо и пометка «остановлено» не появится.
+      fake.failNextSend(new ApiError({ code: "TURN_DRAINING", message: "дописывается" }));
+      controller.actions.send("следующий");
+      await settle();
+      fake.emit("chat.cancelled", { turnId: "t-1" });
+
+      expect(controller.getModel().messages[1]?.status).toBe(
+        DEFAULT_CHAT_STRINGS.host.messageStatus.stopped,
+      );
+      expect(controller.getModel().error?.text).toBe(DEFAULT_CHAT_STRINGS.host.turnFailed);
+    });
+
+    it("события, обогнавшие ответ на отправку, не теряются", async () => {
+      const fake = createFakeApi();
+      const controller = create(fake, createFakeView());
+      await settle();
+
+      // На HTTP ответ на `chatSend` и поток событий идут разными
+      // соединениями: первый кусок и конец хода приходят раньше номера.
+      const release = fake.holdSend();
+      controller.actions.send("вопрос");
+      await settle();
+      fake.emit("chat.text", { turnId: "t-1", text: "ранний ответ" });
+      fake.emit("chat.done", { turnId: "t-1", model: "demo-echo", latencyMs: 12 });
+      release();
+      await settle();
+
+      const model = controller.getModel();
+      expect(model.messages[1]?.text).toBe("ранний ответ");
+      expect(model.streaming).toBe(false);
+      expect(model.sending).toBe(false);
+    });
+
+    it("раннее событие чужого хода в ленту не попадает", async () => {
+      const fake = createFakeApi();
+      const controller = create(fake, createFakeView());
+      await settle();
+
+      const release = fake.holdSend();
+      controller.actions.send("вопрос");
+      await settle();
+      fake.emit("chat.text", { turnId: "t-99", text: "чужой кусок" });
+      release();
+      await settle();
+
+      expect(controller.getModel().messages[1]?.text).toBe("");
+      expect(controller.getModel().streaming).toBe(true);
+    });
   });
 
   it("второй ход не отправляется, пока идёт первый", async () => {

@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { bridgeAvailable, createBridgeTransport } from "../src/bridge.js";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { bridgeAvailable, createBridgeTransport, OP_TIMEOUT_MS } from "../src/bridge.js";
 import { createApi } from "../src/facade.js";
 import { API_VERSION, ApiError, type ApiEvents } from "../src/types.js";
 
@@ -106,6 +106,54 @@ describe("транспорт моста", () => {
     await expect(transport.call("getStatus", {})).rejects.toMatchObject({
       code: "TRANSPORT_UNAVAILABLE",
     });
+  });
+
+  it("ожидание «chatSend» из протокола общим сроком не снимается", async () => {
+    // Отправка сразу после Stop ждёт у мода до 30 с, пока отменённый ход
+    // допишется в историю (протокол канала, «Ход чата»). Общие 10 с снимали
+    // ожидание раньше мода: игрок видел ошибку, а ход уже шёл у Foreman, и
+    // запоздалый ответ считался потерянным (ревью Gs на #62, P1-1).
+    const sent = installMod();
+    vi.useFakeTimers();
+    try {
+      const transport = createBridgeTransport({ timeoutMs: 10_000 });
+      const rejected: string[] = [];
+      const status = transport.call("getStatus", {});
+      const send = transport.call("chatSend", { text: "привет" });
+      void status.catch(() => rejected.push("getStatus"));
+      void send.catch(() => rejected.push("chatSend"));
+
+      // 15-я секунда: общий срок вышел, срок отправки — нет.
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(rejected).toEqual(["getStatus"]);
+
+      // Мод отвечает позже общего срока — ответ всё ещё ждут.
+      answer(sent[1]?.payload.id as string, { turnId: "t-7" });
+      await expect(send).resolves.toMatchObject({ turnId: "t-7" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("срок у «chatSend» всё же есть: 35 с, с запасом над 30 с протокола", async () => {
+    installMod();
+    vi.useFakeTimers();
+    try {
+      const transport = createBridgeTransport();
+      let settled = false;
+      const result = transport.call("chatSend", { text: "привет" }).catch((err: unknown) => {
+        settled = true;
+        return err;
+      });
+
+      await vi.advanceTimersByTimeAsync(34_000);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(2_000);
+      await expect(result).resolves.toMatchObject({ code: "TRANSPORT_UNAVAILABLE" });
+      expect(OP_TIMEOUT_MS["chatSend"]).toBe(35_000);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("события мода доходят до подписчика", async () => {
