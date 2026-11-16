@@ -93,15 +93,47 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalA->UpdateHostState();
     TestEqual(TEXT("Сервер при потере питания переходит в NoPower"), TerminalA->GetScreenContext().HostState, EFicsitAIHostState::NoPower);
     TestFalse(TEXT("Обесточенный сервер не открывает модули"), TerminalA->OpenModule(FName(TEXT("Notes"))));
-    TestFalse(TEXT("Обесточенный терминал не рендерит экран в мире (§6.6)"), TerminalA->RenderWorldScreenIfDirty());
+
+    // Проверка решения King 15.11.2026, Co-112, D-1-world-screen §3.1:
+    // Обесточенный терминал выполняет разовую отрисовку статичного экрана NO POWER на приглушённой яркости
+    const uint64 DrawCountBeforeNoPower = TerminalA->GetWorldScreenDrawCount();
+    TestTrue(TEXT("Обесточенный терминал выполняет разовый рендер экрана NO POWER (D-1 §3.1)"), TerminalA->RenderWorldScreenIfDirty());
+    TestEqual(TEXT("WorldScreenDrawCount увеличился ровно на 1 при рендере NO POWER"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeNoPower + 1);
+    TestFalse(TEXT("Повторный вызов RenderWorldScreenIfDirty при NoPower возвращает false (нет покадровых тиков)"), TerminalA->RenderWorldScreenIfDirty());
+    TestEqual(TEXT("WorldScreenDrawCount не увеличивается при повторном вызове"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeNoPower + 1);
+
     if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
     {
         FLinearColor TintVal = FLinearColor::White;
         Mat->GetVectorParameterValue(TEXT("TintColorAndOpacity"), TintVal);
-        TestTrue(TEXT("При NoPower экран затемнён в Чёрный"), TintVal.Equals(FLinearColor::Black, 0.01f));
+        TestTrue(TEXT("При NoPower экран подсвечен на приглушённой яркости резервного питания (0.35)"), TintVal.Equals(FLinearColor(0.35f, 0.35f, 0.35f, 1.0f), 0.01f));
     }
 
-    // Клиент получает реплицированный контекст от сервера
+    // Проверка геометрии области экрана в мире при NoPower (D-1-world-screen §3.1: полоса статуса свернута, модуль 1280x720)
+    if (UFicsitAIScreenSurfaceWidget* WorldWidget = TerminalA->GetWorldSurfaceWidget())
+    {
+        WorldWidget->LayoutInVirtualWindow(FVector2D(1280.0f, 720.0f));
+        TestEqual(TEXT("При NoPower на меше область модуля занимает весь экран 1280x720 (D-1 §3.1)"), WorldWidget->GetModuleAreaSizePx(), FIntPoint(1280, 720));
+        TestTrue(TEXT("При NoPower на меше соотношение сторон строго 16:9"), FMath::IsNearlyEqual(WorldWidget->GetModuleAreaAspectRatio(), 16.0f / 9.0f, 0.01f));
+    }
+
+    // Проверка: при NoPower внешняя текстура CEF переключается на WorldScreenRenderTarget (D-1 §3.1: браузер на резерве не живёт)
+    {
+        UTexture2D* DummyTex = UTexture2D::CreateTransient(16, 9, PF_B8G8R8A8);
+        TerminalA->SetWorldScreenTexture(DummyTex);
+        // В NoPower GetWorldScreenTexture возвращает WorldScreenRenderTarget
+        TestEqual(TEXT("При NoPower GetWorldScreenTexture возвращает WorldScreenRenderTarget (аварийный статичный экран)"), TerminalA->GetWorldScreenTexture(), static_cast<UTexture*>(TerminalA->GetWorldScreenRenderTarget()));
+
+        // При возврате питания в Ready внешняя текстура снова активна
+        TerminalA->SetPowerOverride(true);
+        TerminalA->UpdateHostState();
+        TestEqual(TEXT("При возврате в Ready внешняя текстура восстанавливается"), TerminalA->GetWorldScreenTexture(), static_cast<UTexture*>(DummyTex));
+        TerminalA->SetWorldScreenTexture(nullptr);
+    }
+
+    // Клиент получает реплицированный контекст от сервера (снова выставляем NoPower на сервере для теста репликации)
+    TerminalA->SetPowerOverride(false);
+    TerminalA->UpdateHostState();
     TerminalClient->SetHostContextForClient(TerminalA->GetScreenContext());
     TerminalClient->OnRep_HostContext();
     TestEqual(TEXT("Клиент реплицирует NoPower от сервера"), TerminalClient->GetScreenContext().HostState, EFicsitAIHostState::NoPower);
@@ -111,11 +143,18 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TerminalA->SetPowerOverride(true);
     TerminalA->UpdateHostState();
     TestEqual(TEXT("Сервер при подаче питания переходит в Ready"), TerminalA->GetScreenContext().HostState, EFicsitAIHostState::Ready);
+
+    // Рендер при возврате питания в Ready
+    const uint64 DrawCountBeforeReady = TerminalA->GetWorldScreenDrawCount();
+    TestTrue(TEXT("При возврате питания терминал выполняет перерисовку в Ready"), TerminalA->RenderWorldScreenIfDirty());
+    TestEqual(TEXT("WorldScreenDrawCount увеличился на 1 при возврате в Ready"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeReady + 1);
+    TestFalse(TEXT("Повторный вызов RenderWorldScreenIfDirty в Ready без изменений возвращает false"), TerminalA->RenderWorldScreenIfDirty());
+
     if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
     {
         FLinearColor TintVal = FLinearColor::Black;
         Mat->GetVectorParameterValue(TEXT("TintColorAndOpacity"), TintVal);
-        TestTrue(TEXT("При Ready экран подсвечен в Белый"), TintVal.Equals(FLinearColor::White, 0.01f));
+        TestTrue(TEXT("При Ready экран подсвечен в Белый (полная яркость)"), TintVal.Equals(FLinearColor::White, 0.01f));
     }
 
     // Клиент реплицирует восстановление питания

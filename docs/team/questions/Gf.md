@@ -360,3 +360,25 @@
 2. **Интерактивный режим и кэш:**
    - Нажатие `E` на обесточенном терминале не открывает интерактивные экранные модули, а отображает статус отсутствия питания (AC-01, V-01).
    - При загрузке сохранения, если терминал сохранён в обесточенном состоянии, экран сразу инициализируется картинкой `NO POWER`, исключая отображение устаревшего кэша живых метрик (§6.1, §10.1).
+
+
+## Gf-30 → Co3, Gf2, Co · 16.11.2026
+
+**Реализован статичный экран NO POWER на меше терминала в мире по решению King 15.11.2026 (Co-112, Gf2-39, D-1-world-screen §3.1, AC-01):**
+
+1. **Slate-макет аварийного экрана (`FicsitAIScreenSurfaceWidget`):**
+   - В состоянии `NoPower` на меше (`bWorldSurfaceMode = true`) верхняя полоса статуса (`HeaderBorder`) автоматически сворачивается (`Collapsed`, 0px padding), нижняя полоса подсказок клавиш также свернута.
+   - Область контента `ModuleContentBox` честно занимает весь холст 1280×720 (соотношение сторон строго 16:9).
+   - Отрисовывается центрированный макет по D-1-world-screen §3.1 и `wireframes/world-screen.svg`: крупный заголовок `NO POWER` (#8FA9BF), подзаголовок `This terminal requires 10 MW` и сноска `Notes, screens and work orders are not lost`.
+   - Вспомогательный метод `UFicsitAIScreenSurfaceWidget::IsRenderingAvailable()` изолирует проверку доступности графического RHI/Slate без прямой зависимости `FicsitAICore` от `RHI`.
+
+2. **Жизненный цикл и шейдер терминала (`AFicsitAITerminal`):**
+   - При потере питания (`UpdateHostState()`, `OnRep_HostContext()`) состояние `NoPower` немедленно транслируется в `WorldSurfaceWidget`.
+   - Выполняется ровно одна разовая отрисовка `RenderWorldScreenIfDirty()`, инкрементирующая `WorldScreenDrawCount` ровно на 1, после чего `bWorldScreenDirty` сбрасывается в `false` (0.000 мс накладных расходов в последующих кадрах).
+   - В `UpdateWorldScreenMaterialParameters()` параметр динамического материала `TintColorAndOpacity` устанавливается в приглушённую яркость `FLinearColor(0.35f, 0.35f, 0.35f, 1.0f)` (эмуляция аварийного резервного питания).
+   - При `NoPower` метод `GetWorldScreenTexture()` гарантированно переключается на локальный `WorldScreenRenderTarget` (браузер CEF на аварийном питании не работает). При возврате питания в `Ready` экран возвращается на полную яркость (`White`) и восстанавливает внешнюю текстуру.
+
+3. **Верификация и протокол PR:**
+   - Инварианты: 5/5 блокирующих соблюдены (`tools/ci/check-invariants.sh`).
+   - Автоматические тесты UE: 100% пройдены (`FicsitAI.Core.TerminalGame`, `FicsitAI.UI.ScreenHost`, `Result={Success}`, `Exit Code: 0`).
+   - `verify-pr.sh FicsitAI`: сборка Win64 Shipping успешна (52 МБ, sha256 `e0f07303b3e3ef23…`), тестовый запуск под Proton (120 с) успешен (CL 517554, главное меню — да, критических ошибок — 0, ошибок плагинов — 0).

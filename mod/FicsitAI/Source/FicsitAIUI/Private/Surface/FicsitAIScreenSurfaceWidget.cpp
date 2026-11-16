@@ -133,9 +133,14 @@ UFicsitAIScreenSurfaceWidget* UFicsitAIScreenSurfaceWidget::CreateForWorldSurfac
     return Widget;
 }
 
+bool UFicsitAIScreenSurfaceWidget::IsRenderingAvailable()
+{
+    return !GUsingNullRHI && FSlateApplication::IsInitialized();
+}
+
 bool UFicsitAIScreenSurfaceWidget::RenderToTarget(UTextureRenderTarget2D* Target, const FIntPoint& TargetSizePx, float DeltaTime)
 {
-    if (!Target || TargetSizePx.X <= 0 || TargetSizePx.Y <= 0 || GUsingNullRHI || !FSlateApplication::IsInitialized())
+    if (!Target || TargetSizePx.X <= 0 || TargetSizePx.Y <= 0 || !IsRenderingAvailable())
     {
         return false;
     }
@@ -187,7 +192,7 @@ bool UFicsitAIScreenSurfaceWidget::RenderToTarget(UTextureRenderTarget2D* Target
 
 UTextureRenderTarget2D* UFicsitAIScreenSurfaceWidget::CreateWorldRenderTarget(UObject* Outer, const FIntPoint& SizePx)
 {
-    if (SizePx.X <= 0 || SizePx.Y <= 0 || GUsingNullRHI || !FSlateApplication::IsInitialized())
+    if (SizePx.X <= 0 || SizePx.Y <= 0 || !IsRenderingAvailable())
     {
         return nullptr;
     }
@@ -283,6 +288,58 @@ void UFicsitAIScreenSurfaceWidget::RefreshModuleContent()
         return;
     }
 
+    if (CurrentHostState == EFicsitAIHostState::NoPower)
+    {
+        // Полноэкранный статичный макет NO POWER по D-1-world-screen §3.1 и wireframes/world-screen.svg
+        const float TitleFontSize = bWorldSurfaceMode ? 36.0f : 42.0f;
+        const float SubtitleFontSize = bWorldSurfaceMode ? 20.0f : 24.0f;
+        const float FootnoteFontSize = bWorldSurfaceMode ? 14.0f : 16.0f;
+
+        ModuleContentBox->SetContent(
+            SNew(SVerticalBox)
+            + SVerticalBox::Slot()
+            .FillHeight(1.0f)
+            [
+                SNullWidget::NullWidget
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .HAlign(HAlign_Center)
+            [
+                SAssignNew(StatusTextBlock, STextBlock)
+                .Text(NSLOCTEXT("FicsitAI", "NoPowerTitle", "NO POWER"))
+                .Font(FCoreStyle::GetDefaultFontStyle("Bold", TitleFontSize))
+                .ColorAndOpacity(FLinearColor(0.56f, 0.66f, 0.75f, 1.0f))
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .HAlign(HAlign_Center)
+            .Padding(FMargin(0.0f, 16.0f, 0.0f, 0.0f))
+            [
+                SNew(STextBlock)
+                .Text(NSLOCTEXT("FicsitAI", "NoPowerSubtitle", "This terminal requires 10 MW"))
+                .Font(FCoreStyle::GetDefaultFontStyle("Regular", SubtitleFontSize))
+                .ColorAndOpacity(FLinearColor(0.85f, 0.88f, 0.92f, 1.0f))
+            ]
+            + SVerticalBox::Slot()
+            .AutoHeight()
+            .HAlign(HAlign_Center)
+            .Padding(FMargin(0.0f, 12.0f, 0.0f, 0.0f))
+            [
+                SNew(STextBlock)
+                .Text(NSLOCTEXT("FicsitAI", "NoPowerFootnote", "Notes, screens and work orders are not lost"))
+                .Font(FCoreStyle::GetDefaultFontStyle("Italic", FootnoteFontSize))
+                .ColorAndOpacity(FLinearColor(0.45f, 0.52f, 0.60f, 1.0f))
+            ]
+            + SVerticalBox::Slot()
+            .FillHeight(1.0f)
+            [
+                SNullWidget::NullWidget
+            ]
+        );
+        return;
+    }
+
     if (CurrentHostState != EFicsitAIHostState::Ready)
     {
         ModuleContentBox->SetContent(
@@ -333,8 +390,11 @@ void UFicsitAIScreenSurfaceWidget::ClearModule()
 void UFicsitAIScreenSurfaceWidget::SetHostState(EFicsitAIHostState NewState)
 {
     CurrentHostState = NewState;
+    CachedModuleAreaSizePx = FIntPoint::ZeroValue;
+    CachedModuleAreaAspectRatio = 0.0f;
     UpdateLayout();
     RefreshModuleContent();
+    UpdateModuleContentAreaGeometry();
 }
 
 void UFicsitAIScreenSurfaceWidget::UpdateLayout()
@@ -347,8 +407,10 @@ void UFicsitAIScreenSurfaceWidget::UpdateLayout()
     }
     if (HeaderBorder.IsValid())
     {
-        // На экране в мире (§6.6, Co3-2) верхняя полоса статуса отображается обязательно
-        HeaderBorder->SetVisibility(EVisibility::Visible);
+        // На экране в мире без питания верхняя полоса статуса не отображается (D-1-world-screen §3.1),
+        // в остальных режимах на меше (§6.6, Co3-2) и в интерактивном режиме остаётся видимой.
+        const bool bHideHeaderInWorld = bWorldSurfaceMode && (CurrentHostState == EFicsitAIHostState::NoPower);
+        HeaderBorder->SetVisibility(bHideHeaderInWorld ? EVisibility::Collapsed : EVisibility::Visible);
     }
     if (FooterBorder.IsValid())
     {
@@ -441,10 +503,14 @@ TSharedRef<SWidget> UFicsitAIScreenSurfaceWidget::RebuildWidget()
                 .Padding_Lambda([this]() { return bWorldSurfaceMode ? FMargin(0.0f) : FMargin(20.0f); })
                 [
                     SNew(SVerticalBox)
-                    // Верхняя полоса (Header: отображается как на меше терминала по §6.6 Co3-2, так и в интерактивном режиме)
+                    // Верхняя полоса (Header: отображается как на меше терминала по §6.6 Co3-2, так и в интерактивном режиме;
+                    // скрывается на меше при потере питания по D-1-world-screen §3.1)
                     + SVerticalBox::Slot()
                     .AutoHeight()
-                    .Padding(TAttribute<FMargin>::CreateLambda([this]() { return FMargin(0.0f, 0.0f, 0.0f, 10.0f); }))
+                    .Padding(TAttribute<FMargin>::CreateLambda([this]() {
+                        const bool bHideHeaderInWorld = bWorldSurfaceMode && (CurrentHostState == EFicsitAIHostState::NoPower);
+                        return bHideHeaderInWorld ? FMargin(0.0f) : FMargin(0.0f, 0.0f, 0.0f, 10.0f);
+                    }))
                     [
                         SAssignNew(HeaderBorder, SBorder)
                         .BorderBackgroundColor(FLinearColor(0.08f, 0.08f, 0.12f, 1.0f))
@@ -573,9 +639,12 @@ void UFicsitAIScreenSurfaceWidget::UpdateModuleContentAreaGeometry()
         if (bWorldSurfaceMode)
         {
             // На меше терминала (1280x720) верхняя полоса статуса занимает 48px (38px + 10px отступ),
-            // нижняя полоса клавиш свернута (0px), внешняя рамка 0px (§6.6 по Co3-2)
+            // если она видна. Без питания (NoPower) верхняя полоса свернута (0px, D-1-world-screen §3.1),
+            // и область модуля занимает весь холст 1280x720.
+            const bool bHideHeader = (CurrentHostState == EFicsitAIHostState::NoPower);
+            const int32 HeaderHeight = bHideHeader ? 0 : 48;
             const int32 ContentWidth = FMath::RoundToInt(CanvasSize.X);
-            const int32 ContentHeight = FMath::RoundToInt(CanvasSize.Y) - 48;
+            const int32 ContentHeight = FMath::RoundToInt(CanvasSize.Y) - HeaderHeight;
             NewSize = FIntPoint(ContentWidth, ContentHeight);
         }
         else
@@ -620,8 +689,10 @@ FIntPoint UFicsitAIScreenSurfaceWidget::GetModuleAreaSizePx() const
     }
     if (bWorldSurfaceMode)
     {
+        const bool bHideHeader = (CurrentHostState == EFicsitAIHostState::NoPower);
+        const int32 HeaderHeight = bHideHeader ? 0 : 48;
         const int32 ContentWidth = FMath::RoundToInt(CanvasSize.X);
-        const int32 ContentHeight = FMath::RoundToInt(CanvasSize.Y) - 48;
+        const int32 ContentHeight = FMath::RoundToInt(CanvasSize.Y) - HeaderHeight;
         return FIntPoint(ContentWidth, ContentHeight);
     }
     const int32 ContentWidth = FMath::Max(100, FMath::RoundToInt(CanvasSize.X) - 40);

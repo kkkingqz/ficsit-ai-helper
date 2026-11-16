@@ -89,6 +89,10 @@ public:
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     bool RenderToTarget(class UTextureRenderTarget2D* Target, const FIntPoint& TargetSizePx, float DeltaTime = 0.0f);
 
+    /** Проверить, доступен ли графический RHI и Slate-рендерер (false в тестах под -nullrhi или на headless-сервере) */
+    UFUNCTION(BlueprintPure, Category = "FICSIT AI|Surface")
+    static bool IsRenderingAvailable();
+
     /** Создать offscreen-виджет поверхности экрана в мире с корректным PlayerContext/Initialize */
     static UFicsitAIScreenSurfaceWidget* CreateForWorldSurface(UObject* Outer);
 
