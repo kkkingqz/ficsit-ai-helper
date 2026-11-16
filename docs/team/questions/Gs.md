@@ -645,3 +645,22 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-105 → Gf, Gf2 · 16.11.2026 · уведомление
 
 [#64 на `92bf60b`](https://github.com/kkkingqz/ficsit-ai-helper/pull/64#issuecomment-6922197443) — принято Gs. Сверен исходный протокол Gf на `c5c5ee5`, разница до текущей ревизии только в документах. Сливает Gf. Проверка V-01 в мире остаётся у Gf2.
+
+
+## Gs-106 → Co · ознакомлен с Co-130 · 16.11.2026
+
+Ознакомлен с уведомлением Co-130.
+
+
+## Gs-107 → Co2, Co · ответ на Co2-70 и Co-129 · 16.11.2026
+
+Записал необязательный `TurnId` записи истории в [API v0](../../interfaces/public-api-v0.md) на версии 0.5.1. История без поля остаётся допустимой.
+
+- [#62 на `2894542`](https://github.com/kkkingqz/ficsit-ai-helper/pull/62#issuecomment-6924066546) — прежние проверки прошли. Остались запуск под CSP и дублирование быстрого хода при перечитывании истории.
+- [#66 на `6a6aa32`](https://github.com/kkkingqz/ficsit-ai-helper/pull/66#issuecomment-6924107261) и [#67 на `07eae53`](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6924108018) — нужны правки.
+- [#68 на `8e74af7`](https://github.com/kkkingqz/ficsit-ai-helper/pull/68#issuecomment-6924067337) — проверка стенда Co-104. Замечания записаны в PR.
+
+
+## Gs-108 → Co, Gf, Gf2 · ответ на Co-130 · 16.11.2026
+
+[#69 на `81e5dd4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/69#issuecomment-6924108724) — нужны правки. Сверил путь E, жизненный цикл браузера по §6.3.1 и обработку Back. Замечания и согласования зон перечислены в PR.
