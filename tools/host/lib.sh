@@ -87,11 +87,25 @@ fa_check_build_env() {
 # fa_sync_mod_source <каталог в репозитории> <каталог мода в проекте SML> [шаблон для сохранения]...
 # Приводит исходники мода в проекте к дереву репозитория. Binaries, Intermediate и Saved не трогает;
 # дополнительные шаблоны — для того, чего в репозитории быть не должно (бинарники CEF в ThirdParty).
+# Файл, содержимое которого изменилось, получает текущее время: cp -a сохраняет время из репозитория, а оно
+# бывает старше объектных файлов, собранных из прежней копии, — например, сборка другого мода того же проекта
+# пересобрала этот мод между синхронизациями. Тогда UBT считает модуль собранным и линкует старый код (S8 3.4).
 # Любая ошибка удаления или копирования — код 1: собирать неполное дерево нельзя.
 fa_sync_mod_source() {
     local src="$1" dst="$2"; shift 2
-    local keep=(Binaries Intermediate Saved "$@") entry name k skip
+    local keep=(Binaries Intermediate Saved "$@") entry name k skip hash path
+    local -A before=()
     mkdir -p "$dst" || return 1
+    _fa_sync_hashes() {
+        local e n k2 s2
+        for e in "$dst"/* "$dst"/.[!.]*; do
+            [[ -e "$e" ]] || continue
+            n="$(basename "$e")"; s2=0
+            for k2 in "${keep[@]}"; do [[ "$n" == $k2 ]] && s2=1; done
+            [[ $s2 -eq 1 ]] || find "$e" -type f -print0
+        done | xargs -0 -r sha1sum
+    }
+    while read -r hash path; do before["$path"]="$hash"; done < <(_fa_sync_hashes)
     for entry in "$dst"/* "$dst"/.[!.]*; do
         [[ -e "$entry" || -L "$entry" ]] || continue
         name="$(basename "$entry")"; skip=0
@@ -104,6 +118,9 @@ fa_sync_mod_source() {
         for k in "${keep[@]}"; do [[ "$name" == $k ]] && skip=1; done
         [[ $skip -eq 1 ]] || cp -a "$entry" "$dst/" || return 1
     done
+    while read -r hash path; do
+        [[ "${before[$path]:-}" == "$hash" ]] || touch "$path" || return 1
+    done < <(_fa_sync_hashes)
     [[ -f "$dst/$(basename "$src").uplugin" ]] || return 1
 }
 

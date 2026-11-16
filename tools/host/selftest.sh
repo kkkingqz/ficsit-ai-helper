@@ -301,6 +301,19 @@ check "в выводе — ожидание очереди" "$(grep -c "очер
 check "CEF заменён" "$(cat "$CW/shipping/libcef.dll")" new
 rm -f "$T/bin/7z"
 
+# --- синхронизация: изменённый файл новее объектных файлов (S8 3.4) ---------------------------------
+SR="$T/syncrepo/SyncMod"; SD="$T/syncproj/SyncMod"
+mkdir -p "$SR/Source" "$SD/Intermediate" && echo '{}' > "$SR/SyncMod.uplugin"
+echo 'int a;' > "$SR/Source/a.cpp"; echo 'int b;' > "$SR/Source/b.cpp"
+sync_mod() { ( source "$T/repo/tools/host/lib.sh" >/dev/null 2>&1; fa_sync_mod_source "$SR" "$SD" ); }
+sync_mod; touch -d '2026-01-01 00:00' "$SR/Source/a.cpp" "$SR/Source/b.cpp"; sync_mod
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
+echo 'int changed;' > "$SR/Source/a.cpp"; touch -d '2026-01-02 00:00' "$SR/Source/a.cpp"
+check "синхронизация успешна" "$(sync_mod; echo $?)" 0
+check "изменённый файл новее объектного" "$([[ "$SD/Source/a.cpp" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+check "неизменённый файл сохранил время" "$(date -r "$SD/Source/b.cpp" +%F)" 2026-01-01
+check "содержимое обновлено" "$(cat "$SD/Source/a.cpp")" "int changed;"
+
 # --- страницы веб-экранов (S8 3.4) ------------------------------------------------------------------
 W="$T/webrepo"; WD="$T/webdst"
 mkdir -p "$W/web/screens/statistics/dist" "$W/web/screens/chat/src" "$W/web/screens/api/dist" "$W/web/ui-kit/screens" "$W/third_party/uplot"
