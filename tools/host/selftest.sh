@@ -26,6 +26,11 @@ cat > "$T/engine/Engine/Build/BatchFiles/RunUAT.sh" <<'STUB'
 proj=""; mod=""
 for a in "$@"; do case "$a" in -Project=*) proj="$(dirname "${a#-Project=}")";; -dlcname=*) mod="${a#-dlcname=}";; esac; done
 [[ -n "${STUB_UAT_SLEEP:-}" ]] && sleep "$STUB_UAT_SLEEP"
+# Правка заголовка проекта во время сборки (ревью #45): STUB_UAT_EDIT — путь в проекте, STUB_UAT_COMMIT=1 — ещё и коммит.
+if [[ -n "${STUB_UAT_EDIT:-}" ]]; then
+  echo '// mid-build' >> "$proj/$STUB_UAT_EDIT"
+  [[ -n "${STUB_UAT_COMMIT:-}" ]] && "$FICSITAI_GIT" -C "$proj" -c user.name=t -c user.email=t@t commit -qam mid >/dev/null 2>&1
+fi
 case "${STUB_UAT:-ok}" in
   fail) echo "error C1234: stub"; exit 6 ;;
   stale) exit 0 ;;
@@ -46,7 +51,7 @@ saved="$STUB_SAVED"; mkdir -p "$saved/Logs"; log="$saved/Logs/FactoryGame.log"
 [[ -n "${STUB_GAME_SLEEP:-}" ]] && sleep "$STUB_GAME_SLEEP"
 mods="$( (ls "$STUB_MODS"; ls "$STUB_MODS/GameFeatures" 2>/dev/null) | grep -v -e '^SML$' -e '^GameFeatures$' | head -1)"
 {
-  echo "LogSatisfactoryModLoader: Display: Version check passed successfully! Game Changelist: 517554"
+  [[ -z "${STUB_NO_CL:-}" ]] && echo "LogSatisfactoryModLoader: Display: Version check passed successfully! Game Changelist: ${STUB_CL:-517554}"
   echo "LogSatisfactoryModLoader: Display: List of loaded mods:"
   [[ -n "$mods" ]] && echo "LogSatisfactoryModLoader: Display: $mods: ${STUB_MOD_VERSION:-0.1.0}"
   echo "LogSatisfactoryModLoader: Display: FactoryGame: 517554.0.0"
@@ -70,7 +75,8 @@ echo '"buildid" "1"' > "$S/.local/share/Steam/steamapps/appmanifest_526870.acf"
 mkdir -p "$T/sml" && echo '{}' > "$T/sml/SML.uplugin" && ( cd "$T/sml" && zip -q "$T/SML-Windows.zip" SML.uplugin )
 
 export PATH="$T/bin:$PATH" UE_WINE_MSVC="$T/msvc" FICSITAI_ENGINE="$T/engine" FICSITAI_STEAM_APP="$S" \
-       FICSITAI_LOCK_DIR="$T/locks" FICSITAI_ROLE=test FICSITAI_GIT=/bin/false HOME="$T/home"
+       FICSITAI_LOCK_DIR="$T/locks" FICSITAI_ROLE=test FICSITAI_GIT=/bin/false HOME="$T/home" \
+       FICSITAI_SML_HEADERS_CL=517554
 mkdir -p "$HOME"
 export STUB_SAVED="$S/Projects/ficsitai-test/compat/pfx/drive_c/users/steamuser/AppData/Local/FactoryGame/Saved"
 export STUB_MODS="$S/Projects/ficsitai-test/game/FactoryGame/Mods"
@@ -176,6 +182,81 @@ check "та же версия — пройдено" "$(STUB_MOD_VERSION=2.0.0 ru
 printf '{}' > "$U"
 check "без SemVersion — не пройдено" "$([[ "$(run "$V" "${ARGS[@]}")" != 0 ]] && echo yes || echo no)" yes
 echo '{"SemVersion":"0.1.0"}' > "$U"
+
+echo "4д. Заголовки проекта SML от другой сборки игры (Co-75, ревью #45)"
+check "заголовки CL 491125 при игре CL 517554 — не пройдено" "$(FICSITAI_SML_HEADERS_CL=491125 run "$V" "${ARGS[@]}")" 1
+check "протокол называет обе сборки" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
+check "номер заголовков не определён — не пройдено" "$(FICSITAI_SML_HEADERS_CL= run "$V" "${ARGS[@]}")" 1
+check "причина названа" "$(grep -c 'нет коммита «Update headers to CL…»' "$T/out.txt")" 1
+check "ручной номер не числом — не пройдено" "$(FICSITAI_SML_HEADERS_CL=CL517554 run "$V" "${ARGS[@]}")" 1
+check "совпадение — пройдено, источник в протоколе" "$(run "$V" "${ARGS[@]}"; grep -c 'заголовки CL 517554 (задан вручную, правки заголовков не проверены: проект не в git)' "$T/out.txt")" "0
+1"
+check "журнал без Game Changelist — не пройдено" "$(STUB_NO_CL=1 run "$V" "${ARGS[@]}")" 1
+check "причина названа" "$(grep -c 'Номер сборки игры не найден в журнале' "$T/out.txt")" 1
+check "Game Changelist 0 — не пройдено" "$(STUB_CL=0 run "$V" "${ARGS[@]}")" 1
+
+GIT="$(command -v git || true)"
+check "git есть на машине (нужен для проверок истории)" "$([[ -n "$GIT" ]] && echo yes || echo no)" yes
+if [[ -n "$GIT" ]]; then
+    # Настоящая история: проект SML — git-репозиторий с заголовком в Source/.
+    P="$T/proj"; pgit() { "$GIT" -C "$P" -c user.name=t -c user.email=t@t "$@" >/dev/null 2>&1; }
+    mkdir -p "$P/Source/FactoryGame/Public" "$P/Mods/WwisePatches" "$P/Mods/SML/Source"
+    echo 'class A { virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"; echo '#' > "$P/Mods/WwisePatches/applyPatches.sh"
+    printf 'Mods/TestMod/\nSaved/\n' > "$P/.gitignore"
+    pgit init -q && pgit add -A && pgit commit -q -m "Update headers to CL491125" && pgit commit -q --allow-empty -m "Bump version"
+    GV() { FICSITAI_GIT="$GIT" FICSITAI_SML_HEADERS_CL="${HCL-}" run "$V" "${ARGS[@]}"; }
+    check "история: CL 491125 под «Bump version», игра 517554 — не пройдено" "$(HCL= GV)" 1
+    check "протокол называет обе сборки" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
+    check "ручной 517554 не перекрывает историю 491125" "$(HCL=517554 GV)" 1
+    check "конфликт назван с обоими номерами" "$(grep -c 'в истории проекта CL 491125, в FICSITAI_SML_HEADERS_CL — CL 517554' "$T/out.txt")" 1
+    pgit commit -q --allow-empty -m "Update headers to CL517554"
+    check "более новый коммит заголовков — пройдено" "$(HCL= GV)" 0
+    check "источник — история проекта" "$(grep -c 'заголовки CL 517554 (история проекта)' "$T/out.txt")" 1
+    check "ручной номер, равный истории, — пройдено" "$(HCL=517554 GV)" 0
+    # Ревью #45, п. 1: заголовок заменён следующим коммитом — рабочее дерево чистое, но ABI уже не тот.
+    echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"; pgit commit -qam "Swap header"
+    check "заголовок заменён коммитом после «Update headers» — не пройдено" "$(HCL= GV)" 1
+    check "файл и коммит названы" "$(grep -c 'изменены коммитами после «Update headers to CL517554»: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1
+    pgit revert --no-edit HEAD
+    check "возврат заголовка коммитом — пройдено: дерево снова как в «Update headers»" "$(HCL= GV)" 0
+    # Ревью #45, п. 2: заголовок меняется, пока сборка держит блокировку.
+    check "правка заголовка во время сборки — не пройдено" "$(STUB_UAT_EDIT=Source/FactoryGame/Public/A.h HCL= GV)" 1
+    check "причина — проект изменился во время сборки" "$(grep -c 'проект SML изменился во время сборки' "$T/out.txt")" 1
+    pgit checkout -- Source
+    check "коммит заголовка во время сборки — не пройдено" "$(STUB_UAT_EDIT=Source/FactoryGame/Public/A.h STUB_UAT_COMMIT=1 HCL= GV)" 1
+    check "в причине оба коммита проекта" "$(grep -cE 'проект SML изменился во время сборки: коммит [0-9a-f]{8} → [0-9a-f]{8}' "$T/out.txt")" 1
+    pgit revert --no-edit HEAD
+    check "после возврата — снова пройдено" "$(HCL= GV)" 0
+    echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
+    check "заголовок изменён в рабочем дереве — не пройдено" "$(HCL= GV)" 1
+    check "файл назван" "$(grep -c 'изменены в рабочем дереве проекта: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1
+    pgit checkout -- Source; echo 'struct B;' > "$P/Mods/SML/Source/B.h"
+    check "новый файл в заголовках SML — не пройдено" "$(HCL= GV)" 1
+    rm -f "$P/Mods/SML/Source/B.h"; echo '# local' >> "$P/Mods/WwisePatches/applyPatches.sh"
+    check "правка Mods/WwisePatches допустима" "$(HCL= GV)" 0
+    pgit checkout -- Mods; rm -rf "$P/.git" "$P/.gitignore" "$P/Source" "$P/Mods/WwisePatches" "$P/Mods/SML"
+    # Ревью #45, второй круг: коммит заголовков ищется по точному заголовку. Обычный revert коммита
+    # «Update headers» и упоминание в теле постороннего коммита номер не дают.
+    newproj() {
+        rm -rf "$P/.git" "$P/Source"; mkdir -p "$P/Source/FactoryGame/Public"
+        echo 'class A { virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
+        pgit init -q && pgit add -A && pgit commit -q -m "Update headers to CL491125"
+    }
+    newproj
+    echo 'class A { virtual void G(); virtual void F(); };' > "$P/Source/FactoryGame/Public/A.h"
+    pgit commit -qam "Update headers to CL517554"
+    check "заголовки CL 517554 изменены коммитом «Update headers» — пройдено" "$(HCL= GV)" 0
+    pgit revert --no-edit HEAD
+    check "обычный revert «Update headers to CL517554» — не пройдено" "$(HCL= GV)" 1
+    check "названы файл и коммит заголовков, а не revert" "$(grep -c 'изменены коммитами после «Update headers to CL517554»: Source/FactoryGame/Public/A.h' "$T/out.txt")" 1
+    newproj
+    pgit commit -q --allow-empty -m "Notes" -m "Next: Update headers to CL517554"
+    check "номер в теле постороннего коммита не учитывается — не пройдено" "$(HCL= GV)" 1
+    check "протокол называет CL 491125 из заголовка коммита" "$(grep -c 'заголовки CL 491125, игра CL 517554' "$T/out.txt")" 1
+    pgit commit -q --allow-empty -m "Update headers to CL517554 (partial)"
+    check "заголовок с хвостом не учитывается — не пройдено" "$(HCL= GV)" 1
+    rm -rf "$P/.git" "$P/.gitignore" "$P/Source"
+fi
 
 echo "5. Блокировка и роль (замечание 5)"
 W="$T/repo/tools/host/with-lock.sh"

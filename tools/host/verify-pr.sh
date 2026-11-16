@@ -9,6 +9,7 @@
 # все моды собрались, игра дошла до главного меню, дожила до таймера и не записала критических ошибок.
 # Ревью начинается при наличии этого блока в PR (решение King 11.11.2026).
 #
+# Протокол не проходит, если заголовки проекта SML сделаны не под ту сборку игры, что загрузилась, или изменены локально.
 # Что протокол НЕ проверяет: загрузку сохранения, поведение мода в мире, EGS-сборку в игре, Windows.
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 project="${FICSITAI_SML_PROJECT:-}"; sml="${FICSITAI_SML_ZIP:-}"; extra=(); seconds=120; keeps=(); sync=1; mods=()
@@ -20,7 +21,7 @@ while [[ $# -gt 0 ]]; do
         --seconds) seconds="$2"; shift 2 ;;
         --keep) keeps+=("$2"); shift 2 ;;
         --no-sync) sync=0; shift ;;
-        -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,14p' "$0"; exit 0 ;;
         *) mods+=("$1"); shift ;;
     esac
 done
@@ -29,6 +30,8 @@ done
 fa_require_role
 fa_new_dir runs "verify-"; out="$FA_NEW_DIR"
 ok=1; lines=(); zips=(); declare -A want=()
+# Заголовки проекта SML проверяются под блокировкой сборки для каждого архива (fa_build_mod, ревью #45).
+hcl=""; hcl_src=""; hcl_problem=""; hcl_rev=""
 
 for mod in "${mods[@]}"; do
     if fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"; then
@@ -40,6 +43,12 @@ for mod in "${mods[@]}"; do
         first="$(grep -m1 -E 'error [A-Z]+[0-9]+|ERROR:' "$FA_BUILD_LOG" 2>/dev/null | cut -c1-160)"
         lines+=("- Сборка Win64 Shipping, \`$mod\`: **не выполнена** — $FA_BUILD_STAGE; исходники — $FA_BUILD_ORIGIN${first:+; первая ошибка: \`$first\`}")
     fi
+    # Заголовки и ревизия проекта — из проверки под блокировкой этой сборки; все архивы — на одном состоянии.
+    if [[ -z "$hcl_problem" && -n "$FA_BUILD_HCL_PROBLEM" ]]; then hcl_problem="$FA_BUILD_HCL_PROBLEM"
+    elif [[ -z "$hcl_problem" && -n "$hcl_rev$hcl" && ( "$FA_BUILD_PROJECT_REV" != "$hcl_rev" || "$FA_BUILD_HCL" != "$hcl" ) ]]; then
+        hcl_problem="архивы собраны на разных состояниях проекта SML: коммит ${hcl_rev:0:8} и ${FA_BUILD_PROJECT_REV:0:8}"
+    fi
+    [[ -z "$hcl$hcl_rev" ]] && { hcl="$FA_BUILD_HCL"; hcl_src="$FA_BUILD_HCL_SRC"; hcl_rev="$FA_BUILD_PROJECT_REV"; }
 done
 
 if [[ $ok -eq 1 ]]; then
@@ -53,6 +62,15 @@ if [[ $ok -eq 1 ]]; then
         menu="нет"; [[ "$FA_LOG_MENU" == yes ]] && menu="да"
         lines+=("- Игра: CL ${FA_LOG_CL:-не определён}, Proton, без клиента Steam; загружены: ${FA_LOG_MODS:-ни одного мода}")
         lines+=("- Запуск на $seconds с: главное меню — $menu; дожила до таймера — $alive; критических ошибок — $FA_LOG_FATAL; ошибок загрузки плагинов — $FA_LOG_PLUGIN_ERRORS")
+        # Заголовки проекта SML должны быть от той же сборки игры, иначе виртуальные вызовы уходят в чужие слоты.
+        if [[ ! "${FA_LOG_CL:-}" =~ ^[1-9][0-9]*$ ]]; then
+            ok=0; lines+=("- **Номер сборки игры не найден в журнале** (\`Game Changelist\`): нельзя сверить его с заголовками проекта SML")
+        fi
+        if [[ -n "$hcl_problem" ]]; then
+            ok=0; lines+=("- **Заголовкам проекта SML нельзя верить:** $hcl_problem (ENVIRONMENT.md §5.1)")
+        elif [[ "${FA_LOG_CL:-}" =~ ^[1-9][0-9]*$ && "$hcl" != "$FA_LOG_CL" ]]; then
+            ok=0; lines+=("- **Заголовки проекта SML не от этой сборки игры:** заголовки CL $hcl, игра CL $FA_LOG_CL (ENVIRONMENT.md §5.1)")
+        fi
         # Загружен должен быть именно собранный архив: имя и SemVersion из его дескриптора.
         for mod in "${mods[@]}"; do
             if [[ ", $FA_LOG_MODS," != *", $mod: "* ]]; then
@@ -73,12 +91,12 @@ fi
 rev="$("$FA_GIT" -C "$FA_REPO_ROOT" rev-parse --short HEAD 2>/dev/null || echo '?')"
 branch="$("$FA_GIT" -C "$FA_REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || echo '?')"
 dirty="чистое"; [[ -n "$("$FA_GIT" -C "$FA_REPO_ROOT" status --porcelain -- mod 2>/dev/null)" ]] && dirty="**есть незакоммиченные правки в \`mod/\`**"
-smlrev="$("$FA_GIT" -C "$project" rev-parse --short HEAD 2>/dev/null || echo 'не git')"
+smlrev="${hcl_rev:0:8}"; [[ -n "$smlrev" ]] || smlrev="$("$FA_GIT" -C "$project" rev-parse --short=8 HEAD 2>/dev/null || echo 'не git')"
 {
     echo "**Протокол проверки** · роль ${FA_ROLE^} · $(date '+%d.%m.%Y %H:%M') · \`tools/host/verify-pr.sh\`"
     echo
     echo "- Репозиторий: \`$rev\` (\`$branch\`), рабочее дерево — $dirty"
-    echo "- Проект SML: \`${project/#$HOME/\~}\` на \`$smlrev\`"
+    echo "- Проект SML: \`${project/#$HOME/\~}\` на \`$smlrev\`, заголовки CL ${hcl:-не определены}${hcl_src:+ ($hcl_src)}"
     printf '%s\n' "${lines[@]}"
     echo "- Не проверялось: загрузка сохранения, поведение в мире, EGS в игре, Windows"
     echo
