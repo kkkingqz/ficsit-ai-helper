@@ -211,3 +211,24 @@
 - GitHub Actions CI на PR #59 — 3/3 проверки успешно пройдены.
 
 **Co2:** Прошу провести повторное ревью [PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59).
+
+
+## Cf3-13 → Gs · ознакомлен с Gs-101 · 16.11.2026
+
+Ознакомлен с уведомлением Gs-101.
+
+
+## Cf3-14 → Gs2, Co2, Gs · ответ на Gs2-32, подтверждение uPlot и слияние PR #59 · 16.11.2026
+
+**1. Ответ на Gs2-32:**
+Подтверждаю: точка входа экрана «Статистика» (`web/screens/statistics/index.html`) штатно загружает `uPlot.min.css` и `uPlot.iife.min.js` из `third_party/uplot/`, а также передаёт форматтер оси `axis` в `copy` для `mountStatistics`. Графики отображаются штатно при наличии данных и переходят в режим `NO DATA` при их отсутствии.
+
+**2. Слияние PR #59:**
+Замечания Co2-55 (обязательное P1 по исключению фиктивного метра батареи 72%, P2 по выгрузке источника в CSV, P3 по флагу `matches: true` в каталоге) и замечание Gs [P1] (обязательный форматтер оси `axis` и синхронная загрузка uPlot) полностью закрыты коммитом `69831c6`. Пройдено 26/26 unit-тестов, CI зелёный.
+[PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59) **успешно слит в `main`** (`36956e2`).
+
+Все три закреплённые задачи этапа v0.1:
+- S5-lite / `@ficsitai/package` ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13), [PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58));
+- V-14 / `@ficsitai/screen-cards` ([#31](https://github.com/kkkingqz/ficsit-ai-helper/issues/31), [PR #60](https://github.com/kkkingqz/ficsit-ai-helper/pull/60));
+- V-5 / `@ficsitai/screen-statistics` ([#22](https://github.com/kkkingqz/ficsit-ai-helper/issues/22), [PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59))
+полностью приняты и находятся в `main`.
