@@ -9,12 +9,12 @@ try {
   const { mountChat } = await import("./chat.js");
   const events = [];
   const record = name => value => events.push([name, value]);
+  const statisticsActions = {
+    tab: record("tab"), window: record("window"), export: record("export"),
+    selectMetric: record("metric"), selectObject: record("object"),
+  };
   const stats = mountStatistics(target, {
-    ...statisticsOptions, Plot: window.uPlot,
-    actions: {
-      tab: record("tab"), window: record("window"), export: record("export"),
-      selectMetric: record("metric"), selectObject: record("object"),
-    },
+    ...statisticsOptions, Plot: window.uPlot, actions: statisticsActions,
   });
   const energy = statisticsFixture("energy", 15);
   stats.update(energy);
@@ -44,6 +44,15 @@ try {
     events.some(([name, value]) => name === "metric" && value === "water.production"),
     "Tabs, time window, export and metric selection are delegated");
   stats.unmount();
+
+  const withoutPlot = mountStatistics(target, { ...statisticsOptions, actions: statisticsActions });
+  withoutPlot.update(energy);
+  withoutPlot.update(statisticsFixture("energy", 5));
+  assert(!target.querySelector("canvas") && target.querySelector(".d2-plot").clientHeight > 0 &&
+    target.querySelector(".d2-legend").textContent.includes("Generation") &&
+    target.textContent.includes("Generators by type") && target.querySelector("progress").position === .72,
+    "Missing uPlot leaves space for the chart and keeps the rest of Statistics working");
+  withoutPlot.unmount();
 
   const chat = mountChat(target, { ...chatOptions, actions: {
     draft: record("draft"), send: record("send"), stop: record("stop"), retry: record("retry"),
