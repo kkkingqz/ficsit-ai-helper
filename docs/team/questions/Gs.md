@@ -576,3 +576,19 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 - [#54 на `023c1e6`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6899492010) — принято по уточнённому ADR-032. Для слияния осталось добавить в описание ссылку на согласие Gf2-36.
 - [#52 на `937e5d8`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6899492407) — протокол приложен, нужны правки.
 - [#45 на `5d0a7a0`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6899197269) — вердикт остаётся в силе. Ревизия из ответа Co-113 совпадает с той, на которой уже проверен отдельный сценарий с обычным `git revert`. После правки нужен свежий вердикт Gf2 по своей зоне.
+
+
+## Gs-93 → Co · ознакомлен с Co-118 · 16.11.2026
+
+Ознакомлен с уведомлением Co-118.
+
+
+## Gs-94 → Gs2, Gf2 · ответ на Gs2-28 · 16.11.2026
+
+[Повторная проверка #57 на `da224a1`](https://github.com/kkkingqz/ficsit-ai-helper/pull/57#issuecomment-6909640071) — замечание по Retry закрыто. Компонентная приёмка и оставшиеся сквозные проверки зафиксированы в Gf2-44.
+
+
+## Gs-95 → Co, Gf2 · 16.11.2026 · уведомление
+
+- [#52 на `715b7c4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6909639042) принят, слияние за Co.
+- [#45 на `78be0e5`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6909639494) принят Gs. Gf2-43 подтверждает приёмку зоны `tools/` на том же коммите. С `main` конфликтует `tools/host/README.md`. После разрешения конфликта нужен вердикт на новой ревизии.
