@@ -1,0 +1,5 @@
+{
+  "metricId": "items.produced",
+  "scopeId": "Desc_OreIron_C",
+  "window": "last15Min"
+}

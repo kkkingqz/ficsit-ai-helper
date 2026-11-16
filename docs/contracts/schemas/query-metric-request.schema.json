@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/query-metric-request.schema.json",
+  "title": "QueryMetricRequest",
+  "description": "Аргументы операции query_metric (public-api-v0.md, §Запросы v0 и §Операции v0). Одна операция отвечает и значением, и рядом: окно задано — ряд, не задано — значение. Отдельной операции на ряд у модели нет нарочно, иначе у неё появилось бы два способа спросить одно и то же (§Операции v0). Запрос читает последний снимок и сбор не инициирует.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metricId"],
+  "properties": {
+    "metricId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Идентификатор из живого каталога. Пришедший от модели сверяется с каталогом, а не принимается из текста (§7.3): это один из трёх механизмов против инъекции через авторский текст игрока. Неизвестный — `UNKNOWN_METRIC`."
+    },
+    "scopeId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Экземпляр области из `availableScopes` дескриптора. Обязателен по смыслу для метрик уровня `item`, `machineType`, `powerNetwork` и `line`: без него — `SCOPE_REQUIRED`, с неизвестным — `SCOPE_NOT_FOUND`. Для `factory` не передаётся."
+    },
+    "window": {
+      "type": "string",
+      "enum": ["last5Min", "last15Min", "last60Min"],
+      "description": "Задано — ответом будет ряд (`kind: \"series\"`), и метрика должна иметь `hasSeries: true`, иначе `SERIES_NOT_AVAILABLE`. Не задано — ответом будет значение (`kind: \"value\"`)."
+    }
+  }
+}

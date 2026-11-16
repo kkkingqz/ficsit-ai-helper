@@ -1,0 +1,6 @@
+{
+  "metricId": "items.produced",
+  "scopeFilter": "iron",
+  "pageSize": 50,
+  "scopeCursor": "s:50"
+}

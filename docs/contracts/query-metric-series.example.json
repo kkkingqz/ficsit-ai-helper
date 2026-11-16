@@ -1,0 +1,13 @@
+{
+  "kind": "series",
+  "metricId": "power.consumption",
+  "scopeId": "",
+  "window": "last15Min",
+  "unit": "megawatt",
+  "source": "live",
+  "intervalSec": 5,
+  "values": [401.0, 412.5],
+  "timestamps": [1810.0, 1830.0],
+  "firstPointSessionTimeSec": 1810.0,
+  "windowIncomplete": false
+}

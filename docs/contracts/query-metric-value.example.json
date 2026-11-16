@@ -1,0 +1,11 @@
+{
+  "kind": "value",
+  "metricId": "power.consumption",
+  "scopeId": "",
+  "state": "value",
+  "value": 412.5,
+  "unit": "megawatt",
+  "source": "live",
+  "sessionTimeSec": 1830.2,
+  "precisionDigits": 1
+}

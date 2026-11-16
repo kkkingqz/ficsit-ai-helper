@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/query-metric-result.schema.json",
+  "title": "QueryMetricResult",
+  "description": "Результат операции query_metric: значение или ряд (public-api-v0.md, `FFicsitAIValue` и `FFicsitAISeries`). Форму различает поле-дискриминатор `kind`, а не наличие массива: угадывать по форме клиенту не нужно.",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["value", "series"],
+      "description": "Дискриминатор формы: `value` — одно значение, `series` — ряд за окно."
+    }
+  },
+  "oneOf": [{ "$ref": "#/$defs/value" }, { "$ref": "#/$defs/series" }],
+  "$defs": {
+    "metricId": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "scopeId": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Область, к которой относится ответ. Пустая строка — метрика уровня фабрики."
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "itemsPerMinute",
+        "cubicMetersPerMinute",
+        "megawatt",
+        "megawattHour",
+        "percent",
+        "count",
+        "seconds"
+      ]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["live", "save", "saveEstimated", "recorded", "fixture", "planned"],
+      "description": "Откуда пришло значение (§8.5). Экран показывает это в метке свежести: `fixture` и `planned` не должны выглядеть как замер."
+    },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "metricId",
+        "scopeId",
+        "state",
+        "value",
+        "unit",
+        "source",
+        "sessionTimeSec",
+        "precisionDigits"
+      ],
+      "properties": {
+        "kind": { "const": "value" },
+        "metricId": { "$ref": "#/$defs/metricId" },
+        "scopeId": { "$ref": "#/$defs/scopeId" },
+        "state": {
+          "type": "string",
+          "enum": ["value", "notApplicable"],
+          "description": "`notApplicable` — нормальное состояние мира, а не сбой: «времени до разряда нет», потому что сеть не разряжается. Это успешный ответ, и клиент показывает прочерк, а не ошибку."
+        },
+        "value": {
+          "type": ["number", "null"],
+          "description": "`null` ровно тогда, когда `state` — `notApplicable`. Ни ноль, ни отсутствие поля этого не заменяют: ноль — это измеренный ноль."
+        },
+        "unit": { "$ref": "#/$defs/unit" },
+        "source": { "$ref": "#/$defs/source" },
+        "sessionTimeSec": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Секунды от начала сессии, когда значение снято. Реальная метка времени живёт в заголовке снимка, а не в каждом значении."
+        },
+        "precisionDigits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 6,
+          "description": "Сколько знаков имеет смысл показывать. Клиент не придумывает точность сам."
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "type": "object",
+            "properties": { "state": { "const": "notApplicable" } },
+            "required": ["state"]
+          },
+          "then": { "properties": { "value": { "type": "null" } } },
+          "else": { "properties": { "value": { "type": "number" } } }
+        }
+      ]
+    },
+    "series": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "metricId",
+        "scopeId",
+        "window",
+        "unit",
+        "source",
+        "intervalSec",
+        "values",
+        "timestamps",
+        "firstPointSessionTimeSec",
+        "windowIncomplete"
+      ],
+      "properties": {
+        "kind": { "const": "series" },
+        "metricId": { "$ref": "#/$defs/metricId" },
+        "scopeId": { "$ref": "#/$defs/scopeId" },
+        "window": { "type": "string", "enum": ["last5Min", "last15Min", "last60Min"] },
+        "unit": { "$ref": "#/$defs/unit" },
+        "source": { "$ref": "#/$defs/source" },
+        "intervalSec": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Номинальный шаг сетки, а не гарантия равномерности. Восстанавливать по нему время точки нельзя."
+        },
+        "values": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": { "type": "number" },
+          "description": "Только наблюдённые значения. Неприменимых точек в ряду не бывает: пропуск виден по `timestamps`, а подставленных значений нет (Gs-3.3, Gs-5.3)."
+        },
+        "timestamps": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": { "type": "number", "minimum": 0 },
+          "description": "Время каждой точки, той же длины, что `values`, по возрастанию. Единственный источник времени точки. Равенство длин двух массивов схемой не выражается — его проверяет валидатор мода (§7.5) и тест паритета."
+        },
+        "firstPointSessionTimeSec": { "type": "number", "minimum": 0 },
+        "windowIncomplete": {
+          "type": "boolean",
+          "description": "true — сессия короче запрошенного окна, и экран обязан сказать это игроку (AC-04). Это не признак пропуска внутри окна: пропуск виден только по `timestamps`."
+        }
+      }
+    }
+  }
+}

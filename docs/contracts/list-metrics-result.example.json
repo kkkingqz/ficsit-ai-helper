@@ -1,0 +1,47 @@
+{
+  "metrics": [
+    {
+      "id": "power.consumption",
+      "displayName": "Total Power Consumption",
+      "unit": "megawatt",
+      "scope": "factory",
+      "hasSeries": true,
+      "costClass": "normal",
+      "sampleIntervalSec": 5,
+      "external": false,
+      "availableScopes": [],
+      "scopesTruncated": false
+    },
+    {
+      "id": "power.network.battery_time_to_empty",
+      "displayName": "Network Battery Time To Empty",
+      "unit": "seconds",
+      "scope": "powerNetwork",
+      "hasSeries": false,
+      "costClass": "cheap",
+      "sampleIntervalSec": 5,
+      "external": false,
+      "availableScopes": [
+        { "scopeId": "1", "displayName": "Power Circuit 1" },
+        { "scopeId": "2", "displayName": "Power Circuit 2" }
+      ],
+      "scopesTruncated": false
+    },
+    {
+      "id": "items.produced",
+      "displayName": "Items Produced",
+      "unit": "itemsPerMinute",
+      "scope": "item",
+      "hasSeries": true,
+      "costClass": "heavy",
+      "sampleIntervalSec": 15,
+      "external": false,
+      "availableScopes": [
+        { "scopeId": "Desc_OreIron_C", "displayName": "Iron Ore" },
+        { "scopeId": "Desc_IronIngot_C", "displayName": "Iron Ingot" }
+      ],
+      "scopesTruncated": true
+    }
+  ],
+  "nextCursor": "m:50"
+}

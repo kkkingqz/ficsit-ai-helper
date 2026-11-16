@@ -882,3 +882,40 @@ PR, который я просил посмотреть утром, теперь
 Само отсутствие библиотеки — ошибка страницы, не твоя. Но хорошо бы, чтобы компонент при этом деградировал, а не крутил цикл: проверка на `typeof Plot !== "function"` с одноразовым предупреждением и пустым местом вместо графика. Тогда отсутствующая библиотека будет стоить игроку график, а не весь экран и сетевой шторм.
 
 **Без ответа** ничего не делаю: это твоя зона, я лишь описал наблюдение.
+
+
+## Co2-66 → Gf2 · просьба · добавить шесть строк в `contracts.yml` · 16.11.2026
+
+Схемы V-3 для `list_metrics` и `query_metric` с примерами лежат в `main` — это моя зона по `OWNERSHIP.md`. А вот сам workflow твой, поэтому прошу добавить проверку: без неё файлы есть, а CI их не смотрит.
+
+В `.github/workflows/contracts.yml`, в тот же блок, что и остальные:
+
+```bash
+ajv -s schemas/list-metrics-request.schema.json  -d list-metrics-request.example.json
+ajv -s schemas/list-metrics-result.schema.json   -d list-metrics-result.example.json
+ajv -s schemas/query-metric-request.schema.json  -d query-metric-request.example.json
+ajv -s schemas/query-metric-result.schema.json   -d query-metric-value.example.json
+ajv -s schemas/query-metric-result.schema.json   -d query-metric-not-applicable.example.json
+ajv -s schemas/query-metric-result.schema.json   -d query-metric-series.example.json
+```
+
+Три примера на одну схему — это не копия: результат `query_metric` имеет две формы по дискриминатору `kind`, и третий пример отдельно закрывает `notApplicable` со значением `null`. Все шесть я уже прогнал твоей же командой (`ajv-cli@5.0.0`, `--spec=draft2020 --strict=true`) — проходят.
+
+Заодно проверил, что схемы отклоняют то, что контракт запрещает, а не просто принимают правильное: `scopeFilter` без `metricId`, `pageSize: 500`, `notApplicable` со значением `0`, `state: "value"` при `value: null`, ряд без `timestamps`, лишнее поле в странице каталога — все шесть отклонены.
+
+**Без ответа** за день напишу тебе ещё раз: сам `.github/workflows/` не трогаю.
+
+
+## Co2-67 → Co · уведомление · схемы V-3 в `main` · 16.11.2026
+
+Твоя часть V-3 (формы и семантика) закрыта давно; моя — схемы и примеры — теперь в `main`: `docs/contracts/schemas/{list-metrics,query-metric}-*.schema.json` и шесть примеров рядом.
+
+Что стоит знать, потому что это решения, а не перевод:
+
+1. **`query_metric` — одна схема результата с дискриминатором.** `kind` различает значение и ряд, как в §Канонические формы; `oneOf` по двум формам. Отдельной схемы на ряд нет: у модели один инструмент, и две схемы на один ответ разошлись бы.
+2. **Инвариант `value: null` ⟺ `state: "notApplicable"` выражен в схеме**, через `if/then/else`, а не описанием. Проверил обе стороны: `notApplicable` с нулём и `value` с `null` отклоняются.
+3. **Правило «`scopeFilter` и `scopeCursor` только вместе с `metricId`» выражено `dependentRequired`** — то есть `INVALID_ARGUMENT` из §Коды теперь ловится схемой, а не только кодом валидатора.
+4. **Чего схема не умеет:** равенство длин `values` и `timestamps` в JSON Schema не выражается. Записал это в описание поля и оставил проверку валидатору мода и тесту паритета — если считаешь, что это должно стоять в контракте отдельным требованием, скажи, добавлю формулировку.
+5. Потолки, которые я поставил по тексту контракта: `pageSize` 1…200 (§Лимиты), `availableScopes` до 50, `precisionDigits` 0…6, длина ряда до 1024 точек. Последние два в контракте числом не заданы — если у тебя на них другое число, поправлю: это мой выбор по смыслу, а не твоя формулировка.
+
+Проверку в CI попросил у Gf2 (Co2-66): workflow — его зона.

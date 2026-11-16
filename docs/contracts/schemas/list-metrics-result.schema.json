@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/list-metrics-result.schema.json",
+  "title": "ListMetricsResult",
+  "description": "Страница каталога метрик — результат операции list_metrics (public-api-v0.md, `FFicsitAIMetricDescriptor`). Дескриптор отвечает на три вопроса клиента сразу: можно ли просить ряд (`hasSeries`), как часто имеет смысл обновлять (`sampleIntervalSec`, `costClass`) и какие области у метрики есть (`availableScopes`).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["metrics", "nextCursor"],
+  "properties": {
+    "metrics": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/$defs/descriptor" }
+    },
+    "nextCursor": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Курсор следующей страницы метрик; пустая строка — страниц больше нет. Непрозрачен для клиента."
+    },
+    "nextScopeCursor": {
+      "type": "string",
+      "maxLength": 256,
+      "description": "Курсор областей единственной метрики ответа; приходит только на запрос с `metricId`. Пустая строка — областей больше нет."
+    }
+  },
+  "$defs": {
+    "metricId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Устойчивый идентификатор: `power.consumption`, `items.produced`. Метрики других модов — `ext.<modId>.<name>`."
+    },
+    "unit": {
+      "type": "string",
+      "enum": [
+        "itemsPerMinute",
+        "cubicMetersPerMinute",
+        "megawatt",
+        "megawattHour",
+        "percent",
+        "count",
+        "seconds"
+      ]
+    },
+    "scopeRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scopeId", "displayName"],
+      "properties": {
+        "scopeId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Непрозрачная строка: className предмета, идентификатор сети. Числовой ключ кодируется строкой, форма контракта от этого не меняется."
+        },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 128 }
+      }
+    },
+    "descriptor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "displayName",
+        "unit",
+        "scope",
+        "hasSeries",
+        "costClass",
+        "sampleIntervalSec",
+        "external",
+        "availableScopes",
+        "scopesTruncated"
+      ],
+      "properties": {
+        "id": { "$ref": "#/$defs/metricId" },
+        "displayName": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "unit": { "$ref": "#/$defs/unit" },
+        "scope": {
+          "type": "string",
+          "enum": ["factory", "powerNetwork", "item", "machineType", "line"]
+        },
+        "hasSeries": {
+          "type": "boolean",
+          "description": "false — ряда нет, и запрашивать его не нужно: ответом будет `SERIES_NOT_AVAILABLE`."
+        },
+        "costClass": {
+          "type": "string",
+          "enum": ["cheap", "normal", "heavy"],
+          "description": "От него зависит нижний порог обновления виджета: для `heavy` — не чаще 15 с (§8.2)."
+        },
+        "sampleIntervalSec": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Номинальный интервал сбора. Он же задаёт порог устаревания: max(3 × sampleIntervalSec, 10 с)."
+        },
+        "external": {
+          "type": "boolean",
+          "description": "Метрику зарегистрировал другой мод или компьютер FIN (v1.1)."
+        },
+        "availableScopes": {
+          "type": "array",
+          "maxItems": 50,
+          "items": { "$ref": "#/$defs/scopeRef" },
+          "description": "Экземпляры области: сети, предметы, типы машин. Пусто при `scope: \"factory\"`. Потолок 50 — это потолок врезки, а не каталога."
+        },
+        "scopesTruncated": {
+          "type": "boolean",
+          "description": "true — список областей обрезан потолком 50. Экран берёт полный перечень через `listScopes`, модель — тем же `list_metrics` с `metricId` и `scopeCursor`."
+        }
+      }
+    }
+  }
+}

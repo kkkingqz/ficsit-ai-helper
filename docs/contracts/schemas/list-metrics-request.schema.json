@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ficsit-ai/contracts/list-metrics-request.schema.json",
+  "title": "ListMetricsRequest",
+  "description": "Аргументы операции list_metrics — каталога метрик телеметрии (public-api-v0.md, §Запросы v0 и §Операции v0; ARCHITECTURE.md §7.5, §8.2). Модель получает каталог страницами и с фильтром, а не целиком: перечень из десятков метрик в одном ответе переполнил бы контекст. Все поля необязательны: вызов без аргументов отдаёт первую страницу полного каталога.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "metricId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Один идентификатор метрики. Ответ тогда содержит ровно один дескриптор, а курсор областей в нём однозначен (Gs-8.1)."
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["factory", "powerNetwork", "item", "machineType", "line"],
+      "description": "Фильтр по уровню метрики. `line` в v0.1 не заполняется: экрана линий в срезе нет."
+    },
+    "filter": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Подстрока по названию и идентификатору метрики."
+    },
+    "scopeFilter": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "Подстрока по названию области. Допустим только вместе с `metricId`, иначе `INVALID_ARGUMENT`."
+    },
+    "pageSize": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 200,
+      "default": 50,
+      "description": "По умолчанию 50, максимум 200. Вне границ — `INVALID_ARGUMENT`, а не молчаливое усечение."
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Курсор метрик: непрозрачная строка из `nextCursor` предыдущей страницы. Клиент её не разбирает и не конструирует."
+    },
+    "scopeCursor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 256,
+      "description": "Курсор областей одной метрики из `nextScopeCursor`. Допустим только вместе с `metricId`. Курсоры метрик и областей не взаимозаменяемы: подмена — `INVALID_ARGUMENT`, а не пустая страница, которая выглядела бы как «областей больше нет»."
+    }
+  },
+  "dependentRequired": {
+    "scopeFilter": ["metricId"],
+    "scopeCursor": ["metricId"]
+  }
+}

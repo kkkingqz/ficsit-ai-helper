@@ -1,0 +1,11 @@
+{
+  "kind": "value",
+  "metricId": "power.network.battery_time_to_empty",
+  "scopeId": "2",
+  "state": "notApplicable",
+  "value": null,
+  "unit": "seconds",
+  "source": "live",
+  "sessionTimeSec": 1830.2,
+  "precisionDigits": 0
+}
