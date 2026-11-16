@@ -3,6 +3,7 @@ import { ApiError } from "@ficsitai/screens-api";
 import { DEFAULT_CHAT_STRINGS } from "./strings.js";
 import type {
   ChatActions,
+  ChatError,
   ChatHistoryState,
   ChatMessage,
   ChatPanelItem,
@@ -81,8 +82,13 @@ export function createChatController(options: ChatControllerOptions): ChatContro
   let sending = false;
   let streaming = false;
   let turnId: string | null = null;
-  let lastSent = "";
-  let error: ChatViewModel["error"] = null;
+  /**
+   * Последний отправленный текст — для повтора. Запоминается до ответа мода:
+   * повторяют обычно как раз тот ход, который не состоялся, и помнить только
+   * удачные значило бы, что кнопка Retry после отказа ничего не делает.
+   */
+  let lastAttempt = "";
+  let error: ChatError | null = null;
   let rateLimit: string | null = null;
   /** Ход отменён — историю надо перечитать, там окажется дочитанный ответ. */
   let historyStale = false;
@@ -304,9 +310,9 @@ export function createChatController(options: ChatControllerOptions): ChatContro
     rateLimit = null;
     render();
 
+    lastAttempt = trimmed;
     try {
       const sent = await api.chatSend({ text: trimmed });
-      lastSent = trimmed;
       draft = "";
       turnId = sent.turnId;
       const at = now();
@@ -369,9 +375,11 @@ export function createChatController(options: ChatControllerOptions): ChatContro
     },
 
     retry(): void {
-      if (lastSent === "") return;
+      if (lastAttempt === "") return;
       error = null;
-      void send(lastSent);
+      // Повтора в API нет: это новый ход с тем же текстом и новым turnId,
+      // а прежний остаётся в истории (Co2-48 §3).
+      void send(lastAttempt);
     },
   };
 

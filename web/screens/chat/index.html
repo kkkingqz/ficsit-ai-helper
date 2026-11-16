@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FICSIT AI — Chat</title>
+    <link rel="stylesheet" href="/ui-kit/ui-kit.css" />
+    <link rel="stylesheet" href="/ui-kit/screens/screens.css" />
+  </head>
+  <body class="d2-screen">
+    <!-- Корень экрана: его имя зафиксировано в Co2-48 §1. -->
+    <div id="ficsitai-chat"></div>
+
+    <!--
+      Сборка экрана импортирует фасад по имени пакета, а браузер имён пакетов
+      не знает. Карта ставит имя на адрес; в игре её подменяет тот же файл
+      страницы, поэтому адрес один и тот же относительно корня.
+    -->
+    <script type="importmap">
+      {
+        "imports": {
+          "@ficsitai/screens-api": "/screens/api/dist/index.js"
+        }
+      }
+    </script>
+    <script type="module">
+      // Экран собран в dist/: страница грузит сборку, а не исходники.
+      import { autoMount } from "./dist/main.js";
+      autoMount();
+    </script>
+    <!-- Горячая перезагрузка dev-сервера; в игре файла нет и строка молчит. -->
+    <script src="/api/v0/reload.js" type="module"></script>
+  </body>
+</html>

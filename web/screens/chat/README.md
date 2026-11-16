@@ -1,6 +1,6 @@
 # @ficsitai/screen-chat
 
-Типы экрана «Чат с ИИ» (**V-6**, [#23](https://github.com/kkkingqz/ficsit-ai-helper/issues/23)): строки от хоста и свойства представления. Это первая часть экрана — состояние, вызовы фасада и точка входа `index.html` приходят вместе с запросами чата в фасаде (`chatSend`, `chatCancel`, `chatHistory`), отдельным PR.
+Экран «Чат с ИИ» (**V-6**, [#23](https://github.com/kkkingqz/ficsit-ai-helper/issues/23)): строки, типы свойств представления, контроллер и точка входа. Представление — у Gs2 в `web/ui-kit/screens/chat.js`, данные — из фасада `@ficsitai/screens-api`.
 
 Зоны разведены по [ADR-032](../../../docs/ARCHITECTURE.md) и ответу [Gs2-25](../../../docs/team/questions/Gs2.md): представление `mountChat` — у Gs2 в `web/ui-kit/screens/chat.js`, экран — здесь.
 
@@ -41,6 +41,37 @@ view.update(model); // ChatViewModel
 ## Демонстрационные данные
 
 `chatDemoModel(state)` даёт детерминированную модель для каждого из состояний `ready`, `empty`, `loading`, `streaming`, `sending`, `error`, `offline`. Это данные для вёрстки и дымовых проверок, не телеметрия: в экране их нет, он строит модель из фасада.
+
+## Контроллер
+
+```ts
+import { createChatController } from "@ficsitai/screen-chat";
+
+const controller = createChatController({ api, mountView: mountChat, root, presenter });
+// controller.actions — то, что представление зовёт в ответ на игрока
+// controller.getModel() — то, что ушло в представление последним update
+// controller.destroy() — снять подписки и представление
+```
+
+Что он делает сам, и почему именно так:
+
+- **Ход.** `send` ставит `sending` сразу, снимает его при `turnId` или ошибке, затем кладёт в ленту вопрос и пустой ответ ассистента с `id = turnId`. Текст дописывается событиями `chat.text`, `chat.tool` показывается пометкой сообщения (аргументов в событии нет), `chat.done` снимает поток. События с чужим `turnId` отбрасываются.
+- **Отмена.** `stop` зовёт `chatCancel`, а по `chat.cancelled` помечает ответ как остановленный и **помечает историю устаревшей**. Перед следующим ходом история перечитывается: Foreman дочитывает ход, и полный ответ лежит там. Без этого в ленте навсегда остался бы обрубок, которого в истории нет.
+- **Повтор.** Текст запоминается **до** ответа мода: повторяют обычно тот ход, который не состоялся. `retry` — это новый `chat.send` с тем же текстом и новым `turnId`.
+- **Разрыв связи.** По `api.status` с `sidecarConnected: false` поток снимается, показанные сообщения остаются — исчезнувшая лента выглядела бы как потерянный разговор, хотя он цел.
+- **Коды в слова.** `SIDECAR_UNAVAILABLE`, `MOD_INERT`, `API_VERSION_MISMATCH`, `RATE_LIMITED` и прочее превращаются в текст из `ChatHostStrings`; повтор предлагается только там, где он может помочь.
+
+## Точка входа
+
+`index.html` с корнем `<div id="ficsitai-chat">` и `dist/main.js`. Страница одна и та же в игре и в браузере: транспорт выбирает фасад. Представление и форматтер грузятся по адресу (`/ui-kit/screens/chat.js`, `/ui-kit/components.js`), а не импортом пакета, — витрина и экран собираются порознь. Имя пакета фасада ставит на адрес карта импорта в `index.html`.
+
+```bash
+# из web/screens/api
+node dist/dev/cli.js --root web --port 5173
+# http://127.0.0.1:5173/screens/chat/index.html
+```
+
+Корень — `web`, а не `web/screens`: странице нужны и `/ui-kit/`, и `/screens/api/dist/`.
 
 ## Сборка и проверки
 
