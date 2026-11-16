@@ -184,7 +184,7 @@ FFicsitAIScreenContext AFicsitAITerminal::GetWorldScreenContext() const
     else
     {
         constexpr int32 DefaultContentWidth = 1280;
-        constexpr int32 DefaultContentHeight = 672; // 720 - 48 (Header: 38px + 10px margin)
+        const int32 DefaultContentHeight = (HostContext.HostState == EFicsitAIHostState::NoPower) ? 720 : 672;
         Context.SizePx = FIntPoint(DefaultContentWidth, DefaultContentHeight);
         Context.AspectRatio = static_cast<float>(DefaultContentWidth) / static_cast<float>(DefaultContentHeight);
     }
@@ -295,6 +295,10 @@ void AFicsitAITerminal::OnRep_HostContext()
             Widget->SetHostState(HostContext.HostState);
         }
     }
+    if (WorldSurfaceWidget)
+    {
+        WorldSurfaceWidget->SetHostState(HostContext.HostState);
+    }
 
     MarkWorldScreenDirty();
     UpdateWorldScreenMaterialParameters();
@@ -373,6 +377,10 @@ void AFicsitAITerminal::UpdateHostState()
                     Widget->SetHostState(EFicsitAIHostState::Inert);
                 }
             }
+            if (WorldSurfaceWidget)
+            {
+                WorldSurfaceWidget->SetHostState(EFicsitAIHostState::Inert);
+            }
             UE_LOG(LogFicsitAITerminal, Warning, TEXT("Терминал переведён в инертный режим (вход удалённого игрока). Экран закрыт."));
             MarkWorldScreenDirty();
             UpdateWorldScreenMaterialParameters();
@@ -393,7 +401,11 @@ void AFicsitAITerminal::UpdateHostState()
                     Widget->SetHostState(EFicsitAIHostState::NoPower);
                 }
             }
-            UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал обесточен (требуется 10 МВт). Экран погашен."));
+            if (WorldSurfaceWidget)
+            {
+                WorldSurfaceWidget->SetHostState(EFicsitAIHostState::NoPower);
+            }
+            UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал обесточен (требуется 10 МВт). Экран переведён в NO POWER на резервном питании (AC-01, D-1 §3.1)."));
             MarkWorldScreenDirty();
             UpdateWorldScreenMaterialParameters();
         }
@@ -409,6 +421,10 @@ void AFicsitAITerminal::UpdateHostState()
                 {
                     Widget->SetHostState(EFicsitAIHostState::Ready);
                 }
+            }
+            if (WorldSurfaceWidget)
+            {
+                WorldSurfaceWidget->SetHostState(EFicsitAIHostState::Ready);
             }
             UE_LOG(LogFicsitAITerminal, Log, TEXT("Терминал запитан (10 МВт). Готов к работе."));
             MarkWorldScreenDirty();
@@ -574,7 +590,11 @@ void AFicsitAITerminal::OpenInteractiveScreen(UFicsitAIScreenSurfaceWidget* InSu
         InSurfaceWidget->SetModule(ActiveModuleInstance);
     }
 
-    MarkWorldScreenDirty();
+    // Экран в мире обновляется только в рабочем режиме Ready (§6.6); при NoPower статичный макет сохраняется (D-1 §3.1)
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+    }
 }
 
 bool AFicsitAITerminal::IsUseable_Implementation() const
@@ -708,9 +728,12 @@ void AFicsitAITerminal::CloseInteractiveScreen()
     }
     SetScreenSurface(nullptr);
 
-    // Возвращаем модуль на поверхность в мире (§6.6, Gs-59 P2)
-    SyncWorldSurfaceState();
-    MarkWorldScreenDirty();
+    // Возвращаем модуль на поверхность в мире (§6.6, Gs-59 P2); при NoPower статичный макет сохраняется (D-1 §3.1)
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        SyncWorldSurfaceState();
+        MarkWorldScreenDirty();
+    }
 }
 
 void AFicsitAITerminal::CloseActiveModule()
@@ -727,7 +750,10 @@ void AFicsitAITerminal::CloseActiveModule()
     {
         WorldSurfaceWidget->ClearModule();
     }
-    MarkWorldScreenDirty();
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+    }
 }
 
 void AFicsitAITerminal::RequestInputFocus(bool bWanted)
@@ -744,7 +770,10 @@ void AFicsitAITerminal::RequestInputFocus(bool bWanted)
 void AFicsitAITerminal::NotifyContentChanged()
 {
     FlushActiveModuleState();
-    MarkWorldScreenDirty();
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+    }
 }
 
 bool AFicsitAITerminal::HandleBackAction()
@@ -843,12 +872,22 @@ void AFicsitAITerminal::UpdateWorldScreenMaterialParameters()
         return;
     }
 
-    const bool bPoweredAndReady = (HostContext.HostState == EFicsitAIHostState::Ready);
-    // Обесточенный или инертный терминал экран в мире не подсвечивает и не рендерит (§6.6)
-    WorldScreenMaterial->SetVectorParameterValue(
-        TEXT("TintColorAndOpacity"),
-        bPoweredAndReady ? FLinearColor::White : FLinearColor::Black
-    );
+    // В Ready терминал подсвечивается на полной рабочей яркости (White).
+    // При NoPower (решение King 15.11.2026, Co-112, D-1-world-screen §3.1)
+    // терминал питается от минимального резерва: картинка NO POWER светится на приглушённой яркости.
+    // При Inert (или неинициализированном) экран погашен (Black).
+    FLinearColor TintColor = FLinearColor::Black;
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        TintColor = FLinearColor::White;
+    }
+    else if (HostContext.HostState == EFicsitAIHostState::NoPower)
+    {
+        // Приглушённая яркость аварийного резервного питания (D-1-world-screen §3.1, wireframes/world-screen.svg)
+        TintColor = FLinearColor(0.35f, 0.35f, 0.35f, 1.0f);
+    }
+
+    WorldScreenMaterial->SetVectorParameterValue(TEXT("TintColorAndOpacity"), TintColor);
     WorldScreenMaterial->SetScalarParameterValue(TEXT("OpacityFromTexture"), 1.0f);
 
     if (UTexture* ActiveTex = GetWorldScreenTexture())
@@ -864,12 +903,22 @@ void AFicsitAITerminal::SetWorldScreenTexture(UTexture* InTexture)
     {
         InitializeWorldScreen();
     }
-    MarkWorldScreenDirty();
-    UpdateWorldScreenMaterialParameters();
+    // Внешняя текстура CEF применяется к мешу только в Ready; при NoPower меш сохраняет аварийный экран (D-1 §3.1)
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+        UpdateWorldScreenMaterialParameters();
+    }
 }
 
 UTexture* AFicsitAITerminal::GetWorldScreenTexture() const
 {
+    if (HostContext.HostState == EFicsitAIHostState::NoPower)
+    {
+        // При NoPower экран питается от аварийного резерва без живого браузера (D-1-world-screen §3.1)
+        // Картинку NO POWER рисует каркас в WorldScreenRenderTarget
+        return WorldScreenRenderTarget.Get();
+    }
     if (ExternalScreenTexture)
     {
         return ExternalScreenTexture.Get();
@@ -885,7 +934,8 @@ void AFicsitAITerminal::MarkWorldScreenDirty()
 
 bool AFicsitAITerminal::RenderWorldScreenIfDirty()
 {
-    if (HostContext.HostState != EFicsitAIHostState::Ready)
+    // В инертном режиме терминал экран не рендерит
+    if (HostContext.HostState == EFicsitAIHostState::Inert)
     {
         UpdateWorldScreenMaterialParameters();
         return false;
@@ -896,19 +946,35 @@ bool AFicsitAITerminal::RenderWorldScreenIfDirty()
         return false;
     }
 
-    if (ExternalScreenTexture)
+    // Внешняя текстура (CEF / BLUI) активна только в состоянии Ready
+    if (ExternalScreenTexture && HostContext.HostState == EFicsitAIHostState::Ready)
     {
         UpdateWorldScreenMaterialParameters();
         bWorldScreenDirty = false;
         return true;
     }
 
-    if (!WorldScreenMaterial || !WorldScreenRenderTarget || !WorldSurfaceWidget)
+    if (!WorldScreenMaterial || !WorldSurfaceWidget)
     {
         return false;
     }
 
     SyncWorldSurfaceState();
+
+    if (!UFicsitAIScreenSurfaceWidget::IsRenderingAvailable())
+    {
+        WorldSurfaceWidget->LayoutInVirtualWindow(FVector2D(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx));
+        UpdateWorldScreenMaterialParameters();
+        ++WorldScreenDrawCount;
+        bWorldScreenDirty = false;
+        return true;
+    }
+
+    if (!WorldScreenRenderTarget)
+    {
+        return false;
+    }
+
     const bool bRendered = WorldSurfaceWidget->RenderToTarget(
         WorldScreenRenderTarget,
         FIntPoint(DefaultWorldScreenWidthPx, DefaultWorldScreenHeightPx),

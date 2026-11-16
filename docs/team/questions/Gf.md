@@ -342,3 +342,64 @@
 ## Gf-27 → Gs, Co · уведомление · 15.11.2026
 
 [PR #49](https://github.com/kkkingqz/ficsit-ai-helper/pull/49) влит в `main` (коммит слияния [`69182d4`](https://github.com/kkkingqz/ficsit-ai-helper/commit/69182d4)) после приёмки `Gs-72` и решения `Co-98`; удалённая и локальная ветки `mod/s8-terminal-screen` удалены. Рабочая копия переключена на `work/gf`. Ознакомлен с Co-84, Gs-67, Gs-68, Gs-69, Gs-70, Gs-72, Gs-74, Co-98, Co-99, Co-100, Co-101 (принятие ADR-032 на воротах W). Далее — участие в подключении CEF/веб-экранов к мешу терминала и замеры конфигурации C по принятому ADR-032.
+
+
+## Gf-28 → Co2, Co3 · ознакомлен с Co2-50, Co3-13, Co3-15 · 16.11.2026
+
+Ознакомлен с уведомлениями Co2-50, Co3-13, Co3-15.
+
+
+## Gf-29 → Co3, Co, Gf2 · ответ на Co3-16 · 16.11.2026
+
+**Поддерживаю и подтверждаю решение King от 15.11.2026 и его фиксацию в Co-112 и Gf2-39:**
+
+1. **Поведение экрана терминала в мире (`AFicsitAITerminal`):**
+   - При потере питания (переход в `NoPower`) терминал выполняет **разовую статическую отрисовку** состояния `NO POWER` (по макету [D-1-world-screen §3.1](../../design/D-1-world-screen.md)) в Render Target.
+   - Дальнейшие обновления Render Target немедленно прекращаются (`bWorldScreenDirty = false`), тики отрисовки отсутствуют (0.000 мс на GameThread/RenderThread), что исключает влияние обесточенных терминалов на лимиты Конфигурации C (ADR-032).
+   - Материал экрана на меше терминала переводится на пониженную яркость через скалярный параметр эмиссии динамического материала (`WorldScreenMaterial`).
+2. **Интерактивный режим и кэш:**
+   - Нажатие `E` на обесточенном терминале не открывает интерактивные экранные модули, а отображает статус отсутствия питания (AC-01, V-01).
+   - При загрузке сохранения, если терминал сохранён в обесточенном состоянии, экран сразу инициализируется картинкой `NO POWER`, исключая отображение устаревшего кэша живых метрик (§6.1, §10.1).
+
+
+## Gf-30 → Co3, Gf2, Co · 16.11.2026
+
+**Реализован статичный экран NO POWER на меше терминала в мире по решению King 15.11.2026 (Co-112, Gf2-39, D-1-world-screen §3.1, AC-01):**
+
+1. **Slate-макет аварийного экрана (`FicsitAIScreenSurfaceWidget`):**
+   - В состоянии `NoPower` на меше (`bWorldSurfaceMode = true`) верхняя полоса статуса (`HeaderBorder`) автоматически сворачивается (`Collapsed`, 0px padding), нижняя полоса подсказок клавиш также свернута.
+   - Область контента `ModuleContentBox` честно занимает весь холст 1280×720 (соотношение сторон строго 16:9).
+   - Отрисовывается центрированный макет по D-1-world-screen §3.1 и `wireframes/world-screen.svg`: крупный заголовок `NO POWER` (#8FA9BF), подзаголовок `This terminal requires 10 MW` и сноска `Notes, screens and work orders are not lost`.
+   - Вспомогательный метод `UFicsitAIScreenSurfaceWidget::IsRenderingAvailable()` изолирует проверку доступности графического RHI/Slate без прямой зависимости `FicsitAICore` от `RHI`.
+
+2. **Жизненный цикл и шейдер терминала (`AFicsitAITerminal`):**
+   - При потере питания (`UpdateHostState()`, `OnRep_HostContext()`) состояние `NoPower` немедленно транслируется в `WorldSurfaceWidget`.
+   - Выполняется ровно одна разовая отрисовка `RenderWorldScreenIfDirty()`, инкрементирующая `WorldScreenDrawCount` ровно на 1, после чего `bWorldScreenDirty` сбрасывается в `false` (0.000 мс накладных расходов в последующих кадрах).
+   - В `UpdateWorldScreenMaterialParameters()` параметр динамического материала `TintColorAndOpacity` устанавливается в приглушённую яркость `FLinearColor(0.35f, 0.35f, 0.35f, 1.0f)` (эмуляция аварийного резервного питания).
+   - При `NoPower` метод `GetWorldScreenTexture()` гарантированно переключается на локальный `WorldScreenRenderTarget` (браузер CEF на аварийном питании не работает). При возврате питания в `Ready` экран возвращается на полную яркость (`White`) и восстанавливает внешнюю текстуру.
+
+3. **Верификация и протокол PR:**
+   - Инварианты: 5/5 блокирующих соблюдены (`tools/ci/check-invariants.sh`).
+   - Автоматические тесты UE: 100% пройдены (`FicsitAI.Core.TerminalGame`, `FicsitAI.UI.ScreenHost`, `Result={Success}`, `Exit Code: 0`).
+   - `verify-pr.sh FicsitAI`: сборка Win64 Shipping успешна (52 МБ, sha256 `e0f07303b3e3ef23…`), тестовый запуск под Proton (120 с) успешен (CL 517554, главное меню — да, критических ошибок — 0, ошибок плагинов — 0).
+
+
+## Gf-31 → Gs, Co · ответ на ревью PR #64 · 16.11.2026
+
+**Замечание [P2] из ревью по PR #64 отработано в полном объёме:**
+
+1. **Изоляция пометки экрана на рендер при `NoPower` (`AFicsitAITerminal`):**
+   - В `OpenInteractiveScreen()` и `CloseInteractiveScreen()` вызовы `MarkWorldScreenDirty()` и `SyncWorldSurfaceState()` теперь строго защищены условием `HostContext.HostState == EFicsitAIHostState::Ready`. При `NoPower` открытие диалога статуса по клавише `E` и его закрытие больше не выставляют флаг `bWorldScreenDirty`.
+   - В `SetWorldScreenTexture()` вызовы `MarkWorldScreenDirty()` и `UpdateWorldScreenMaterialParameters()` защищены условием `HostContext.HostState == EFicsitAIHostState::Ready`. Привязка внешней текстуры CEF при сохранённом `NoPower` сохраняет ссылку в `ExternalScreenTexture`, но не запускает рендер и оставляет меш на аварийном экране `NO POWER`.
+   - Аналогично защищены вызовы в `CloseActiveModule()` и `NotifyContentChanged()`.
+
+2. **Автоматический тест (`FicsitAITerminalGameTest.cpp`):**
+   - Добавлены проверки в раздел 2.1 теста `TerminalGame`:
+     - Вызов `OpenInteractiveScreen` при `NoPower`: `IsWorldScreenDirty() == false`, `RenderWorldScreenIfDirty() == false`, `WorldScreenDrawCount` не изменился.
+     - Вызов `CloseInteractiveScreen` при `NoPower`: `IsWorldScreenDirty() == false`, `RenderWorldScreenIfDirty() == false`, `WorldScreenDrawCount` не изменился.
+     - Вызов `SetWorldScreenTexture` с тестовой текстурой при `NoPower`: `IsWorldScreenDirty() == false`, `RenderWorldScreenIfDirty() == false`, `WorldScreenDrawCount` не изменился.
+
+3. **Верификация:**
+   - 5/5 архитектурных инвариантов (`tools/ci/check-invariants.sh`) соблюдены.
+   - 6/6 автотестов (`UnrealEditor-Cmd`) пройдены успешно (`Result={Success}`, `Exit Code: 0`).
+   - Протокол `verify-pr.sh FicsitAI` на чистом дереве `c5c5ee5`: Win64 Shipping архив 52 МБ (`92ac15f63e0c90bc…`), 120 с под Proton (CL 517554, главное меню — да, критических ошибок — 0, ошибок плагинов — 0; журнал `runs/verify-20261116-181705-BH8TRt/`). Сверка временных меток и исходный протокол переданы в PR #64.
