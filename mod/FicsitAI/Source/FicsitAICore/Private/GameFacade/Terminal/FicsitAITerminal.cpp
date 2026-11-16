@@ -590,7 +590,11 @@ void AFicsitAITerminal::OpenInteractiveScreen(UFicsitAIScreenSurfaceWidget* InSu
         InSurfaceWidget->SetModule(ActiveModuleInstance);
     }
 
-    MarkWorldScreenDirty();
+    // Экран в мире обновляется только в рабочем режиме Ready (§6.6); при NoPower статичный макет сохраняется (D-1 §3.1)
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+    }
 }
 
 bool AFicsitAITerminal::IsUseable_Implementation() const
@@ -724,9 +728,12 @@ void AFicsitAITerminal::CloseInteractiveScreen()
     }
     SetScreenSurface(nullptr);
 
-    // Возвращаем модуль на поверхность в мире (§6.6, Gs-59 P2)
-    SyncWorldSurfaceState();
-    MarkWorldScreenDirty();
+    // Возвращаем модуль на поверхность в мире (§6.6, Gs-59 P2); при NoPower статичный макет сохраняется (D-1 §3.1)
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        SyncWorldSurfaceState();
+        MarkWorldScreenDirty();
+    }
 }
 
 void AFicsitAITerminal::CloseActiveModule()
@@ -743,7 +750,10 @@ void AFicsitAITerminal::CloseActiveModule()
     {
         WorldSurfaceWidget->ClearModule();
     }
-    MarkWorldScreenDirty();
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+    }
 }
 
 void AFicsitAITerminal::RequestInputFocus(bool bWanted)
@@ -760,7 +770,10 @@ void AFicsitAITerminal::RequestInputFocus(bool bWanted)
 void AFicsitAITerminal::NotifyContentChanged()
 {
     FlushActiveModuleState();
-    MarkWorldScreenDirty();
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+    }
 }
 
 bool AFicsitAITerminal::HandleBackAction()
@@ -890,8 +903,12 @@ void AFicsitAITerminal::SetWorldScreenTexture(UTexture* InTexture)
     {
         InitializeWorldScreen();
     }
-    MarkWorldScreenDirty();
-    UpdateWorldScreenMaterialParameters();
+    // Внешняя текстура CEF применяется к мешу только в Ready; при NoPower меш сохраняет аварийный экран (D-1 §3.1)
+    if (HostContext.HostState == EFicsitAIHostState::Ready)
+    {
+        MarkWorldScreenDirty();
+        UpdateWorldScreenMaterialParameters();
+    }
 }
 
 UTexture* AFicsitAITerminal::GetWorldScreenTexture() const

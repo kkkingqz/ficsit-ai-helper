@@ -102,6 +102,27 @@ bool FFicsitAITerminalGameTest::RunTest(const FString& Parameters)
     TestFalse(TEXT("Повторный вызов RenderWorldScreenIfDirty при NoPower возвращает false (нет покадровых тиков)"), TerminalA->RenderWorldScreenIfDirty());
     TestEqual(TEXT("WorldScreenDrawCount не увеличивается при повторном вызове"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeNoPower + 1);
 
+    // Замечание Gs по PR #64:
+    // Нажатие E (открытие интерактивного окна статуса), его закрытие и передача внешней текстуры
+    // при сохранённом NoPower НЕ должны помечать меш как dirty и НЕ увеличивают WorldScreenDrawCount (D-1 §3.1, §6.6).
+    UFicsitAIScreenSurfaceWidget* PlayerInteractiveWidget = UFicsitAIScreenSurfaceWidget::CreateForWorldSurface(TerminalA);
+    TerminalA->OpenInteractiveScreen(PlayerInteractiveWidget);
+    TestFalse(TEXT("Открытие экрана по E при NoPower не помечает меш как dirty"), TerminalA->IsWorldScreenDirty());
+    TestFalse(TEXT("RenderWorldScreenIfDirty после открытия по E при NoPower возвращает false"), TerminalA->RenderWorldScreenIfDirty());
+    TestEqual(TEXT("WorldScreenDrawCount не изменился после открытия по E"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeNoPower + 1);
+
+    TerminalA->CloseInteractiveScreen();
+    TestFalse(TEXT("Закрытие экрана при NoPower не помечает меш как dirty"), TerminalA->IsWorldScreenDirty());
+    TestFalse(TEXT("RenderWorldScreenIfDirty после закрытия при NoPower возвращает false"), TerminalA->RenderWorldScreenIfDirty());
+    TestEqual(TEXT("WorldScreenDrawCount не изменился после закрытия экрана"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeNoPower + 1);
+
+    UTexture2D* ExtraTex = UTexture2D::CreateTransient(16, 9, PF_B8G8R8A8);
+    TerminalA->SetWorldScreenTexture(ExtraTex);
+    TestFalse(TEXT("SetWorldScreenTexture при NoPower не помечает меш как dirty"), TerminalA->IsWorldScreenDirty());
+    TestFalse(TEXT("RenderWorldScreenIfDirty после SetWorldScreenTexture при NoPower возвращает false"), TerminalA->RenderWorldScreenIfDirty());
+    TestEqual(TEXT("WorldScreenDrawCount не изменился после передачи внешней текстуры при NoPower"), TerminalA->GetWorldScreenDrawCount(), DrawCountBeforeNoPower + 1);
+    TerminalA->SetWorldScreenTexture(nullptr);
+
     if (UMaterialInstanceDynamic* Mat = TerminalA->GetWorldScreenMaterial())
     {
         FLinearColor TintVal = FLinearColor::White;

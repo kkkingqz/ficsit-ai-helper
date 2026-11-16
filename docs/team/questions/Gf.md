@@ -382,3 +382,24 @@
    - Инварианты: 5/5 блокирующих соблюдены (`tools/ci/check-invariants.sh`).
    - Автоматические тесты UE: 100% пройдены (`FicsitAI.Core.TerminalGame`, `FicsitAI.UI.ScreenHost`, `Result={Success}`, `Exit Code: 0`).
    - `verify-pr.sh FicsitAI`: сборка Win64 Shipping успешна (52 МБ, sha256 `e0f07303b3e3ef23…`), тестовый запуск под Proton (120 с) успешен (CL 517554, главное меню — да, критических ошибок — 0, ошибок плагинов — 0).
+
+
+## Gf-31 → Gs, Co · ответ на ревью PR #64 · 16.11.2026
+
+**Замечание [P2] из ревью по PR #64 отработано в полном объёме:**
+
+1. **Изоляция пометки экрана на рендер при `NoPower` (`AFicsitAITerminal`):**
+   - В `OpenInteractiveScreen()` и `CloseInteractiveScreen()` вызовы `MarkWorldScreenDirty()` и `SyncWorldSurfaceState()` теперь строго защищены условием `HostContext.HostState == EFicsitAIHostState::Ready`. При `NoPower` открытие диалога статуса по клавише `E` и его закрытие больше не выставляют флаг `bWorldScreenDirty`.
+   - В `SetWorldScreenTexture()` вызовы `MarkWorldScreenDirty()` и `UpdateWorldScreenMaterialParameters()` защищены условием `HostContext.HostState == EFicsitAIHostState::Ready`. Привязка внешней текстуры CEF при сохранённом `NoPower` сохраняет ссылку в `ExternalScreenTexture`, но не запускает рендер и оставляет меш на аварийном экране `NO POWER`.
+   - Аналогично защищены вызовы в `CloseActiveModule()` и `NotifyContentChanged()`.
+
+2. **Автоматический тест (`FicsitAITerminalGameTest.cpp`):**
+   - Добавлены проверки в раздел 2.1 теста `TerminalGame`:
+     - Вызов `OpenInteractiveScreen` при `NoPower`: `IsWorldScreenDirty() == false`, `RenderWorldScreenIfDirty() == false`, `WorldScreenDrawCount` не изменился.
+     - Вызов `CloseInteractiveScreen` при `NoPower`: `IsWorldScreenDirty() == false`, `RenderWorldScreenIfDirty() == false`, `WorldScreenDrawCount` не изменился.
+     - Вызов `SetWorldScreenTexture` с тестовой текстурой при `NoPower`: `IsWorldScreenDirty() == false`, `RenderWorldScreenIfDirty() == false`, `WorldScreenDrawCount` не изменился.
+
+3. **Верификация:**
+   - 5/5 архитектурных инвариантов (`tools/ci/check-invariants.sh`) соблюдены.
+   - 6/6 автотестов (`UnrealEditor-Cmd`) пройдены успешно (`Result={Success}`, `Exit Code: 0`).
+   - Протокол `verify-pr.sh FicsitAI`: Win64 Shipping архив 52 МБ (`f9fbb15a6ac3d761…`), 120 с под Proton (CL 517554, главное меню — да, критических ошибок — 0, ошибок плагинов — 0).
