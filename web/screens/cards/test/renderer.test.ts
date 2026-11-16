@@ -84,7 +84,7 @@ describe('Card Renderer & show_card Pipeline (AC-18)', () => {
     expect(model.html).toContain('ficsit-card__sparkline');
   });
 
-  it('escapes unsafe HTML to prevent XSS injection', () => {
+  it('escapes unsafe HTML to prevent XSS injection in title and classes', () => {
     const resolved: ResolvedCard = {
       card: {
         schemaVersion: 1,
@@ -113,10 +113,12 @@ describe('Card Renderer & show_card Pipeline (AC-18)', () => {
     expect(model.html).toContain('&lt;script&gt;');
   });
 
-  it('executes processShowCard end-to-end for valid card', async () => {
+  it('executes processShowCard end-to-end and pulls session time from getStatus', async () => {
     const mockApi: FicsitAIApi = {
       transport: 'bridge',
-      getStatus: vi.fn(),
+      getStatus: vi.fn().mockResolvedValue({
+        lastSnapshotSessionTimeSec: 502,
+      }),
       listMetrics: vi.fn().mockResolvedValue({
         metrics: [
           {
@@ -158,11 +160,13 @@ describe('Card Renderer & show_card Pipeline (AC-18)', () => {
       source: { kind: 'metric', id: 'power.consumption' },
     };
 
-    const result = await processShowCard(input, mockApi, { currentSessionTimeSec: 502 });
+    const result = await processShowCard(input, mockApi);
     expect(result.ok).toBe(true);
     expect(result.model?.primaryValue).toBe('450.5');
     expect(result.model?.unit).toBe('MW');
+    expect(result.model?.status).toBe('fresh');
     expect(result.fallbackText).toBe('Нагрузка сети: 450.5 MW');
+    expect(mockApi.getStatus).toHaveBeenCalled();
   });
 
   it('executes processShowCard and returns fallback text for invalid card (AC-18)', async () => {

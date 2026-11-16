@@ -29,6 +29,18 @@ function createMockApi(overrides?: Partial<FicsitAIApi>): FicsitAIApi {
       availableScopes: [],
       scopesTruncated: false,
     },
+    {
+      id: 'factory.status',
+      displayName: 'Статус фабрики',
+      unit: 'count',
+      scope: 'factory',
+      hasSeries: false,
+      costClass: 'cheap',
+      sampleIntervalSec: 5,
+      external: false,
+      availableScopes: [],
+      scopesTruncated: false,
+    },
   ];
 
   return {
@@ -43,9 +55,14 @@ function createMockApi(overrides?: Partial<FicsitAIApi>): FicsitAIApi {
       apiVersionMismatch: '',
       reason: '',
     }),
-    listMetrics: vi.fn().mockResolvedValue({
-      metrics: defaultDescriptors,
-      nextCursor: '',
+    listMetrics: vi.fn().mockImplementation((args?: { metricId?: string }) => {
+      const filtered = args?.metricId
+        ? defaultDescriptors.filter((d) => d.id === args.metricId)
+        : defaultDescriptors;
+      return Promise.resolve({
+        metrics: filtered,
+        nextCursor: '',
+      });
     }),
     listScopes: vi.fn().mockResolvedValue({ scopes: [], nextCursor: '' }),
     queryMetric: vi.fn().mockImplementation((args: { metricId: string }): Promise<MetricValue> => {
@@ -97,6 +114,7 @@ describe('Card Resolver (live values & catalog lookup, AC-18)', () => {
     expect(res.isReference).toBe(true);
     expect(res.metric?.value).toBe(1250.4);
     expect(res.fallbackText).toBe('Потребление: 1250.4 MW');
+    expect(api.listMetrics).toHaveBeenCalledWith({ metricId: 'power.consumption' });
   });
 
   it('marks metric stale when age exceeds threshold', async () => {
@@ -131,6 +149,23 @@ describe('Card Resolver (live values & catalog lookup, AC-18)', () => {
     expect(res.series?.values.length).toBe(3);
     expect(res.series?.window).toBe('last60Min');
     expect(res.fallbackText).toContain('График выработки (60 мин): 1250.4 MW (3 точек)');
+    expect(api.listMetrics).toHaveBeenCalledWith({ metricId: 'power.production' });
+  });
+
+  it('rejects timeseries when metric does not support series', async () => {
+    const api = createMockApi();
+    const card: ChatCard = {
+      schemaVersion: 1,
+      type: 'timeseries',
+      title: 'График статуса',
+      source: { kind: 'metric', id: 'factory.status' },
+    };
+
+    const res = await resolveCard(card, api);
+    expect(res.status).toBe('error');
+    expect(res.error).toContain('не поддерживает временные ряды');
+    expect(res.fallbackText).toContain('не поддерживает временные ряды');
+    expect(api.querySeries).not.toHaveBeenCalled();
   });
 
   it('returns error when metric ID is not present in catalog', async () => {

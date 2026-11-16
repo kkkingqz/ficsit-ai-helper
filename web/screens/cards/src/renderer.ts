@@ -46,23 +46,30 @@ export function renderCard(resolved: ResolvedCard): CardRenderModel {
     unit = formatUnit(metric.unit);
   }
 
-  // Данные точек для графика (timeseries)
+  // Данные точек для графика (timeseries): исключаем пропуски
   let points: Array<{ timeSec: number; value: number }> | undefined;
   if (series && series.values.length > 0) {
-    points = series.timestamps.map((t, idx) => ({
-      timeSec: t,
-      value: series.values[idx] ?? 0,
-    }));
-    const validValues = series.values.filter((v): v is number => typeof v === 'number');
-    if (validValues.length > 0) {
-      const minVal = Math.min(...validValues);
-      const maxVal = Math.max(...validValues);
-      const avgVal = validValues.reduce((acc, p) => acc + p, 0) / validValues.length;
+    const validPoints: Array<{ timeSec: number; value: number }> = [];
+    for (let i = 0; i < series.timestamps.length; i++) {
+      const val = series.values[i];
+      const t = series.timestamps[i];
+      if (typeof val === 'number' && typeof t === 'number') {
+        validPoints.push({ timeSec: t, value: val });
+      }
+    }
+    if (validPoints.length > 0) {
+      points = validPoints;
+      const valuesOnly = validPoints.map((p) => p.value);
+      const minVal = Math.min(...valuesOnly);
+      const maxVal = Math.max(...valuesOnly);
+      const avgVal = valuesOnly.reduce((acc, p) => acc + p, 0) / valuesOnly.length;
       secondaryText = `мин: ${minVal.toFixed(1)} / макс: ${maxVal.toFixed(1)} / ср: ${avgVal.toFixed(1)} ${unit}`;
     }
   }
 
   const safeTitle = escapeHtml(title);
+  const safeType = escapeHtml(type);
+  const safeStatus = escapeHtml(status);
   const safeBadge = escapeHtml(badgeText);
   const safeValue = escapeHtml(primaryValue);
   const safeUnit = escapeHtml(unit);
@@ -77,10 +84,10 @@ export function renderCard(resolved: ResolvedCard): CardRenderModel {
   const secondaryHtml = safeSecondary ? `<div class="ficsit-card__secondary">${safeSecondary}</div>` : '';
 
   const html = `
-<div class="ficsit-card ficsit-card--${status} ficsit-card--${type}" data-card-type="${type}" role="region" aria-label="${safeTitle}">
+<div class="ficsit-card ficsit-card--${safeStatus} ficsit-card--${safeType}" data-card-type="${safeType}" role="region" aria-label="${safeTitle}">
   <header class="ficsit-card__header">
     <span class="ficsit-card__title">${safeTitle}</span>
-    <span class="ficsit-card__badge ficsit-card__badge--${status}">${safeBadge}</span>
+    <span class="ficsit-card__badge ficsit-card__badge--${safeStatus}">${safeBadge}</span>
   </header>
   <div class="ficsit-card__body">
     <div class="ficsit-card__metric">

@@ -165,4 +165,19 @@ describe('Card Validator (chat-card.schema.json, AC-18)', () => {
     });
     expect(resBadType.ok).toBe(false);
   });
+
+  it('handles contracts/chat-card.example.json by rejecting unsupported type gracefully', async () => {
+    const fs = await import('node:fs');
+    const path = await import('node:path');
+    const examplePath = path.resolve(__dirname, '../../../../docs/contracts/chat-card.example.json');
+    if (fs.existsSync(examplePath)) {
+      const content = JSON.parse(fs.readFileSync(examplePath, 'utf-8'));
+      const res = validateCard(content);
+      expect(res.ok).toBe(false);
+      if (!res.ok) {
+        expect(res.error).toContain('не поддерживается в v0.1');
+        expect(res.fallbackText).toContain('временно недоступен в текущей версии');
+      }
+    }
+  });
 });

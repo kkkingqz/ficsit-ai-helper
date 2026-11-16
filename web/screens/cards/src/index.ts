@@ -30,7 +30,22 @@ export async function processShowCard(
     };
   }
 
-  const resolved = await resolveCard(validation.card, api, options);
+  let resolveOpts = options;
+  if (!resolveOpts?.currentSessionTimeSec) {
+    try {
+      const status = await api.getStatus();
+      if (status.lastSnapshotSessionTimeSec) {
+        resolveOpts = {
+          ...resolveOpts,
+          currentSessionTimeSec: status.lastSnapshotSessionTimeSec,
+        };
+      }
+    } catch {
+      // Ignore getStatus errors if api is unreachable
+    }
+  }
+
+  const resolved = await resolveCard(validation.card, api, resolveOpts);
   const model = renderCard(resolved);
 
   return {

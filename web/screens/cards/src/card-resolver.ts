@@ -58,8 +58,8 @@ export async function resolveCard(
   const metricId = card.source.id;
 
   try {
-    // 1. Сверка с каталогом метрик (ARCHITECTURE.md §7.6)
-    const listRes = await api.listMetrics();
+    // 1. Сверка с каталогом метрик с фильтром по ID (ARCHITECTURE.md §7.6, Co2-55)
+    const listRes = await api.listMetrics({ metricId });
     const descriptor: MetricDescriptor | undefined = listRes.metrics.find(
       (m: MetricDescriptor) => m.id === metricId,
     );
@@ -103,6 +103,17 @@ export async function resolveCard(
 
     // 3. Обработка карточки временного ряда (timeseries)
     if (card.type === 'timeseries') {
+      if (!descriptor.hasSeries) {
+        const errorMsg = `${card.title}: метрика "${metricId}" не поддерживает временные ряды`;
+        return {
+          card,
+          status: 'error',
+          isReference: true,
+          error: errorMsg,
+          fallbackText: `[${errorMsg}]`,
+        };
+      }
+
       let windowMinutes = 15;
       let windowParam: SeriesWindow = 'last15Min';
 

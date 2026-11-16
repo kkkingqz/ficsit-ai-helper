@@ -19,7 +19,7 @@ export function evaluateCardFreshness(
   }
 
   if (currentSessionTimeSec === undefined || metric.sessionTimeSec === undefined) {
-    return 'fresh';
+    return 'loading';
   }
 
   const age = Math.max(0, currentSessionTimeSec - metric.sessionTimeSec);
