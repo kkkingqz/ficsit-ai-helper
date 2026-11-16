@@ -162,7 +162,7 @@ POST /mod/send
 | `mod.status` | `{ saveId, inert }` | нет; шлётся при изменении: загрузка сохранения, инертный режим |
 | `chat.send` | `{ saveId, saveName?, text }`, с `id` | `{ turnId }`; ошибки `TURN_IN_PROGRESS`, `TURN_DRAINING`, `FOREMAN_UNAVAILABLE`, `INVALID_ARGUMENT` |
 | `chat.cancel` | `{ saveId, turnId }`, с `id` | `{ state: "cancelled" \| "alreadyCancelled" }`; ошибки `NO_TURN`, `TURN_MISMATCH` |
-| `chat.history` | `{ saveId, limit }`, с `id`; `limit` 1–100, по умолчанию 50 | `{ messages: [ { id, role: "user" \| "assistant", text, createdAt } ] }` — от старых к новым |
+| `chat.history` | `{ saveId, limit }`, с `id`; `limit` 1–100, по умолчанию 50 | `{ messages: [ { id, role: "user" \| "assistant", text, createdAt, turnId? } ] }` — от старых к новым. `turnId` (с 16.11.2026, Co-129) — у записей хода, номер которого адаптер знает: вопрос игрока и ответ на него. Записи без номера — старые или из Foreman напрямую |
 | `tool.result` | `re` — `id` вызова; `body` — каноническая форма результата из API v0 или `error` | нет |
 
 ## Ход чата
