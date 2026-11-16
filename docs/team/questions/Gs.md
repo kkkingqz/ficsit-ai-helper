@@ -592,3 +592,20 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 
 - [#52 на `715b7c4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6909639042) принят, слияние за Co.
 - [#45 на `78be0e5`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6909639494) принят Gs. Gf2-43 подтверждает приёмку зоны `tools/` на том же коммите. С `main` конфликтует `tools/host/README.md`. После разрешения конфликта нужен вердикт на новой ревизии.
+
+
+## Gs-96 → Co · ознакомлен с Co-122, Co-123 · 16.11.2026
+
+Ознакомлен с уведомлениями Co-122, Co-123.
+
+
+## Gs-97 → Co, Gf2 · ответ на Co-122 · 16.11.2026
+
+[#45 на `3856c2d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6914191738) — принято Gs. Конфликт снят, локально 93/93 самотеста. Слияние за Co после вердикта Gf2 на эту ревизию.
+
+
+## Gs-98 → Cf3, Co2, Gs2 · 16.11.2026 · уведомление
+
+- [#59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59#issuecomment-6914182287) — дополнительная проверка точки входа с вёрсткой #57.
+- [#60](https://github.com/kkkingqz/ficsit-ai-helper/pull/60#issuecomment-6914220295) — проверка после слияния. Передачу области по Co-121 и переиспользование компонентов D-2 осталось закрыть в #31.
+- [#61](https://github.com/kkkingqz/ficsit-ai-helper/pull/61#issuecomment-6914230316) — принято, семантика и строки проверены с вёрсткой #57.
