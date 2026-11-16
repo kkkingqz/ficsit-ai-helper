@@ -1,9 +1,12 @@
 import type { ChatHostStrings, ChatStrings, ChatViewCopy } from "./types.js";
 
 /**
- * Набор по умолчанию. Тексты представления совпадают с демонстрацией вёрстки
+ * Набор по умолчанию. Тексты представления взяты из демонстрации вёрстки
  * (`web/ui-kit/screens/fixtures.js`, зона Gs2), чтобы экран и витрина говорили
- * одними словами. Локаль здесь `en`, как у остальных экранов на этом этапе;
+ * одними словами. Два исключения — пустая история и строка офлайна: в
+ * демонстрации они обещают Notes, Screens и Lines, которых в срезе v0.1 нет
+ * (§17 архитектуры: Chat и Dashboard), и обещать экраны, которых игрок не
+ * увидит, нельзя (ревью Gs на #61). Локаль здесь `en`, как у остальных экранов на этом этапе;
  * перевод — отдельная работа, и делается он подменой этого объекта, а не
  * правкой представления.
  */
@@ -13,8 +16,7 @@ export const DEFAULT_CHAT_VIEW_COPY: ChatViewCopy = {
     loading: { label: "Loading history" },
     empty: {
       label: "No messages yet",
-      detail:
-        "Ask about your factory. The assistant reads factory data and can prepare notes or screens.",
+      detail: "Ask about your factory. The assistant reads live telemetry and explains what it sees.",
     },
     unavailable: {
       label: "History unavailable",
@@ -23,7 +25,7 @@ export const DEFAULT_CHAT_VIEW_COPY: ChatViewCopy = {
   },
   offlineTitle: "Assistant unavailable — the sidecar is not connected",
   offlineDetail: "Start the sidecar and reopen Chat. Connection retries automatically.",
-  offlineScope: "Statistics, Notes, Screens and Lines keep working.",
+  offlineScope: "The Dashboard keeps working: telemetry does not depend on the sidecar.",
   streaming: (backKey: string) => `Streaming… ${backKey} stops displaying the answer`,
   sending: "Sending request…",
   stop: "Stop",
