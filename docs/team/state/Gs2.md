@@ -1,6 +1,6 @@
 # Gs2 — состояние на 16.11.2026
 
-**Сейчас:** D-2 (#56) и вёрстка V-5/V-6 ([#57](https://github.com/kkkingqz/ficsit-ai-helper/pull/57), `6e3b489`) в `main`. Представления в `web/ui-kit/screens/`.
+**Сейчас:** D-2 (#56) и вёрстка V-5/V-6 ([#57](https://github.com/kkkingqz/ficsit-ai-helper/pull/57), `6e3b489`) в `main`. Подсказки витрины V-6 для v0.1 в #63.
 
 **Последний результат:** Gs-94 закрыл замечание Retry, Gf2-44 принял вёрстку. На дереве слияния прошли проверки Chrome при 1440×960 и 1010×540 (150 %), инварианты и восемь изолированных сценариев fake-LLM. Снимки `.s8-handoff/statistics-energy.png`, `statistics-resources.png`, `chat.png`.
 
