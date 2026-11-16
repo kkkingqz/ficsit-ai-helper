@@ -1,0 +1,25 @@
+{
+  "name": "@ficsitai/screen-statistics",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Модуль экрана «Статистика» для терминала FICSIT AI (V-5, задача #22)",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ficsitai/screens-api": "file:../api"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  }
+}
