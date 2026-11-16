@@ -140,6 +140,8 @@ function isolatedPoints(plot, index) {
   return isolated.length ? isolated : null;
 }
 
+let warnedAboutMissingPlot = false;
+
 export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, windowControl }) {
   const figure = node("figure", "d2-panel d2-chart");
   const heading = node("figcaption", "d2-panel-heading");
@@ -220,8 +222,12 @@ export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, window
     dataChanged = false;
   }
 
-  const resize = new ResizeObserver(render);
-  resize.observe(surface);
+  const resize = typeof Plot === "function" ? new ResizeObserver(render) : null;
+  resize?.observe(surface);
+  if (!resize && !warnedAboutMissingPlot) {
+    warnedAboutMissingPlot = true;
+    console.warn("D-2: uPlot is unavailable. Charts will retain their legend without drawing a plot.");
+  }
 
   return {
     element: figure,
@@ -256,10 +262,10 @@ export function timeChart(presenter, Plot, { title, timeLabel, axisLabel, window
       setState(figure, state);
       notice.update(state);
       dataChanged = true;
-      render();
+      if (resize) render();
     },
     destroy() {
-      resize.disconnect();
+      resize?.disconnect();
       plot?.destroy();
     },
   };
