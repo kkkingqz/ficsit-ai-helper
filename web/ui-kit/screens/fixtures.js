@@ -170,11 +170,11 @@ export const chatOptions = {
     historyStates: {
       loading: { label: "Loading history" },
       unavailable: { label: "History unavailable", detail: "Earlier messages could not be loaded." },
-      empty: { label: "No messages yet", detail: "Ask about your factory. The assistant reads factory data and can prepare notes or screens." },
+      empty: { label: "No messages yet", detail: "Ask about your factory. The assistant reads live telemetry and explains what it sees." },
     },
     offlineTitle: "Assistant unavailable — the sidecar is not connected",
     offlineDetail: "Start the sidecar and reopen Chat. Connection retries automatically.",
-    offlineScope: "Statistics, Notes, Screens and Lines keep working.",
+    offlineScope: "The Dashboard keeps working: telemetry does not depend on the sidecar.",
     streaming: backKey => `Streaming… ${backKey} stops displaying the answer`,
     sending: "Sending request…",
     stop: "Stop", retry: "Retry", draftLabel: "Message", send: "Send",
