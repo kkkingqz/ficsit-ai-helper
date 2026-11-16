@@ -8,8 +8,8 @@
 - [Gf2-49](../questions/Gf2.md): ответ на `Co2-72` (наборы Fixture как файлы данных JSON в `fixtures/data/` по схемам `contracts.yml`).
 
 ## Стенд и текущие задачи
-- Личный проект `~/Projects/SML-gf2` на `a7e8550` (`WwisePatches` `v3.12.0`); сборка `FicsitAI` (`BUILD_EXIT=0`, SHA256_16 `25be023a7ed6a634`), `6/6` автотестов UE (`EXIT CODE: 0`).
-- **Сквозная приёмка V-01:** интерактивный запуск Proton на `save_a_starter.sav` с авто-разблокировкой схемы `UFicsitAITerminalSchematic`, рецепта и дескриптора в `BC_TradingPost` / `SC_Progression`.
+- Личный проект `~/Projects/SML-gf2` на `a7e8550` (`WwisePatches` `v3.12.0`); сборка `FicsitAI` (`BUILD_EXIT=0`, SHA256_16 `74db25d9d556a5db`).
+- **Сквозная приёмка V-01:** исправлен стартовый тик и рендер экрана терминала на 3D-модели в мире (`bStartWithTickEnabled`, немедленный `RenderWorldScreenIfDirty`, зазор 25.8 см, отключение теней экрана). Свежая сборка установлена в Steam-копию Satisfactory. Чек-лист передан King для ручной приёмки.
 - **Открытые PR:** #62 (Co2, `web/chat-requests`).
 - **Слиты в main:** #44, #45, #48, #50, #51, #52, #53, #54, #55, #56, #57, #58, #59, #60, #61, #63, #64 (`3a4d9c4`), #65 (`fc7e667`).
 - **S8 (Ворота W):** PR #54 влит в `main`. Ждём подключения CEF к мешу терминала от Co (`mod/s8-web-screen`) для замеров Конфигурации C (3 браузера).

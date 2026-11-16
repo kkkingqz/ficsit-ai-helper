@@ -37,6 +37,7 @@ static bool CheckApiCompatibility(const FString& RequiredVersion, const FString&
 AFicsitAITerminal::AFicsitAITerminal()
 {
     PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = true;
     bReplicates = true;
 
     TerminalMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TerminalMesh"));
@@ -57,10 +58,11 @@ AFicsitAITerminal::AFicsitAITerminal()
     if (ScreenPlaneFinder.Succeeded())
     {
         ScreenMeshComponent->SetStaticMesh(ScreenPlaneFinder.Object);
-        ScreenMeshComponent->SetRelativeLocation(FVector(25.5f, 0.0f, 20.0f));
+        ScreenMeshComponent->SetRelativeLocation(FVector(25.8f, 0.0f, 20.0f));
         ScreenMeshComponent->SetRelativeRotation(FRotator(0.0f, -90.0f, 90.0f));
         ScreenMeshComponent->SetRelativeScale3D(FVector(0.96f, 0.54f, 1.0f)); // 96 см (U/ширина) x 54 см (V/высота) = ровно 16:9
     }
+    ScreenMeshComponent->SetCastShadow(false);
     ScreenMeshComponent->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
     ScreenMeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
     ScreenMeshComponent->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
@@ -237,12 +239,15 @@ FFicsitAIScreenContext AFicsitAITerminal::GetScreenContext() const
 void AFicsitAITerminal::BeginPlay()
 {
     Super::BeginPlay();
+    SetActorTickEnabled(true);
     InitializeHost();
 
     if (HasAuthority())
     {
         UpdateHostState();
     }
+
+    RenderWorldScreenIfDirty();
 }
 
 void AFicsitAITerminal::Tick(float DeltaSeconds)
@@ -814,9 +819,12 @@ void AFicsitAITerminal::InitializeWorldScreen()
         }
     }
 
-    if (ScreenMeshComponent && ScreenBaseMaterial && !WorldScreenMaterial)
+    if (ScreenMeshComponent && ScreenBaseMaterial)
     {
-        WorldScreenMaterial = UMaterialInstanceDynamic::Create(ScreenBaseMaterial, this);
+        if (!WorldScreenMaterial)
+        {
+            WorldScreenMaterial = UMaterialInstanceDynamic::Create(ScreenBaseMaterial, this);
+        }
         if (WorldScreenMaterial)
         {
             ScreenMeshComponent->SetMaterial(0, WorldScreenMaterial);
@@ -846,6 +854,7 @@ void AFicsitAITerminal::InitializeWorldScreen()
     SyncWorldSurfaceState();
     UpdateWorldScreenMaterialParameters();
     MarkWorldScreenDirty();
+    RenderWorldScreenIfDirty();
 }
 
 void AFicsitAITerminal::SyncWorldSurfaceState()
@@ -958,6 +967,11 @@ bool AFicsitAITerminal::RenderWorldScreenIfDirty()
         UpdateWorldScreenMaterialParameters();
         bWorldScreenDirty = false;
         return true;
+    }
+
+    if (!WorldScreenRenderTarget || !WorldSurfaceWidget || !WorldScreenMaterial)
+    {
+        InitializeWorldScreen();
     }
 
     if (!WorldScreenMaterial || !WorldSurfaceWidget)

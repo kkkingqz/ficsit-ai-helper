@@ -314,7 +314,7 @@ T="\$1"; shift
 timeout --signal=TERM --kill-after=20 "\$T" \\
   "\$S/steamapps/common/SteamLinuxRuntime_4/_v2-entry-point" --verb=waitforexitandrun -- \\
   "\$S/steamapps/common/Proton - Experimental/proton" waitforexitandrun \\
-  "\$HOME/Projects/ficsitai-$FA_ROLE/game/FactoryGameSteam.exe" -windowed -ResX=1280 -ResY=720 -NoSplash -log -FORCELOGFLUSH "\$@"
+  "\$HOME/Projects/ficsitai-$FA_ROLE/game/FactoryGameSteam.exe" "\$@" -windowed -ResX=1280 -ResY=720 -NoSplash -log -FORCELOGFLUSH
 echo "RUN_EXIT=\$?"
 LAUNCH
         chmod +x "$FA_ROLE_DIR/launch.sh"

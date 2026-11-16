@@ -169,9 +169,10 @@ bool UFicsitAIScreenSurfaceWidget::RenderToTarget(UTextureRenderTarget2D* Target
     if (!WorldVirtualWindow.IsValid())
     {
         WorldVirtualWindow = SNew(SVirtualWindow).Size(DrawSize);
-        WorldVirtualWindow->SetContent(RootSlate);
     }
+    WorldVirtualWindow->SetContent(RootSlate);
     WorldVirtualWindow->Resize(DrawSize);
+    WorldVirtualWindow->SlatePrepass(1.0f);
 
     if (!WorldWidgetRenderer)
     {
