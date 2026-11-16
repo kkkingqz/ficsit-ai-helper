@@ -85,6 +85,30 @@ const schema = z.object({
   saveFilePath: z.string().min(1).optional(),
   /** `save` — номинальные скорости, `saveEstimated` — оценочные (§8.5). */
   saveSourceMode: z.enum(["save", "saveEstimated"]).default("save"),
+  /**
+   * Чьи страницы пускать к чтениям по сохранению из браузера.
+   *
+   * По умолчанию — никого: страница с другого адреса получает отказ, а не
+   * вид разрешения. Нужно это только одному сценарию — страница экрана
+   * открыта с dev-сервера, а данные читаются из адаптера, — и он включается
+   * явно: `FICSITAI_SAVE_ALLOW_ORIGIN=http://127.0.0.1:5173`. Только петля и
+   * только http(s), по тому же правилу, что `FOREMAN_BASE_URL`: пускать к
+   * локальным данным чужой сайт нельзя даже по просьбе.
+   *
+   * Проверка `Host` работает всегда и этим флагом не отключается: чужая
+   * страница может навести своё имя на петлю (DNS rebinding), и без
+   * проверки сервер отдавал реальные числа сохранения (ревью Gs на #67).
+   */
+  saveAllowOrigins: z
+    .string()
+    .default("")
+    .transform((raw) => raw.split(",").map((item) => item.trim()).filter((item) => item !== ""))
+    .refine((list) => list.every(isLoopbackHttpUrl), {
+      message:
+        "FICSITAI_SAVE_ALLOW_ORIGIN: только http(s) на петле (127.0.0.1, ::1, localhost), " +
+        "через запятую",
+    })
+    .transform((list) => list.map((item) => new URL(item).origin)),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -126,6 +150,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     saveId: env.FICSITAI_SAVE_ID,
     saveFilePath: env.FICSITAI_SAVE_FILE,
     saveSourceMode: env.FICSITAI_SAVE_MODE,
+    saveAllowOrigins: env.FICSITAI_SAVE_ALLOW_ORIGIN,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 

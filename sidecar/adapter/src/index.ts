@@ -233,6 +233,10 @@ export async function createApp(config: Config, log: Logger) {
             saveId: config.saveId ?? "",
             saveFile: config.saveFilePath ?? "",
             apiVersion: saveApi?.libraryApiVersion ?? "",
+            // Пусто — библиотека на месте. Иначе здесь видно, почему
+            // чтения отвечают `SOURCE_UNAVAILABLE`, и не нужно идти в журнал.
+            loadError: saveApi?.loadError ?? "",
+            allowedOrigins: config.saveAllowOrigins,
           }
         : { enabled: false },
     });
@@ -277,13 +281,22 @@ export async function createApp(config: Config, log: Logger) {
   // (`web/screens/api/src/http.ts`) заголовков нет вовсе — с токеном экраны
   // не смогли бы подключиться, то есть смысл поверхности исчез бы.
   if (saveSourceConfigured(config)) {
-    saveApi = createSaveApi({ config, log });
+    saveApi = await createSaveApi({ config, log });
     app.use("/api/v0", saveApi.router);
     log.info(
       `чтения API v0 из сохранения на /api/v0 (режим «${config.saveSourceMode}», ` +
         `${config.saveFilePath ?? `${String(config.saveDataDir)}/${String(config.saveId)}`})`,
     );
-    if (saveApi.libraryApiVersion !== config.apiVersion) {
+    if (config.saveAllowOrigins.length > 0) {
+      log.info(
+        `чтения по сохранению открыты для origin: ${config.saveAllowOrigins.join(", ")} ` +
+          "(проверка Host работает всегда)",
+      );
+    }
+    if (saveApi.loadError === "") {
+      log.info(`библиотека источника Save объявляет API ${saveApi.libraryApiVersion}`);
+    }
+    if (saveApi.loadError === "" && saveApi.libraryApiVersion !== config.apiVersion) {
       // Минорная разница по §5.5 ничего не ломает, но молчать о ней нельзя:
       // версию объявляют двое, и расходиться они не должны (Co2-71).
       log.warn(

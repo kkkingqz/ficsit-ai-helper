@@ -1,5 +1,5 @@
 import type { AddressInfo } from "node:net";
-import type { Server } from "node:http";
+import { request as httpRequest, type Server } from "node:http";
 import express from "express";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSaveApi, type SaveApi } from "../src/save-api.js";
@@ -57,6 +57,7 @@ function config(overrides: Partial<Config> = {}): Config {
 
 interface Started {
   url: string;
+  port: number;
   api: SaveApi;
   server: Server;
   /** Чем библиотеку позвали. */
@@ -80,8 +81,18 @@ async function serve(
 ): Promise<Started> {
   const passed: Record<string, unknown>[] = [];
   const calls: string[] = [];
-  const api = createSaveApi({
-    config: config(overrides),
+
+  // Слушатель поднимается первым: проверка `Host` сверяет порт с настройкой,
+  // поэтому настройка должна знать тот порт, на котором мы слушаем.
+  const app = express();
+  app.use(express.json());
+  const server = await new Promise<Server>((done) => {
+    const listener = app.listen(0, "127.0.0.1", () => done(listener));
+  });
+  const port = (server.address() as AddressInfo).port;
+
+  const api = await createSaveApi({
+    config: config({ port, ...overrides }),
     log: quiet,
     createSource(options) {
       passed.push(options);
@@ -100,14 +111,8 @@ async function serve(
     },
   });
 
-  const app = express();
-  app.use(express.json());
   app.use("/api/v0", api.router);
-  const server = await new Promise<Server>((done) => {
-    const listener = app.listen(0, "127.0.0.1", () => done(listener));
-  });
-  const port = (server.address() as AddressInfo).port;
-  const item: Started = { url: `http://127.0.0.1:${port}`, api, server, passed, calls };
+  const item: Started = { url: `http://127.0.0.1:${port}`, port, api, server, passed, calls };
   started.push(item);
   return item;
 }
@@ -118,6 +123,47 @@ const post = (url: string, body: unknown): Promise<Response> =>
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
   });
+
+/**
+ * Запрос со своими заголовками `Host` и `Origin`.
+ *
+ * Через `node:http`, а не `fetch`: `Host` там подставляется сам, а предмет
+ * проверки — именно чужой `Host` (ревью Gs на #67, п. 3).
+ */
+function raw(
+  port: number,
+  headers: Record<string, string>,
+  body: unknown,
+  method = "POST",
+  path = "/api/v0",
+): Promise<{ status: number; headers: Record<string, string | string[] | undefined>; text: string }> {
+  return new Promise((done, fail) => {
+    const payload = body === undefined ? "" : JSON.stringify(body);
+    const request = httpRequest(
+      {
+        host: "127.0.0.1",
+        port,
+        path,
+        method,
+        headers: {
+          "content-type": "application/json",
+          "content-length": Buffer.byteLength(payload),
+          ...headers,
+        },
+      },
+      (response) => {
+        let text = "";
+        response.on("data", (chunk: Buffer) => (text += chunk.toString("utf8")));
+        response.on("end", () =>
+          done({ status: response.statusCode ?? 0, headers: response.headers, text }),
+        );
+      },
+    );
+    request.on("error", fail);
+    if (payload !== "") request.write(payload);
+    request.end();
+  });
+}
 
 describe("чтения API v0 по сохранению", () => {
   it("конверт тот же, что у моста: ответ приходит с своим `re`", async () => {
@@ -260,6 +306,154 @@ describe("чтения API v0 по сохранению", () => {
       sourceMode: "saveEstimated",
       saveFilePath: "/несуществующий/save_a_starter.sav",
     });
+  });
+});
+
+describe("замечания ревью Gs на #67", () => {
+  const ALLOWED = "http://127.0.0.1:5173";
+
+  it("чужой Host данных не получает (DNS rebinding)", async () => {
+    // Браузер отправит запрос на любое имя, которое разрешается в
+    // 127.0.0.1, и чужая страница может навести своё имя на петлю. Прежде
+    // сервер отдавал на такой запрос реальные числа сохранения.
+    const { port, calls } = await serve();
+
+    const answer = await raw(port, { host: "ficsitai.example.com:1" }, {
+      id: "h-1",
+      op: "getStatus",
+      args: {},
+    });
+    expect(answer.status).toBe(403);
+    expect(answer.text).toContain("чужим Host");
+    expect(answer.text).not.toContain("save_a_starter");
+    // До библиотеки запрос не дошёл вовсе.
+    expect(calls).toEqual([]);
+  });
+
+  it("свой Host с чужим origin тоже отказ, а разрешённый — проходит с заголовками", async () => {
+    const { port } = await serve({}, { saveAllowOrigins: [ALLOWED] });
+    const host = `127.0.0.1:${port}`;
+
+    const stranger = await raw(port, { host, origin: "https://chyzhoi.example" }, {
+      id: "h-2",
+      op: "getStatus",
+      args: {},
+    });
+    expect(stranger.status).toBe(403);
+    expect(stranger.text).toContain("стороннего origin");
+
+    const allowed = await raw(port, { host, origin: ALLOWED }, {
+      id: "h-3",
+      op: "getStatus",
+      args: {},
+    });
+    expect(allowed.status).toBe(200);
+    expect(allowed.headers["access-control-allow-origin"]).toBe(ALLOWED);
+    expect(allowed.headers["vary"]).toBe("origin");
+  });
+
+  it("предполётный запрос: без разрешения — отказ, с разрешением — 204 и заголовки", async () => {
+    const { port } = await serve({}, { saveAllowOrigins: [ALLOWED] });
+    const host = `127.0.0.1:${port}`;
+
+    // Прежде Express отвечал на OPTIONS 200 без заголовков доступа — вид
+    // разрешения без разрешения.
+    const bare = await raw(port, { host }, undefined, "OPTIONS");
+    expect(bare.status).toBe(403);
+
+    const stranger = await raw(port, { host, origin: "https://chyzhoi.example" }, undefined, "OPTIONS");
+    expect(stranger.status).toBe(403);
+    expect(stranger.text).toContain("FICSITAI_SAVE_ALLOW_ORIGIN");
+
+    const allowed = await raw(port, { host, origin: ALLOWED }, undefined, "OPTIONS");
+    expect(allowed.status).toBe(204);
+    expect(allowed.headers["access-control-allow-origin"]).toBe(ALLOWED);
+    expect(allowed.headers["access-control-allow-methods"]).toContain("POST");
+  });
+
+  it("по умолчанию из браузера не пускает никого", async () => {
+    const { port } = await serve();
+    const answer = await raw(port, { host: `127.0.0.1:${port}`, origin: ALLOWED }, {
+      id: "h-4",
+      op: "getStatus",
+      args: {},
+    });
+    expect(answer.status).toBe(403);
+  });
+
+  it("пропущенный и битый `args` — отказ, и `re` не теряется", async () => {
+    const { url, calls } = await serve();
+
+    for (const broken of [
+      { id: "a-10", op: "getStatus" },
+      { id: "a-11", op: "getStatus", args: null },
+    ]) {
+      const response = await post(url, broken);
+      expect(response.status).toBe(400);
+      const body = (await response.json()) as { re?: string; error: { code: string } };
+      // Без `re` клиент не свяжет ответ со своим запросом и покажет ошибку
+      // транспорта вместо причины.
+      expect(body.re).toBe((broken as { id: string }).id);
+      expect(body.error.code).toBe("INVALID_ARGUMENT");
+    }
+    expect(calls).toEqual([]);
+  });
+
+  it("аргумент не того типа — INVALID_ARGUMENT, а не ошибка источника", async () => {
+    const { url, calls } = await serve();
+
+    const response = await post(url, { id: "a-12", op: "queryMetric", args: { metricId: 42 } });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { re: string; error: { code: string; message: string } };
+    expect(body.re).toBe("a-12");
+    expect(body.error.code).toBe("INVALID_ARGUMENT");
+    expect(body.error.message).toContain("metricId");
+    // Внутренний `TypeError` библиотеки наружу больше не выходит.
+    expect(body.error.message).not.toContain("TypeError");
+    expect(calls).toEqual([]);
+  });
+
+  it("правила контракта остались у библиотеки: границы не наши", async () => {
+    const seen: Record<string, unknown>[] = [];
+    const { url } = await serve({
+      listMetrics: (args) => {
+        seen.push(args);
+        return { metrics: [], nextCursor: "" };
+      },
+    });
+
+    // `pageSize: 500` вне границ контракта — но это правило, а не тип, и
+    // проверяет его библиотека. Наша проверка типов его не перехватывает.
+    await post(url, { id: "a-13", op: "listMetrics", args: { pageSize: 500 } });
+    expect(seen[0]).toEqual({ pageSize: 500 });
+  });
+
+  it("незнакомое поле аргументов доходит до библиотеки нетронутым", async () => {
+    const seen: Record<string, unknown>[] = [];
+    const { url } = await serve({
+      queryMetric: (args) => {
+        seen.push(args);
+        return { kind: "value" };
+      },
+    });
+
+    // Добавление минорной версии не должно молча теряться у нас.
+    await post(url, { id: "a-14", op: "queryMetric", args: { metricId: "x", будущее: "поле" } });
+    expect(seen[0]).toEqual({ metricId: "x", "будущее": "поле" });
+  });
+
+  it("close() закрывает открытый поток событий, а не ждёт клиента", async () => {
+    // Иначе `server.close()` не доходит до своего callback, пока клиент сам
+    // не отключится, и адаптер висит на остановке.
+    const { url, api } = await serve();
+    const response = await fetch(`${url}/api/v0/events`);
+    const reader = response.body?.getReader();
+    const first = await reader?.read();
+    expect(new TextDecoder().decode(first?.value)).toContain("event: ready");
+
+    api.close();
+    const next = await reader?.read();
+    expect(next?.done).toBe(true);
   });
 });
 

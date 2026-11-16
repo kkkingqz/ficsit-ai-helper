@@ -221,6 +221,15 @@ cmd_start() {
   common_env
   [ -d "$FOREMAN_SRC" ] || { echo "нет клона Foreman: $FOREMAN_SRC (коммит — foreman.pin.json)" >&2; exit 1; }
   [ -d "$ADAPTER_SRC/node_modules" ] || run_node "$ADAPTER_SRC" npm install --no-audit --no-fund
+  # Библиотека источника Save нужна собранной, и только когда её позвали:
+  # адаптер грузит её динамически, поэтому без сборки ломается не запуск, а
+  # одна поверхность чтения (ревью Gs на #67). Собираем здесь, чтобы
+  # обычный запуск из чистого checkout не требовал ручного шага.
+  if [ -n "${FICSITAI_SAVE_FILE:-}" ] || [ -n "${FICSITAI_SAVE_ID:-}" ]; then
+    SAVE_SRC="$(cd "$ADAPTER_SRC/../save-source" && pwd)"
+    [ -d "$SAVE_SRC/node_modules" ] || run_node "$SAVE_SRC" npm install --no-audit --no-fund
+    [ -f "$SAVE_SRC/dist/index.js" ] || run_node "$SAVE_SRC" npm run build > /dev/null
+  fi
   # Занятый порт — повод остановиться, а не поднимать второй экземпляр поверх.
   for port in "$SF_MCP_PORT" "$FF_SERVER_PORT" "$ADAPTER_PORT" "$NORMALIZER_PORT"; do
     if [ -n "$(listeners_on "$port")" ]; then
