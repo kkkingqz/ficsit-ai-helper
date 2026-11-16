@@ -1,10 +1,15 @@
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
 #include "GameFacade/Terminal/FicsitAITerminal.h"
 #include "GameFacade/Terminal/FicsitAITerminalRecipe.h"
+#include "GameFacade/Terminal/FicsitAITerminalDescriptor.h"
+#include "GameFacade/Terminal/FicsitAITerminalSchematic.h"
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
 #include "FGCharacterPlayer.h"
 #include "FGPlayerController.h"
 #include "FGRecipeManager.h"
+#include "FGSchematicManager.h"
+#include "Equipment/FGBuildGun.h"
+#include "FGBuildCategory.h"
 #include "FGUseableInterface.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -72,15 +77,7 @@ void AFicsitAISubsystem::BeginPlay()
     }
 
     // Автоматическая разблокировка рецепта терминала для Build Gun (V-01)
-    if (UWorld* World = GetWorld())
-    {
-        if (AFGRecipeManager* RecipeManager = AFGRecipeManager::Get(World))
-        {
-            RecipeManager->AddAvailableRecipe(UFicsitAITerminalRecipe::StaticClass());
-            bRecipeUnlocked = true;
-            UE_LOG(LogFicsitAISubsystem, Log, TEXT("Рецепт AI Terminal автоматически разблокирован для Build Gun (V-01)."));
-        }
-    }
+    EnsureTerminalRecipeUnlocked();
 
     // Подписка на инициализацию ввода игрока (SML Enhanced Input, ADR-027, P-7 §1.3–1.4)
     AFGCharacterPlayer::OnPlayerInputInitialized.AddUObject(this, &AFicsitAISubsystem::HandlePlayerInputInitialized);
@@ -228,16 +225,8 @@ void AFicsitAISubsystem::Tick(float DeltaSeconds)
             }
         }
 
-        // Гарантированная разблокировка рецепта при первом доступном RecipeManager (V-01)
-        if (!bRecipeUnlocked)
-        {
-            if (AFGRecipeManager* RecipeManager = AFGRecipeManager::Get(World))
-            {
-                RecipeManager->AddAvailableRecipe(UFicsitAITerminalRecipe::StaticClass());
-                bRecipeUnlocked = true;
-                UE_LOG(LogFicsitAISubsystem, Log, TEXT("Рецепт AI Terminal автоматически разблокирован для Build Gun (V-01)."));
-            }
-        }
+        // Гарантированная разблокировка рецепта при первом доступном RecipeManager / SchematicManager (V-01)
+        EnsureTerminalRecipeUnlocked();
 
         // Если контекст ввода ещё не привязан к локальному контроллеру, пробуем привязать
         if (!bInputContextRegistered)
@@ -357,4 +346,74 @@ AFicsitAISubsystem* AFicsitAISubsystem::Get(UObject* WorldContext)
     }
 
     return nullptr;
+}
+
+void AFicsitAISubsystem::EnsureTerminalRecipeUnlocked()
+{
+    if (bRecipeUnlocked)
+    {
+        return;
+    }
+
+    UWorld* World = GetWorld();
+    if (!World)
+    {
+        return;
+    }
+
+    // 1. Настройка CDO дескриптора (категории меню строительства)
+    if (UFicsitAITerminalDescriptor* DescCDO = GetMutableDefault<UFicsitAITerminalDescriptor>())
+    {
+        DescCDO->EnsureCategoriesConfigured();
+    }
+
+    // 2. Настройка CDO рецепта (привязка к Build Gun и ингредиентам)
+    if (UFicsitAITerminalRecipe* RecipeCDO = GetMutableDefault<UFicsitAITerminalRecipe>())
+    {
+        RecipeCDO->EnsureRecipeConfigured();
+    }
+
+    // 3. Разблокировка схемы через FGSchematicManager
+    if (AFGSchematicManager* SchematicManager = AFGSchematicManager::Get(World))
+    {
+        SchematicManager->GiveAccessToSchematic(UFicsitAITerminalSchematic::StaticClass(), nullptr, ESchematicUnlockFlags::Force);
+        UE_LOG(LogFicsitAISubsystem, Log, TEXT("Схема FicsitAITerminalSchematic разблокирована через FGSchematicManager."));
+    }
+
+    // 4. Прямая регистрация в FGRecipeManager (гарантия доступности рецепта и дескриптора)
+    if (AFGRecipeManager* RecipeManager = AFGRecipeManager::Get(World))
+    {
+        RecipeManager->AddAvailableRecipe(UFicsitAITerminalRecipe::StaticClass());
+        RecipeManager->AddAvailableItemDescriptor(UFicsitAITerminalDescriptor::StaticClass());
+        bRecipeUnlocked = true;
+        UE_LOG(LogFicsitAISubsystem, Log, TEXT("Рецепт AI Terminal и дескриптор автоматически разблокированы для Build Gun (V-01)."));
+    }
+}
+
+bool AFicsitAISubsystem::ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor)
+{
+    if (FParse::Command(&Cmd, TEXT("FicsitAI.SpawnTerminal")) || FParse::Command(&Cmd, TEXT("SpawnTerminal")))
+    {
+        if (UWorld* World = GetWorld())
+        {
+            if (APlayerController* PC = World->GetFirstPlayerController())
+            {
+                if (APawn* Pawn = PC->GetPawn())
+                {
+                    const FVector SpawnLoc = Pawn->GetActorLocation() + Pawn->GetActorForwardVector() * 300.0f;
+                    const FRotator SpawnRot = FRotator(0.0f, Pawn->GetActorRotation().Yaw + 180.0f, 0.0f);
+                    FActorSpawnParameters Params;
+                    Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+                    AFicsitAITerminal* Spawned = World->SpawnActor<AFicsitAITerminal>(AFicsitAITerminal::StaticClass(), SpawnLoc, SpawnRot, Params);
+                    if (Spawned)
+                    {
+                        UE_LOG(LogFicsitAISubsystem, Log, TEXT("Терминал успешно создан перед игроком в %s"), *SpawnLoc.ToString());
+                        Ar.Logf(TEXT("AI Terminal successfully spawned in front of player at %s"), *SpawnLoc.ToString());
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    return Super::ProcessConsoleExec(Cmd, Ar, Executor);
 }

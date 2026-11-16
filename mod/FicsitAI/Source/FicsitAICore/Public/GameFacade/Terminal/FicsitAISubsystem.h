@@ -78,6 +78,11 @@ public:
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Subsystem")
     FString GetModuleState(const FString& InSaveId, FName ModuleId) const;
 
+    /** Разблокировка рецепта и схемы терминала для Build Gun (V-01) */
+    void EnsureTerminalRecipeUnlocked();
+
+    virtual bool ProcessConsoleExec(const TCHAR* Cmd, FOutputDevice& Ar, UObject* Executor) override;
+
 protected:
     UPROPERTY(SaveGame, BlueprintReadOnly, Category = "FICSIT AI|Subsystem")
     FString SaveId;

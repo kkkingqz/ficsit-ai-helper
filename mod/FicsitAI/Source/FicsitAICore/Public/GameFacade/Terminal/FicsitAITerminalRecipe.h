@@ -15,4 +15,7 @@ class FICSITAICORE_API UFicsitAITerminalRecipe : public UFGRecipe
 
 public:
     UFicsitAITerminalRecipe();
+
+    /** Настройка параметров рецепта для Build Gun (V-01) */
+    void EnsureRecipeConfigured();
 };

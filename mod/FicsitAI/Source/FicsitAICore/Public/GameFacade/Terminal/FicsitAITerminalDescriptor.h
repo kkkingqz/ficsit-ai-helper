@@ -15,4 +15,7 @@ class FICSITAICORE_API UFicsitAITerminalDescriptor : public UFGBuildingDescripto
 
 public:
     UFicsitAITerminalDescriptor();
+
+    /** Настройка категорий меню строительства Build Gun (V-01) */
+    void EnsureCategoriesConfigured();
 };
