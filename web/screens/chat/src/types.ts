@@ -29,6 +29,12 @@ export interface ChatMessage {
   author: string;
   /** Отметка времени, уже отформатированная экраном ({@link ChatHostStrings.messageTime}). */
   time: string;
+  /**
+   * Та же отметка машиночитаемо — уходит в атрибут `datetime` элемента
+   * `<time>` (компонент `chatMessage` в D-2). Без неё разметка показывает
+   * время, но не говорит его программе чтения с экрана.
+   */
+  dateTime?: string;
   text: string;
   /**
    * Пометка состояния сообщения, уже локализованная: «Остановлено», «Ошибка».
@@ -189,6 +195,8 @@ export interface ChatHostStrings {
     /** Показ остановлен игроком; ход у Foreman мог дойти до конца. */
     stopped: string;
     failed: string;
+    /** Ассистент вызвал инструмент: аргументов в событии нет, только имя. */
+    tool: (name: string) => string;
   };
   /** Ход не состоялся — текст для `error.text`. */
   turnFailed: string;

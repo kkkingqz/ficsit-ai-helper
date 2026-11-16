@@ -53,6 +53,7 @@ export const DEFAULT_CHAT_HOST_STRINGS: ChatHostStrings = {
   messageStatus: {
     stopped: "Stopped",
     failed: "Failed",
+    tool: (name: string) => `Reading ${name}…`,
   },
   turnFailed: "The assistant did not respond.",
   sidecarUnavailable: "The sidecar is not connected, so the assistant cannot answer.",
