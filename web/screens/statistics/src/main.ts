@@ -57,15 +57,20 @@ export async function initStatistics(
         seconds: "s",
       });
 
+      const copy = {
+        ...DEFAULT_STRINGS,
+        axis: (value: number) => presenter.number(value, 0),
+      };
+
       const controller = new StatisticsController({
         api,
-        copy: DEFAULT_STRINGS,
+        copy,
       });
 
       view = screensMod.mountStatistics(root, {
         presenter,
         Plot: (globalThis as any).uPlot,
-        copy: DEFAULT_STRINGS,
+        copy,
         actions: controller.getActions(),
       });
 

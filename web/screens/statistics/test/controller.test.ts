@@ -72,6 +72,18 @@ function createMockApi(overrides: Partial<ApiStatus> = {}): {
           scopesTruncated: false,
         },
         {
+          id: "power.network.battery_charge",
+          displayName: "Battery Charge",
+          unit: "percent",
+          scope: "factory",
+          hasSeries: true,
+          costClass: "normal",
+          sampleIntervalSec: 5,
+          external: false,
+          availableScopes: [],
+          scopesTruncated: false,
+        },
+        {
           id: "iron.production",
           displayName: "Iron Ore Production",
           unit: "itemsPerMinute",
@@ -499,6 +511,53 @@ describe("StatisticsController (V-5, #22)", () => {
     expect(extractionTile).toBeDefined();
     expect(extractionTile!.reading.value).toBe(777);
     expect(extractionTile!.source).toBe("Live telemetry");
+
+    controller.destroy();
+  });
+
+  it("does not render battery meter when power.network.battery_charge is absent (Co2-55 P1)", async () => {
+    const { api } = createMockApi();
+    (api.listMetrics as any).mockImplementation(async () => ({
+      metrics: [
+        {
+          id: "power.production",
+          displayName: "Power Production",
+          unit: "megawatt",
+          scope: "factory",
+          hasSeries: true,
+          costClass: "normal",
+          sampleIntervalSec: 5,
+          external: false,
+          availableScopes: [],
+          scopesTruncated: false,
+        },
+      ],
+      nextCursor: "",
+    }));
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+    expect(model.meters?.length ?? 0).toBe(0);
+
+    controller.destroy();
+  });
+
+  it("sets matches: true on catalog metrics when search query is empty (Co2-55 P3)", async () => {
+    const { api } = createMockApi();
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+    expect(model.metrics.length).toBeGreaterThan(0);
+    expect(model.metrics.every((m) => m.matches === true)).toBe(true);
 
     controller.destroy();
   });

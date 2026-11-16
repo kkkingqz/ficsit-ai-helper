@@ -251,6 +251,7 @@ export class StatisticsController implements StatisticsActions {
         .filter((t): t is TableModel => Boolean(t))
         .map((t, idx) => ({
           title: this.copy.reports[this.currentTab].tables[idx]?.title ?? `Table ${idx + 1}`,
+          source: t.state?.label,
           columns: (this.copy.reports[this.currentTab].tables[idx]?.columns ?? []).map((c) => c.label),
           rows: t.groups.flatMap((g) => {
             const rows: unknown[][] = [];
@@ -761,26 +762,15 @@ export class StatisticsController implements StatisticsActions {
     ];
 
     // Meters
-    const meters: MeterModel[] = [
-      battChargeVal && battChargeVal.value !== null
-        ? {
-            id: "battery",
-            value: battChargeVal.value,
-            max: 100,
-            reading: battChargeVal,
-          }
-        : {
-            id: "battery",
-            value: 72,
-            max: 100,
-            reading: {
-              value: 72,
-              unit: "percent",
-              precisionDigits: 0,
-              state: "value",
-            },
-          },
-    ];
+    const meters: MeterModel[] = [];
+    if (battChargeVal && battChargeVal.value !== null) {
+      meters.push({
+        id: "battery",
+        value: battChargeVal.value,
+        max: 100,
+        reading: battChargeVal,
+      });
+    }
 
     const catalogMetrics = this.buildCatalogMetrics("energy");
 
@@ -1095,7 +1085,7 @@ export class StatisticsController implements StatisticsActions {
         const matches = this.searchQuery.trim().length > 0
           ? m.displayName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
             m.id.toLowerCase().includes(this.searchQuery.toLowerCase())
-          : undefined;
+          : true;
 
         return {
           id: m.id,
@@ -1103,7 +1093,7 @@ export class StatisticsController implements StatisticsActions {
           unit: m.unit,
           hasSeries: m.hasSeries,
           selected: selectedIds.has(m.id),
-          ...(matches !== undefined ? { matches } : {}),
+          matches,
         };
       });
   }

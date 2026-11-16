@@ -45,6 +45,7 @@ export interface StatisticsExportData {
   sessionTimeSec?: number;
   tables: Array<{
     title: string;
+    source?: string;
     columns: string[];
     rows: Array<unknown[]>;
   }>;
@@ -78,6 +79,9 @@ export function generateStatisticsCsv(data: StatisticsExportData): string {
   // 2. Tables
   for (const table of data.tables) {
     csv += buildCsvRow([`[TABLE: ${table.title}]`]);
+    if (table.source) {
+      csv += buildCsvRow([`# Source: ${table.source}`]);
+    }
     csv += buildCsvRow(table.columns);
     for (const row of table.rows) {
       csv += buildCsvRow(row);

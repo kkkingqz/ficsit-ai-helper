@@ -71,6 +71,7 @@ export const DEFAULT_STRINGS: StatisticsStrings = {
   },
   window: (minutes: number) => `${minutes} min`,
   time: (seconds: number) => (seconds ? `${Math.round(seconds / 60)} min` : "Now"),
+  axis: (value: number) => (Number.isFinite(value) ? `${Math.round(value * 10) / 10}` : String(value)),
   sessionOnly: "Session data only — 24 h history arrives in v1.1",
   noValue: "No value",
   metrics: "Metrics",

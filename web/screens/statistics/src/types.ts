@@ -180,6 +180,7 @@ export interface StatisticsStrings {
   };
   window(minutes: number): string;
   time(seconds: number): string;
+  axis(value: number): string;
   sessionOnly: string;
   noValue: string;
   metrics: string;
