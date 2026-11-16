@@ -59,7 +59,7 @@
 
 Отчёты по энергии и ресурсам (V-02). При варианте UMG исполнитель — Gs.
 
-- [ ] Вёрстка по дизайн-системе D-2
+- [x] Вёрстка по дизайн-системе D-2. [PR #57](https://github.com/kkkingqz/ficsit-ai-helper/pull/57) в `main`, компонентная приёмка в Gf2-44.
 
 Общие пункты задачи:
 
@@ -71,7 +71,7 @@
 
 Диалог с Foreman в игре (V-03). При варианте UMG исполнитель — Gs.
 
-- [ ] Вёрстка
+- [x] Вёрстка. [PR #57](https://github.com/kkkingqz/ficsit-ai-helper/pull/57) в `main`, компонентная приёмка в Gf2-44.
 
 ### [V-14 · Карточки в чате (сверх плана)](https://github.com/kkkingqz/ficsit-ai-helper/issues/31) · #31
 

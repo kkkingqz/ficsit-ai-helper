@@ -263,3 +263,18 @@
   overflow-wrap: anywhere;
   cursor: pointer;
 }
+
+.d2-row-button {
+  color: inherit;
+  background: transparent;
+  border: 0;
+  border-block-end: 1px solid var(--d2-stroke-strong);
+  padding: 0;
+  text-align: start;
+  font: inherit;
+  cursor: pointer;
+}
+.d2-row-button[aria-pressed="true"] {
+  border-block-end-color: var(--d2-accent);
+  font-weight: 700;
+}

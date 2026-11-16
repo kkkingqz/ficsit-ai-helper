@@ -4,7 +4,7 @@
 
 **Зависимость S3:** проводка каталога [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) слита как `a486e71`.
 
-**Ревью Gs:** #54 слит (`0903f6d`). [#52 `715b7c4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6909639042) принят, слияние за Co. [#45 `78be0e5`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6909639494) принят Gs и Gf2, нужен новый коммит из-за конфликта в `tools/host/README.md`. [#57 `da224a1`](https://github.com/kkkingqz/ficsit-ai-helper/pull/57#issuecomment-6909640071): Retry исправлен в черновике, компонентная приёмка Gf2-44.
+**Ревью Gs:** #52 и #54 слиты (`756c7f9`, `0903f6d`). [#45 `3856c2d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6914191738) принят, ревью зоны за Gf2. #57: Retry исправлен, компонентная приёмка Gf2-44. [#61](https://github.com/kkkingqz/ficsit-ai-helper/pull/61#issuecomment-6914230316) принят. #59 не монтируется в браузере, #60 слит с незакрытой передачей области (Gs-98).
 
 **Дальше:** `catalogRevision`, обновление по событиям, индекс построек и нарезка сбора по кадрам. Co-61 — убрать дубли плана и снятые понятия из документов Gs.
 
