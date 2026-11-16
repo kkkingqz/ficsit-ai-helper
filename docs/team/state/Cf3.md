@@ -1,28 +1,32 @@
 # Cf3 — состояние на 15.11.2026
 
-**Сейчас:** Открыт [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55) по спайку S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) в `sidecar/package/` (сборка архива сайдкара для альфы). Жду ревью Co2 (Cf3-7).
+**Сейчас:** Завершены все закреплённые задачи этапа v0.1:
+1. Spike S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) влит в `main` ([PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55), `a0e18ba`). Замечания Co2-53 устранены в [PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58).
+2. Экран V-5 «Статистика» ([#22](https://github.com/kkkingqz/ficsit-ai-helper/issues/22)) реализован в пакете `@ficsitai/screen-statistics` ([PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59)).
+3. Экран V-14 «Карточки в чате» ([#31](https://github.com/kkkingqz/ficsit-ai-helper/issues/31), AC-18) реализован в пакете `@ficsitai/screen-cards` ([PR #60](https://github.com/kkkingqz/ficsit-ai-helper/pull/60)).
+
+Все три PR (#58, #59, #60) открыты, имеют 100% зелёные проверки CI и ожидают ревью Co2 / Gs2.
 
 **Последний результат:**
-1. Пакет `@ficsitai/package` (S5-lite, [#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)) полностью реализован в `sidecar/package/`:
-   - Сборка самодостаточных архивов в двух раскладках (`linux-x64` и `win-x64`) с портативным Node.js 22 (`v22.23.4`, по `foreman.pin.json`).
-   - Поставка ровно 3 процессов: `ff-server`, `sf-mcp`, `adapter` (с `save-source` и нормализатором).
-   - Все слушатели строго на `127.0.0.1` (AC-12, V-08 — брандмауэр не задаёт вопросов).
-   - Предсозданная SQLite база `data/foreman.db` со всеми 12 применёнными миграциями.
-   - Для Windows поставляется предсобранный нативный аддон `better_sqlite3.node` (win32-x64, Node 22 ABI v127).
-   - Автономные лаунчеры `start.sh` / `start.bat`, `stop.sh` / `stop.bat`, `status.sh` / `status.bat` поверх кроссплатформенного `launcher.js`.
-2. Windows-архив успешно протестирован под Wine 11.0: запуск `node.exe` и тестовые операции с SQLite в памяти работают штатно (пункт 4.1 чек-листа `spikes-checklist.md` закрыт).
-3. Тесты пакета зелёные (5/5). Открыт [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55).
-4. Ранее библиотека `@ficsitai/save-source` (S6 Save, [#12](https://github.com/kkkingqz/ficsit-ai-helper/issues/12)) полностью реализована, протестирована, одобрена Co2 и влита в `main` ([PR #46](https://github.com/kkkingqz/ficsit-ai-helper/pull/46)).
+1. Пакет `@ficsitai/screen-cards` ([PR #60](https://github.com/kkkingqz/ficsit-ai-helper/pull/60)):
+   - Реализована валидация схемы `chat-card.schema.json` для виджетов `metric` и `timeseries`.
+   - Реализован безопасный текстовый fallback для невалидных карточек по AC-18.
+   - Реализовано разрешение ссылочных карточек через `FicsitAIApi` со сверкой каталога и расчётом актуальности.
+   - Реализован рендеринг карточек в HTML со sparkline SVG и защитой от XSS.
+   - Проверки: `npm run typecheck` (0 ошибок), `npm test` (19/19 тестов зелёные), `npm run build` успешен. CI зелёный (2/2).
+2. Пакет `@ficsitai/screen-statistics` ([PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59)):
+   - Реализован `StatisticsController` (энергия, ресурсы, окна 5/15/60 мин, инвариант 4 рядов, CSV экспорт по RFC 4180, толерантность к разрыву сайдкара FR-10).
+   - Проверки: `npm run typecheck` (0 ошибок), `npm test` (20/20 тестов зелёные), `npm run build` успешен. CI зелёный (2/2).
+3. Пакет `@ficsitai/package` ([PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58)):
+   - Устранены замечания Co2-53 (тайм-ауты 30/60/120 с c SIGKILL, WINEPREFIX в `cache/wine-prefix`, vitest.config.ts). CI зелёный (2/2).
 
 **Блокирует меня:** ничего.
 
 **Ждут меня:**
-- Co2: ревью [PR #55](https://github.com/kkkingqz/ficsit-ai-helper/pull/55) по S5-lite.
-- V-5 ([#22](https://github.com/kkkingqz/ficsit-ai-helper/issues/22)) и V-14 ([#31](https://github.com/kkkingqz/ficsit-ai-helper/issues/31)): веб-экраны и карточки поверх `@ficsitai/screens-api` по графику.
+- Co2, Gs2: ревью [PR #58](https://github.com/kkkingqz/ficsit-ai-helper/pull/58), [PR #59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59), [PR #60](https://github.com/kkkingqz/ficsit-ai-helper/pull/60).
 
-**Решения, на которых стою:** ADR-012, ADR-015, ADR-025, ADR-032, ADR-033, ADR-034, [Co-46](../questions/Co.md#co-46--все--11112026--уведомление), [Co-73](../questions/Co.md#co-73--все--12112026--уведомление), [Co-84](../questions/Co.md#co-84--co2-gf2-gs-все--уведомление--12112026), [Co-100](../questions/Co.md#co-100--все--уведомление--отчёт-по-воротам-w-готов-решение-за-king--15112026), [Co-101](../questions/Co.md#co-101--все--уведомление--adr-032-принят-экраны--веб-во-встроенном-браузере--15112026), [Co2-18](../questions/Co2.md#co2-18--gs-cf3--ответ-на-gs-19--11112026), [Co2-32](../questions/Co2.md#co2-32--cf3-co3--уведомление--ревью-46-закрыто-прочерк-на-экране--12112026), [Co2-38](../questions/Co2.md#co2-38--cf3-gs2--уведомление--фасад-api-готов-на-него-можно-опираться--13112026), [public-api-v0.md](../../interfaces/public-api-v0.md), `AGENTS.md` §6 и §9.
+**Решения, на которых стою:** ADR-012, ADR-015, ADR-021, ADR-025, ADR-032, ADR-033, ADR-034, [Co2-51](../questions/Co2.md#co2-51--cf3-gf2--ответ-на-cf3-8--повторное-ревью-55-принято--15112026), `AGENTS.md` §6 и §9.
 
 **Дальше:**
-
-1. Ревью и слияние PR #55 по S5-lite ([#13](https://github.com/kkkingqz/ficsit-ai-helper/issues/13)).
-2. Экран «Статистика» (V-5) и карточки (V-14) — в `web/screens/statistics/` и `web/screens/cards/` поверх фасада Co2 (`@ficsitai/screens-api`).
+1. Получение ревью Co2 / Gs2 по PR #58, PR #59, PR #60, устранение замечаний при наличии, слияние после одобрения и зелёных проверок.
+2. Совместная сквозная интеграция экранов с игрой и терминалом (V-01, V-02, V-03).

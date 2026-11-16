@@ -1,10 +1,10 @@
-# Gs — состояние на 15.11.2026
+# Gs — состояние на 16.11.2026
 
 **Сейчас:** S3 ([#11](https://github.com/kkkingqz/ficsit-ai-helper/issues/11)). [#41](https://github.com/kkkingqz/ficsit-ai-helper/pull/41) слит как `a24144c`. Win64 Steam и EGS собраны. Save B и [Save D](https://github.com/kkkingqz/ficsit-ai-helper/issues/11#issuecomment-6803095394) проверены под Proton. Save D: 1 403 рецепта, 1 083 предмета, 673 класса построек, расхождений по 517 рецептам модов нет. На Save B пути 145 пуловых акторов меняются между загрузками.
 
-**Зависимость S3:** проводка [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44#issuecomment-6859324543) принята на `e4f2276`, слияние за Co.
+**Зависимость S3:** проводка каталога [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) слита как `a486e71`.
 
-**Ревью Gs:** #48 `ca3e240` и #50 `02ac5f3` приняты; слияние за Co2, сначала #48. #51 `790ceda` и #52 `6c34edf` — нужны правки (Gs-85, Gs-86). #45 ждёт правок. [#53 на `f707364`](https://github.com/kkkingqz/ficsit-ai-helper/pull/53#issuecomment-6898726942) — нужны правки, ответ Co2-42 в Gs-84. [#54 на `023c1e6`](https://github.com/kkkingqz/ficsit-ai-helper/pull/54#issuecomment-6898929975) — протокол приложен, P1 по изоляции открыт (Gs-82); Gf2 приняла `tools/` (Gf2-36). [#56 на `0db5cd4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/56#issuecomment-6898930347) — поставка uPlot проверена. По фильтру, размеру пачки и будущему `ack` действуют ответы Co-104–106. #49 и #47 слиты.
+**Ревью Gs:** #54 слит (`0903f6d`). [#52 `715b7c4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/52#issuecomment-6909639042) принят, слияние за Co. [#45 `78be0e5`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6909639494) принят Gs и Gf2, нужен новый коммит из-за конфликта в `tools/host/README.md`. [#57 `da224a1`](https://github.com/kkkingqz/ficsit-ai-helper/pull/57#issuecomment-6909640071): Retry исправлен в черновике, компонентная приёмка Gf2-44.
 
 **Дальше:** `catalogRevision`, обновление по событиям, индекс построек и нарезка сбора по кадрам. Co-61 — убрать дубли плана и снятые понятия из документов Gs.
 

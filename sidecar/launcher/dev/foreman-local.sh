@@ -21,6 +21,7 @@ set -euo pipefail
 FOREMAN_SRC="${FOREMAN_SRC:-$HOME/Projects/foreman-src}"
 FICSITAI_DATA="${FICSITAI_DATA:-$HOME/.local/share/ficsitai/foreman}"
 ADAPTER_SRC="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../adapter" && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 SF_MCP_PORT="${SF_MCP_PORT:-8723}"
 FF_SERVER_PORT="${FF_SERVER_PORT:-8724}"
@@ -180,6 +181,10 @@ common_env() {
   mkdir -p "$FICSITAI_DATA/saves"
   export SAVE_DATA_DIR="$FICSITAI_DATA/saves"
   export DATABASE_URL="file:$FICSITAI_DATA/foreman.db"
+  # Файл аккаунта адаптера лежит рядом со своей базой, а не в общем каталоге
+  # XDG: иначе при своём FICSITAI_DATA пароль остаётся вне резервной копии
+  # этой базы, и восстановление даёт базу без доступа к ней (ревью Gs #48).
+  export FOREMAN_ACCOUNT_PATH="$FICSITAI_DATA/adapter-account.json"
   # sf-mcp по умолчанию слушает 0.0.0.0 и в режиме stdio не слушает вовсе.
   export MCP_TRANSPORT=http
   export MCP_HTTP_HOST="$HOST_LOOPBACK"
@@ -189,6 +194,16 @@ common_env() {
   export PORT="$FF_SERVER_PORT"
   # Единственный MCP_URL Foreman — наш адаптер, а не sf-mcp напрямую (S2).
   export MCP_URL="http://$HOST_LOOPBACK:$ADAPTER_PORT/mcp?token=$ADAPTER_TOKEN"
+  # Свой системный промпт (S2): штатный обещает модели инструменты, которые
+  # адаптер скрывает белым списком, а обещание несуществующего инструмента
+  # заканчивается ходом без ответа. Промпт и список — одна настройка на две
+  # стороны, и обе половины здесь включены всегда.
+  #
+  # Переключателя «штатный промпт» тут нет: по Co-104 фильтр штатного
+  # адаптера не отключается ничем во время работы, а сравнение со штатным
+  # Foreman живёт на отдельном стенде — свой Foreman, свой playthrough, без
+  # мода и без этого лаунчера.
+  export SYSTEM_PROMPT_PATH="$REPO_ROOT/third_party/foreman/SYSTEM_PROMPT.md"
   export ADAPTER_HOST="$HOST_LOOPBACK"
   export ADAPTER_PORT
   export SF_MCP_URL="http://$HOST_LOOPBACK:$SF_MCP_PORT/mcp"

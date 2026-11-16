@@ -1,0 +1,4 @@
+body { margin: 0; padding: 24px 32px; background: #12161c; color: #d8dee6; font: 16px/1.4 system-ui, sans-serif; }
+h1 { font-size: 22px; margin: 0 0 12px; color: #f2a33a; }
+#state { color: #9fb3c8; }
+pre { font: 14px/1.35 ui-monospace, monospace; white-space: pre-wrap; }
