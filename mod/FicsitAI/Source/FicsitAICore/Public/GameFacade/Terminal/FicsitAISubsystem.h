@@ -99,4 +99,5 @@ protected:
     TArray<TWeakObjectPtr<class AFicsitAITerminal>> RegisteredTerminals;
 
     bool bInputContextRegistered = false;
+    bool bRecipeUnlocked = false;
 };

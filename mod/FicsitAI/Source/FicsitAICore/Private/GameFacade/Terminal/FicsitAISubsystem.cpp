@@ -1,8 +1,10 @@
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
 #include "GameFacade/Terminal/FicsitAITerminal.h"
+#include "GameFacade/Terminal/FicsitAITerminalRecipe.h"
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
 #include "FGCharacterPlayer.h"
 #include "FGPlayerController.h"
+#include "FGRecipeManager.h"
 #include "FGUseableInterface.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -67,6 +69,17 @@ void AFicsitAISubsystem::BeginPlay()
         bDiagnosticsActive = true;
         DiagnosticsScenario = FName(TEXT("S1"));
         UE_LOG(LogFicsitAISubsystem, Log, TEXT("Активирован режим диагностики (сценарий по умолчанию: S1)"));
+    }
+
+    // Автоматическая разблокировка рецепта терминала для Build Gun (V-01)
+    if (UWorld* World = GetWorld())
+    {
+        if (AFGRecipeManager* RecipeManager = AFGRecipeManager::Get(World))
+        {
+            RecipeManager->AddAvailableRecipe(UFicsitAITerminalRecipe::StaticClass());
+            bRecipeUnlocked = true;
+            UE_LOG(LogFicsitAISubsystem, Log, TEXT("Рецепт AI Terminal автоматически разблокирован для Build Gun (V-01)."));
+        }
     }
 
     // Подписка на инициализацию ввода игрока (SML Enhanced Input, ADR-027, P-7 §1.3–1.4)
@@ -212,6 +225,17 @@ void AFicsitAISubsystem::Tick(float DeltaSeconds)
             {
                 bInertMode = true;
                 UE_LOG(LogFicsitAISubsystem, Warning, TEXT("Обнаружено подключение удалённого игрока (%d игроков в мире). Переход в инертный режим (ADR-016)."), NumPlayers);
+            }
+        }
+
+        // Гарантированная разблокировка рецепта при первом доступном RecipeManager (V-01)
+        if (!bRecipeUnlocked)
+        {
+            if (AFGRecipeManager* RecipeManager = AFGRecipeManager::Get(World))
+            {
+                RecipeManager->AddAvailableRecipe(UFicsitAITerminalRecipe::StaticClass());
+                bRecipeUnlocked = true;
+                UE_LOG(LogFicsitAISubsystem, Log, TEXT("Рецепт AI Terminal автоматически разблокирован для Build Gun (V-01)."));
             }
         }
 

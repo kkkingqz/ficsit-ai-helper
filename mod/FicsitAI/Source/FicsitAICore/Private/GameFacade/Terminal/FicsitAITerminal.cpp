@@ -4,6 +4,7 @@
 #include "FicsitAIScreenModuleFactoryImpl.h"
 #include "Surface/FicsitAIScreenSurfaceWidget.h"
 #include "FGCharacterPlayer.h"
+#include "Hologram/FGBuildableHologram.h"
 #include "Net/UnrealNetwork.h"
 #include "GameFramework/PlayerController.h"
 #include "EnhancedInputSubsystems.h"
@@ -90,6 +91,11 @@ AFicsitAITerminal::AFicsitAITerminal()
     PowerConnectionComponent->SetupAttachment(RootComponent);
     // Привязываем силовую цепь к информации о потреблении мощности (10 МВт) (Gs-15.2)
     PowerConnectionComponent->SetPowerInfo(PowerInfoComponent);
+
+    // Параметры для Build Gun и размещения в мире (V-01)
+    mHologramClass = AFGBuildableHologram::StaticClass();
+    mDisplayName = NSLOCTEXT("FicsitAI", "TerminalName", "AI Terminal");
+    mDescription = NSLOCTEXT("FicsitAI", "TerminalDesc", "FICSIT AI interactive factory management terminal (10 MW).");
 }
 
 float AFicsitAITerminal::GetScreenAspectRatio() const
