@@ -1,5 +1,5 @@
 import { EventHub, toErrorBody, transportError, type Transport } from "./transport.js";
-import type { ApiEventName } from "./types.js";
+import { API_EVENT_NAMES, type ApiEventName } from "./types.js";
 
 /**
  * Транспорт в браузере: HTTP к dev-серверу (S6, Screen Lab).
@@ -45,8 +45,10 @@ export function createHttpTransport(options: HttpOptions = {}): Transport {
       (globalThis as { EventSource?: new (url: string) => EventSourceLike }).EventSource;
     if (Source !== undefined) {
       stream = new Source(`${base}/api/v0/events`);
-      // Имена событий API v0 — это и есть имена событий потока.
-      for (const name of ["metrics.snapshot", "mod.inert", "api.status"]) {
+      // Имена событий API v0 — это и есть имена событий потока. Список общий
+      // с типом: раньше он был здесь строками, и события `chat.*` дошли бы до
+      // dev-сервера, но не до страницы.
+      for (const name of API_EVENT_NAMES) {
         stream.addEventListener(name, (event) => {
           try {
             hub.emit(name, JSON.parse(event.data ?? "null"));

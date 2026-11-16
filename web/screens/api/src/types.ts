@@ -18,11 +18,9 @@
 /**
  * Версия контракта, на которой собран фасад.
  *
- * Поверхность запросов здесь — **подмножество** API 0.5.0: статус, каталог,
- * области, значение и ряд. Запросы чата (`chatSend`, `chatCancel`,
- * `chatHistory`) и события `chat.*` придут отдельным PR вместе с мостом
- * (Co-82); типы состояния ассистента уже здесь, потому что их отдаёт
- * `getStatus` и событие `api.status`.
+ * Поверхность запросов — вся поверхность API 0.5.0: статус, каталог, области,
+ * значение, ряд и чат (`chatSend`, `chatCancel`, `chatHistory`) с событиями
+ * `chat.*`.
  */
 export const API_VERSION = "0.5.0";
 
@@ -77,6 +75,13 @@ export type ApiErrorCode =
   | "UNKNOWN_OP"
   | "TOO_LARGE"
   | "TRANSPORT_UNAVAILABLE"
+  // 0.5.0, чат: запрос без связи с сайдкаром и правила хода из протокола
+  // канала. Отвечают сразу, ожидания нет.
+  | "SIDECAR_UNAVAILABLE"
+  | "TURN_IN_PROGRESS"
+  | "TURN_DRAINING"
+  | "NO_TURN"
+  | "TURN_MISMATCH"
   | (string & {});
 
 export interface ApiErrorBody {
@@ -206,6 +211,53 @@ export interface QuerySeriesArgs {
   scopeId?: string;
 }
 
+/**
+ * Чат (0.5.0). Это запросы к сайдкару через API, как Work Orders: экран знает
+ * только API и ничего не знает ни про канал, ни про Foreman. Сохранение —
+ * текущее, `saveId` клиент не передаёт.
+ */
+export type ChatMessageRole = "user" | "assistant";
+
+export interface ChatMessage {
+  id: string;
+  role: ChatMessageRole;
+  text: string;
+  /** Метка создания сообщения, как её отдал мод. */
+  createdAt: string;
+}
+
+export interface ChatSendArgs {
+  text: string;
+}
+
+export interface ChatSendResult {
+  /** Дальше придут события `chat.*` с этим `turnId`. */
+  turnId: string;
+}
+
+export interface ChatCancelArgs {
+  turnId: string;
+}
+
+export interface ChatCancelResult {
+  /**
+   * `cancelled` — вещание остановлено этим вызовом, `alreadyCancelled` — ход
+   * уже был отменён. Ни то, ни другое не значит, что хода не было: Foreman
+   * дочитывает его и ответ всё равно ложится в историю.
+   */
+  state: "cancelled" | "alreadyCancelled";
+}
+
+export interface ChatHistoryArgs {
+  /** 1–100, по умолчанию 50. Вне диапазона — `INVALID_ARGUMENT` от мода. */
+  limit?: number;
+}
+
+export interface ChatHistoryResult {
+  /** От старых к новым. */
+  messages: ChatMessage[];
+}
+
 /** События API v0. Данные приходят как есть из контракта. */
 export interface ApiEvents {
   "metrics.snapshot": {
@@ -225,9 +277,40 @@ export interface ApiEvents {
     /** С 0.5.0. */
     assistantModel?: string;
   };
+  /**
+   * Ход чата (0.5.0). Приходят только тому клиенту, который отправил ход, и
+   * только с его `turnId` — отбор делает мод, фасад их просто доставляет.
+   */
+  "chat.text": { turnId: string; text: string };
+  /** Ассистент вызвал инструмент; аргументов в событии нет нарочно. */
+  "chat.tool": { turnId: string; name: string };
+  "chat.done": { turnId: string; model: string; latencyMs: number };
+  "chat.failed": { turnId: string; code: ApiErrorCode; message: string };
+  /** Показ остановлен. Ответ Foreman всё равно окажется в истории. */
+  "chat.cancelled": { turnId: string };
 }
 
 export type ApiEventName = keyof ApiEvents;
+
+/**
+ * Все имена событий API v0 одним списком.
+ *
+ * Нужен транспортам: мост доставляет событие с любым именем, а поток
+ * `text/event-stream` подписывается поимённо, и забытое имя там означает
+ * событие, которое до страницы просто не доходит — молча. Список и тип
+ * сверяются компилятором, поэтому новое событие нельзя добавить в контракт и
+ * забыть здесь.
+ */
+export const API_EVENT_NAMES = [
+  "metrics.snapshot",
+  "mod.inert",
+  "api.status",
+  "chat.text",
+  "chat.tool",
+  "chat.done",
+  "chat.failed",
+  "chat.cancelled",
+] as const satisfies readonly ApiEventName[];
 
 /** Имена запросов на мосту — lowerCamelCase, как в конверте (`op`). */
 export type ApiOperation =
@@ -235,4 +318,7 @@ export type ApiOperation =
   | "listMetrics"
   | "listScopes"
   | "queryMetric"
-  | "querySeries";
+  | "querySeries"
+  | "chatSend"
+  | "chatCancel"
+  | "chatHistory";

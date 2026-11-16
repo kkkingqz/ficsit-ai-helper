@@ -10,7 +10,7 @@ import {
   prepareRequestBody,
   resolveTarget,
 } from "../src/normalizer.js";
-import { redact, safeUrl, type Logger } from "../src/log.js";
+import { isConnectionRefused, redact, safeUrl, type Logger } from "../src/log.js";
 import { loadConfig } from "../src/config.js";
 
 /**
@@ -167,8 +167,33 @@ describe("п. 4 — ключ провайдера не попадает в ло�
 });
 
 describe("п. 5 — версия API по умолчанию идёт за контрактом", () => {
-  it("0.4.0, пока окружение не сказало иначе", () => {
-    expect(loadConfig({ ADAPTER_TOKEN: "0".repeat(32) }).apiVersion).toBe("0.4.0");
+  it("0.5.0, пока окружение не сказало иначе", () => {
+    // Контракт уехал на 0.5.0 12.11.2026 (Co-84), а здесь до 16.11.2026
+    // оставалось 0.4.0 — адаптер объявлял в рукопожатии версию старше
+    // контракта (Co2-52).
+    expect(loadConfig({ ADAPTER_TOKEN: "0".repeat(32) }).apiVersion).toBe("0.5.0");
+  });
+});
+
+describe("Co2-54 — отказ соединения отличается от настоящей ошибки", () => {
+  it("ECONNREFUSED в причине узнаётся на любой глубине", () => {
+    const refused = Object.assign(new TypeError("fetch failed"), {
+      cause: Object.assign(new Error("connect ECONNREFUSED 127.0.0.1:8724"), {
+        code: "ECONNREFUSED",
+      }),
+    });
+    expect(isConnectionRefused(refused)).toBe(true);
+    expect(isConnectionRefused({ cause: { cause: { code: "ENOTFOUND" } } })).toBe(true);
+  });
+
+  it("ошибка входа отказом соединения не считается", () => {
+    expect(isConnectionRefused(new Error("вход отклонён: 401"))).toBe(false);
+    expect(isConnectionRefused({ code: "ERR_INVALID_ARG_TYPE" })).toBe(false);
+    expect(isConnectionRefused(undefined)).toBe(false);
+    // Кольцо в причинах не должно уводить проверку в бесконечность.
+    const loop: { cause?: unknown; code?: string } = { code: "X" };
+    loop.cause = loop;
+    expect(isConnectionRefused(loop)).toBe(false);
   });
 });
 
