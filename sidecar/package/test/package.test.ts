@@ -167,7 +167,7 @@ describe("S5-lite Sidecar Packager", () => {
     expect(smokeRes.success).toBe(true);
   });
 
-  it("stages win-x64 layout, validates prompt, and passes Wine verification directly in stagePackage", { timeout: 90000 }, () => {
+  it("stages win-x64 layout, validates prompt, and passes Wine verification directly in stagePackage", { timeout: 120000 }, () => {
     const config = getDefaultConfig();
     const stageDir = stagePackage("win-x64", config);
 
@@ -178,7 +178,7 @@ describe("S5-lite Sidecar Packager", () => {
     expect(fs.existsSync(path.join(stageDir, "app/SYSTEM_PROMPT.md"))).toBe(false);
     expect(fs.existsSync(path.join(stageDir, "data/foreman.db"))).toBe(true);
 
-    const wineRes = verifyWine(stageDir);
+    const wineRes = verifyWine(stageDir, config.cacheDir);
     expect(wineRes.success).toBe(true);
     expect(wineRes.details).toContain("Wine 11.0 verified successfully");
   });

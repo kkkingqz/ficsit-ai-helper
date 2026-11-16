@@ -47,7 +47,7 @@ async function main(): Promise<void> {
   if (verifyWineOnly) {
     console.log("Verifying Windows package under Wine...");
     const winStage = stagePackage("win-x64", config);
-    const res = verifyWine(winStage);
+    const res = verifyWine(winStage, config.cacheDir);
     if (res.success) {
       console.log(`[OK] ${res.details}`);
       process.exit(0);

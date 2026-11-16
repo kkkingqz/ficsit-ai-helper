@@ -634,7 +634,7 @@ proc.on("exit", (code) => {
 });
 
 setTimeout(() => {
-  proc.kill("SIGTERM");
+  proc.kill("SIGKILL");
   console.error("Smoke test timeout. Output:", out);
   process.exit(1);
 }, 6000);
@@ -645,6 +645,7 @@ setTimeout(() => {
       cwd: appDir,
       encoding: "utf-8",
       timeout: 10000,
+      killSignal: "SIGKILL",
     });
     return {
       success: true,
@@ -826,9 +827,8 @@ export function verifyWine(
   const logFile = path.join(stageDir, "run", "wine-verify.log");
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
 
-  const winePrefix = cacheDir
-    ? path.join(cacheDir, "wine-prefix")
-    : path.resolve(stageDir, "../../cache/wine-prefix");
+  const resolvedCache = cacheDir || getDefaultConfig().cacheDir;
+  const winePrefix = path.join(resolvedCache, "wine-prefix");
   fs.mkdirSync(winePrefix, { recursive: true });
 
   const wineEnv = {
@@ -882,5 +882,15 @@ export function verifyWine(
       success: false,
       details: `Wine verification failed: ${err.message || String(err)}\nOutput: ${output}`,
     };
+  } finally {
+    try {
+      execFileSync("wineserver", ["-k"], {
+        env: wineEnv,
+        timeout: 5000,
+        stdio: "ignore",
+      });
+    } catch {
+      // Wineserver may not be running or already terminated
+    }
   }
 }
