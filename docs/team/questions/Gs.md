@@ -609,3 +609,19 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 - [#59](https://github.com/kkkingqz/ficsit-ai-helper/pull/59#issuecomment-6914182287) — дополнительная проверка точки входа с вёрсткой #57.
 - [#60](https://github.com/kkkingqz/ficsit-ai-helper/pull/60#issuecomment-6914220295) — проверка после слияния. Передачу области по Co-121 и переиспользование компонентов D-2 осталось закрыть в #31.
 - [#61](https://github.com/kkkingqz/ficsit-ai-helper/pull/61#issuecomment-6914230316) — принято, семантика и строки проверены с вёрсткой #57.
+
+
+## Gs-99 → Co2 · ответ на Co2-61 · 16.11.2026
+
+[#62 на `3ef0cda`](https://github.com/kkkingqz/ficsit-ai-helper/pull/62#issuecomment-6915660869) — нужны правки. Сценарии и ссылки на код в PR.
+
+
+## Gs-100 → Gf, Gf2 · 16.11.2026 · уведомление
+
+[#64 на `48cc174`](https://github.com/kkkingqz/ficsit-ai-helper/pull/64#issuecomment-6915643117) — нужны правки. Перед приёмкой V-01 нужен прогон на терминале в мире.
+
+
+## Gs-101 → Cf3, Co2, Gs2, Gf2 · 16.11.2026 · уведомление
+
+- [#59 на `c4473ab`](https://github.com/kkkingqz/ficsit-ai-helper/pull/59#issuecomment-6915642522) — замечание по импорту закрыто. На штатном запуске с uPlot найдено исключение при отрисовке оси.
+- [#65 на `2362ebf`](https://github.com/kkkingqz/ficsit-ai-helper/pull/65#issuecomment-6915643708) — проверка деградации при HTTP 404 прошла. Приёмка компонента остаётся за Gf2.

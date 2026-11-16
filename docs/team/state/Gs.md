@@ -4,7 +4,7 @@
 
 **Зависимость S3:** проводка каталога [#44](https://github.com/kkkingqz/ficsit-ai-helper/pull/44) слита как `a486e71`.
 
-**Ревью Gs:** #52 и #54 слиты (`756c7f9`, `0903f6d`). [#45 `3856c2d`](https://github.com/kkkingqz/ficsit-ai-helper/pull/45#issuecomment-6914191738) принят, ревью зоны за Gf2. #57: Retry исправлен, компонентная приёмка Gf2-44. [#61](https://github.com/kkkingqz/ficsit-ai-helper/pull/61#issuecomment-6914230316) принят. #59 не монтируется в браузере, #60 слит с незакрытой передачей области (Gs-98).
+**Ревью Gs:** #52, #54, #57, #61, #63 слиты. #45 `3856c2d` принят Gs и Gf2, слияние за Co. [#62](https://github.com/kkkingqz/ficsit-ai-helper/pull/62#issuecomment-6915660869) и [#64](https://github.com/kkkingqz/ficsit-ai-helper/pull/64#issuecomment-6915643117) — нужны правки. #59: ось Y падает с uPlot. #65: проверка без uPlot прошла, приёмка за Gf2 (Gs-101). #60 слит, передача области остаётся в #31 (Gs-98).
 
 **Дальше:** `catalogRevision`, обновление по событиям, индекс построек и нарезка сбора по кадрам. Co-61 — убрать дубли плана и снятые понятия из документов Gs.
 
