@@ -363,4 +363,143 @@ describe("StatisticsController (V-5, #22)", () => {
 
     controller.destroy();
   });
+
+  it("handles windowIncomplete and displays corresponding notice (Co2-55 §5)", async () => {
+    const { api } = createMockApi();
+    (api.querySeries as any).mockImplementation(async (args: any) => ({
+      kind: "series",
+      metricId: args.metricId,
+      scopeId: args.scopeId || "",
+      window: args.window,
+      unit: "megawatt",
+      source: "live",
+      intervalSec: 5,
+      timestamps: [2090, 2100],
+      values: [500, 505],
+      windowIncomplete: true,
+    }));
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+    expect(model.notice).toContain("Session shorter than requested history window");
+
+    controller.destroy();
+  });
+
+  it("preserves notApplicable state without coercing to zero (Co2-55 §4, D-1)", async () => {
+    const { api } = createMockApi();
+    (api.queryMetric as any).mockImplementation(async (args: any) => {
+      if (args.metricId === "power.capacity") {
+        return {
+          kind: "value",
+          metricId: args.metricId,
+          scopeId: "",
+          value: null,
+          unit: "megawatt",
+          source: "live",
+          sessionTimeSec: 2100,
+          state: "notApplicable",
+        };
+      }
+      return {
+        kind: "value",
+        metricId: args.metricId,
+        scopeId: "",
+        value: 500,
+        unit: "megawatt",
+        source: "live",
+        sessionTimeSec: 2100,
+        state: "value",
+      };
+    });
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+    const headroomTile = model.tiles.find((t) => t.id === "headroom");
+    expect(headroomTile).toBeDefined();
+    expect(headroomTile!.reading.state).toBe("notApplicable");
+    expect(headroomTile!.reading.value).toBeNull();
+
+    controller.destroy();
+  });
+
+  it("does not synthesize flat lines when series data is missing (Co2-55 §3)", async () => {
+    const { api } = createMockApi();
+    (api.querySeries as any).mockImplementation(async () => {
+      throw new Error("Series not available");
+    });
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+    const primaryChart = model.charts[0];
+    expect(primaryChart).toBeDefined();
+    for (const s of primaryChart!.series) {
+      if (s) {
+        expect(s.timestamps).toEqual([]);
+        expect(s.values).toEqual([]);
+      }
+    }
+
+    controller.destroy();
+  });
+
+  it("reads real telemetry values for resources tab (Co2-55 §1)", async () => {
+    const { api } = createMockApi();
+    (api.queryMetric as any).mockImplementation(async (args: any) => {
+      if (args.metricId === "iron.production" || args.metricId === "items.produced") {
+        return {
+          kind: "value",
+          metricId: args.metricId,
+          scopeId: args.scopeId || "",
+          value: 777,
+          unit: "itemsPerMinute",
+          source: "live",
+          sessionTimeSec: 2100,
+          state: "value",
+        };
+      }
+      return {
+        kind: "value",
+        metricId: args.metricId,
+        scopeId: args.scopeId || "",
+        value: 123,
+        unit: "itemsPerMinute",
+        source: "live",
+        sessionTimeSec: 2100,
+        state: "value",
+      };
+    });
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    controller.setTab("resources");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    const model = controller.buildModel();
+    const extractionTile = model.tiles.find((t) => t.id === "extraction");
+    expect(extractionTile).toBeDefined();
+    expect(extractionTile!.reading.value).toBe(777);
+    expect(extractionTile!.source).toBe("Live telemetry");
+
+    controller.destroy();
+  });
 });

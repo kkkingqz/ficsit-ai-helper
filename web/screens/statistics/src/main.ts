@@ -25,13 +25,27 @@ export async function initStatistics(
   let view: IStatisticsView | undefined;
   try {
     // Dynamic path resolution to link with web/ui-kit in browser / dev environments
-    const uiKitComponentsPath = "../../ui-kit/components.js";
-    const uiKitScreensPath = "../../ui-kit/screens/statistics.js";
+    // From dist/main.js, ui-kit is at ../../../ui-kit/ (fallback to ../../ui-kit/)
+    const uiKitComponentsPath: string = "../../../ui-kit/components.js";
+    const uiKitScreensPath: string = "../../../ui-kit/screens/statistics.js";
+    const altComponentsPath: string = "../../ui-kit/components.js";
+    const altScreensPath: string = "../../ui-kit/screens/statistics.js";
 
-    const [componentsMod, screensMod] = await Promise.all([
-      import(/* @vite-ignore */ uiKitComponentsPath).catch(() => null),
-      import(/* @vite-ignore */ uiKitScreensPath).catch(() => null),
-    ]);
+    const loadUiKit = async () => {
+      try {
+        const [c, s] = await Promise.all([
+          import(/* @vite-ignore */ uiKitComponentsPath),
+          import(/* @vite-ignore */ uiKitScreensPath),
+        ]);
+        return [c, s];
+      } catch {
+        return Promise.all([
+          import(/* @vite-ignore */ altComponentsPath).catch(() => null),
+          import(/* @vite-ignore */ altScreensPath).catch(() => null),
+        ]);
+      }
+    };
+    const [componentsMod, screensMod] = await loadUiKit();
 
     if (componentsMod && screensMod && typeof screensMod.mountStatistics === "function") {
       const presenter = componentsMod.createPresenter("en", {

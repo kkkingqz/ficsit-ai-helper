@@ -5,6 +5,16 @@ export const DEFAULT_STRINGS: StatisticsStrings = {
   tabLabel: "Report",
   windowLabel: "History window",
   export: "Export CSV",
+  generationLabel: "Generation",
+  consumptionLabel: "Consumption",
+  capacityLabel: "Grid capacity",
+  headroomLabel: "Headroom",
+  sessionPeakLabel: "Session peak",
+  generatorsOnlineLabel: "Generators online",
+  windowIncompleteNotice: "Session shorter than requested history window",
+  liveSource: "Live telemetry",
+  derivedSource: "Derived calculation",
+  fixtureSource: "Fixture data",
   reports: {
     energy: {
       label: "Energy",

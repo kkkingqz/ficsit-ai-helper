@@ -148,6 +148,16 @@ export interface StatisticsStrings {
   tabLabel: string;
   windowLabel: string;
   export: string;
+  generationLabel: string;
+  consumptionLabel: string;
+  capacityLabel: string;
+  headroomLabel: string;
+  sessionPeakLabel: string;
+  generatorsOnlineLabel: string;
+  windowIncompleteNotice: string;
+  liveSource: string;
+  derivedSource: string;
+  fixtureSource: string;
   reports: {
     energy: {
       label: string;

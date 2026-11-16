@@ -1,4 +1,4 @@
-import type { FreshnessItem, FreshnessKind, ReadingValue } from "./types.js";
+import type { FreshnessItem, ReadingValue } from "./types.js";
 import type { MetricValue } from "@ficsitai/screens-api";
 
 export function evaluateFreshness(
@@ -6,15 +6,21 @@ export function evaluateFreshness(
   currentSessionTime: number,
   sampleIntervalSec = 5
 ): FreshnessItem {
-  if (!reading || reading.state === "notApplicable" || !Number.isFinite(reading.value)) {
+  if (!reading || reading.state === "notApplicable" || reading.value === null) {
     return {
       kind: "empty",
       label: "NO DATA",
     };
   }
 
-  const readingTime = reading.sessionTimeSec ?? currentSessionTime;
-  const age = Math.max(0, currentSessionTime - readingTime);
+  if (reading.sessionTimeSec === undefined) {
+    return {
+      kind: "loading",
+      label: "LOADING",
+    };
+  }
+
+  const age = Math.max(0, currentSessionTime - reading.sessionTimeSec);
   const threshold = Math.max(3 * sampleIntervalSec, 10);
 
   if (age <= threshold) {
