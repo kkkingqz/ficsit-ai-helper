@@ -116,12 +116,18 @@ function sse(res: ServerResponse): Held {
 }
 
 const playthroughJson = (req: IncomingMessage, res: ServerResponse): boolean => {
-  if (req.method === "GET" && !req.url?.endsWith("/messages")) {
+  if (req.method !== "GET") return false;
+  // Записи истории: адаптер читает их до и после хода, чтобы связать записи
+  // с его номером (Co-129). Прежде этот путь падал в ветку потока, и ход
+  // вставал, не начавшись.
+  if (req.url?.endsWith("/messages") === true) {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ id: "playthrough" }));
+    res.end("[]");
     return true;
   }
-  return false;
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(JSON.stringify({ id: "playthrough" }));
+  return true;
 };
 
 /** Foreman, которому в проверке делать нечего. */
@@ -606,6 +612,171 @@ describe("чат по каналу", () => {
     expect(history).toHaveLength(10);
     expect(history[0]?.text).toBe("сообщение 70");
     expect(history[9]?.text).toBe("сообщение 79");
+  });
+
+  /**
+   * Foreman с настоящим порядком записи: вопрос игрока — до потока, ответ
+   * модели — после (`packages/ff-server/src/routes/chat.ts`). Именно на этом
+   * порядке и держится связывание записей с ходом.
+   */
+  const storingForeman = async (
+    stored: { id: string; role: string; content: string; createdAt: string }[],
+    options: { extraWriter?: boolean; failFirstRead?: boolean } = {},
+  ) => {
+    let reads = 0;
+    let seq = stored.length;
+    const append = (role: string, content: string): void => {
+      seq += 1;
+      stored.push({ id: `s${seq}`, role, content, createdAt: new Date(seq).toISOString() });
+    };
+    return await fakeForeman((req, res, hold) => {
+      if (req.method === "GET" && req.url?.endsWith("/messages") === true) {
+        reads += 1;
+        if (options.failFirstRead === true && reads === 1) {
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end("{}");
+          return;
+        }
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(stored));
+        return;
+      }
+      if (req.method === "GET") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ id: "playthrough" }));
+        return;
+      }
+      if (req.url?.endsWith("/chat") === true) {
+        append("user", "вопрос игрока");
+        if (options.extraWriter === true) append("user", "вопрос из веб-клиента Foreman");
+        const stream = sse(res);
+        stream.send("text", { delta: "ответ" });
+        hold({
+          send: (event, data) => {
+            if (event === "done") append("assistant", "полный ответ");
+            stream.send(event, data);
+          },
+          end: stream.end,
+        });
+        return;
+      }
+      res.end("{}");
+    });
+  };
+
+  const historyOf = async (mod: ModClient, id: string) => {
+    await mod.send([mod.next("chat.history", { saveId: SAVE_ID }, id)]);
+    const reply = await mod.wait("reply", id);
+    return (reply.body as { messages: { id: string; role: string; turnId?: string }[] }).messages;
+  };
+
+  it("записи хода получают его номер (Co-129)", async () => {
+    const fake = await storingForeman([]);
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "вопрос" }, "m-1")]);
+    const turnId = ((await mod.wait("reply", "m-1")).body as { turnId: string }).turnId;
+    await mod.wait("chat.text");
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await mod.wait("chat.done");
+
+    const history = await historyOf(mod, "m-2");
+    expect(history.map((item) => item.role)).toEqual(["user", "assistant"]);
+    expect(history.every((item) => item.turnId === turnId)).toBe(true);
+  });
+
+  it("дочитанный ответ отменённого хода несёт номер того же хода", async () => {
+    // Ради этого случая связь и нужна: в ленте остался обрубок, а в истории
+    // лежит полный ответ, и экрану надо знать, какая запись его заменяет.
+    const fake = await storingForeman([]);
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "долгий" }, "m-1")]);
+    const turnId = ((await mod.wait("reply", "m-1")).body as { turnId: string }).turnId;
+    await mod.wait("chat.text");
+    await mod.send([mod.next("chat.cancel", { saveId: SAVE_ID, turnId }, "m-2")]);
+    await mod.wait("chat.cancelled");
+
+    // Foreman дочитывает ход и пишет ответ уже после отмены.
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await new Promise((resolve) => setTimeout(resolve, 60));
+
+    const history = await historyOf(mod, "m-3");
+    const answer = history.find((item) => item.role === "assistant");
+    expect(answer?.turnId).toBe(turnId);
+  });
+
+  it("записи, бывшие до хода, номера не получают — и поля тоже", async () => {
+    const fake = await storingForeman([
+      { id: "старая-1", role: "user", content: "прошлый вопрос", createdAt: "2026-11-01T00:00:00Z" },
+      { id: "старая-2", role: "assistant", content: "прошлый ответ", createdAt: "2026-11-01T00:00:01Z" },
+    ]);
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "новый" }, "m-1")]);
+    await mod.wait("reply", "m-1");
+    await mod.wait("chat.text");
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await mod.wait("chat.done");
+
+    const history = await historyOf(mod, "m-2");
+    const old = history.filter((item) => item.id.startsWith("старая"));
+    expect(old).toHaveLength(2);
+    // Пустой строки вместо номера быть не должно: экран прочитал бы её как
+    // «ход с пустым номером».
+    expect(old.every((item) => !("turnId" in item))).toBe(true);
+  });
+
+  it("чужая запись в тот же playthrough — номер не ставится никому", async () => {
+    const fake = await storingForeman([], { extraWriter: true });
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "вопрос" }, "m-1")]);
+    await mod.wait("reply", "m-1");
+    await mod.wait("chat.text");
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await mod.wait("chat.done");
+
+    const history = await historyOf(mod, "m-2");
+    // Состав появившихся записей не опознан — угадывать, какая из двух
+    // пользовательских наша, нельзя (Co-129: лучше честное «номера нет»).
+    expect(history.some((item) => item.turnId !== undefined)).toBe(false);
+  });
+
+  it("сорванное чтение до хода не ломает ход: номера нет, ответ есть", async () => {
+    const fake = await storingForeman([], { failFirstRead: true });
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "вопрос" }, "m-1")]);
+    await mod.wait("reply", "m-1");
+    // Ход идёт как обычно: номер записи дешевле хода.
+    expect((await mod.wait("chat.text")).body).toMatchObject({ text: "ответ" });
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await mod.wait("chat.done");
+
+    const history = await historyOf(mod, "m-2");
+    expect(history.length).toBeGreaterThan(0);
+    expect(history.some((item) => item.turnId !== undefined)).toBe(false);
   });
 
   it("пустой текст хода — INVALID_ARGUMENT, до Foreman не идёт", async () => {

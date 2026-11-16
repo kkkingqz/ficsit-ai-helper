@@ -34,6 +34,26 @@ const DRAIN_LIMIT_MS = 5 * 60_000;
 /** Длина текста хода — предел из README адаптера, его же отдаёт рукопожатие. */
 export const MAX_CHAT_TEXT = 8000;
 
+/**
+ * Сколько связей «запись → ход» помнить на playthrough.
+ *
+ * Связь живёт в памяти адаптера и переживает конец хода, но не перезапуск
+ * процесса: у Foreman этих номеров нет, он их не хранит и не возвращает.
+ * Предел — чтобы долгий разговор не рос без границ; вытесняются самые старые,
+ * а они и так уже уехали за хвост истории.
+ */
+const MAX_TURN_LINKS = 200;
+
+/**
+ * Срок на чтение записей для связывания.
+ *
+ * Своего срока у `request()` нет, а чтение «что было до хода» стоит перед
+ * отправкой: без предела молчащий Foreman подвесил бы ход целиком, и игрок
+ * не увидел бы даже первого слова. Номер записи дешевле хода, поэтому срок
+ * короткий и его истечение — не ошибка, а «номера не будет».
+ */
+const LINK_READ_MS = 2000;
+
 /** История: до 100 сообщений (протокол), по умолчанию 50. */
 export const MAX_HISTORY_LIMIT = 100;
 export const DEFAULT_HISTORY_LIMIT = 50;
@@ -98,6 +118,14 @@ export interface HistoryMessage {
   role: string;
   text: string;
   createdAt: string;
+  /**
+   * Ход, которому принадлежит запись, — если адаптер его знает.
+   *
+   * Необязательное по протоколу (`chat.history`, добавлено Co-129). Номера
+   * нет у записей, сделанных до запуска адаптера, и у записей, пришедших в
+   * playthrough мимо хода: лучше честное «номера нет», чем угаданный.
+   */
+  turnId?: string;
 }
 
 interface StoredMessage {
@@ -118,11 +146,32 @@ interface Turn {
   cancelled: boolean;
   /** Исполнится, когда ход дочитан и сохранение свободно. */
   drained: Promise<void>;
+  /**
+   * Идентификаторы записей истории, бывшие до хода.
+   *
+   * По ним в конце хода видно, какие записи он добавил. Foreman не
+   * возвращает идентификатор при записи (его `appendMessage` отдаёт их
+   * только в базу), а связывать ход с записью по тексту нельзя — это и есть
+   * указание Co-129. Чтение не удалось — номера у записей этого хода не
+   * будет, и это правильнее догадки.
+   */
+  idsBefore?: ReadonlySet<string> | undefined;
 }
 
 export class ChatTurns {
   /** Идущие ходы по playthrough: не больше одного на сохранение. */
   private readonly turns = new Map<string, Turn>();
+
+  /**
+   * Запись истории → ход, который её добавил: `playthroughId` → `id` → `turnId`.
+   *
+   * Источник номера — адаптер, по ходу, который он сам ведёт (Co-129). Связь
+   * ставится по идентификаторам записей, появившихся за время хода, и только
+   * когда их состав совпадает с ожидаемым: вопрос игрока и, если модель
+   * ответила, её ответ. Всё остальное — чужая запись в тот же playthrough, и
+   * тогда номер не ставится никому.
+   */
+  private readonly linkedTurns = new Map<string, Map<string, string>>();
 
   public constructor(
     private readonly foreman: ForemanSession,
@@ -232,6 +281,11 @@ export class ChatTurns {
     // остаётся занятым.
     const limit = setTimeout(() => turn.controller.abort(), DRAIN_LIMIT_MS);
 
+    // Запись игрока Foreman делает до начала потока, поэтому читать «что
+    // было» нужно до отправки. Слот уже занят, и чужой ход в этот зазор не
+    // влезет.
+    turn.idsBefore = await this.idsBefore(turn.playthroughId);
+
     try {
       const upstream = await this.foreman.request(
         `/api/playthroughs/${turn.playthroughId}/chat`,
@@ -289,6 +343,10 @@ export class ChatTurns {
       }
     } finally {
       clearTimeout(limit);
+      // Связываем после дочитывания, и для отменённого хода тоже — ради него
+      // это и нужно: его ответ лёг в историю, а в ленте остался обрубок, и
+      // экрану нужно знать, какая запись его заменяет.
+      await this.linkTurn(turn);
       // Снимаем только свою запись: чужой ход, занявший слот, не наш.
       if (this.turns.get(turn.playthroughId) === turn) this.turns.delete(turn.playthroughId);
       release();
@@ -368,31 +426,114 @@ export class ChatTurns {
     return "cancelled";
   }
 
+  /**
+   * Записи истории playthrough, как их отдаёт Foreman.
+   *
+   * Отдельный метод, потому что читают двое: история для мода и связывание
+   * записей с ходом. Форма одна, и второй её копии быть не должно.
+   */
+  private async storedMessages(playthroughId: string, timeoutMs?: number): Promise<StoredMessage[]> {
+    const response = await this.foreman.request(
+      `/api/playthroughs/${playthroughId}/messages`,
+      timeoutMs === undefined ? {} : { signal: AbortSignal.timeout(timeoutMs) },
+    );
+    if (!response.ok) {
+      throw new TurnError("FOREMAN_UNAVAILABLE", `история недоступна: ${response.status}`);
+    }
+    return (await response.json()) as StoredMessage[];
+  }
+
+  /** Идентификаторы записей до хода; `undefined` — прочитать не удалось. */
+  private async idsBefore(playthroughId: string): Promise<ReadonlySet<string>| undefined> {
+    try {
+      const stored = await this.storedMessages(playthroughId, LINK_READ_MS);
+      return new Set(stored.map((message) => message.id));
+    } catch (err: unknown) {
+      // Не повод валить ход: без этого чтения у его записей просто не будет
+      // номера. Ход важнее номера.
+      this.log.warn("не прочитал записи до хода — номера у его записей не будет", err);
+      return undefined;
+    }
+  }
+
+  /**
+   * Связывает записи, появившиеся за время хода, с его номером.
+   *
+   * Ожидаемый состав — вопрос игрока и, если модель ответила, её ответ
+   * (`routes/chat.ts` Foreman пишет первый до потока, второй после). Любой
+   * другой состав значит, что в playthrough писал кто-то ещё, и тогда номер
+   * не ставится никому: по Co-129 лучше честное «номера нет».
+   */
+  private async linkTurn(turn: Turn): Promise<void> {
+    const before = turn.idsBefore;
+    if (before === undefined) return;
+
+    let added: StoredMessage[];
+    try {
+      const stored = await this.storedMessages(turn.playthroughId, LINK_READ_MS);
+      added = stored.filter((message) => !before.has(message.id));
+    } catch (err: unknown) {
+      this.log.warn(`не прочитал записи после хода ${turn.id} — номера у них не будет`, err);
+      return;
+    }
+
+    const roles = added.map((message) => message.role);
+    const expected =
+      (roles.length === 1 && roles[0] === "user") ||
+      (roles.length === 2 && roles[0] === "user" && roles[1] === "assistant");
+    if (!expected) {
+      this.log.warn(
+        `записи хода ${turn.id} не опознаны (${roles.join(", ") || "ни одной"}): ` +
+          `в playthrough писал кто-то ещё, номера не ставлю`,
+      );
+      return;
+    }
+
+    let links = this.linkedTurns.get(turn.playthroughId);
+    if (links === undefined) {
+      links = new Map<string, string>();
+      this.linkedTurns.set(turn.playthroughId, links);
+    }
+    for (const message of added) links.set(message.id, turn.id);
+    // Вытесняем самые старые: Map хранит порядок вставки.
+    while (links.size > MAX_TURN_LINKS) {
+      const oldest = links.keys().next();
+      if (oldest.done === true) break;
+      links.delete(oldest.value);
+    }
+    this.log.debug(`ход ${turn.id}: связано записей ${added.length}`);
+  }
+
   /** История разговора: от старых к новым, хвостом нужной длины. */
   public async history(args: z.infer<typeof chatHistorySchema>): Promise<HistoryMessage[]> {
     const playthroughId = await this.playthroughFor(args.saveId);
     const limit = args.limit ?? DEFAULT_HISTORY_LIMIT;
 
-    let response: Response;
+    let all: StoredMessage[];
     try {
-      response = await this.foreman.request(`/api/playthroughs/${playthroughId}/messages`);
+      all = await this.storedMessages(playthroughId);
     } catch (err: unknown) {
+      if (err instanceof TurnError) throw err;
       throw new TurnError(
         "FOREMAN_UNAVAILABLE",
         `история недоступна: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    if (!response.ok) {
-      throw new TurnError("FOREMAN_UNAVAILABLE", `история недоступна: ${response.status}`);
-    }
 
     // Foreman отдаёт до 500 сообщений по возрастанию времени; моду нужен хвост.
-    const all = (await response.json()) as StoredMessage[];
-    return all.slice(-limit).map((message) => ({
-      id: message.id,
-      role: message.role,
-      text: message.content,
-      createdAt: message.createdAt,
-    }));
+    const links = this.linkedTurns.get(playthroughId);
+    return all.slice(-limit).map((message) => {
+      const turnId = links?.get(message.id);
+      return {
+        id: message.id,
+        role: message.role,
+        text: message.content,
+        createdAt: message.createdAt,
+        // Поле необязательное: у записей до запуска адаптера и у записей
+        // мимо хода номера нет, и пустую строку вместо него ставить нельзя —
+        // экран прочитал бы её как «ход с пустым номером».
+        ...(turnId === undefined ? {} : { turnId }),
+      };
+    });
   }
 }
