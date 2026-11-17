@@ -48,6 +48,20 @@ const REPO = resolve(import.meta.dirname, "../../../..");
 const ADAPTER = join(REPO, "sidecar/adapter");
 const FOREMAN_SRC = process.env.FOREMAN_SRC ?? join(process.env.HOME ?? ".", "Projects/foreman-src");
 
+/**
+ * Что каждая служба пишет в свой журнал, когда действительно слушает.
+ *
+ * Это и есть привязка готовности к своему экземпляру: строку в наш файл
+ * может написать только наш процесс. Тексты — из кода на закреплённом
+ * коммите Foreman (`sf-mcp/src/http.ts`, `ff-server/src/index.ts`) и из
+ * нашего адаптера.
+ */
+const LISTENING = {
+  sfMcp: (port) => `Listening on http://127.0.0.1:${port}`,
+  ffServer: (port) => `Listening on http://127.0.0.1:${port}`,
+  adapter: (port) => `адаптер слушает http://127.0.0.1:${port}`,
+};
+
 /** Свои порты: стенд не должен драться с лаунчером (8723, 8724, 8730, 8731). */
 const PORTS = {
   sfMcp: Number(process.env.BENCH_SF_MCP_PORT ?? 8743),
@@ -92,7 +106,7 @@ function nodeCommand() {
   return process.env.BENCH_NODE_PREFIX ?? "";
 }
 
-function startProcess(name, cwd, script, env, logDir) {
+function startProcess(name, cwd, script, env, logDir, marker) {
   const logFile = join(logDir, `${name}.log`);
   const out = openSync(logFile, "a");
   const prefix = nodeCommand();
@@ -107,7 +121,7 @@ function startProcess(name, cwd, script, env, logDir) {
   // Смерть своей команды запоминаем сразу: без этого стенд ждал готовности у
   // того, кого уже нет, и принимал за свою службу чужого слушателя на том же
   // порту (ревью Gs на #68).
-  const service = { name, child, logFile, exit: undefined };
+  const service = { name, child, logFile, marker, exit: undefined };
   child.once("exit", (code, signal) => {
     service.exit = code === null ? `сигнал ${String(signal)}` : `код ${String(code)}`;
   });
@@ -133,6 +147,17 @@ function portFree(port) {
  * (ревью Gs на #68). Тот же приём у `foreman-local.sh`.
  */
 async function requireFreePorts(ports) {
+  // Совпадающие порты предварительная проверка пропускала: оба раза порт был
+  // свободен, потом его занимала первая служба, вторая падала, и стенд
+  // сравнивал службу сама с собой (дополнительный сценарий Gs на #68).
+  const seen = new Map();
+  for (const [name, port] of Object.entries(ports)) {
+    const already = seen.get(port);
+    if (already !== undefined) {
+      throw new Error(`порты ${already} и ${name} совпадают (${port}) — у каждой службы свой порт`);
+    }
+    seen.set(port, name);
+  }
   for (const [name, port] of Object.entries(ports)) {
     if (!(await portFree(port))) {
       throw new Error(
@@ -152,6 +177,15 @@ async function waitForPortFree(port, name, timeoutMs = 30_000) {
       throw new Error(`порт ${port} (${name}) не освободился за ${timeoutMs} мс`);
     }
     await new Promise((done) => setTimeout(done, 200));
+  }
+}
+
+/** Сказала ли своя служба в свой журнал то, что говорит при старте. */
+function logHas(file, marker) {
+  try {
+    return readFileSync(file, "utf8").includes(marker);
+  } catch {
+    return false;
   }
 }
 
@@ -184,32 +218,42 @@ process.on("SIGINT", () => {
 });
 
 /**
- * Ждёт готовности **своей** службы.
+ * Ждёт готовности **своей** службы, и это не то же самое, что отвечающий порт.
  *
- * Отвечающий порт сам по себе ничего не значит: на нём мог сидеть чужой
- * слушатель ещё до запуска. Поэтому порт проверен свободным заранее, а здесь
- * ожидание прерывается, как только своя команда завершилась, — с хвостом её
- * журнала, чтобы причина была видна сразу (ревью Gs на #68).
+ * Свободный порт перед запуском не доказывает ничего о том, что будет через
+ * секунду: Gs поднял чужой слушатель ровно в момент старта своей команды,
+ * своя упала с кодом 42, а стенд принял чужой ответ, спросил у него список
+ * инструментов и записал `foreign_tool` в отчёт (ревью Gs на #68).
+ * Повторная проверка после запроса этого не лечит — она снова проверяет
+ * порт, а не владельца.
+ *
+ * Поэтому готовность определяется по **своему журналу**: служба пишет в
+ * файл, который открыли мы, и строку о прослушивании своего порта может
+ * написать только она. Чужой процесс в этот файл не пишет. Запрос по HTTP
+ * остаётся вторым условием — журнал говорит «слушаю», запрос подтверждает,
+ * что отвечает.
  */
 async function waitForReady(service, url, timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs;
+  const stop = (why) =>
+    new Error(`${service.name}: ${why}\nЖурнал ${service.logFile}:\n${logTail(service.logFile, 20)}`);
+
   for (;;) {
-    if (service.exit !== undefined) {
-      throw new Error(
-        `${service.name} завершился (${service.exit}) до готовности.\n` +
-          `Журнал ${service.logFile}:\n${logTail(service.logFile)}`,
-      );
+    if (service.exit !== undefined) throw stop(`завершился (${service.exit}) до готовности`);
+
+    if (service.marker !== undefined && !logHas(service.logFile, service.marker)) {
+      // Своя служба ещё не сказала, что слушает. Чужой ответ на этом порту
+      // нас не касается: спрашивать его нельзя.
+      if (Date.now() > deadline) throw stop(`не сказал «${service.marker}» за ${timeoutMs} мс`);
+      await new Promise((done) => setTimeout(done, 300));
+      continue;
     }
+
     try {
       await fetch(url, { signal: AbortSignal.timeout(2000) });
       return;
     } catch {
-      if (Date.now() > deadline) {
-        throw new Error(
-          `${service.name} не поднялся за ${timeoutMs} мс: ${url}\n` +
-            `Журнал ${service.logFile}:\n${logTail(service.logFile)}`,
-        );
-      }
+      if (Date.now() > deadline) throw stop(`не отвечает на ${url} за ${timeoutMs} мс`);
       await new Promise((done) => setTimeout(done, 500));
     }
   }
@@ -233,6 +277,15 @@ export function foremanRevision(pin, dir = FOREMAN_SRC) {
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
   try {
+    // Корень репозитория обязан совпадать с самим каталогом: папке без
+    // своего git доставался HEAD родительского репозитория, и отчёт о
+    // сравнении подписывался ревизией FICSIT AI как ревизией Foreman (ревью
+    // Gs на #68). Сравниваем канонические пути, иначе `/tmp` против
+    // `/private/tmp` даст ложное расхождение.
+    const top = realpathSync(git(["rev-parse", "--show-toplevel"]));
+    if (top !== realpathSync(dir)) {
+      return { sha: "", dirty: false, pinned: pin.commit, matchesPin: false, foreignGit: top };
+    }
     const sha = git(["rev-parse", "HEAD"]);
     const dirty = git(["status", "--porcelain"]) !== "";
     return { sha, dirty, pinned: pin.commit, matchesPin: sha === pin.commit };
@@ -329,7 +382,11 @@ async function askForeman(baseUrl, account, saveId, questions, log) {
 /** Строка о ревизии Foreman для отчёта: что запускали, а не что закреплено. */
 export function describeForeman(foreman, dir = FOREMAN_SRC) {
   if (foreman.sha === "") {
-    return `\`${dir}\` — **ревизия неизвестна** (каталог не git-клон), ` +
+    const why =
+      foreman.foreignGit === undefined
+        ? "каталог не git-клон"
+        : `git-корень чужой: \`${foreman.foreignGit}\``;
+    return `\`${dir}\` — **ревизия неизвестна** (${why}), ` +
       `закреплено \`${foreman.pinned.slice(0, 8)}\``;
   }
   const dirty = foreman.dirty ? ", **есть незакоммиченные правки**" : "";
@@ -448,7 +505,14 @@ async function main() {
     BETTER_AUTH_SECRET: "bench-secret-not-a-real-one-0123456789",
   };
 
-  const sfMcp = startProcess("sf-mcp", FOREMAN_SRC, ["run", "start:mcp"], common, logs);
+  const sfMcp = startProcess(
+    "sf-mcp",
+    FOREMAN_SRC,
+    ["run", "start:mcp"],
+    common,
+    logs,
+    LISTENING.sfMcp(PORTS.sfMcp),
+  );
   await waitForReady(sfMcp, `http://127.0.0.1:${PORTS.sfMcp}/health`);
   console.log(`sf-mcp поднят на ${PORTS.sfMcp}`);
 
@@ -463,7 +527,10 @@ async function main() {
       SF_MCP_URL: `http://127.0.0.1:${PORTS.sfMcp}/mcp`,
       FOREMAN_BASE_URL: `http://127.0.0.1:${PORTS.ffServer}`,
       FOREMAN_ACCOUNT_PATH: join(data, "adapter-account.json"),
-      ADAPTER_LOG_LEVEL: "warn",
+      // `info`, а не `warn`: готовность стенд определяет по строке адаптера о
+      // прослушивании своего порта, а она пишется уровнем `info`. На `warn`
+      // стенд ждал её 90 с и не дождался — поймал мой же прогон.
+      ADAPTER_LOG_LEVEL: "info",
       ...(llm === undefined
         ? {}
         : {
@@ -472,6 +539,7 @@ async function main() {
           }),
     },
     logs,
+    LISTENING.adapter(PORTS.adapter),
   );
   await waitForReady(adapter, `http://127.0.0.1:${PORTS.adapter}/health`);
   console.log(`адаптер поднят на ${PORTS.adapter}`);
@@ -484,7 +552,10 @@ async function main() {
 
   let model;
   if (llm !== undefined) {
-    await waitForReady(adapter, `http://127.0.0.1:${PORTS.normalizer}`);
+    await waitForReady(
+      { ...adapter, marker: `нормализатор ответов слушает http://127.0.0.1:${PORTS.normalizer}` },
+      `http://127.0.0.1:${PORTS.normalizer}`,
+    );
     console.log(`нормализатор поднят на ${PORTS.normalizer} (ADR-034, нужен обоим путям)`);
     model = await modelRuns(data, logs, token, save, log, llm);
   }
@@ -578,6 +649,7 @@ async function modelRuns(data, logs, token, save, log, llm) {
       ["run", "start:server"],
       { ...common, ...llm.forForeman(), ...env },
       logs,
+      LISTENING.ffServer(PORTS.ffServer),
     );
     ffServer.name = `ff-server (${tag})`;
     await waitForReady(ffServer, base);
