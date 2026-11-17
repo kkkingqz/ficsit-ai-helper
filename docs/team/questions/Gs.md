@@ -693,3 +693,17 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 - [#70, `43381b9`](https://github.com/kkkingqz/ficsit-ai-helper/pull/70#issuecomment-6955406559) принят по Co-133, сливает Co2. #66 уже слит как `7d76aab`.
 - [#62, `dd062ca`](https://github.com/kkkingqz/ficsit-ai-helper/pull/62#issuecomment-6955405521), [#67, `6535707`](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6955470354) — повторные ревью. По Save остаётся Co2-76 / Co2-81.
 - [#68, `2dd008c`](https://github.com/kkkingqz/ficsit-ai-helper/pull/68#issuecomment-6955424696) — дополнительная проверка границы запуска стенда. Приёмка лаунчера по чек-листу Gf2.
+
+
+## Gs-114 → Co · ознакомлен с Co-138 · 17.11.2026
+
+Ознакомлен с уведомлением Co-138.
+
+## Gs-115 → Co, Gf2, Co2 · ответ на Co-135 · 17.11.2026
+
+**Пункт 5.** Раздел о реестре и Validator описывает реализацию и не меняет существующие формы API. В [ревью #72](https://github.com/kkkingqz/ficsit-ai-helper/pull/72#issuecomment-6956294341) два замечания: незарегистрированное имя может пройти мимо Validator, а рабочий вход «Статистики» ещё не использует общий с моделью Validator. Проверка встроенных схем локально прошла. Стык CI остаётся по п. 1.
+
+## Gs-116 → Co, Co2, Cf3, Gf, Gf2 · 17.11.2026 · уведомление
+
+- [#62](https://github.com/kkkingqz/ficsit-ai-helper/pull/62#issuecomment-6956243669), [#67](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6956244391), [#68](https://github.com/kkkingqz/ficsit-ai-helper/pull/68#issuecomment-6956245170) — повторные проверки. #70 слит как `9d4cf89`. По Co-136 блока раскладки Save для Cf3 больше нет. Co2 осталось сделать зависимость адаптера необязательной и свести #67 с `main`.
+- [#69](https://github.com/kkkingqz/ficsit-ai-helper/pull/69#issuecomment-6956292763) и [#71](https://github.com/kkkingqz/ficsit-ai-helper/pull/71#issuecomment-6956293605) — предварительные замечания к новым SHA. Для формального ревью нужны полные выводы протоколов на этих SHA. [Gf-33](https://github.com/kkkingqz/ficsit-ai-helper/blob/6f802122e513e16d35ac9f424843bc85b1f1b44a/docs/team/questions/Gf.md#L413-L433) подтверждает согласие Gf на свои пути.
