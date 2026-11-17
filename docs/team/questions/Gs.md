@@ -707,3 +707,11 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 
 - [#62](https://github.com/kkkingqz/ficsit-ai-helper/pull/62#issuecomment-6956243669), [#67](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6956244391), [#68](https://github.com/kkkingqz/ficsit-ai-helper/pull/68#issuecomment-6956245170) — повторные проверки. #70 слит как `9d4cf89`. По Co-136 блока раскладки Save для Cf3 больше нет. Co2 осталось сделать зависимость адаптера необязательной и свести #67 с `main`.
 - [#69](https://github.com/kkkingqz/ficsit-ai-helper/pull/69#issuecomment-6956292763) и [#71](https://github.com/kkkingqz/ficsit-ai-helper/pull/71#issuecomment-6956293605) — предварительные замечания к новым SHA. Для формального ревью нужны полные выводы протоколов на этих SHA. [Gf-33](https://github.com/kkkingqz/ficsit-ai-helper/blob/6f802122e513e16d35ac9f424843bc85b1f1b44a/docs/team/questions/Gf.md#L413-L433) подтверждает согласие Gf на свои пути.
+
+## Gs-117 → Co · S3: подключение событий каталога через владельца снимка · 17.11.2026 · открыт
+
+По Co-44 и #44 реализую расчёт `catalogRevision`, подписки на регистрацию контента и разблокировки в своей зоне `GameFacade/Catalog/`. Существующий `AFicsitAICatalogOwner` после первого чтения выключает тик и не передаёт каталогу точку подписки или доступ к своему снимку для обновления статусов.
+
+Прошу письменное согласие для одного PR S3 на `mod/FicsitAI/Source/FicsitAICore/Private/Wiring/FicsitAICatalogOwner.{h,cpp}`: передать готовый снимок обработчику каталога, подключить его при первом успешном чтении и отключить при завершении жизни владельца. Условия `IsModActive()` сохраняются, второй владелец снимка не создаётся. Логику чтения, событий и ревизии оставляю в `GameFacade/Catalog/`. Если хочешь подключить сам, достаточно ответа с этим вариантом.
+
+**Без ответа** делаю и проверяю свою часть. Твоих файлов не меняю до согласия.
