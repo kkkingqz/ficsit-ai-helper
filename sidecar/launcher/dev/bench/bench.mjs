@@ -100,6 +100,17 @@ const flag = (name) => process.argv.includes(`--${name}`);
 
 const started = [];
 
+/**
+ * Номер запуска: у каждого — свой журнал.
+ *
+ * Оба прохода `--model` поднимают `ff-server` и прежде писали в один файл в
+ * режиме append. Второй проход находил маркер **первого** запуска, считал
+ * службу готовой и уходил с запросом к тому, кто занял порт (ревью Gs на
+ * #68). Один файл на запуск убирает саму возможность: маркер ищется только
+ * в журнале этого запуска.
+ */
+let launches = 0;
+
 function nodeCommand() {
   // Тот же приём, что в `foreman-local.sh`: системный Node 22, иначе разовый
   // nix shell. Профиль не меняем.
@@ -107,7 +118,8 @@ function nodeCommand() {
 }
 
 function startProcess(name, cwd, script, env, logDir, marker) {
-  const logFile = join(logDir, `${name}.log`);
+  launches += 1;
+  const logFile = join(logDir, `${launches}-${name}.log`);
   const out = openSync(logFile, "a");
   const prefix = nodeCommand();
   const command = prefix === "" ? "npm" : prefix.split(" ")[0];
