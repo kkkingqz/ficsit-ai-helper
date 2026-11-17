@@ -327,17 +327,31 @@ export function createChatController(options: ChatControllerOptions): ChatContro
    * Лента после рубежа принятия хода: история плюс свой вопрос, если мод
    * ещё не записал его сам.
    *
-   * Дочитанный ответ отменённого хода появляется только в истории, и она же
-   * источник истины для всего, что было до нового хода. Но записи истории не
-   * несут номера хода (вопрос Co2-69), связать запись с ходом не на чем, и
-   * свой вопрос отличается от записанного модом только текстом. Поэтому: мод
-   * успел записать вопрос — показываем его запись, не успел — свою. Удвоить
-   * вопрос игрока хуже, чем показать его из истории.
+   * Снимок истории — источник истины для всего, что было до нового хода:
+   * дочитанный ответ отменённого хода появляется только там. Но к моменту
+   * чтения мод мог записать уже и **весь новый ход**: вопрос он пишет при
+   * отправке, а ответ — как только модель ответила, и при быстром ответе
+   * оба оказываются в снимке. Прежде лента тогда получала вопрос дважды, а
+   * ответ приходил и из истории, и потоком (ревью Gs на #62).
+   *
+   * Поэтому смотрим хвост снимка: есть наш вопрос — своего не добавляем;
+   * есть ответ после него — не добавляем и пустое сообщение под поток,
+   * потому что ход уже закончен и дописывать в него нечего.
+   *
+   * Отличить запись мода от своей по-прежнему можно только по тексту:
+   * записи истории не несут номера хода, и два одинаковых вопроса подряд
+   * неразличимы. Это второе место, которое платит за отсутствие связи
+   * «запись → ход»; подтверждённый источник спрошен у Co (Co2-78), и с ним
+   * весь этот разбор сведётся к сравнению номеров.
    */
-  const feedAfterAccept = (ask: ChatMessage): ChatMessage[] => {
-    const last = messages[messages.length - 1];
-    const recorded = last !== undefined && last.role === "operator" && last.text === ask.text;
-    return recorded ? messages : [...messages, ask];
+  const feedAfterAccept = (ask: ChatMessage): { feed: ChatMessage[]; answered: boolean } => {
+    const tail = messages.slice(-2);
+    const asked = tail.findIndex((item) => item.role === "operator" && item.text === ask.text);
+    if (asked < 0) return { feed: [...messages, ask], answered: false };
+    return {
+      feed: messages,
+      answered: tail.slice(asked + 1).some((item) => item.role === "assistant"),
+    };
   };
 
   const send = async (text: string): Promise<void> => {
@@ -373,13 +387,15 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       turnId = sent.turnId;
       const at = now();
       const ask = message(`${sent.turnId}-ask`, "operator", trimmed, at);
-      messages = [
-        ...(wasStale ? feedAfterAccept(ask) : [...messages, ask]),
-        message(sent.turnId, "assistant", "", at),
-      ];
+      const base = wasStale ? feedAfterAccept(ask) : { feed: [...messages, ask], answered: false };
+      // Пустое сообщение под поток добавляем только если ответа ещё нет:
+      // иначе он показался бы дважды — из истории и событиями.
+      messages = base.answered
+        ? base.feed
+        : [...base.feed, message(sent.turnId, "assistant", "", at)];
       history = "ready";
       sending = false;
-      streaming = true;
+      streaming = !base.answered;
       // Куски, обогнавшие ответ на отправку, применяем сразу — иначе
       // сообщение осталось бы пустым, а поток незакрытым.
       flushBuffered();

@@ -330,6 +330,72 @@ describe("контроллер чата", () => {
       expect(texts.filter((text) => text === "следующий")).toHaveLength(1);
     });
 
+    it("быстрый ответ из истории не удваивается (ревью Gs на #62)", async () => {
+      const fake = createFakeApi();
+      const controller = await afterStop(fake);
+
+      // Мод записывает вопрос при отправке, а ответ — как только модель
+      // ответила. При быстром ответе снимок истории содержит весь новый ход,
+      // и прежде лента получала вопрос дважды, а ответ — из истории и
+      // потоком.
+      fake.onSend(() => {
+        fake.setHistory([
+          { id: "h-1", role: "user", text: "вопрос", createdAt: "2026-11-17T09:00:00.000Z" },
+          {
+            id: "h-2",
+            role: "assistant",
+            text: "дочитанный ответ",
+            createdAt: "2026-11-17T09:00:01.000Z",
+          },
+          { id: "h-3", role: "user", text: "второй", createdAt: "2026-11-17T09:00:02.000Z" },
+          {
+            id: "h-4",
+            role: "assistant",
+            text: "быстрый ответ",
+            createdAt: "2026-11-17T09:00:03.000Z",
+          },
+        ]);
+      });
+
+      controller.actions.send("второй");
+      await settle();
+
+      const texts = controller.getModel().messages.map((item) => item.text);
+      expect(texts.filter((text) => text === "второй")).toHaveLength(1);
+      expect(texts.filter((text) => text === "быстрый ответ")).toHaveLength(1);
+      // Пустого сообщения под поток нет: ход уже закончен, дописывать некуда.
+      expect(texts).not.toContain("");
+      expect(controller.getModel().streaming).toBe(false);
+    });
+
+    it("вопрос записан, а ответа ещё нет — поток ждём, вопрос не удваиваем", async () => {
+      const fake = createFakeApi();
+      const controller = await afterStop(fake);
+
+      fake.onSend(() => {
+        fake.setHistory([
+          { id: "h-1", role: "user", text: "вопрос", createdAt: "2026-11-17T09:00:00.000Z" },
+          {
+            id: "h-2",
+            role: "assistant",
+            text: "дочитанный ответ",
+            createdAt: "2026-11-17T09:00:01.000Z",
+          },
+          { id: "h-3", role: "user", text: "второй", createdAt: "2026-11-17T09:00:02.000Z" },
+        ]);
+      });
+
+      controller.actions.send("второй");
+      await settle();
+
+      const model = controller.getModel();
+      expect(model.messages.filter((item) => item.text === "второй")).toHaveLength(1);
+      expect(model.streaming).toBe(true);
+      // Пустое сообщение под поток есть — туда придут куски ответа.
+      fake.emit("chat.text", { turnId: "t-2", text: "кусок" });
+      expect(controller.getModel().messages.at(-1)?.text).toBe("кусок");
+    });
+
     it("два Enter подряд во время ожидания мода уходят одним ходом", async () => {
       const fake = createFakeApi();
       const controller = await afterStop(fake);
