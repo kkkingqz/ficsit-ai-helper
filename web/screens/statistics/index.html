@@ -8,13 +8,13 @@
   <link rel="stylesheet" href="../../ui-kit/ui-kit.css">
   <link rel="stylesheet" href="../../ui-kit/screens/screens.css">
   <script src="../../../third_party/uplot/uPlot.iife.min.js"></script>
-  <script type="importmap">
-  {
-    "imports": {
-      "@ficsitai/screens-api": "../api/dist/index.js"
-    }
-  }
-  </script>
+  <!--
+    Ни одного встроенного скрипта: страницы в игре отдаются с
+    `script-src 'self'` (ARCHITECTURE §6.3.1, §12 п. 11), и под эту политику
+    не проходит встроенная карта импорта (решение Co-128). Имя пакета фасада
+    развязано при сборке относительным путём (`scripts/relink.mjs`), карта
+    импорта больше не нужна.
+  -->
 </head>
 <body class="d2">
   <div id="ficsitai-statistics"></div>
