@@ -106,7 +106,7 @@ export function createChatController(options: ChatControllerOptions): ChatContro
    * нельзя: экран показал бы пустое сообщение и остался бы «в потоке»
    * навсегда (ревью Gs на #62, P2-3).
    */
-  const buffered: { turnId: string; apply: () => void }[] = [];
+  const buffered: { turnId: string; terminal: boolean; apply: () => void }[] = [];
 
   const unsubscribes: (() => void)[] = [];
   let view: ChatViewHandle | undefined = options.view;
@@ -235,13 +235,13 @@ export function createChatController(options: ChatControllerOptions): ChatContro
    * складываем до присвоения. Чужое — молча мимо: ход у сохранения один, и
    * событие с другим номером относится к уже закрытому ходу.
    */
-  const gate = (incomingTurn: string, apply: () => void): void => {
+  const gate = (incomingTurn: string, apply: () => void, terminal = false): void => {
     if (turnId !== null && incomingTurn === turnId) {
       apply();
       render();
       return;
     }
-    if (awaitingTurn) buffered.push({ turnId: incomingTurn, apply });
+    if (awaitingTurn) buffered.push({ turnId: incomingTurn, terminal, apply });
   };
 
   /** Применяет события, дождавшиеся номера хода, в порядке прихода. */
@@ -270,30 +270,42 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       gate(data.turnId, () => setTurnStatus(host.messageStatus.tool(data.name)));
     }));
     unsubscribes.push(api.on("chat.done", (data) => {
-      gate(data.turnId, () => {
-        if (data.model !== "") assistantModel = data.model;
-        setTurnStatus(undefined);
-        streaming = false;
-        turnId = null;
-      });
+      gate(
+        data.turnId,
+        () => {
+          if (data.model !== "") assistantModel = data.model;
+          setTurnStatus(undefined);
+          streaming = false;
+          turnId = null;
+        },
+        true,
+      );
     }));
     unsubscribes.push(api.on("chat.failed", (data) => {
-      gate(data.turnId, () => {
-        setTurnStatus(host.messageStatus.failed);
-        streaming = false;
-        turnId = null;
-        fail(new ApiError({ code: data.code, message: data.message }));
-      });
+      gate(
+        data.turnId,
+        () => {
+          setTurnStatus(host.messageStatus.failed);
+          streaming = false;
+          turnId = null;
+          fail(new ApiError({ code: data.code, message: data.message }));
+        },
+        true,
+      );
     }));
     unsubscribes.push(api.on("chat.cancelled", (data) => {
-      gate(data.turnId, () => {
-        setTurnStatus(host.messageStatus.stopped);
-        streaming = false;
-        turnId = null;
-        // Ход продолжается у Foreman, и его ответ ляжет в историю. Пометить
-        // историю устаревшей — единственный способ не соврать игроку позже.
-        historyStale = true;
-      });
+      gate(
+        data.turnId,
+        () => {
+          setTurnStatus(host.messageStatus.stopped);
+          streaming = false;
+          turnId = null;
+          // Ход продолжается у Foreman, и его ответ ляжет в историю. Пометить
+          // историю устаревшей — единственный способ не соврать игроку позже.
+          historyStale = true;
+        },
+        true,
+      );
     }));
 
     await loadHistory();
@@ -334,25 +346,40 @@ export function createChatController(options: ChatControllerOptions): ChatContro
    * оба оказываются в снимке. Прежде лента тогда получала вопрос дважды, а
    * ответ приходил и из истории, и потоком (ревью Gs на #62).
    *
-   * Поэтому смотрим хвост снимка: есть наш вопрос — своего не добавляем;
-   * есть ответ после него — не добавляем и пустое сообщение под поток,
-   * потому что ход уже закончен и дописывать в него нечего.
+   * Поэтому смотрим хвост снимка: есть наш вопрос — своего не добавляем.
+   * **И только это.** Прежде я выводил из того же хвоста, что ход уже
+   * закончен (вопрос, а за ним ответ), и это было ошибкой: после Stop на A
+   * тот же текст, отправленный заново, совпадает с вопросом A, а ответ за
+   * ним — дочитанный ответ A, а не нового хода. Экран снимал поток и терял
+   * новый ответ целиком (ревью Gs на #62). Совпадение текста не
+   * подтверждает завершение хода, и в неоднозначном случае мы продолжаем
+   * слушать события — их принадлежность ходу известна точно, по номеру.
    *
    * Отличить запись мода от своей по-прежнему можно только по тексту:
-   * записи истории не несут номера хода, и два одинаковых вопроса подряд
-   * неразличимы. Это второе место, которое платит за отсутствие связи
-   * «запись → ход»; подтверждённый источник спрошен у Co (Co2-78), и с ним
-   * весь этот разбор сведётся к сравнению номеров.
+   * записи истории не несут номера хода (Co-133 это и подтвердил —
+   * заполнять его нечем, сравнение текста для истории согласовано). Два
+   * одинаковых вопроса подряд в ленте неразличимы, и это видно игроку как
+   * один вопрос вместо двух — цена, которую Co принял.
    */
-  const feedAfterAccept = (ask: ChatMessage): { feed: ChatMessage[]; answered: boolean } => {
-    const tail = messages.slice(-2);
-    const asked = tail.findIndex((item) => item.role === "operator" && item.text === ask.text);
-    if (asked < 0) return { feed: [...messages, ask], answered: false };
-    return {
-      feed: messages,
-      answered: tail.slice(asked + 1).some((item) => item.role === "assistant"),
-    };
+  const feedAfterAccept = (ask: ChatMessage): ChatMessage[] => {
+    // Хвост из двух записей, а не одна: мод мог успеть записать и вопрос, и
+    // ответ, и тогда вопрос уже не последний.
+    const recorded = messages
+      .slice(-2)
+      .some((item) => item.role === "operator" && item.text === ask.text);
+    return recorded ? messages : [...messages, ask];
   };
+
+  /**
+   * Закончился ли ход ещё до того, как мы узнали его номер.
+   *
+   * Признак точный, без догадок по тексту: терминальное событие (`chat.done`,
+   * `chat.failed`, `chat.cancelled`) с этим номером уже лежит в буфере ранних
+   * событий. Тогда пустое сообщение под поток не нужно — ответ уже в
+   * перечитанной истории, и дописывать в него нечего.
+   */
+  const finishedBeforeStart = (id: string): boolean =>
+    buffered.some((item) => item.turnId === id && item.terminal);
 
   const send = async (text: string): Promise<void> => {
     const trimmed = text.trim();
@@ -387,15 +414,16 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       turnId = sent.turnId;
       const at = now();
       const ask = message(`${sent.turnId}-ask`, "operator", trimmed, at);
-      const base = wasStale ? feedAfterAccept(ask) : { feed: [...messages, ask], answered: false };
-      // Пустое сообщение под поток добавляем только если ответа ещё нет:
-      // иначе он показался бы дважды — из истории и событиями.
-      messages = base.answered
-        ? base.feed
-        : [...base.feed, message(sent.turnId, "assistant", "", at)];
+      const feed = wasStale ? feedAfterAccept(ask) : [...messages, ask];
+      // Пустое сообщение под поток не нужно только в одном случае: ход
+      // закончился раньше, чем мы узнали его номер, и его ответ уже пришёл
+      // в перечитанной истории. Признак — терминальное событие в буфере, а
+      // не похожий текст в хвосте (ревью Gs на #62).
+      const finished = wasStale && finishedBeforeStart(sent.turnId);
+      messages = finished ? feed : [...feed, message(sent.turnId, "assistant", "", at)];
       history = "ready";
       sending = false;
-      streaming = !base.answered;
+      streaming = !finished;
       // Куски, обогнавшие ответ на отправку, применяем сразу — иначе
       // сообщение осталось бы пустым, а поток незакрытым.
       flushBuffered();

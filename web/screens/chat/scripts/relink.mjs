@@ -13,8 +13,12 @@
 
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const DIST = new URL("../dist/", import.meta.url).pathname;
+// Через `fileURLToPath`, а не `.pathname`: в файловом URL путь
+// процентно-закодирован, и в каталоге с пробелом шаг искал
+// `tree%20with%20spaces/.../dist/` и падал с ENOENT (ревью Gs на #62).
+const DIST = fileURLToPath(new URL("../dist/", import.meta.url));
 const PACKAGE = "@ficsitai/screens-api";
 const RELATIVE = "../../api/dist/index.js";
 

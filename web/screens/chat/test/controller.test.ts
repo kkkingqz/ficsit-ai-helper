@@ -330,14 +330,13 @@ describe("контроллер чата", () => {
       expect(texts.filter((text) => text === "следующий")).toHaveLength(1);
     });
 
-    it("быстрый ответ из истории не удваивается (ревью Gs на #62)", async () => {
+    it("ход закончился раньше своего номера — ответ показан один раз", async () => {
       const fake = createFakeApi();
       const controller = await afterStop(fake);
 
-      // Мод записывает вопрос при отправке, а ответ — как только модель
-      // ответила. При быстром ответе снимок истории содержит весь новый ход,
-      // и прежде лента получала вопрос дважды, а ответ — из истории и
-      // потоком.
+      // Признак того, что ход уже закончен, — терминальное событие с его
+      // номером, пришедшее раньше ответа на отправку. Текст в хвосте
+      // истории таким признаком не является (ревью Gs на #62).
       fake.onSend(() => {
         fake.setHistory([
           { id: "h-1", role: "user", text: "вопрос", createdAt: "2026-11-17T09:00:00.000Z" },
@@ -357,14 +356,53 @@ describe("контроллер чата", () => {
         ]);
       });
 
+      const release = fake.holdSend();
       controller.actions.send("второй");
+      await settle();
+      fake.emit("chat.text", { turnId: "t-2", text: "быстрый ответ" });
+      fake.emit("chat.done", { turnId: "t-2", model: "demo-echo", latencyMs: 9 });
+      release();
       await settle();
 
       const texts = controller.getModel().messages.map((item) => item.text);
       expect(texts.filter((text) => text === "второй")).toHaveLength(1);
       expect(texts.filter((text) => text === "быстрый ответ")).toHaveLength(1);
-      // Пустого сообщения под поток нет: ход уже закончен, дописывать некуда.
+      // Пустого сообщения под поток нет: дописывать в него нечего.
       expect(texts).not.toContain("");
+      expect(controller.getModel().streaming).toBe(false);
+    });
+
+    it("повтор того же вопроса после Stop не теряет новый ответ", async () => {
+      // Проба Gs: после Stop на A отправлен тот же текст. В истории — только
+      // A и его дочитанный ответ, и совпадение текста прежде убеждало экран,
+      // что новый ход уже закончен: поток снимался, события нового хода шли
+      // в никуда, в ленте оставался старый ответ.
+      const fake = createFakeApi();
+      const controller = await afterStop(fake);
+
+      fake.onSend(() => {
+        fake.setHistory([
+          { id: "h-1", role: "user", text: "вопрос", createdAt: "2026-11-17T09:00:00.000Z" },
+          {
+            id: "h-2",
+            role: "assistant",
+            text: "дочитанный ответ A",
+            createdAt: "2026-11-17T09:00:01.000Z",
+          },
+        ]);
+      });
+
+      controller.actions.send("вопрос");
+      await settle();
+      expect(controller.getModel().streaming).toBe(true);
+
+      fake.emit("chat.text", { turnId: "t-2", text: "новый ответ" });
+      fake.emit("chat.done", { turnId: "t-2", model: "demo-echo", latencyMs: 11 });
+
+      const texts = controller.getModel().messages.map((item) => item.text);
+      // Новый ответ на месте, и дочитанный ответ A не потерян.
+      expect(texts).toContain("новый ответ");
+      expect(texts).toContain("дочитанный ответ A");
       expect(controller.getModel().streaming).toBe(false);
     });
 
