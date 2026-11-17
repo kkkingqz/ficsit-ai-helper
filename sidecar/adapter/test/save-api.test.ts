@@ -178,9 +178,27 @@ describe("чтения API v0 по сохранению", () => {
     // должен это видеть, а не ждать с пустым полем ввода.
     expect(await response.json()).toEqual({
       re: "a-1",
-      body: { ...status, assistantState: "unavailable" },
+      // Причина обязательна: контракт отводит `reason` именно под неё, и
+      // пустое поле оставляло экран без объяснения (ревью Gs на #66).
+      body: {
+        ...status,
+        assistantState: "unavailable",
+        reason: "чата у источника Save нет: это снимок сохранения, а не живая игра",
+      },
     });
     expect(calls).toEqual(["getStatus"]);
+  });
+
+  it("причину источника своей не затираем", async () => {
+    const { url } = await serve({
+      getStatus: () => ({ ...status, reason: "Save source requires saveFilePath" }),
+    });
+
+    const body = (await (await post(url, { id: "a-15", op: "getStatus", args: {} })).json()) as {
+      body: { reason: string; assistantState: string };
+    };
+    expect(body.body.reason).toBe("Save source requires saveFilePath");
+    expect(body.body.assistantState).toBe("unavailable");
   });
 
   it("остальные чтения проходят как есть, без наших полей", async () => {

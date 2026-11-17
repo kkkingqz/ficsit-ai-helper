@@ -37,6 +37,17 @@ const READS = new Set(["getStatus", "listMetrics", "listScopes", "queryMetric", 
 const KEEPALIVE_MS = 15_000;
 
 /**
+ * Причина в статусе, когда ассистента нет.
+ *
+ * Контракт отводит `reason` именно под причину недоступности («Unavailable —
+ * нет сайдкара или Foreman не отвечает, причина в Reason»), и пустым его
+ * оставлять нельзя: экран показывал бы «ассистент недоступен» и молчал о
+ * том, почему (ревью Gs на #66 — та же правка в обёртке dev-сервера,
+ * расходиться им нельзя).
+ */
+const NO_ASSISTANT = "чата у источника Save нет: это снимок сохранения, а не живая игра";
+
+/**
  * Имя пакета библиотеки — строкой, и это важно.
  *
  * Импорт **динамический и по переменной**: `tsc` не разрешает нелитеральный
@@ -343,7 +354,17 @@ export async function createSaveApi(deps: SaveApiDeps): Promise<SaveApi> {
         // ввода. Та же правка в обёртке dev-сервера — расходиться им нельзя.
         const body =
           call.op === "getStatus" && answer !== null && typeof answer === "object"
-            ? { ...(answer as Record<string, unknown>), assistantState: "unavailable" }
+            ? {
+                ...(answer as Record<string, unknown>),
+                assistantState: "unavailable",
+                // Причину источника, если он её назвал, не затираем: его
+                // важнее нашей.
+                reason:
+                  (answer as { reason?: unknown }).reason === "" ||
+                  (answer as { reason?: unknown }).reason === undefined
+                    ? NO_ASSISTANT
+                    : (answer as { reason?: unknown }).reason,
+              }
             : answer;
         if (body === undefined || body === null) {
           res.json({
