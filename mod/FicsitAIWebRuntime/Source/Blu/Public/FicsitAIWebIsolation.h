@@ -12,6 +12,13 @@ namespace FicsitAIWeb
 	BLU_API void SetWebRoot(const FString& AbsoluteDir);
 	BLU_API FString GetWebRoot();
 
+	/**
+	 * CEF поднялся (CefInitialize прошёл). false — браузеры создаваться не будут: экраны на вебе не регистрируются,
+	 * хост остаётся на модулях без браузера (ревью #69, P2). Ставит модуль Blu при запуске.
+	 */
+	BLU_API bool IsCefReady();
+	void MarkCefReady();
+
 	/** Адрес источника страниц без завершающей косой черты. */
 	BLU_API const TCHAR* Origin();
 

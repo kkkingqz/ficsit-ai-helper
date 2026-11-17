@@ -93,6 +93,7 @@ class FBlu : public IBlu
 			return;
 		}
 
+		FicsitAIWeb::MarkCefReady();
 		UE_LOG(LogBlu, Log, TEXT(" STATUS: Loaded CEF %d.%d.%d (chromium %d.%d.%d.%d)"),
 			cef_version_info(0), cef_version_info(1), cef_version_info(2),
 			cef_version_info(4), cef_version_info(5), cef_version_info(6), cef_version_info(7));

@@ -23,7 +23,8 @@ class UBluEye;
  * и не даёт ему фокус.
  *
  * Клавиши хоста (HostKeys): странице не передаются ни нажатие, ни символ, событие всплывает к владельцу.
- * Экран терминала оставляет себе Esc — им управляет хост через HandleBackAction (S8 3.4).
+ * Экран терминала оставляет себе Esc и клавиши действия «Назад» — ими управляет хост через HandleBackAction
+ * (S8 3.4). Набор меняется на ходу (SetHostKeys): игрок может переназначить «Назад» при открытом экране.
  */
 class BLU_API SFicsitAIWebView : public SLeafWidget
 {
@@ -44,6 +45,10 @@ public:
 	void ReleaseAll();
 
 	void SetFollowPixelSize(bool bFollow) { bFollowPixelSize = bFollow; PendingSize = FIntPoint::ZeroValue; }
+
+	/** Заменить клавиши хоста. Нажатые в странице клавиши, ставшие клавишами хоста, отпускаются. */
+	void SetHostKeys(const TArray<FKey>& InKeys);
+	const TArray<FKey>& GetHostKeys() const { return HostKeys; }
 	bool IsFollowingPixelSize() const { return bFollowPixelSize; }
 
 	/** Пиксель страницы для точки экрана; false — точка вне виджета. Для проверок и отладки. */
@@ -81,9 +86,11 @@ private:
 	FIntPoint PendingSize = FIntPoint::ZeroValue;
 	double PendingSince = 0.0;
 	TArray<FKey> HostKeys;
-	bool bHostEscape = false;
+	/** Символы, которые клавиши хоста присылают отдельным событием OnKeyChar (Esc — 0x1B, Backspace — 0x08). */
+	TSet<TCHAR> HostChars;
 
 	bool IsHostKey(const FKeyEvent& Event) const { return HostKeys.Contains(Event.GetKey()); }
+	bool IsHostChar(TCHAR Ch) const { return HostChars.Contains(FChar::ToLower(Ch)); }
 
 	FReply SendButton(const FGeometry& Geometry, const FPointerEvent& Event, bool bUp, int32 ClickCount);
 	FIntPoint PageSize() const;
