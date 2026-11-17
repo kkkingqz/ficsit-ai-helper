@@ -26,7 +26,11 @@ class FFicsitAIWebBridge;
  * отменить (поток чата), заранее заявляет это запросом моста `screen.back.capture`, и тогда модуль отдаёт ей
  * событие `screen.back` вместо закрытия экрана.
  *
- * Без браузера (сервер, платформа без FicsitAIWebRuntime) модуль показывает надпись и не падает.
+ * Клавиши «Назад» хоста (Context.BackKeys) странице не передаются, поэтому переназначенное действие тоже доходит
+ * до хоста.
+ *
+ * Без браузера (сервер, платформа без FicsitAIWebRuntime, CEF не поднялся или отказал в браузере) модуль
+ * показывает надпись и не падает. Фабрика регистрирует веб-экран, только если IsWebAvailable и IsPageReady.
  */
 UCLASS()
 class FICSITAIUI_API UFicsitAIWebScreenModule : public UUserWidget, public IFicsitAIScreenModule
@@ -53,8 +57,17 @@ public:
     int64 GetWorldNotifies() const { return WorldNotifies; }
     /** Страница заявила, что сама обработает Esc. */
     bool IsBackCaptured() const { return bBackCaptured; }
-    /** Есть ли в сборке браузер. false — сервер или платформа без FicsitAIWebRuntime. */
+    /** Браузер этого модуля не создался: CEF отказал (для проверок и надписи на экране). */
+    bool HasBrowserFailed() const { return bBrowserFailed; }
+    /** Есть ли браузер: клиент Win64 с FicsitAIWebRuntime и поднятым CEF. false — сервер, Linux-редактор, отказ CEF. */
     static bool IsWebAvailable();
+    /**
+     * Страница запустится в игре: файл есть в каталоге страниц, у неё нет встроенных скриптов (CSP страниц —
+     * `script-src 'self'`, встроенный скрипт и import map он не выполнит), и каждый скрипт по `src` лежит рядом.
+     * Модули, которые загружают эти скрипты, не проверяются. Результат запоминается на процесс: каталог страниц
+     * в игре не меняется. OutReason — почему нет. Только GameThread.
+     */
+    static bool IsPageReady(const FString& PagePath, FString* OutReason = nullptr);
 
     // IFicsitAIScreenModule
     virtual FName GetModuleId() const override { return ModuleId; }
@@ -96,11 +109,13 @@ private:
     bool bAttached = false;
     bool bBackCaptured = false;
     bool bFocusPending = false;
+    bool bBrowserFailed = false;
 
     void CreateBrowser();
     void DestroyBrowser();
     void ApplyContext();
     void RebuildContent();
     void SetWorldWatch(bool bEnabled);
+    TArray<FKey> HostKeys() const;
     bool TickWorld(float DeltaTime);
 };

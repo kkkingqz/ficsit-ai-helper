@@ -3,6 +3,7 @@
 #include "Framework/Application/SlateApplication.h"
 #include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
+#include "Internationalization/Regex.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
@@ -50,14 +51,98 @@ namespace
                 *Dir, *FicsitAIWeb::GetWebRoot());
         }
     }
+
+    /** Проверка страницы без кэша; см. IsPageReady. */
+    bool CheckPage(const FString& PagePath, FString& OutReason)
+    {
+        TArray<uint8> Bytes;
+        const int32 Status = FicsitAIWeb::ReadPageFile(PagePath, Bytes);
+        if (Status != 200)
+        {
+            OutReason = FString::Printf(TEXT("страница %s: %d"), *PagePath, Status);
+            return false;
+        }
+        const FUTF8ToTCHAR Conv(reinterpret_cast<const ANSICHAR*>(Bytes.GetData()), Bytes.Num());
+        const FString Html(Conv.Length(), Conv.Get());
+        const FString PageDir = FPaths::GetPath(PagePath);
+
+        const FRegexPattern TagPattern(TEXT("<script\\b([^>]*)>"), ERegexPatternFlags::CaseInsensitive);
+        const FRegexPattern SrcPattern(TEXT("\\bsrc\\s*=\\s*[\"']([^\"']*)[\"']"), ERegexPatternFlags::CaseInsensitive);
+        FRegexMatcher Tags(TagPattern, Html);
+        while (Tags.FindNext())
+        {
+            const FString Attrs = Tags.GetCaptureGroup(1);
+            FRegexMatcher Src(SrcPattern, Attrs);
+            if (!Src.FindNext())
+            {
+                OutReason = FString::Printf(TEXT("страница %s: встроенный скрипт <script%s>, CSP страниц его не выполнит"), *PagePath, *Attrs);
+                return false;
+            }
+            FString Ref = Src.GetCaptureGroup(1);
+            int32 Cut = INDEX_NONE;
+            if (Ref.FindChar(TEXT('?'), Cut) || Ref.FindChar(TEXT('#'), Cut))
+            {
+                Ref.LeftInline(Cut);
+            }
+            if (Ref.IsEmpty() || Ref.Contains(TEXT(":")) || Ref.StartsWith(TEXT("//")))
+            {
+                OutReason = FString::Printf(TEXT("страница %s: скрипт не из каталога страниц: %s"), *PagePath, *Ref);
+                return false;
+            }
+            FString Path = Ref.StartsWith(TEXT("/")) ? Ref : PageDir / Ref;
+            while (Path.ReplaceInline(TEXT("/./"), TEXT("/")) > 0) {}
+            FPaths::CollapseRelativeDirectories(Path);
+            TArray<uint8> Script;
+            const int32 ScriptStatus = FicsitAIWeb::ReadPageFile(Path, Script);
+            if (ScriptStatus != 200)
+            {
+                OutReason = FString::Printf(TEXT("страница %s: скрипт %s: %d"), *PagePath, *Path, ScriptStatus);
+                return false;
+            }
+        }
+        return true;
+    }
 #endif
 }
 
 bool UFicsitAIWebScreenModule::IsWebAvailable()
 {
 #if WITH_FICSITAI_WEB
-    return !IsRunningDedicatedServer() && FSlateApplication::IsInitialized();
+    return !IsRunningDedicatedServer() && FSlateApplication::IsInitialized() && FicsitAIWeb::IsCefReady();
 #else
+    return false;
+#endif
+}
+
+bool UFicsitAIWebScreenModule::IsPageReady(const FString& PagePath, FString* OutReason)
+{
+#if WITH_FICSITAI_WEB
+    check(IsInGameThread());
+    static TMap<FString, FString> Checked; // путь → причина; пустая причина — страница готова
+    if (const FString* Known = Checked.Find(PagePath))
+    {
+        if (OutReason) { *OutReason = *Known; }
+        return Known->IsEmpty();
+    }
+    EnsureModWebRoot();
+    FString Reason;
+    if (!CheckPage(PagePath, Reason) && Reason.IsEmpty())
+    {
+        Reason = TEXT("страница не прошла проверку");
+    }
+    Checked.Add(PagePath, Reason);
+    if (Reason.IsEmpty())
+    {
+        UE_LOG(LogFicsitAIWebScreen, Log, TEXT("Страница готова: %s"), *PagePath);
+    }
+    else
+    {
+        UE_LOG(LogFicsitAIWebScreen, Warning, TEXT("Экран не регистрируется: %s"), *Reason);
+    }
+    if (OutReason) { *OutReason = Reason; }
+    return Reason.IsEmpty();
+#else
+    if (OutReason) { *OutReason = TEXT("в сборке нет браузера"); }
     return false;
 #endif
 }
@@ -149,6 +234,7 @@ void UFicsitAIWebScreenModule::CreateBrowser()
         ? CurrentContext.SizePx
         : (CurrentContext.bWorldSurface ? DefaultWorldSize : FIntPoint(FMath::Max(CurrentContext.SizePx.X, 16), FMath::Max(CurrentContext.SizePx.Y, 16)));
 
+    bBrowserFailed = false;
     UBluEye* E = NewObject<UBluEye>(this);
     E->SetProperties(Size.X, Size.Y, false, true, false, GetPageUrl(), FName(TEXT("BluTexture")), nullptr);
     E->Settings.FrameRate = CurrentContext.bWorldSurface ? WorldFrameRate : InteractiveFrameRate;
@@ -156,6 +242,16 @@ void UFicsitAIWebScreenModule::CreateBrowser()
     E->Settings.bAutoPlayEnabled = false;
     const double T0 = FPlatformTime::Seconds();
     E->Init();
+    if (!E->GetBrowserHost())
+    {
+        // CEF отказал в браузере (Init пишет причину в LogBlu). Пустой вид не выдаём за готовую страницу.
+        UE_LOG(LogFicsitAIWebScreen, Warning, TEXT("%s: браузер не создан, экран показывает отказ"), *ModuleId.ToString());
+        E->CloseBrowser();
+        E->MarkAsGarbage();
+        bBrowserFailed = true;
+        RebuildContent();
+        return;
+    }
     Eye = E;
     LastSeenUploads = 0;
     UE_LOG(LogFicsitAIWebScreen, Log, TEXT("%s: браузер %dx%d, %s, %.1f мс"),
@@ -224,6 +320,7 @@ void UFicsitAIWebScreenModule::ApplyContext()
         if (View.IsValid())
         {
             const TSharedPtr<SFicsitAIWebView> WebView = StaticCastSharedPtr<SFicsitAIWebView>(View);
+            WebView->SetHostKeys(HostKeys());
             // На интерактивном экране страница идёт за пикселями окна; в мире — ровно в размер области модуля.
             WebView->SetFollowPixelSize(!bWorld);
             if (bWorld)
@@ -289,6 +386,20 @@ bool UFicsitAIWebScreenModule::TickWorld(float DeltaTime)
     return true;
 }
 
+TArray<FKey> UFicsitAIWebScreenModule::HostKeys() const
+{
+    // Esc всегда за хостом (screen-host-and-module, п. 3), даже если хост не сообщил привязок.
+    TArray<FKey> Keys = { EKeys::Escape };
+    for (const FKey& Key : CurrentContext.BackKeys)
+    {
+        if (Key.IsValid())
+        {
+            Keys.AddUnique(Key);
+        }
+    }
+    return Keys;
+}
+
 TSharedRef<SWidget> UFicsitAIWebScreenModule::RebuildWidget()
 {
     SAssignNew(RootBox, SBox);
@@ -310,7 +421,7 @@ void UFicsitAIWebScreenModule::RebuildContent()
             View = SNew(SFicsitAIWebView)
                 .Eye(E)
                 .FollowPixelSize(!CurrentContext.bWorldSurface)
-                .HostKeys({ EKeys::Escape });
+                .HostKeys(HostKeys());
         }
         RootBox->SetContent(View.ToSharedRef());
         return;
@@ -319,7 +430,9 @@ void UFicsitAIWebScreenModule::RebuildContent()
     View.Reset();
     RootBox->SetContent(
         SNew(STextBlock)
-        .Text(IsWebAvailable()
+        .Text(bBrowserFailed
+            ? NSLOCTEXT("FicsitAI", "WebScreenBrowserFailed", "Встроенный браузер не запустился")
+            : IsWebAvailable()
             ? NSLOCTEXT("FicsitAI", "WebScreenNoBrowser", "Экран не открыт")
             : NSLOCTEXT("FicsitAI", "WebScreenUnavailable", "Встроенный браузер недоступен"))
         .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f)));
