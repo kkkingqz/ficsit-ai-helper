@@ -199,7 +199,59 @@ bool TryReadCatalog(UWorld* World, FSnapshot& OutSnapshot)
     }
 
     ReadDescriptors(*Registry, *RecipeManager, Snapshot);
+    Snapshot.CatalogRevision = ComputeCatalogRevision(Snapshot);
     OutSnapshot = MoveTemp(Snapshot);
+    return true;
+}
+
+bool TryRefreshCatalogUnlocks(UWorld* World, FSnapshot& Snapshot)
+{
+    if (!IsInGameThread() || !IsValid(World) || !World->IsGameWorld() || !World->HasBegunPlay())
+    {
+        return false;
+    }
+
+    const AFGRecipeManager* RecipeManager = AFGRecipeManager::Get(World);
+    if (!RecipeManager)
+    {
+        return false;
+    }
+
+    // Classes in the snapshot were already loaded by the registry. The refresh never loads assets.
+    const auto ReadClass = [](const FClassId& Id) { return FindObject<UClass>(nullptr, *Id.ClassPath); };
+    bool bChanged = false;
+    const auto Update = [&bChanged](bool& Previous, bool bAvailable)
+    {
+        bChanged |= Previous != bAvailable;
+        Previous = bAvailable;
+    };
+    for (FRecipe& Recipe : Snapshot.Recipes)
+    {
+        const TSubclassOf<UFGRecipe> Class = ReadClass(Recipe.Id);
+        Update(Recipe.bUnlocked, Class && RecipeManager->IsRecipeAvailable(Class));
+    }
+    for (FItem& Item : Snapshot.Items)
+    {
+        const TSubclassOf<UFGItemDescriptor> Class = ReadClass(Item.Id);
+        Update(Item.bUnlocked, Class && RecipeManager->IsItemDescriptorAvailable(Class));
+    }
+    for (FBuilding& Building : Snapshot.Buildings)
+    {
+        const TSubclassOf<AFGBuildable> Class = ReadClass(Building.Id);
+        Update(Building.bBuildable, Class && RecipeManager->IsBuildingAvailable(Class));
+    }
+
+    if (const AFGGameState* GameState = World->GetGameState<AFGGameState>())
+    {
+        const float Multiplier = GameState->GetPartsCostMultiplier();
+        bChanged |= !Snapshot.PartsCostMultiplier.IsSet() || Snapshot.PartsCostMultiplier.GetValue() != Multiplier;
+        Snapshot.PartsCostMultiplier = Multiplier;
+    }
+
+    if (bChanged)
+    {
+        Snapshot.CatalogRevision = ComputeCatalogRevision(Snapshot);
+    }
     return true;
 }
 }
