@@ -251,11 +251,20 @@ FFicsitAIApiClient::TResult<FFicsitAISeries> FFicsitAIApiClient::QuerySeries(con
 
 FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args)
 {
+    return Dispatch(Op, Args, [] { return TOptional<FFicsitAIApiError>(); });
+}
+
+FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args, FArgsCheck Check)
+{
     // Сначала допуск, потом аргументы: иначе ошибочные запросы шли бы мимо лимита и инертного режима (Gs-109, п. 2).
     const EOp Kind = ParseOp(Op);
     if (TOptional<FFicsitAIApiError> Denied = Admit(Kind, Op))
     {
         return MakeError(Denied.GetValue());
+    }
+    if (TOptional<FFicsitAIApiError> Bad = Check())
+    {
+        return MakeError(Bad.GetValue());
     }
     const TSharedPtr<FFicsitAIApiCore> Api = Core.Pin();
 

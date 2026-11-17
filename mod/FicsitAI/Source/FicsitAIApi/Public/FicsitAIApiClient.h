@@ -45,6 +45,13 @@ public:
      *  Допуск тот же, что у типизированных запросов, и до разбора аргументов: ошибочный запрос тоже тратит токен. */
     TResult<TSharedRef<FJsonObject>> Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args);
 
+    /** Проверка аргументов перед выполнением: Validator операции. Пустой результат — аргументы в порядке. */
+    using FArgsCheck = TFunctionRef<TOptional<FFicsitAIApiError>()>;
+
+    /** То же с проверкой аргументов после допуска и до разбора (OperationRegistry, V-3): отказ схемы тратит токен,
+     *  как любой ошибочный запрос, и в инертном режиме уступает MOD_INERT. */
+    TResult<TSharedRef<FJsonObject>> Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args, FArgsCheck Check);
+
     /** Запросы API v0. Unknown — имени нет в контракте. */
     enum class EOp : uint8 { Unknown, GetStatus, ListMetrics, ListScopes, QueryMetric, QuerySeries, ChatSend, ChatCancel, ChatHistory };
     static EOp ParseOp(const FString& Op);
