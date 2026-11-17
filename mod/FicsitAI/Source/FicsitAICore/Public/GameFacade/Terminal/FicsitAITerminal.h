@@ -159,6 +159,8 @@ public:
     bool IsWorldScreenDirty() const { return bWorldScreenDirty; }
     /** Модуль экрана в мире снят по расстоянию, экран показывает последний кадр (для проверок). */
     bool IsWorldModuleParked() const { return bWorldModuleParked; }
+    /** Клавиши «Назад», которые терминал передаёт модулю (для проверок). */
+    const TArray<FKey>& GetHostBackKeys() const { return HostBackKeys; }
 
     uint64 GetWorldScreenRenderRevision() const { return WorldScreenRenderRevision; }
     uint64 GetWorldScreenDrawCount() const { return WorldScreenDrawCount; }
@@ -233,7 +235,8 @@ protected:
      * Живой модуль на экране в мире — только у ближнего терминала (§6.3.1, условие 4; ревью #69, P2). Дальше
      * ParkDistance модуль снимается (OnDetach, у веб-модуля закрывается браузер), а render target хранит последний
      * кадр: экран показывает кэшированную картинку. Ближе WakeDistance модуль возвращается. Разрыв между
-     * расстояниями не даёт модулю мигать на границе. Проверка — раз в ProximityCheckInterval секунд.
+     * расстояниями не даёт модулю мигать на границе. Проверка — таймером мира раз в ProximityCheckInterval
+     * секунд, а не из Tick: у далёкой постройки игра выключает Tick по значимости, и проверка бы не сработала.
      */
     UPROPERTY(EditDefaultsOnly, Category = "Screen")
     float LiveScreenParkDistance = 3000.0f;
@@ -242,7 +245,7 @@ protected:
     float LiveScreenWakeDistance = 2500.0f;
 
     static constexpr float ProximityCheckInterval = 0.5f;
-    float ProximityCheckCountdown = 0.0f;
+    FTimerHandle ProximityTimer;
 
     /** Модуль снят по расстоянию: ActiveModuleId сохранён, экземпляра на поверхности нет. */
     bool bWorldModuleParked = false;
@@ -253,7 +256,7 @@ protected:
     void InitializeWorldScreen();
     void UpdateWorldScreenMaterialParameters();
     void TeardownActiveModule();
-    void UpdateWorldModuleProximity(float DeltaSeconds);
+    void UpdateWorldModuleProximity();
     void ParkWorldModule();
     bool UnparkWorldModule();
     void RefreshBackKeys(class UEnhancedInputLocalPlayerSubsystem* Subsystem);

@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "EnhancedInputSubsystems.h"
 #include "UObject/ConstructorHelpers.h"
+#include "TimerManager.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Engine/Texture.h"
@@ -129,6 +130,7 @@ AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 
 void AFicsitAITerminal::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+    GetWorldTimerManager().ClearTimer(ProximityTimer);
     CloseInteractiveScreen();
     CloseActiveModule();
 
@@ -240,6 +242,13 @@ void AFicsitAITerminal::BeginPlay()
     Super::BeginPlay();
     InitializeHost();
 
+    // Таймер мира, а не Tick: Tick далёкой постройки игра выключает по значимости (ревью #69, P2).
+    if (!IsRunningDedicatedServer())
+    {
+        GetWorldTimerManager().SetTimer(ProximityTimer, FTimerDelegate::CreateUObject(this, &AFicsitAITerminal::UpdateWorldModuleProximity),
+            ProximityCheckInterval, true);
+    }
+
     if (HasAuthority())
     {
         UpdateHostState();
@@ -273,19 +282,11 @@ void AFicsitAITerminal::Tick(float DeltaSeconds)
         }
     }
 
-    UpdateWorldModuleProximity(DeltaSeconds);
     RenderWorldScreenIfDirty();
 }
 
-void AFicsitAITerminal::UpdateWorldModuleProximity(float DeltaSeconds)
+void AFicsitAITerminal::UpdateWorldModuleProximity()
 {
-    ProximityCheckCountdown -= DeltaSeconds;
-    if (ProximityCheckCountdown > 0.0f)
-    {
-        return;
-    }
-    ProximityCheckCountdown = ProximityCheckInterval;
-
     if (IsInteractiveScreenOpen() || HostContext.HostState != EFicsitAIHostState::Ready || (!ActiveModuleInstance && !bWorldModuleParked))
     {
         return;
