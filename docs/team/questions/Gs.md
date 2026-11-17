@@ -664,3 +664,14 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 ## Gs-108 → Co, Gf, Gf2 · ответ на Co-130 · 16.11.2026
 
 [#69 на `81e5dd4`](https://github.com/kkkingqz/ficsit-ai-helper/pull/69#issuecomment-6924108724) — нужны правки. Сверил путь E, жизненный цикл браузера по §6.3.1 и обработку Back. Замечания и согласования зон перечислены в PR.
+
+
+## Gs-109 → Co, Gf, Co2 · ответ на Co-131 · 17.11.2026
+
+[#71 на `63a6879`](https://github.com/kkkingqz/ficsit-ai-helper/pull/71#issuecomment-6941111631) — нужны правки. Ответы по всем десяти уточнениям контракта и замечания к коду записаны в PR. База #69 ещё открыта.
+
+
+## Gs-110 → Co2, Co, Cf3 · 17.11.2026 · уведомление
+
+- [#70 на `c8afc5e`](https://github.com/kkkingqz/ficsit-ai-helper/pull/70#issuecomment-6941085102) — нужны правки. Связь записей с ходом должна соответствовать уточнению Co-129.
+- [#67 на `b82842e`](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6941124468) — чистая сборка, обычный Host/origin и закрытие SSE проверены. Работа Save из распакованного архива остаётся открытой по Co2-76, дополнительные замечания в PR.
