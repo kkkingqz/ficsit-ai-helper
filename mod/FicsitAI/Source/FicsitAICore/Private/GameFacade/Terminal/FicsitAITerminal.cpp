@@ -131,7 +131,11 @@ AFicsitAISubsystem* AFicsitAITerminal::GetSubsystem() const
 
 void AFicsitAITerminal::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
-    GetWorldTimerManager().ClearTimer(ProximityTimer);
+    // Терминал без мира (автотест через NewObject) таймера не заводил: GetWorldTimerManager без мира роняет процесс.
+    if (UWorld* World = GetWorld())
+    {
+        World->GetTimerManager().ClearTimer(ProximityTimer);
+    }
     CloseInteractiveScreen();
     CloseActiveModule();
 
@@ -251,9 +255,9 @@ void AFicsitAITerminal::BeginPlay()
     InitializeHost();
 
     // Таймер мира, а не Tick: Tick далёкой постройки игра выключает по значимости (ревью #69, P2).
-    if (!IsRunningDedicatedServer())
+    if (!IsRunningDedicatedServer() && GetWorld())
     {
-        GetWorldTimerManager().SetTimer(ProximityTimer, FTimerDelegate::CreateUObject(this, &AFicsitAITerminal::UpdateWorldModuleProximity),
+        GetWorld()->GetTimerManager().SetTimer(ProximityTimer, FTimerDelegate::CreateUObject(this, &AFicsitAITerminal::UpdateWorldModuleProximity),
             ProximityCheckInterval, true);
     }
 
