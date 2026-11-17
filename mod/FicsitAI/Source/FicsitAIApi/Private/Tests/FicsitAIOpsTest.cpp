@@ -102,8 +102,10 @@ bool FFicsitAIOpsV0Test::RunTest(const FString& Parameters)
             TestEqual(TEXT("2: минимум"), Message(L.Validate(Obj(TEXT("{\"pageSize\":0}")))), FString(TEXT("pageSize: 0.0 меньше минимума 1.0")));
             TestTrue(TEXT("2: enum, регистр важен"), Message(Q.Validate(Obj(TEXT("{\"metricId\":\"a\",\"window\":\"Last5Min\"}")))).StartsWith(TEXT("window: «Last5Min» не из допустимых")));
             TestEqual(TEXT("2: пустая строка"), Message(Q.Validate(Obj(TEXT("{\"metricId\":\"\"}")))), FString(TEXT("metricId: строка короче 1")));
-            TestEqual(TEXT("2: длина в символах, а не в байтах"), Message(L.Validate(Obj(*FString::Printf(TEXT("{\"filter\":\"%s\"}"), *FString::ChrN(128, TEXT('ж'))))), FString(TEXT("OK")));
-            TestEqual(TEXT("2: длиннее 128"), Message(L.Validate(Obj(*FString::Printf(TEXT("{\"filter\":\"%s\"}"), *FString::ChrN(129, TEXT('ж'))))), FString(TEXT("filter: строка длиннее 128")));
+            const FString Filter128 = FString::Printf(TEXT("{\"filter\":\"%s\"}"), *FString::ChrN(128, TEXT('ж')));
+            const FString Filter129 = FString::Printf(TEXT("{\"filter\":\"%s\"}"), *FString::ChrN(129, TEXT('ж')));
+            TestEqual(TEXT("2: длина в символах, а не в байтах"), Message(L.Validate(Obj(*Filter128))), FString(TEXT("OK")));
+            TestEqual(TEXT("2: длиннее 128"), Message(L.Validate(Obj(*Filter129))), FString(TEXT("filter: строка длиннее 128")));
             TestEqual(TEXT("2: dependentRequired"), Message(L.Validate(Obj(TEXT("{\"scopeCursor\":\"s:50:items.produced\"}")))), FString(TEXT("scopeCursor: допустимо только вместе с metricId")));
             TestEqual(TEXT("2: null"), Message(Q.Validate(Obj(TEXT("{\"metricId\":null}")))), FString(TEXT("metricId: ожидается строка, пришло null")));
             TestEqual(TEXT("2: код"), L.Validate(Obj(TEXT("{\"x\":1}")))->Code, FString(TEXT("INVALID_ARGUMENT")));
