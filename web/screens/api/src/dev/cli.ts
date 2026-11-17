@@ -2,19 +2,22 @@
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createDemoSource } from "./demo-source.js";
+import { createSaveDevSource, type SaveDevSourceOptions } from "./save-source.js";
 import { startDevServer } from "./server.js";
 import type { DevSource } from "./source.js";
 
 /**
  * Запуск dev-сервера экранов: `ficsitai-screens-dev --root web/screens --port 5173`.
  *
- * Источник выбирается флагом. `demo` — свой, для самопроверки; остальные
- * подключаются по пути к модулю, который экспортирует `createSource()`:
- * так наборы Fixture (Gf2) и источник Save (Cf3) приезжают без правки
+ * Источник выбирается флагом. Свои два: `demo` — для самопроверки, `save` и
+ * `saveEstimated` — библиотека Cf3 поверх файла сохранения. Остальные
+ * подключаются по пути к модулю, который экспортирует `createSource()`: так
+ * наборы Fixture и проигрыватель Recording (Gf2) приедут без правки
  * сервера.
  */
 async function loadSource(spec: string): Promise<DevSource> {
   if (spec === "demo") return createDemoSource();
+  if (spec === "save" || spec === "saveEstimated") return await loadSaveSource(spec);
   // Путь к файлу разрешается от каталога запуска, а не от `dist/dev/`, где
   // лежит этот файл: иначе документированный `--source ./my-source.js` не
   // находился (ревью Gs на #53). `pathToFileURL` нужен и для Windows, где
@@ -34,12 +37,66 @@ function flag(name: string, fallback?: string): string | undefined {
   return process.argv[index + 1] ?? fallback;
 }
 
+/**
+ * Источник Save: флаги поверх входов из `OWNERSHIP.md`.
+ *
+ * `SAVE_DATA_DIR` и `saveId` — документированные входы пакета, поэтому
+ * переменная окружения работает без флага. Поля, которых не дали, не
+ * передаём вовсе: пакет сам скажет, чего ему не хватает, и скажет кодом
+ * контракта, а не нашей догадкой.
+ */
+async function loadSaveSource(mode: "save" | "saveEstimated"): Promise<DevSource> {
+  const options: SaveDevSourceOptions = { sourceMode: mode };
+  const dir = flag("save-dir", process.env["SAVE_DATA_DIR"]);
+  const id = flag("save-id", process.env["FICSITAI_SAVE_ID"]);
+  const file = flag("save-file");
+  const module = flag("save-package", process.env["FICSITAI_SAVE_SOURCE"]);
+  if (dir !== undefined) options.saveDataDir = dir;
+  if (id !== undefined) options.saveId = id;
+  if (file !== undefined) options.saveFilePath = file;
+  if (module !== undefined) options.modulePath = module;
+  return await createSaveDevSource(options);
+}
+
+/**
+ * Врезки каталогов: `--mount /third_party=third_party`, можно несколько раз.
+ *
+ * Нужны, когда страница ссылается за пределы корня: «Статистика» просит
+ * uPlot из `third_party/` рядом с `web/`. Без врезки один из двух адресов
+ * неизбежно отдавал 404 — на это я сам потратил прогон ревью.
+ */
+function mounts(): Record<string, string> {
+  const found: Record<string, string> = {};
+  for (let index = 0; index < process.argv.length; index += 1) {
+    if (process.argv[index] !== "--mount") continue;
+    const pair = process.argv[index + 1];
+    const split = pair === undefined ? -1 : pair.indexOf("=");
+    if (pair === undefined || split <= 0) {
+      throw new Error("--mount ждёт пару вида /третий-путь=каталог");
+    }
+    const dir = pair.slice(split + 1).trim();
+    // Пустая правая часть — отказ до старта: `resolve("")` даёт каталог
+    // запуска, и статика молча расширялась до него (ревью Gs на #66).
+    if (dir === "") {
+      throw new Error(`--mount «${pair}»: каталог не задан`);
+    }
+    found[pair.slice(0, split)] = dir;
+  }
+  return found;
+}
+
 async function main(): Promise<void> {
   const root = flag("root", ".") as string;
   const source = await loadSource(flag("source", "demo") as string);
   const port = Number.parseInt(flag("port", "5173") as string, 10);
 
-  const server = await startDevServer({ root, source, port, watch: flag("watch") !== "off" });
+  const server = await startDevServer({
+    root,
+    source,
+    port,
+    mounts: mounts(),
+    watch: flag("watch") !== "off",
+  });
   console.log(`экраны: ${server.url} (источник «${source.name}», корень ${root})`);
   console.log("горячая перезагрузка: подключите <script src=\"/api/v0/reload.js\"></script>");
 
@@ -51,4 +108,10 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => stop("SIGTERM"));
 }
 
-await main();
+// Ошибка в флаге — это ошибка человека, и она должна читаться строкой, а не
+// стеком: пустая правая часть `--mount` печатала трассировку (ревью Gs на
+// #66). Код выхода ненулевой, чтобы промах было видно и из скрипта.
+await main().catch((err: unknown) => {
+  console.error(`dev-сервер не запустился: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(2);
+});

@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { extname, join, normalize, posix, resolve, sep } from "node:path";
 import { SourceError, type DevSource } from "./source.js";
 import type { ApiOperation } from "../types.js";
 
@@ -46,6 +46,19 @@ source.addEventListener("reload", () => location.reload());
 export interface DevServerOptions {
   /** Каталог со страницами. */
   root: string;
+  /**
+   * Дополнительные каталоги: адресный префикс → каталог на диске.
+   *
+   * Нужны потому, что экран может ссылаться за пределы корня страниц:
+   * «Статистика» просит uPlot из `third_party/` рядом с `web/`, и с одним
+   * корнем либо он, либо `ui-kit/` неизбежно отдавал 404. Запуск с
+   * `--mount /third_party=third_party` закрывает это, не перенося чужие
+   * файлы и не правя чужую страницу.
+   *
+   * За изменениями в этих каталогах сервер не следит: там лежит вендор,
+   * а горячая перезагрузка нужна для своего кода.
+   */
+  mounts?: Readonly<Record<string, string>>;
   source: DevSource;
   port?: number;
   host?: string;
@@ -66,6 +79,20 @@ interface Listener {
 
 export async function startDevServer(options: DevServerOptions): Promise<DevServer> {
   const root = resolve(options.root);
+  // Префиксы с самого длинного: `/third_party/uplot` должен победить
+  // `/third_party`, если заданы оба.
+  const mounts = Object.entries(options.mounts ?? {})
+    .map(([prefix, dir]) => {
+      // Пустой каталог — отказ до старта, а не `resolve("")`: тот даёт
+      // каталог запуска, и статика молча расширялась до него (ревью Gs на
+      // #66). Промах во флаге не должен открывать половину диска.
+      if (dir.trim() === "") {
+        throw new Error(`врезка «${prefix}» без каталога: --mount ждёт пару вида /префикс=каталог`);
+      }
+      return { prefix: `/${prefix.replace(/^\/+|\/+$/g, "")}`, dir: resolve(dir) };
+    })
+    .filter((mount) => mount.prefix !== "/")
+    .sort((left, right) => right.prefix.length - left.prefix.length);
   const host = options.host ?? "127.0.0.1";
   const log = options.log ?? ((message: string) => console.log(message));
   const listeners = new Set<Listener>();
@@ -182,12 +209,33 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     res.on("close", () => listeners.delete(listener));
   };
 
+  /**
+   * Каталог и путь внутри него: сначала врезки, иначе корень страниц.
+   *
+   * Выбор идёт по **адресному** пути, а не по пути файловой системы:
+   * `path.normalize` на Windows меняет прямые слеши на обратные, и
+   * `/third_party/uplot/…` перестал бы совпадать с префиксом `/third_party`
+   * — запрос uPlot уходил бы в корень страниц и получал 404 (ревью Gs на
+   * #66). `posix.normalize` ведёт себя одинаково на всех системах.
+   */
+  const baseFor = (urlPath: string): { base: string; inside: string } => {
+    const clean = posix.normalize(urlPath.startsWith("/") ? urlPath : `/${urlPath}`);
+    for (const mount of mounts) {
+      if (clean === mount.prefix || clean.startsWith(`${mount.prefix}/`)) {
+        return { base: mount.dir, inside: clean.slice(mount.prefix.length) };
+      }
+    }
+    return { base: root, inside: clean };
+  };
+
   const handleStatic = async (pathname: string, res: ServerResponse): Promise<void> => {
     // Выход за корень закрыт до любого обращения к диску: dev-сервер открыт
-    // на петле, но каталог страниц — не весь диск.
-    const relative = normalize(decodeURIComponent(pathname)).replace(/^(\.\.(\/|\\|$))+/, "");
-    let file = join(root, relative);
-    if (!file.startsWith(root + sep) && file !== root) {
+    // на петле, но каталог страниц — не весь диск. Для врезки правило то же
+    // и проверяется против её каталога, а не против корня.
+    const { base, inside } = baseFor(decodeURIComponent(pathname));
+    const relative = normalize(inside).replace(/^(\.\.(\/|\\|$))+/, "");
+    let file = join(base, relative);
+    if (!file.startsWith(base + sep) && file !== base) {
       sendJson(res, 403, { error: { code: "INVALID_ARGUMENT", message: "путь вне каталога" } });
       return;
     }
@@ -199,7 +247,7 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       // корнем отдавался по ссылке из корня (ревью Gs на #53). Поэтому
       // смотрим фактический путь, уже разрешённый.
       const real = await realpath(file);
-      const realRoot = await realpath(root);
+      const realRoot = await realpath(base);
       if (!real.startsWith(realRoot + sep) && real !== realRoot) {
         sendJson(res, 403, {
           error: { code: "INVALID_ARGUMENT", message: "путь вне каталога после разрешения ссылок" },
