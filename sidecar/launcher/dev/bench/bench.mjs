@@ -29,11 +29,20 @@
 // детерминированно, бесплатно и воспроизводимо. С `--model` добавляется
 // сравнение ответов модели — нужен ключ провайдера, и он тратится.
 
-import { spawn } from "node:child_process";
-import { mkdtempSync, mkdirSync, openSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { spawn, execFileSync } from "node:child_process";
+import { createServer } from "node:net";
+import {
+  mkdtempSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  realpathSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, basename } from "node:path";
-import { pathToFileURL } from "node:url";
+import { pathToFileURL, fileURLToPath } from "node:url";
 
 const REPO = resolve(import.meta.dirname, "../../../..");
 const ADAPTER = join(REPO, "sidecar/adapter");
@@ -84,7 +93,8 @@ function nodeCommand() {
 }
 
 function startProcess(name, cwd, script, env, logDir) {
-  const out = openSync(join(logDir, `${name}.log`), "a");
+  const logFile = join(logDir, `${name}.log`);
+  const out = openSync(logFile, "a");
   const prefix = nodeCommand();
   const command = prefix === "" ? "npm" : prefix.split(" ")[0];
   const args = prefix === "" ? script : [...prefix.split(" ").slice(1), "npm", ...script];
@@ -94,8 +104,64 @@ function startProcess(name, cwd, script, env, logDir) {
     stdio: ["ignore", out, out],
     detached: true,
   });
-  started.push({ name, child });
-  return child;
+  // Смерть своей команды запоминаем сразу: без этого стенд ждал готовности у
+  // того, кого уже нет, и принимал за свою службу чужого слушателя на том же
+  // порту (ревью Gs на #68).
+  const service = { name, child, logFile, exit: undefined };
+  child.once("exit", (code, signal) => {
+    service.exit = code === null ? `сигнал ${String(signal)}` : `код ${String(code)}`;
+  });
+  started.push(service);
+  return service;
+}
+
+/** Свободен ли порт. Проверяем привязкой, а не запросом: запрос видит чужого. */
+function portFree(port) {
+  return new Promise((done) => {
+    const probe = createServer();
+    probe.once("error", () => done(false));
+    probe.once("listening", () => probe.close(() => done(true)));
+    probe.listen(port, "127.0.0.1");
+  });
+}
+
+/**
+ * Отказ при занятом порте — до любого запуска.
+ *
+ * Стенд не поднимает второй экземпляр поверх чужого слушателя: иначе он
+ * спросит список инструментов у него и подпишет отчёт как своим прогоном
+ * (ревью Gs на #68). Тот же приём у `foreman-local.sh`.
+ */
+async function requireFreePorts(ports) {
+  for (const [name, port] of Object.entries(ports)) {
+    if (!(await portFree(port))) {
+      throw new Error(
+        `порт ${port} (${name}) занят — остановите прежний прогон или задайте другой порт ` +
+          `(BENCH_SF_MCP_PORT, BENCH_FF_SERVER_PORT, BENCH_ADAPTER_PORT, BENCH_NORMALIZER_PORT)`,
+      );
+    }
+  }
+}
+
+/** Ждёт, пока порт освободится: между проходами ff-server поднимается заново. */
+async function waitForPortFree(port, name, timeoutMs = 30_000) {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    if (await portFree(port)) return;
+    if (Date.now() > deadline) {
+      throw new Error(`порт ${port} (${name}) не освободился за ${timeoutMs} мс`);
+    }
+    await new Promise((done) => setTimeout(done, 200));
+  }
+}
+
+/** Последние строки журнала — чтобы причина отказа была видна сразу. */
+function logTail(file, lines = 12) {
+  try {
+    return readFileSync(file, "utf8").trimEnd().split("\n").slice(-lines).join("\n");
+  } catch {
+    return "(журнал пуст)";
+  }
 }
 
 function stopAll() {
@@ -117,16 +183,61 @@ process.on("SIGINT", () => {
   process.exit(130);
 });
 
-async function waitForHttp(url, name, timeoutMs = 90_000) {
+/**
+ * Ждёт готовности **своей** службы.
+ *
+ * Отвечающий порт сам по себе ничего не значит: на нём мог сидеть чужой
+ * слушатель ещё до запуска. Поэтому порт проверен свободным заранее, а здесь
+ * ожидание прерывается, как только своя команда завершилась, — с хвостом её
+ * журнала, чтобы причина была видна сразу (ревью Gs на #68).
+ */
+async function waitForReady(service, url, timeoutMs = 90_000) {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
+    if (service.exit !== undefined) {
+      throw new Error(
+        `${service.name} завершился (${service.exit}) до готовности.\n` +
+          `Журнал ${service.logFile}:\n${logTail(service.logFile)}`,
+      );
+    }
     try {
       await fetch(url, { signal: AbortSignal.timeout(2000) });
       return;
     } catch {
-      if (Date.now() > deadline) throw new Error(`${name} не поднялся за ${timeoutMs} мс: ${url}`);
+      if (Date.now() > deadline) {
+        throw new Error(
+          `${service.name} не поднялся за ${timeoutMs} мс: ${url}\n` +
+            `Журнал ${service.logFile}:\n${logTail(service.logFile)}`,
+        );
+      }
       await new Promise((done) => setTimeout(done, 500));
     }
+  }
+}
+
+/**
+ * Ревизия Foreman, на которой **на самом деле** шёл прогон.
+ *
+ * Прежде отчёт печатал закреплённый коммит из `foreman.pin.json`, то есть
+ * приписывал результат ревизии, которой мог и не быть в каталоге (ревью Gs
+ * на #68). Теперь берём `rev-parse HEAD` самого каталога, говорим, совпал
+ * ли он с закреплённым, и помечаем незакоммиченные правки: сравнение,
+ * подписанное чужой ревизией, хуже сравнения без подписи.
+ */
+export function foremanRevision(pin, dir = FOREMAN_SRC) {
+  const git = (args) =>
+    // stderr гасим: у не-git каталога git пишет туда объяснение, а у нас на
+    // этот случай есть своя строка в отчёте.
+    execFileSync("git", ["-C", dir, ...args], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+  try {
+    const sha = git(["rev-parse", "HEAD"]);
+    const dirty = git(["status", "--porcelain"]) !== "";
+    return { sha, dirty, pinned: pin.commit, matchesPin: sha === pin.commit };
+  } catch {
+    return { sha: "", dirty: false, pinned: pin.commit, matchesPin: false };
   }
 }
 
@@ -215,11 +326,26 @@ async function askForeman(baseUrl, account, saveId, questions, log) {
 
 /* ---------- отчёт ---------- */
 
+/** Строка о ревизии Foreman для отчёта: что запускали, а не что закреплено. */
+export function describeForeman(foreman, dir = FOREMAN_SRC) {
+  if (foreman.sha === "") {
+    return `\`${dir}\` — **ревизия неизвестна** (каталог не git-клон), ` +
+      `закреплено \`${foreman.pinned.slice(0, 8)}\``;
+  }
+  const dirty = foreman.dirty ? ", **есть незакоммиченные правки**" : "";
+  return foreman.matchesPin
+    ? `\`${foreman.sha.slice(0, 8)}\` — совпадает с закреплённым${dirty}`
+    : `\`${foreman.sha.slice(0, 8)}\` — **не закреплённый** ` +
+      `(закреплено \`${foreman.pinned.slice(0, 8)}\`)${dirty}`;
+}
+
 function report(data) {
   const lines = [];
   lines.push(`# Стенд сравнения со штатным Foreman`);
   lines.push("");
-  lines.push(`Прогон ${data.at}. Сохранение: \`${data.save}\`. Foreman: \`${data.foremanCommit}\`.`);
+  lines.push(`Прогон ${data.at}. Сохранение: \`${data.save}\`.`);
+  lines.push("");
+  lines.push(`Foreman: ${data.foreman}`);
   lines.push("");
   lines.push(`## Поверхность инструментов`);
   lines.push("");
@@ -277,8 +403,13 @@ async function main() {
     console.error(`нет файла сохранения: ${save}`);
     process.exit(2);
   }
-  if (!existsSync(FOREMAN_SRC)) {
-    console.error(`нет клона Foreman: ${FOREMAN_SRC} (коммит — sidecar/launcher/foreman.pin.json)`);
+  if (!existsSync(join(FOREMAN_SRC, "packages/sf-mcp/package.json"))) {
+    // Пустой каталог стенд принимал и подписывал отчёт закреплённым
+    // коммитом (ревью Gs на #68). Теперь требуем именно клон Foreman.
+    console.error(
+      `${FOREMAN_SRC} не похож на клон Foreman: нет packages/sf-mcp/package.json ` +
+        `(коммит — sidecar/launcher/foreman.pin.json)`,
+    );
     process.exit(2);
   }
 
@@ -289,6 +420,11 @@ async function main() {
   mkdirSync(saves);
   const token = "bench-token-0123456789abcdef";
   const pin = JSON.parse(readFileSync(join(REPO, "sidecar/launcher/foreman.pin.json"), "utf8"));
+  const foreman = foremanRevision(pin);
+
+  // Порты проверяются до запуска: стенд не поднимает второй экземпляр
+  // поверх чужого слушателя (ревью Gs на #68).
+  await requireFreePorts(flag("model") ? PORTS : { sfMcp: PORTS.sfMcp, adapter: PORTS.adapter });
 
   const { createLogger } = await import(pathToFileURL(join(ADAPTER, "dist/log.js")).href);
   const log = createLogger(flag("verbose") ? "debug" : "warn");
@@ -312,11 +448,11 @@ async function main() {
     BETTER_AUTH_SECRET: "bench-secret-not-a-real-one-0123456789",
   };
 
-  startProcess("sf-mcp", FOREMAN_SRC, ["run", "start:mcp"], common, logs);
-  await waitForHttp(`http://127.0.0.1:${PORTS.sfMcp}/health`, "sf-mcp");
+  const sfMcp = startProcess("sf-mcp", FOREMAN_SRC, ["run", "start:mcp"], common, logs);
+  await waitForReady(sfMcp, `http://127.0.0.1:${PORTS.sfMcp}/health`);
   console.log(`sf-mcp поднят на ${PORTS.sfMcp}`);
 
-  startProcess(
+  const adapter = startProcess(
     "adapter",
     ADAPTER,
     ["run", "start"],
@@ -337,7 +473,7 @@ async function main() {
     },
     logs,
   );
-  await waitForHttp(`http://127.0.0.1:${PORTS.adapter}/health`, "адаптер");
+  await waitForReady(adapter, `http://127.0.0.1:${PORTS.adapter}/health`);
   console.log(`адаптер поднят на ${PORTS.adapter}`);
 
   const surface = await toolSurfaces(token, log);
@@ -348,7 +484,7 @@ async function main() {
 
   let model;
   if (llm !== undefined) {
-    await waitForHttp(`http://127.0.0.1:${PORTS.normalizer}`, "нормализатор");
+    await waitForReady(adapter, `http://127.0.0.1:${PORTS.normalizer}`);
     console.log(`нормализатор поднят на ${PORTS.normalizer} (ADR-034, нужен обоим путям)`);
     model = await modelRuns(data, logs, token, save, log, llm);
   }
@@ -356,7 +492,7 @@ async function main() {
   const text = report({
     at: new Date().toISOString(),
     save,
-    foremanCommit: `${pin.commit.slice(0, 8)} (${pin.commitDate})`,
+    foreman: describeForeman(foreman),
     surface,
     model,
   });
@@ -433,14 +569,18 @@ async function modelRuns(data, logs, token, save, log, llm) {
       BETTER_AUTH_SECRET: "bench-secret-not-a-real-one-0123456789",
     };
     const tag = env.SYSTEM_PROMPT_PATH === undefined ? "stock" : "ours";
-    startProcess(
+    // Порт должен быть свободен и перед вторым проходом: иначе вопросы уйдут
+    // прежнему ff-server с прежним MCP_URL, и сравнение сравнит путь с собой.
+    await waitForPortFree(PORTS.ffServer, "ff-server");
+    const ffServer = startProcess(
       "ff-server",
       FOREMAN_SRC,
       ["run", "start:server"],
       { ...common, ...llm.forForeman(), ...env },
       logs,
     );
-    await waitForHttp(base, `ff-server (${tag})`);
+    ffServer.name = `ff-server (${tag})`;
+    await waitForReady(ffServer, base);
     console.log(`ff-server поднят для «${name}»`);
 
     const account = loadOrCreateAccount(join(data, "bench-account.json"), log);
@@ -448,23 +588,23 @@ async function modelRuns(data, logs, token, save, log, llm) {
     // получил бы историю первого и отвечал бы по чужому разговору.
     runs[name] = await askForeman(base, account, `bench-${tag}-${basename(save)}`, questions, log);
 
-    const ff = started.find((item) => item.name === "ff-server");
-    if (ff !== undefined) {
-      try {
-        process.kill(-ff.child.pid, "SIGTERM");
-      } catch {
-        /* уже умер */
-      }
-      started.splice(started.indexOf(ff), 1);
+    try {
+      process.kill(-ffServer.child.pid, "SIGTERM");
+    } catch {
+      /* уже умер */
     }
-    await new Promise((done) => setTimeout(done, 1500));
+    started.splice(started.indexOf(ffServer), 1);
   }
 
   return { model: llm.model, questions: questions.length, runs };
 }
 
-main().catch((err) => {
-  console.error(`стенд не доработал: ${err instanceof Error ? err.message : String(err)}`);
-  stopAll();
-  process.exit(1);
-});
+// Запуск только когда файл позвали напрямую: иначе `foremanRevision` и
+// `describeForeman` нельзя импортировать в проверке, не поднимая стенд.
+if (process.argv[1] !== undefined && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  main().catch((err) => {
+    console.error(`стенд не доработал: ${err instanceof Error ? err.message : String(err)}`);
+    stopAll();
+    process.exit(1);
+  });
+}
