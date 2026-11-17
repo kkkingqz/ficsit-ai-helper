@@ -202,6 +202,7 @@ FFicsitAIScreenContext AFicsitAITerminal::GetInteractiveScreenContext() const
 {
     FFicsitAIScreenContext Context = HostContext;
     Context.bWorldSurface = false;
+    Context.BackKeys = HostBackKeys;
 
     if (const UFicsitAIScreenSurfaceWidget* SurfaceWidget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
     {
@@ -272,7 +273,79 @@ void AFicsitAITerminal::Tick(float DeltaSeconds)
         }
     }
 
+    UpdateWorldModuleProximity(DeltaSeconds);
     RenderWorldScreenIfDirty();
+}
+
+void AFicsitAITerminal::UpdateWorldModuleProximity(float DeltaSeconds)
+{
+    ProximityCheckCountdown -= DeltaSeconds;
+    if (ProximityCheckCountdown > 0.0f)
+    {
+        return;
+    }
+    ProximityCheckCountdown = ProximityCheckInterval;
+
+    if (IsInteractiveScreenOpen() || HostContext.HostState != EFicsitAIHostState::Ready || (!ActiveModuleInstance && !bWorldModuleParked))
+    {
+        return;
+    }
+    // Расстояние до глаза локального игрока. Нет локального игрока (выделенный сервер) — решать не о ком.
+    UWorld* World = GetWorld();
+    APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+    if (!PC || !PC->IsLocalController())
+    {
+        return;
+    }
+    FVector ViewLocation;
+    FRotator ViewRotation;
+    PC->GetPlayerViewPoint(ViewLocation, ViewRotation);
+    const FVector ScreenLocation = ScreenMeshComponent ? ScreenMeshComponent->GetComponentLocation() : GetActorLocation();
+    const float Distance = FVector::Dist(ViewLocation, ScreenLocation);
+
+    if (!bWorldModuleParked && Distance > LiveScreenParkDistance)
+    {
+        ParkWorldModule();
+    }
+    else if (bWorldModuleParked && Distance < LiveScreenWakeDistance)
+    {
+        UnparkWorldModule();
+    }
+}
+
+void AFicsitAITerminal::ParkWorldModule()
+{
+    if (!ActiveModuleInstance || IsInteractiveScreenOpen())
+    {
+        return;
+    }
+    FlushActiveModuleState();
+    ActiveModuleInstance->OnDetach();
+    if (WorldSurfaceWidget)
+    {
+        WorldSurfaceWidget->ClearModule();
+    }
+    ActiveModuleInstance = nullptr;
+    bWorldModuleParked = true;
+    // ActiveModuleId остаётся, перерисовки нет: render target держит последний кадр модуля.
+    UE_LOG(LogFicsitAITerminal, Log, TEXT("Экран в мире: модуль %s снят по расстоянию, показан последний кадр"), *ActiveModuleId.ToString());
+}
+
+bool AFicsitAITerminal::UnparkWorldModule()
+{
+    if (!bWorldModuleParked)
+    {
+        return ActiveModuleInstance != nullptr;
+    }
+    const FName ModuleId = ActiveModuleId;
+    bWorldModuleParked = false;
+    ActiveModuleId = NAME_None;
+    const bool bOpened = OpenModule(ModuleId);
+    if (!bOpened)
+    {
+        MarkWorldScreenDirty();
+    }
+    return bOpened;
 }
 
 void AFicsitAITerminal::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -342,6 +415,14 @@ void AFicsitAITerminal::PreSaveGame_Implementation(int32 SaveVersion, int32 Game
 
 void AFicsitAITerminal::TeardownActiveModule()
 {
+    if (bWorldModuleParked)
+    {
+        // Модуль уже снят по расстоянию; сбрасываем и сохранённый кадр.
+        bWorldModuleParked = false;
+        ActiveModuleId = NAME_None;
+        HostContext.bHasInputFocus = false;
+        MarkWorldScreenDirty();
+    }
     if (ActiveModuleInstance)
     {
         FlushActiveModuleState();
@@ -466,6 +547,22 @@ static TMap<FName, FKey> QueryActionKeyBindings(UEnhancedInputLocalPlayerSubsyst
     return Bindings;
 }
 
+void AFicsitAITerminal::RefreshBackKeys(UEnhancedInputLocalPlayerSubsystem* Subsystem)
+{
+    HostBackKeys = { EKeys::Escape };
+    const UFicsitAIInputMappingContext* IMC = GetDefault<UFicsitAIInputMappingContext>();
+    if (Subsystem && IMC && IMC->ActionBack)
+    {
+        for (const FKey& Key : Subsystem->QueryKeysMappedToAction(IMC->ActionBack))
+        {
+            if (Key.IsValid())
+            {
+                HostBackKeys.AddUnique(Key);
+            }
+        }
+    }
+}
+
 void AFicsitAITerminal::HandleControlMappingsRebuilt()
 {
     if (UWorld* World = GetWorld())
@@ -482,6 +579,13 @@ void AFicsitAITerminal::HandleControlMappingsRebuilt()
                         if (UFicsitAIScreenSurfaceWidget* Widget = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
                         {
                             Widget->SetActionKeyBindings(QueryActionKeyBindings(Subsystem, IMC));
+                        }
+                        // Переназначенное «Назад» — модулю тоже: веб-страница не должна забирать новую клавишу.
+                        const TArray<FKey> OldBackKeys = HostBackKeys;
+                        RefreshBackKeys(Subsystem);
+                        if (HostBackKeys != OldBackKeys && ActiveModuleInstance && IsInteractiveScreenOpen())
+                        {
+                            ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
                         }
                     }
                 }
@@ -527,6 +631,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
 
                 Subsystem->ControlMappingsRebuiltDelegate.AddUniqueDynamic(this, &AFicsitAITerminal::HandleControlMappingsRebuilt);
                 CurrentBindings = QueryActionKeyBindings(Subsystem, IMC);
+                RefreshBackKeys(Subsystem);
             }
         }
     }
@@ -557,7 +662,11 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
 
     // В состоянии Ready переключаем открытие терминала. По умолчанию — «Статистика» (веб, ADR-032, S8 3.4);
     // где браузера нет (фабрика её не регистрирует), — тестовый модуль Notes, как раньше.
-    if (ActiveModuleId == NAME_None)
+    if (bWorldModuleParked)
+    {
+        UnparkWorldModule();
+    }
+    if (!ActiveModuleInstance)
     {
         const FName Statistics(TEXT("Statistics"));
         OpenModule(GetAvailableModules().Contains(Statistics) ? Statistics : FName(TEXT("Notes")));
@@ -748,7 +857,7 @@ void AFicsitAITerminal::CloseActiveModule()
 {
     CloseInteractiveScreen();
 
-    if (ActiveModuleInstance)
+    if (ActiveModuleInstance || bWorldModuleParked)
     {
         UE_LOG(LogFicsitAITerminal, Log, TEXT("Закрытие активного модуля: %s"), *ActiveModuleId.ToString());
         TeardownActiveModule();
@@ -950,6 +1059,12 @@ bool AFicsitAITerminal::RenderWorldScreenIfDirty()
     }
 
     if (!bWorldScreenDirty)
+    {
+        return false;
+    }
+
+    // Снятый по расстоянию модуль: экран держит последний кадр, перерисовка — после возвращения модуля.
+    if (bWorldModuleParked && HostContext.HostState == EFicsitAIHostState::Ready)
     {
         return false;
     }
