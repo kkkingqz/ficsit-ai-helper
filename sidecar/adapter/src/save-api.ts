@@ -95,21 +95,25 @@ const ARGS = {
     cursor: z.string().optional(),
     scopeCursor: z.string().optional(),
   }),
+  // Поля сверены с контрактом по одному (`web/screens/api/src/types.ts`):
+  // у `listScopes` фильтр называется `scopeFilter`, а я написал `filter` — и
+  // `scopeFilter: 42` уходил в библиотеку, падал там на `.trim` и возвращался
+  // как `SOURCE_UNAVAILABLE` с её внутренним сообщением (ревью Gs на #67).
   listScopes: z.looseObject({
     metricId: z.string(),
-    filter: z.string().optional(),
+    scopeFilter: z.string().optional(),
     pageSize: z.number().optional(),
     cursor: z.string().optional(),
   }),
   queryMetric: z.looseObject({
     metricId: z.string(),
     scopeId: z.string().optional(),
-    window: z.string().optional(),
   }),
+  // `window` у ряда обязателен по контракту — без него это `queryMetric`.
   querySeries: z.looseObject({
     metricId: z.string(),
+    window: z.string(),
     scopeId: z.string().optional(),
-    window: z.string().optional(),
   }),
 };
 
@@ -241,10 +245,16 @@ export async function createSaveApi(deps: SaveApiDeps): Promise<SaveApi> {
   const streams = new Set<Response>();
   const router = Router();
 
+  /** Отказ по `Host`: правило общее для всех путей поверхности, включая preflight. */
+  const refuseByHost = (req: Request): string | undefined => {
+    const host = req.headers.host ?? "";
+    return hosts.has(host) ? undefined : `запрос с чужим Host «${host}»`;
+  };
+
   /** Отказ по `Host` или `Origin`; `undefined` — запрос можно обслуживать. */
   const refuseByOrigin = (req: Request): string | undefined => {
-    const host = req.headers.host ?? "";
-    if (!hosts.has(host)) return `запрос с чужим Host «${host}»`;
+    const byHost = refuseByHost(req);
+    if (byHost !== undefined) return byHost;
     const origin = req.headers.origin;
     if (origin === undefined || origin === "") return undefined;
     if (origins.has(origin)) return undefined;
@@ -269,6 +279,16 @@ export async function createSaveApi(deps: SaveApiDeps): Promise<SaveApi> {
   // заголовков доступа — вид разрешения без разрешения (ревью Gs на #67,
   // п. 3). Отвечаем честно: разрешён origin — заголовки, иначе отказ.
   router.options("/", (req: Request, res: Response) => {
+    // Проверка `Host` общая для всех путей поверхности, включая предполётный:
+    // прежде он отвечал 204 на запрос с чужим `Host` и разрешённым origin, то
+    // есть подтверждал доступ, которого нет (ревью Gs на #67). Origin ниже
+    // проверяется отдельно — у него свой текст с подсказкой про флаг.
+    const blocked = refuseByHost(req);
+    if (blocked !== undefined) {
+      log.warn(`предполётный запрос по сохранению: ${blocked}`);
+      res.status(403).json({ error: { code: "INVALID_ARGUMENT", message: blocked } });
+      return;
+    }
     const origin = req.headers.origin;
     if (origin === undefined || !origins.has(origin)) {
       res.status(403).json({

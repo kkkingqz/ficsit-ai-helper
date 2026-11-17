@@ -390,6 +390,49 @@ describe("замечания ревью Gs на #67", () => {
     expect(allowed.status).toBe(204);
     expect(allowed.headers["access-control-allow-origin"]).toBe(ALLOWED);
     expect(allowed.headers["access-control-allow-methods"]).toContain("POST");
+
+    // Чужой `Host` при разрешённом origin: прежде предполётный отвечал 204,
+    // то есть подтверждал доступ, которого нет (ревью Gs на #67).
+    const foreignHost = await raw(
+      port,
+      { host: "ficsitai.example.com:1", origin: ALLOWED },
+      undefined,
+      "OPTIONS",
+    );
+    expect(foreignHost.status).toBe(403);
+    expect(foreignHost.text).toContain("чужим Host");
+    expect(foreignHost.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("тип `scopeFilter` у listScopes проверяется здесь, а не падает в библиотеке", async () => {
+    // Я написал в схеме `filter` вместо `scopeFilter`, и `scopeFilter: 42`
+    // уходил в библиотеку, падал там на `.trim` и возвращался как
+    // `SOURCE_UNAVAILABLE` с её внутренним сообщением (ревью Gs на #67).
+    const { url, calls } = await serve();
+
+    const response = await post(url, {
+      id: "a-16",
+      op: "listScopes",
+      args: { metricId: "power.network.production", scopeFilter: 42 },
+    });
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { re: string; error: { code: string; message: string } };
+    expect(body.re).toBe("a-16");
+    expect(body.error.code).toBe("INVALID_ARGUMENT");
+    expect(body.error.message).toContain("scopeFilter");
+    expect(body.error.message).not.toContain("trim");
+    expect(calls).toEqual([]);
+  });
+
+  it("ряд без окна до библиотеки не доходит: по контракту окно обязательно", async () => {
+    const { url, calls } = await serve();
+
+    const body = (await (
+      await post(url, { id: "a-17", op: "querySeries", args: { metricId: "power.consumption" } })
+    ).json()) as { error: { code: string; message: string } };
+    expect(body.error.code).toBe("INVALID_ARGUMENT");
+    expect(body.error.message).toContain("window");
+    expect(calls).toEqual([]);
   });
 
   it("по умолчанию из браузера не пускает никого", async () => {

@@ -223,20 +223,21 @@ export async function createApp(config: Config, log: Logger) {
         session: channel.sessionId ?? "",
         tools: channel.modTools().map((tool) => tool.name),
       },
-      // Поверхность чтения по сохранению: включена ли и что именно читает.
-      // Без этой строки включённый источник Save не видно ничем, кроме
-      // журнала запуска.
+      // Поверхность чтения по сохранению: включена ли и готова ли.
+      //
+      // Ни пути к файлу, ни имени сохранения, ни сырой ошибки загрузки здесь
+      // нет: `/health` отвечает любому, кто дотянулся до порта, и выдавал
+      // абсолютный путь настроенного сохранения (ревью Gs на #67).
+      // Диагностике достаточно признака готовности; путь и причина лежат в
+      // журнале запуска, то есть там, где их читает тот, у кого есть доступ
+      // к машине.
       save: saveSourceConfigured(config)
         ? {
             enabled: true,
             mode: config.saveSourceMode,
-            saveId: config.saveId ?? "",
-            saveFile: config.saveFilePath ?? "",
+            ready: saveApi !== undefined && saveApi.loadError === "",
             apiVersion: saveApi?.libraryApiVersion ?? "",
-            // Пусто — библиотека на месте. Иначе здесь видно, почему
-            // чтения отвечают `SOURCE_UNAVAILABLE`, и не нужно идти в журнал.
-            loadError: saveApi?.loadError ?? "",
-            allowedOrigins: config.saveAllowOrigins,
+            browserOrigins: config.saveAllowOrigins.length,
           }
         : { enabled: false },
     });
