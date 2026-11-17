@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { readFile, realpath, stat } from "node:fs/promises";
 import { watch, type FSWatcher } from "node:fs";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { extname, join, normalize, posix, resolve, sep } from "node:path";
 import { SourceError, type DevSource } from "./source.js";
 import type { ApiOperation } from "../types.js";
 
@@ -82,7 +82,15 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
   // Префиксы с самого длинного: `/third_party/uplot` должен победить
   // `/third_party`, если заданы оба.
   const mounts = Object.entries(options.mounts ?? {})
-    .map(([prefix, dir]) => ({ prefix: `/${prefix.replace(/^\/+|\/+$/g, "")}`, dir: resolve(dir) }))
+    .map(([prefix, dir]) => {
+      // Пустой каталог — отказ до старта, а не `resolve("")`: тот даёт
+      // каталог запуска, и статика молча расширялась до него (ревью Gs на
+      // #66). Промах во флаге не должен открывать половину диска.
+      if (dir.trim() === "") {
+        throw new Error(`врезка «${prefix}» без каталога: --mount ждёт пару вида /префикс=каталог`);
+      }
+      return { prefix: `/${prefix.replace(/^\/+|\/+$/g, "")}`, dir: resolve(dir) };
+    })
     .filter((mount) => mount.prefix !== "/")
     .sort((left, right) => right.prefix.length - left.prefix.length);
   const host = options.host ?? "127.0.0.1";
@@ -201,21 +209,30 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
     res.on("close", () => listeners.delete(listener));
   };
 
-  /** Каталог и путь внутри него: сначала врезки, иначе корень страниц. */
-  const baseFor = (pathname: string): { base: string; inside: string } => {
+  /**
+   * Каталог и путь внутри него: сначала врезки, иначе корень страниц.
+   *
+   * Выбор идёт по **адресному** пути, а не по пути файловой системы:
+   * `path.normalize` на Windows меняет прямые слеши на обратные, и
+   * `/third_party/uplot/…` перестал бы совпадать с префиксом `/third_party`
+   * — запрос uPlot уходил бы в корень страниц и получал 404 (ревью Gs на
+   * #66). `posix.normalize` ведёт себя одинаково на всех системах.
+   */
+  const baseFor = (urlPath: string): { base: string; inside: string } => {
+    const clean = posix.normalize(urlPath.startsWith("/") ? urlPath : `/${urlPath}`);
     for (const mount of mounts) {
-      if (pathname === mount.prefix || pathname.startsWith(`${mount.prefix}/`)) {
-        return { base: mount.dir, inside: pathname.slice(mount.prefix.length) };
+      if (clean === mount.prefix || clean.startsWith(`${mount.prefix}/`)) {
+        return { base: mount.dir, inside: clean.slice(mount.prefix.length) };
       }
     }
-    return { base: root, inside: pathname };
+    return { base: root, inside: clean };
   };
 
   const handleStatic = async (pathname: string, res: ServerResponse): Promise<void> => {
     // Выход за корень закрыт до любого обращения к диску: dev-сервер открыт
     // на петле, но каталог страниц — не весь диск. Для врезки правило то же
     // и проверяется против её каталога, а не против корня.
-    const { base, inside } = baseFor(normalize(decodeURIComponent(pathname)));
+    const { base, inside } = baseFor(decodeURIComponent(pathname));
     const relative = normalize(inside).replace(/^(\.\.(\/|\\|$))+/, "");
     let file = join(base, relative);
     if (!file.startsWith(base + sep) && file !== base) {

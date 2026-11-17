@@ -78,11 +78,27 @@ describe("источник Save в dev-сервере", () => {
 
     const got = await source.getStatus();
     expect(got.assistantState).toBe("unavailable");
+    // Контракт отводит `reason` под причину недоступности ассистента:
+    // пустое поле оставляло экран без объяснения (ревью Gs на #66).
+    expect(got.reason).toContain("чата у источника Save нет");
     // Остальное проходит как есть: версию пакета не подменяем, расхождение
     // видно в статусе, а не исправляется втихую.
     expect(got.apiVersion).toBe("0.4.0");
     expect(got.saveId).toBe("save_a_starter");
     expect(got.source).toBe("save");
+  });
+
+  it("своя причина не затирает причину источника", async () => {
+    // Если пакет уже сказал, почему он не может ответить (не нашёл файл,
+    // расхождение версии), его причина важнее нашей.
+    const fake = fakeModule({
+      getStatus: () => ({ ...status, reason: "Save source requires saveFilePath" }),
+    });
+    const source = await createSaveDevSource({ load: async () => fake.module });
+
+    const got = await source.getStatus();
+    expect(got.reason).toBe("Save source requires saveFilePath");
+    expect(got.assistantState).toBe("unavailable");
   });
 
   it("ошибка пакета становится ошибкой контракта, с кодом и деталями", async () => {

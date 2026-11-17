@@ -36,6 +36,15 @@ import type {
  *    по `mtime` у пакета свой, и вторая его копия разошлась бы с первой.
  */
 
+/**
+ * Причина в статусе, когда ассистента нет.
+ *
+ * Не «ошибка»: сохранение и не должно уметь чат. Но сказать это словами
+ * обязан статус, иначе экран показывает «ассистент недоступен» и молчит о
+ * том, почему (ревью Gs на #66).
+ */
+const NO_ASSISTANT = "чата у источника Save нет: это снимок сохранения, а не живая игра";
+
 /** Путь к сборке пакета по умолчанию — от каталога запуска, как `--source`. */
 export const DEFAULT_SAVE_SOURCE_MODULE = "sidecar/save-source/dist/index.js";
 
@@ -146,7 +155,13 @@ export async function createSaveDevSource(options: SaveDevSourceOptions = {}): P
 
     async getStatus(): Promise<ApiStatus> {
       const status = await contract(() => source.getStatus());
-      return { ...status, assistantState: "unavailable" };
+      // Контракт отводит `reason` под причину недоступности ассистента
+      // («Unavailable — нет сайдкара или Foreman не отвечает, причина в
+      // Reason», §Чтения). Пустое поле при `unavailable` оставляло экран без
+      // объяснения (ревью Gs на #66). Свою причину ставим только если
+      // источник не сказал свою: его причина важнее нашей.
+      const reason = status.reason === "" ? NO_ASSISTANT : status.reason;
+      return { ...status, reason, assistantState: "unavailable" };
     },
 
     async listMetrics(args: ListMetricsArgs): Promise<ListMetricsResult> {

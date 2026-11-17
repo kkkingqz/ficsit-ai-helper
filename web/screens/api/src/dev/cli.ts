@@ -74,7 +74,13 @@ function mounts(): Record<string, string> {
     if (pair === undefined || split <= 0) {
       throw new Error("--mount ждёт пару вида /третий-путь=каталог");
     }
-    found[pair.slice(0, split)] = pair.slice(split + 1);
+    const dir = pair.slice(split + 1).trim();
+    // Пустая правая часть — отказ до старта: `resolve("")` даёт каталог
+    // запуска, и статика молча расширялась до него (ревью Gs на #66).
+    if (dir === "") {
+      throw new Error(`--mount «${pair}»: каталог не задан`);
+    }
+    found[pair.slice(0, split)] = dir;
   }
   return found;
 }
@@ -102,4 +108,10 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => stop("SIGTERM"));
 }
 
-await main();
+// Ошибка в флаге — это ошибка человека, и она должна читаться строкой, а не
+// стеком: пустая правая часть `--mount` печатала трассировку (ревью Gs на
+// #66). Код выхода ненулевой, чтобы промах было видно и из скрипта.
+await main().catch((err: unknown) => {
+  console.error(`dev-сервер не запустился: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(2);
+});

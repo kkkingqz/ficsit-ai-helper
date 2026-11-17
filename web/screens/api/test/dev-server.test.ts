@@ -349,6 +349,51 @@ describe("врезки каталогов", () => {
     expect((await fetch(`${server.url}/third_party/other/uPlot.min.css`)).status).toBe(404);
   });
 
+  it("врезка выбирается по адресному пути, а не по пути файловой системы", async () => {
+    // На Windows `path.normalize` меняет прямые слеши на обратные, и
+    // `/third_party/uplot/…` перестал бы совпадать с префиксом: запрос
+    // uPlot уходил бы в корень страниц и получал 404 (ревью Gs на #66).
+    // Проверяем это свойство напрямую: выбор идёт по пути URL, и лишние
+    // сегменты адреса его не ломают.
+    const root = mkdtempSync(join(tmpdir(), "ficsitai-screens-url-"));
+    const vendor = mkdtempSync(join(tmpdir(), "ficsitai-vendor-url-"));
+    writeFileSync(join(vendor, "uPlot.min.css"), ".uplot{}");
+    const server = await startDevServer({
+      root,
+      mounts: { "/third_party/uplot": vendor },
+      source: createDemoSource(),
+      port: 0,
+      watch: false,
+      log: () => {},
+    });
+    servers.push(server);
+
+    for (const url of [
+      "/third_party/uplot/uPlot.min.css",
+      "/third_party/uplot/./uPlot.min.css",
+      "/third_party/uplot//uPlot.min.css",
+      "/third_party/uplot/%75Plot.min.css",
+    ]) {
+      const response = await fetch(`${server.url}${url}`);
+      expect(response.status, url).toBe(200);
+      expect(await response.text()).toContain(".uplot");
+    }
+  });
+
+  it("врезка без каталога не поднимается: `resolve(\"\")` открыл бы каталог запуска", async () => {
+    const root = mkdtempSync(join(tmpdir(), "ficsitai-screens-empty-"));
+    await expect(
+      startDevServer({
+        root,
+        mounts: { "/third_party": "" },
+        source: createDemoSource(),
+        port: 0,
+        watch: false,
+        log: () => {},
+      }),
+    ).rejects.toThrow(/без каталога/);
+  });
+
   it("выход за каталог врезки закрыт так же, как выход за корень", async () => {
     const root = mkdtempSync(join(tmpdir(), "ficsitai-screens-mount-esc-"));
     const outside = mkdtempSync(join(tmpdir(), "ficsitai-outside-mount-"));
