@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "InputCoreTypes.h"
 #include "IFicsitAIApi.h"
 #include "FicsitAIScreenTypes.generated.h"
 
@@ -58,6 +59,14 @@ struct FICSITAIAPI_API FFicsitAIScreenContext
     /** true — модуль получает ввод; false — только отображение. */
     UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Screen")
     bool bHasInputFocus = false;
+
+    /**
+     * Клавиши действия «Назад» по текущим привязкам хоста, вместе с Esc. Модуль не отдаёт их своему вводу
+     * (полю страницы, тексту), чтобы нажатие дошло до хоста и он спросил HandleBackAction. Хост обновляет
+     * список через OnContextChanged, когда игрок переназначает действие. Пусто — хост клавиш не сообщает.
+     */
+    UPROPERTY(BlueprintReadOnly, NotReplicated, Category = "FICSIT AI|Screen")
+    TArray<FKey> BackKeys;
 
     /** Публичный API мода (§3.6). Единственный путь модуля к данным и операциям. */
     UPROPERTY(BlueprintReadOnly, Category = "FICSIT AI|Screen")

@@ -8,7 +8,9 @@ public class FicsitAIApi : ModuleRules
 
         PublicDependencyModuleNames.AddRange(new string[] {
             "Core",
-            "CoreUObject"
+            "CoreUObject",
+            // FKey в контексте экрана (клавиши действия «Назад», ревью #69).
+            "InputCore"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {
