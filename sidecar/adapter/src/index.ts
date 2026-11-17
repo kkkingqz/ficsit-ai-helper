@@ -23,7 +23,7 @@ import {
 import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
 import { createLogger, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
-import { createSaveApi, type SaveApi } from "./save-api.js";
+import { allowedHosts, createSaveApi, type SaveApi } from "./save-api.js";
 import { tokenMatches } from "./token.js";
 import { ChatTurns } from "./turns.js";
 import { UpstreamMcp } from "./upstream.js";
@@ -182,6 +182,24 @@ export async function createApp(config: Config, log: Logger) {
   // 1 МиБ укладывается в `maxMessageBytes`, но вместе с конвертом сессии
   // выходило за глобальный лимит, и мод получал HTML-страницу 413 вместо
   // `{code:"TOO_LARGE"}` (ревью Gs на #51).
+  // Проверка `Host` для чтений по сохранению стоит **до** разбора тела.
+  // Иначе общий парсер успевает ответить первым: запрос с чужим `Host` и
+  // неизвестным `Content-Encoding` получал HTML-страницу Express со стеком и
+  // абсолютным путём адаптера (ревью Gs на #67). Данных сохранения там не
+  // было, но и этого ответа чужой получать не должен.
+  const saveHosts = allowedHosts(config);
+  app.use("/api/v0", (req: Request, res: Response, next: (error?: unknown) => void) => {
+    const host = req.headers.host ?? "";
+    if (saveHosts.has(host)) {
+      next();
+      return;
+    }
+    log.warn(`чтения по сохранению: запрос с чужим Host «${host}»`);
+    res.status(403).json({
+      error: { code: "INVALID_ARGUMENT", message: `запрос с чужим Host «${host}»` },
+    });
+  });
+
   app.use(
     express.json({
       limit: BODY_LIMIT,
@@ -203,6 +221,20 @@ export async function createApp(config: Config, log: Logger) {
     }
     if (type === "entity.parse.failed") {
       res.status(400).json({ code: "INVALID_ARGUMENT", message: "тело не разобрано как JSON" });
+      return;
+    }
+    // Остальные отказы разборщика тела Express отдавал HTML-страницей со
+    // стеком и абсолютным путём адаптера (ревью Gs на #67). Узнаём их по
+    // признаку самого разборщика — строковый `type` плюс свой код ответа, —
+    // а не по списку имён: у неподдерживаемой кодировки он
+    // `encoding.unsupported`, у оборванного запроса `request.aborted`, и
+    // перечислять их все значит однажды пропустить ещё один. Отвечаем
+    // коротко: чужой не должен узнавать из отказа, где у нас что лежит.
+    const status = (err as { status?: unknown; statusCode?: unknown } | null)?.status;
+    const fallback = (err as { statusCode?: unknown } | null)?.statusCode;
+    const code = typeof status === "number" ? status : typeof fallback === "number" ? fallback : 0;
+    if (typeof type === "string" && code >= 400 && code < 500) {
+      res.status(code).json({ code: "INVALID_ARGUMENT", message: "тело запроса не принято" });
       return;
     }
     next(err);

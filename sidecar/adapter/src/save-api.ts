@@ -194,7 +194,7 @@ export interface SaveApi {
  * сохранения на запрос с чужим `Host` (ревью Gs на #67, п. 3). Петля —
  * единственная защита остальных маршрутов, и здесь она должна быть такой же.
  */
-function allowedHosts(config: Config): ReadonlySet<string> {
+export function allowedHosts(config: Config): ReadonlySet<string> {
   const port = String(config.port);
   return new Set([
     `127.0.0.1:${port}`,
