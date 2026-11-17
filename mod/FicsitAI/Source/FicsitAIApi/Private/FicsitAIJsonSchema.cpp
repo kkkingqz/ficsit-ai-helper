@@ -8,12 +8,12 @@ namespace
 {
 enum EType : uint8
 {
-    TObject = 1 << 0,
-    TString = 1 << 1,
-    TInteger = 1 << 2,
-    TNumber = 1 << 3,
-    TBoolean = 1 << 4,
-    TNull = 1 << 5,
+    TypeObject = 1 << 0,
+    TypeString = 1 << 1,
+    TypeInteger = 1 << 2,
+    TypeNumber = 1 << 3,
+    TypeBoolean = 1 << 4,
+    TypeNull = 1 << 5,
 };
 
 /** Ключевые слова, которые проверку не меняют. */
@@ -139,12 +139,12 @@ TOptional<FString> FFicsitAIJsonSchema::FNode::Compile(const FJsonObject& Schema
             }
             for (const FString& Name : Names)
             {
-                if (Name == TEXT("object")) { Out.Types |= TObject; }
-                else if (Name == TEXT("string")) { Out.Types |= TString; }
-                else if (Name == TEXT("integer")) { Out.Types |= TInteger; }
-                else if (Name == TEXT("number")) { Out.Types |= TNumber; }
-                else if (Name == TEXT("boolean")) { Out.Types |= TBoolean; }
-                else if (Name == TEXT("null")) { Out.Types |= TNull; }
+                if (Name == TEXT("object")) { Out.Types |= TypeObject; }
+                else if (Name == TEXT("string")) { Out.Types |= TypeString; }
+                else if (Name == TEXT("integer")) { Out.Types |= TypeInteger; }
+                else if (Name == TEXT("number")) { Out.Types |= TypeNumber; }
+                else if (Name == TEXT("boolean")) { Out.Types |= TypeBoolean; }
+                else if (Name == TEXT("null")) { Out.Types |= TypeNull; }
                 else { return Bad(FString::Printf(TEXT("тип «%s» Validator v0 не поддерживает"), *Name)); }
             }
             if (Names.IsEmpty())
@@ -267,19 +267,19 @@ TOptional<FString> FFicsitAIJsonSchema::FNode::Check(const FJsonValue& Value, co
         bool bOk = false;
         switch (Value.Type)
         {
-        case EJson::Object: bOk = (Types & TObject) != 0; break;
-        case EJson::String: bOk = (Types & TString) != 0; break;
-        case EJson::Boolean: bOk = (Types & TBoolean) != 0; break;
-        case EJson::Null: bOk = (Types & TNull) != 0; break;
+        case EJson::Object: bOk = (Types & TypeObject) != 0; break;
+        case EJson::String: bOk = (Types & TypeString) != 0; break;
+        case EJson::Boolean: bOk = (Types & TypeBoolean) != 0; break;
+        case EJson::Null: bOk = (Types & TypeNull) != 0; break;
         case EJson::Number:
-            bOk = (Types & TNumber) != 0 || ((Types & TInteger) != 0 && FMath::IsFinite(Value.AsNumber()) && FMath::Frac(Value.AsNumber()) == 0.0);
+            bOk = (Types & TypeNumber) != 0 || ((Types & TypeInteger) != 0 && FMath::IsFinite(Value.AsNumber()) && FMath::Frac(Value.AsNumber()) == 0.0);
             break;
         default: break;
         }
         if (!bOk)
         {
-            const TCHAR* Want = (Types & TInteger) ? TEXT("целое число") : (Types & TNumber) ? TEXT("число") : (Types & TString) ? TEXT("строка")
-                : (Types & TObject) ? TEXT("объект") : (Types & TBoolean) ? TEXT("true или false") : TEXT("null");
+            const TCHAR* Want = (Types & TypeInteger) ? TEXT("целое число") : (Types & TypeNumber) ? TEXT("число") : (Types & TypeString) ? TEXT("строка")
+                : (Types & TypeObject) ? TEXT("объект") : (Types & TypeBoolean) ? TEXT("true или false") : TEXT("null");
             return FString::Printf(TEXT("%s: ожидается %s, пришло %s"), *Where(Path), Want, *Describe(Value));
         }
     }
