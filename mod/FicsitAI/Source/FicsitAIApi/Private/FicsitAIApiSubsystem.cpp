@@ -23,6 +23,14 @@ void UFicsitAIApiSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
     Core = MakeShared<FFicsitAIApiCore>();
+    // Мод инертен в любой не одиночной игре (§4.2). Проверка — на каждом запросе, а не опросом проводки:
+    // у клиента чужой сессии проводке не с кем синхронизироваться, у хоста опрос отстаёт на полсекунды.
+    TWeakObjectPtr<UWorld> WeakWorld(GetWorld());
+    Core->SetNetInertProbe([WeakWorld]()
+    {
+        const UWorld* World = WeakWorld.Get();
+        return World && World->GetNetMode() != NM_Standalone;
+    });
 }
 
 void UFicsitAIApiSubsystem::Deinitialize()

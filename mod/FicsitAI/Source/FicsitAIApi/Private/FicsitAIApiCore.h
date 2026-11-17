@@ -52,7 +52,14 @@ public:
     TResult<FFicsitAIValue> QueryMetric(const FString& MetricId, const FString& ScopeId) const;
     TResult<FFicsitAISeries> QuerySeries(const FString& MetricId, EFicsitAISeriesWindow Window, const FString& ScopeId) const;
 
-    bool IsInert() const { return bInert; }
+    /** Инертный режим: по проводке мода или сразу по сетевому режиму мира (Gs-109, п. 6). */
+    bool IsInert() const { return bInert || (NetInertProbe && NetInertProbe()); }
+
+    /**
+     * Проверка сетевого режима мира без опроса: true — игра не одиночная, мод инертен. Подсистема ставит её при
+     * создании, поэтому API клиента в чужой сессии и хоста до первой синхронизации проводки не отдаёт данные.
+     */
+    void SetNetInertProbe(TFunction<bool()> Probe) { NetInertProbe = MoveTemp(Probe); }
     double Now() const { return Clock(); }
 
     /** Причина расхождения версий для этого клиента; пусто — мажорные версии совпали или клиент версию не назвал. */
@@ -97,6 +104,7 @@ private:
 
     FString SaveId;
     bool bInert = false;
+    TFunction<bool()> NetInertProbe;
     FText InertReason;
 
     /** Что последним ушло событием api.status: шлём только переходы. */

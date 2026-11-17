@@ -126,8 +126,9 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FFicsitAIApiV0Test, "FicsitAI.Api.V0", EAutomat
 
 bool FFicsitAIApiV0Test::RunTest(const FString& Parameters)
 {
-    // Три предупреждения ядра — ожидаемые: снимок из прошлого (шаг 7), бесконечность и чужая область (шаг 8).
-    AddExpectedMessage(TEXT("отброшен"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 3);
+    // Четыре предупреждения ядра — ожидаемые: снимок из прошлого (шаг 7), бесконечность и чужая область (шаг 8),
+    // значение из будущего (шаг 18).
+    AddExpectedMessage(TEXT("отброшен"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 4);
 
     double Now = 1000.0;
     TSharedRef<FFicsitAIApiCore> Core = MakeShared<FFicsitAIApiCore>([&Now] { return Now; });
@@ -375,7 +376,7 @@ bool FFicsitAIApiV0Test::RunTest(const FString& Parameters)
         int32 ModelPassed = 0;
         for (int32 Index = 0; Index < 4; ++Index)
         {
-            ModelPassed += Model->Dispatch(TEXT("getStatus"), MakeShared<FJsonObject>()).HasError() ? 0 : 1;
+            ModelPassed += Model->Dispatch(TEXT("listMetrics"), MakeShared<FJsonObject>()).HasError() ? 0 : 1;
         }
         TestEqual(TEXT("10: модели — 2 подряд"), ModelPassed, 2);
     }
@@ -436,6 +437,139 @@ bool FFicsitAIApiV0Test::RunTest(const FString& Parameters)
         Core->Shutdown();
         TestEqual(TEXT("14: после закрытия"), Code(Call(TEXT("getStatus"), MakeShared<FJsonObject>())), FString(TEXT("SOURCE_UNAVAILABLE")));
         TestEqual(TEXT("14: событий нет"), Events.Names.Num(), Before);
+    }
+
+    // 15–21: правки по ревью #71 (Gs-109) — на отдельном ядре, чтобы не зависеть от шагов выше.
+    {
+        double T = 5000.0;
+        TSharedRef<FFicsitAIApiCore> Api = MakeShared<FFicsitAIApiCore>([&T] { return T; });
+        TSharedRef<FTestSource> Src = MakeShared<FTestSource>(EFicsitAIDataSource::Fixture);
+        Api->SetSource(Src);
+        Src->Sink->PublishSnapshot(MakeSnapshot(5.0, 7.0));
+        TSharedRef<FFicsitAIApiClient> Scr = Api->Connect(ClientInfo(EFicsitAIApiClientKind::Screen));
+        FEventLog Log;
+        Scr->SetEventHandler([&Log](const FString& Name, const TSharedRef<FJsonObject>& Data) { Log.Names.Add(Name); Log.Data.Add(Data); });
+        auto Do = [&T](const TSharedRef<FFicsitAIApiClient>& C, const TCHAR* Op, const TSharedRef<FJsonObject>& In)
+        {
+            T += 1.0;
+            return C->Dispatch(Op, In);
+        };
+
+        // 15. Права модели: только listMetrics и queryMetric (с окном — ряд), и в Dispatch, и в типизированных.
+        TSharedRef<FFicsitAIApiClient> Model = Api->Connect(ClientInfo(EFicsitAIApiClientKind::Model));
+        TestEqual(TEXT("15: модели listScopes нет"), Code(Do(Model, TEXT("listScopes"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}}))), FString(TEXT("UNKNOWN_OP")));
+        TestEqual(TEXT("15: модели querySeries нет"), Code(Do(Model, TEXT("querySeries"), Args({{TEXT("metricId"), Str(TEXT("power.consumption"))}, {TEXT("window"), Str(TEXT("last5Min"))}}))), FString(TEXT("UNKNOWN_OP")));
+        TestEqual(TEXT("15: модели getStatus нет"), Code(Do(Model, TEXT("getStatus"), MakeShared<FJsonObject>())), FString(TEXT("UNKNOWN_OP")));
+        TestEqual(TEXT("15: модели чата нет"), Code(Do(Model, TEXT("chatSend"), Args({{TEXT("text"), Str(TEXT("x"))}}))), FString(TEXT("UNKNOWN_OP")));
+        auto ModelSeries = Do(Model, TEXT("queryMetric"), Args({{TEXT("metricId"), Str(TEXT("power.consumption"))}, {TEXT("window"), Str(TEXT("last5Min"))}}));
+        TestTrue(TEXT("15: модели queryMetric с окном — ряд"), !ModelSeries.HasError() && ModelSeries.GetValue()->GetStringField(TEXT("kind")) == TEXT("series"));
+        T += 1.0;
+        FFicsitAIListScopesArgs ScopesArgs;
+        ScopesArgs.MetricId = TEXT("items.produced");
+        auto TypedScopes = Model->ListScopes(ScopesArgs);
+        TestTrue(TEXT("15: типизированный ListScopes модели — UNKNOWN_OP"), TypedScopes.HasError() && TypedScopes.GetError().Code == TEXT("UNKNOWN_OP"));
+        T += 1.0;
+        auto TypedStatus = Model->GetStatus();
+        TestTrue(TEXT("15: типизированный GetStatus модели — UNKNOWN_OP"), TypedStatus.HasError() && TypedStatus.GetError().Code == TEXT("UNKNOWN_OP"));
+
+        // 16. Единый допуск: ошибочные запросы тратят токен и подчиняются инертному режиму; имена — с учётом регистра.
+        T += 10.0;
+        for (int32 Index = 0; Index < 5; ++Index)
+        {
+            Scr->Dispatch(TEXT("nope"), MakeShared<FJsonObject>());
+            Scr->Dispatch(TEXT("listMetrics"), Args({{TEXT("pageSize"), Str(TEXT("x"))}}));
+        }
+        TestEqual(TEXT("16: десять ошибочных исчерпали лимит"), Code(Scr->Dispatch(TEXT("getStatus"), MakeShared<FJsonObject>())), FString(TEXT("RATE_LIMITED")));
+        TestEqual(TEXT("16: GETSTATUS — не getStatus"), Code(Do(Scr, TEXT("GETSTATUS"), MakeShared<FJsonObject>())), FString(TEXT("UNKNOWN_OP")));
+        TestEqual(TEXT("16: null вместо строки"), Code(Do(Scr, TEXT("listMetrics"), Args({{TEXT("metricId"), MakeShared<FJsonValueNull>()}}))), FString(TEXT("INVALID_ARGUMENT")));
+        TestEqual(TEXT("16: null вместо числа"), Code(Do(Scr, TEXT("listMetrics"), Args({{TEXT("pageSize"), MakeShared<FJsonValueNull>()}}))), FString(TEXT("INVALID_ARGUMENT")));
+        TestEqual(TEXT("16: metricId и cursor вместе"), Code(Do(Scr, TEXT("listMetrics"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}, {TEXT("cursor"), Str(TEXT("m:1"))}}))), FString(TEXT("INVALID_ARGUMENT")));
+        Api->SetModState(TEXT("s"), true, FText::FromString(TEXT("мультиплеер")));
+        TestEqual(TEXT("16: инертный — незнакомый запрос"), Code(Do(Scr, TEXT("nope"), MakeShared<FJsonObject>())), FString(TEXT("MOD_INERT")));
+        TestEqual(TEXT("16: инертный — неверные аргументы"), Code(Do(Scr, TEXT("listMetrics"), Args({{TEXT("pageSize"), Str(TEXT("x"))}}))), FString(TEXT("MOD_INERT")));
+
+        // 17. Причина статуса: при инертном режиме видно и расхождение версий; без проблем — недоступность ассистента.
+        TSharedRef<FFicsitAIApiClient> Future = Api->Connect(ClientInfo(EFicsitAIApiClientKind::Screen, TEXT("1.0.0")));
+        auto Both = Do(Future, TEXT("getStatus"), MakeShared<FJsonObject>());
+        TestTrue(TEXT("17: reason — инертный режим и версия"), !Both.HasError()
+            && Both.GetValue()->GetStringField(TEXT("reason")).Contains(TEXT("мультиплеер"))
+            && Both.GetValue()->GetStringField(TEXT("reason")).Contains(Both.GetValue()->GetStringField(TEXT("apiVersionMismatch"))));
+        Api->SetModState(TEXT("s"), false, FText::GetEmpty());
+        auto Calm = Do(Scr, TEXT("getStatus"), MakeShared<FJsonObject>());
+        TestTrue(TEXT("17: reason при готовых данных — ассистент"), !Calm.HasError() && Calm.GetValue()->GetStringField(TEXT("reason")).Contains(TEXT("сайдкар")));
+
+        // 18. Каталог в changedMetricIds: снятая метрика и изменённые области; значение из будущего отброшено.
+        auto Frozen = [](double Time)
+        {
+            FFicsitAISnapshot S = MakeSnapshot(Time, 7.0);
+            for (FFicsitAIMetricSnapshot& M : S.Metrics)
+            {
+                for (FFicsitAIMetricSample& V : M.Samples) { V.SessionTimeSec = 5.0; }
+            }
+            S.Metrics.RemoveAt(2); // без items.produced
+            return S;
+        };
+        Src->Sink->PublishSnapshot(Frozen(6.0));
+        auto ChangedIds = [&Log]()
+        {
+            TArray<FString> Ids;
+            if (TSharedPtr<FJsonObject> E = Log.Last(TEXT("metrics.snapshot")))
+            {
+                for (const TSharedPtr<FJsonValue>& V : E->GetArrayField(TEXT("changedMetricIds"))) { Ids.Add(V->AsString()); }
+            }
+            return Ids;
+        };
+        TestTrue(TEXT("18: снятая метрика в changedMetricIds"), ChangedIds() == TArray<FString>({TEXT("items.produced")}));
+        FFicsitAISnapshot Wider = Frozen(7.0);
+        Wider.Metrics[1].Descriptor.AvailableScopes.Add({TEXT("3"), FText::FromString(TEXT("Сеть 3"))});
+        Src->Sink->PublishSnapshot(Wider);
+        TestTrue(TEXT("18: новая область без новых значений — изменение"), ChangedIds() == TArray<FString>({TEXT("power.network.battery_time_to_empty")}));
+        Src->Sink->PublishSnapshot(Frozen(8.0));
+        FFicsitAISnapshot Ahead = Frozen(9.0);
+        Ahead.Metrics[0].Samples[0] = Sample(FString(), 99.0, 1000.0);
+        Src->Sink->PublishSnapshot(Ahead);
+        FFicsitAISnapshot Next = Frozen(10.0);
+        Next.Metrics[0].Samples[0] = Sample(FString(), 8.0, 10.0);
+        Src->Sink->PublishSnapshot(Next);
+        auto Points = Do(Scr, TEXT("querySeries"), Args({{TEXT("metricId"), Str(TEXT("power.consumption"))}, {TEXT("window"), Str(TEXT("last5Min"))}}));
+        TArray<double> Times;
+        if (!Points.HasError())
+        {
+            for (const TSharedPtr<FJsonValue>& V : Points.GetValue()->GetArrayField(TEXT("timestamps"))) { Times.Add(V->AsNumber()); }
+        }
+        TestTrue(TEXT("18: точка из будущего не вытеснила следующую"), Times == TArray<double>({5.0, 10.0}));
+
+        // 19. Обработчик события отключает своего клиента — вызов доживает до конца.
+        TSharedRef<FFicsitAIApiClient> Leaver = Api->Connect(ClientInfo(EFicsitAIApiClientKind::Screen));
+        TSharedRef<int32> Calls = MakeShared<int32>(0);
+        TWeakPtr<FFicsitAIApiClient> WeakLeaver = Leaver;
+        Leaver->SetEventHandler([WeakLeaver, Calls](const FString&, const TSharedRef<FJsonObject>&)
+        {
+            if (TSharedPtr<FFicsitAIApiClient> Self = WeakLeaver.Pin()) { Self->Disconnect(); }
+            ++(*Calls); // захват жив: обработчик вызван на копии
+        });
+        Src->Sink->PublishSnapshot(Frozen(11.0));
+        Src->Sink->PublishSnapshot(Frozen(12.0));
+        TestEqual(TEXT("19: обработчик вызван один раз и отписан"), *Calls, 1);
+
+        // 20. Несовместимая модель: состояние получает, снимков — нет.
+        TSharedRef<FFicsitAIApiClient> OldModel = Api->Connect(ClientInfo(EFicsitAIApiClientKind::Model, TEXT("1.0.0")));
+        FEventLog ModelLog;
+        OldModel->SetEventHandler([&ModelLog](const FString& Name, const TSharedRef<FJsonObject>& Data) { ModelLog.Names.Add(Name); ModelLog.Data.Add(Data); });
+        Src->Sink->PublishSnapshot(MakeSnapshot(13.0, 9.0));
+        Api->SetModState(TEXT("s"), true, FText::FromString(TEXT("мультиплеер")));
+        Api->SetModState(TEXT("s"), false, FText::GetEmpty());
+        TestEqual(TEXT("20: снимков несовместимой модели нет"), ModelLog.Count(TEXT("metrics.snapshot")), 0);
+        TestTrue(TEXT("20: состояние доходит"), ModelLog.Count(TEXT("mod.inert")) == 2 && ModelLog.Count(TEXT("api.status")) >= 1);
+
+        // 21. Сетевой режим мира: инертность без проводки.
+        Api->SetNetInertProbe([] { return true; });
+        TestEqual(TEXT("21: не одиночная игра — MOD_INERT"), Code(Do(Scr, TEXT("listMetrics"), MakeShared<FJsonObject>())), FString(TEXT("MOD_INERT")));
+        auto NetStatus = Do(Scr, TEXT("getStatus"), MakeShared<FJsonObject>());
+        TestTrue(TEXT("21: статус inert"), !NetStatus.HasError() && NetStatus.GetValue()->GetBoolField(TEXT("inert")));
+        Api->SetNetInertProbe(nullptr);
+        TestEqual(TEXT("21: одиночная — снова можно"), Code(Do(Scr, TEXT("listMetrics"), MakeShared<FJsonObject>())), FString(TEXT("OK")));
+        Api->Shutdown();
     }
     return true;
 }

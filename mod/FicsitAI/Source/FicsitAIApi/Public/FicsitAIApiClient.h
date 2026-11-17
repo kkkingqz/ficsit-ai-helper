@@ -25,7 +25,10 @@ public:
 
     const FFicsitAIApiClientInfo& GetInfo() const { return Info; }
 
-    /** Подписка на события. Один обработчик на подключение; пустой — отписка. */
+    /**
+     * Подписка на события. Один обработчик на подключение; пустой — отписка. Обработчик может сам отписаться или
+     * отключиться: вызов доживёт до конца на своей копии (ревью #71, P2).
+     */
     void SetEventHandler(FEventHandler Handler) { OnEvent = MoveTemp(Handler); }
 
     /** Отключиться: события больше не приходят, запросы отвечают SOURCE_UNAVAILABLE. */
@@ -37,17 +40,31 @@ public:
     TResult<FFicsitAIValue> QueryMetric(const FString& MetricId, const FString& ScopeId = FString());
     TResult<FFicsitAISeries> QuerySeries(const FString& MetricId, EFicsitAISeriesWindow Window, const FString& ScopeId = FString());
 
-    /** Запрос в канонической форме: имя в lowerCamelCase ("queryMetric") и аргументы. Для моста страниц и канала
-     *  адаптера — они говорят JSON. Ответ — тело в канонической форме или ошибка контракта. */
+    /** Запрос в канонической форме: имя в lowerCamelCase ("queryMetric", регистр важен) и аргументы. Для моста
+     *  страниц и канала адаптера — они говорят JSON. Ответ — тело в канонической форме или ошибка контракта.
+     *  Допуск тот же, что у типизированных запросов, и до разбора аргументов: ошибочный запрос тоже тратит токен. */
     TResult<TSharedRef<FJsonObject>> Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args);
+
+    /** Запросы API v0. Unknown — имени нет в контракте. */
+    enum class EOp : uint8 { Unknown, GetStatus, ListMetrics, ListScopes, QueryMetric, QuerySeries, ChatSend, ChatCancel, ChatHistory };
+    static EOp ParseOp(const FString& Op);
+
+    /** Права вида клиента (раздел «Клиенты»): модели — только list_metrics и query_metric, ряд входит во второй. */
+    static bool IsAllowed(EFicsitAIApiClientKind Kind, EOp Op);
 
 private:
     friend class FFicsitAIApiCore;
 
     FFicsitAIApiClient(const TSharedRef<FFicsitAIApiCore>& InCore, const FFicsitAIApiClientInfo& InInfo, double Now);
 
-    /** Запрос пропущен лимитом, инертным режимом и проверкой версии. Ошибка — почему нет. */
-    TOptional<FFicsitAIApiError> Admit(bool bStatusOnly);
+    /**
+     * Единый допуск запроса, по порядку: API открыт; лимит (токен списывается за любой запрос, и за ошибочный);
+     * инертный режим — всё, кроме getStatus; права вида клиента; мажорная версия модели. Ошибка — почему нет.
+     */
+    TOptional<FFicsitAIApiError> Admit(EOp Op, const FString& OpName);
+
+    /** Событие доходит до этого клиента: модели с несовпавшей мажорной версией данные не рассылаются. */
+    bool AcceptsEvent(const FString& Event) const;
 
     TWeakPtr<FFicsitAIApiCore> Core;
     FFicsitAIApiClientInfo Info;

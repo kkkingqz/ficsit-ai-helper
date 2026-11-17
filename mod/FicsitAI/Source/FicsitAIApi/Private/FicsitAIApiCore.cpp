@@ -113,6 +113,28 @@ bool Contains(const FString& Haystack, const FString& Needle)
     return Haystack.Contains(Needle, ESearchCase::IgnoreCase);
 }
 
+/** Описание метрики для клиента не изменилось: те же поля и тот же перечень областей в том же порядке. */
+bool SameDescriptor(const FFicsitAIMetricDescriptor& A, const FFicsitAIMetricDescriptor& B)
+{
+    if (A.Id != B.Id || !A.DisplayName.EqualTo(B.DisplayName)
+        || A.Unit != B.Unit || A.Scope != B.Scope || A.bHasSeries != B.bHasSeries || A.CostClass != B.CostClass
+        || A.SampleIntervalSec != B.SampleIntervalSec || A.bExternal != B.bExternal
+        || A.AvailableScopes.Num() != B.AvailableScopes.Num())
+    {
+        return false;
+    }
+    for (int32 Index = 0; Index < A.AvailableScopes.Num(); ++Index)
+    {
+        const FFicsitAIScopeRef& X = A.AvailableScopes[Index];
+        const FFicsitAIScopeRef& Y = B.AvailableScopes[Index];
+        if (!X.ScopeId.Equals(Y.ScopeId, ESearchCase::CaseSensitive) || !X.DisplayName.EqualTo(Y.DisplayName))
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool SameSample(const FFicsitAIMetricSample& A, const FFicsitAIMetricSample& B)
 {
     return A.State == B.State && A.SessionTimeSec == B.SessionTimeSec
@@ -242,7 +264,10 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
         State.Descriptor = In.Descriptor;
         State.Descriptor.bScopesTruncated = false;
         State.PrecisionDigits = In.PrecisionDigits;
-        bool bChanged = Previous == nullptr;
+        // Изменилось описание или перечень областей — тоже изменение: «Статистика» обновляет только
+        // перечисленные метрики и иначе держала бы старый каталог (Gs-109, п. 3).
+        bool bChanged = Previous == nullptr || !SameDescriptor(Previous->Descriptor, In.Descriptor)
+            || Previous->PrecisionDigits != In.PrecisionDigits;
 
         TSet<FString> Known;
         Known.Reserve(In.Descriptor.AvailableScopes.Num());
@@ -255,12 +280,15 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
         {
             const bool bFactory = In.Descriptor.Scope == EFicsitAIMetricScope::Factory;
             const bool bScopeOk = bFactory ? Sample.ScopeId.IsEmpty() : Known.Contains(Sample.ScopeId);
-            const bool bNumberOk = Sample.State == EFicsitAIValueState::NotApplicable || FMath::IsFinite(Sample.Value);
-            if (!bScopeOk || !bNumberOk || !FMath::IsFinite(Sample.SessionTimeSec))
+            const bool bNumberOk = (Sample.State == EFicsitAIValueState::NotApplicable || FMath::IsFinite(Sample.Value))
+                && FMath::IsFinite(Sample.SessionTimeSec);
+            // Значение из будущего снимка заняло бы окно и вытеснило бы последующие нормальные точки (Gs-109, п. 4).
+            const bool bTimeOk = bNumberOk && Sample.SessionTimeSec <= Snapshot.SessionTimeSec;
+            if (!bScopeOk || !bNumberOk || !bTimeOk)
             {
                 // NaN в JSON не пишется вовсе, а значение чужой области экран не найдёт: отбрасываем у границы.
                 UE_LOG(LogFicsitAIApi, Warning, TEXT("FicsitAI API: значение «%s» / «%s» отброшено — %s"), *Id, *Sample.ScopeId,
-                    !bScopeOk ? TEXT("области нет в перечне") : TEXT("не конечное число"));
+                    !bScopeOk ? TEXT("области нет в перечне") : !bNumberOk ? TEXT("не конечное число") : TEXT("время позже снимка"));
                 continue;
             }
             const FFicsitAIMetricSample* Old = Previous ? Previous->Samples.Find(Sample.ScopeId) : nullptr;
@@ -282,16 +310,25 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
                     }
                 }
             }
-            const double Oldest = Snapshot.SessionTimeSec - MaxWindowSec;
             for (const TPair<FString, FFicsitAIMetricSample>& Pair : State.Samples)
             {
-                TArray<FPoint>& Points = State.Series.FindOrAdd(Pair.Key);
                 const FFicsitAIMetricSample& Sample = Pair.Value;
                 // Неприменимые точки в ряд не пишутся: разрыв линии и есть «нет значения» (Gs-13).
-                if (Sample.State == EFicsitAIValueState::Value && (Points.IsEmpty() || Sample.SessionTimeSec > Points.Last().Time))
+                if (Sample.State != EFicsitAIValueState::Value)
+                {
+                    continue;
+                }
+                TArray<FPoint>& Points = State.Series.FindOrAdd(Pair.Key);
+                if (Points.IsEmpty() || Sample.SessionTimeSec > Points.Last().Time)
                 {
                     Points.Add({Sample.SessionTimeSec, Sample.Value});
                 }
+            }
+            // Час обрезается у всех рядов, и у областей, по которым в этом снимке значения нет (Gs-109, п. 4).
+            const double Oldest = Snapshot.SessionTimeSec - MaxWindowSec;
+            for (auto It = State.Series.CreateIterator(); It; ++It)
+            {
+                TArray<FPoint>& Points = It.Value();
                 int32 Drop = 0;
                 while (Drop < Points.Num() && Points[Drop].Time < Oldest)
                 {
@@ -300,6 +337,10 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
                 if (Drop > 0)
                 {
                     Points.RemoveAt(0, Drop, EAllowShrinking::No);
+                }
+                if (Points.IsEmpty())
+                {
+                    It.RemoveCurrent();
                 }
             }
         }
@@ -311,6 +352,15 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
         }
     }
 
+    // Исчезнувшая метрика — тоже изменение: клиент, не найдя её в каталоге, убирает её с экрана.
+    for (const FMetricState& Old : Metrics)
+    {
+        if (!FreshIndex.Contains(Old.Descriptor.Id))
+        {
+            Changed.Add(Old.Descriptor.Id);
+        }
+    }
+
     Metrics = MoveTemp(Fresh);
     MetricIndex = MoveTemp(FreshIndex);
     bHasSnapshot = true;
@@ -319,7 +369,7 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
     LastSnapshotTime = Snapshot.SessionTimeSec;
     BroadcastStatusIfChanged();
 
-    if (bInert)
+    if (IsInert())
     {
         return;
     }
@@ -367,26 +417,37 @@ FFicsitAIApiStatus FFicsitAIApiCore::BuildStatus(const FFicsitAIApiClientInfo& C
     Status.ApiVersion = ApiVersion;
     Status.SaveId = SaveId;
     Status.Source = Source.IsValid() ? Source->GetKind() : EFicsitAIDataSource::Live;
-    Status.bInert = bInert;
+    Status.bInert = IsInert();
     Status.LastSnapshotSessionTimeSec = LastSnapshotTime;
     // Канал к сайдкару в продукте ещё никто не поднимает (S2): связи нет, ассистент недоступен.
     Status.bSidecarConnected = false;
     Status.AssistantState = EFicsitAIAssistantState::Unavailable;
     Status.ApiVersionMismatch = VersionMismatch(Client);
 
-    // Одна причина — самая важная для игрока: инертный режим, расхождение версий, затем состояние данных.
-    if (bInert)
+    // Причина — самое важное для игрока: инертный режим, затем расхождение версий, затем данные, затем ассистент.
+    // Расхождение версий видно в Reason и при инертном режиме: контракт требует его в обоих полях (Gs-109, п. 6).
+    TArray<FString> Reasons;
+    if (Status.bInert)
     {
-        Status.Reason = InertReason.IsEmpty() ? NSLOCTEXT("FicsitAIApi", "Inert", "Мод в инертном режиме") : InertReason;
+        Reasons.Add((bInert && !InertReason.IsEmpty() ? InertReason : NSLOCTEXT("FicsitAIApi", "Inert", "Мод в инертном режиме: мультиплеерная сессия")).ToString());
     }
-    else if (!Status.ApiVersionMismatch.IsEmpty())
+    if (!Status.ApiVersionMismatch.IsEmpty())
     {
-        Status.Reason = FText::FromString(Status.ApiVersionMismatch);
+        Reasons.Add(Status.ApiVersionMismatch);
     }
-    else if (const TOptional<FFicsitAIApiError> DataError = CheckData())
+    if (Reasons.IsEmpty())
     {
-        Status.Reason = FText::FromString(DataError->Message);
+        if (const TOptional<FFicsitAIApiError> DataError = CheckData())
+        {
+            Reasons.Add(DataError->Message);
+        }
+        else
+        {
+            // Ассистент недоступен всегда, пока нет канала S2: причина не должна быть пустой (Gs-109, п. 10).
+            Reasons.Add(TEXT("ассистент недоступен: нет связи с сайдкаром"));
+        }
     }
+    Status.Reason = FText::FromString(FString::Join(Reasons, TEXT("; ")));
     return Status;
 }
 
@@ -415,9 +476,12 @@ void FFicsitAIApiCore::Broadcast(const FString& Event, TFunctionRef<TSharedRef<F
     for (const TWeakPtr<FFicsitAIApiClient>& Weak : Snapshot)
     {
         const TSharedPtr<FFicsitAIApiClient> Client = Weak.Pin();
-        if (Client.IsValid() && Client->OnEvent && Client->Core.IsValid())
+        if (Client.IsValid() && Client->OnEvent && Client->Core.IsValid() && Client->AcceptsEvent(Event))
         {
-            Client->OnEvent(Event, Data(Client->Info));
+            // Копия обработчика: он может отключить своего клиента, и сброс OnEvent уничтожил бы захват
+            // посреди вызова (Gs-109, п. 5). Client держит само подключение до конца итерации.
+            const FFicsitAIApiClient::FEventHandler Handler = Client->OnEvent;
+            Handler(Event, Data(Client->Info));
         }
     }
 }
@@ -496,6 +560,11 @@ FFicsitAIApiCore::TResult<FFicsitAIMetricPage> FFicsitAIApiCore::ListMetrics(con
     if (Args.MetricId.IsEmpty() && (Args.ScopeFilter.IsSet() || Args.ScopeCursor.IsSet()))
     {
         return MakeError(ApiError(FicsitAIApiErrors::InvalidArgument, TEXT("scopeFilter и scopeCursor допустимы только вместе с metricId")));
+    }
+    if (!Args.MetricId.IsEmpty() && !Args.Cursor.IsEmpty())
+    {
+        // С metricId ответ — один дескриптор, курсора метрик у него нет; курсор областей идёт в scopeCursor (Gs-109, п. 1).
+        return MakeError(ApiError(FicsitAIApiErrors::InvalidArgument, TEXT("с metricId курсор передаётся в scopeCursor, а не в cursor")));
     }
     if (TOptional<FFicsitAIApiError> NoData = CheckData())
     {
@@ -663,7 +732,7 @@ FFicsitAIApiCore::TResult<FFicsitAISeries> FFicsitAIApiCore::QuerySeries(const F
     {
         for (const FPoint& Point : *Points)
         {
-            if (Point.Time >= From)
+            if (Point.Time >= From && Point.Time <= LastSnapshotTime)
             {
                 Series.Timestamps.Add(Point.Time);
                 Series.Values.Add(Point.Value);

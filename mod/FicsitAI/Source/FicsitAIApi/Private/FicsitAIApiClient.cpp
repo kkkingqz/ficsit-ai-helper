@@ -16,11 +16,11 @@ FFicsitAIApiError BadArg(const FString& Message)
     return FFicsitAIApiError(FicsitAIApiErrors::InvalidArgument, Message);
 }
 
-/** Строковый аргумент: нет поля или null — не задан; другой тип — INVALID_ARGUMENT, а не молчаливая подмена. */
+/** Строковый аргумент: нет поля — не задан; null и другой тип — INVALID_ARGUMENT, а не молчаливая подмена. */
 TOptional<FFicsitAIApiError> ReadString(const FJsonObject& Args, const TCHAR* Name, TOptional<FString>& Out)
 {
     const TSharedPtr<FJsonValue> Field = Args.TryGetField(Name);
-    if (!Field.IsValid() || Field->IsNull())
+    if (!Field.IsValid())
     {
         return {};
     }
@@ -43,7 +43,7 @@ TOptional<FFicsitAIApiError> ReadString(const FJsonObject& Args, const TCHAR* Na
 TOptional<FFicsitAIApiError> ReadInt(const FJsonObject& Args, const TCHAR* Name, TOptional<int32>& Out)
 {
     const TSharedPtr<FJsonValue> Field = Args.TryGetField(Name);
-    if (!Field.IsValid() || Field->IsNull())
+    if (!Field.IsValid())
     {
         return {};
     }
@@ -114,7 +114,44 @@ void FFicsitAIApiClient::Disconnect()
     Core.Reset();
 }
 
-TOptional<FFicsitAIApiError> FFicsitAIApiClient::Admit(bool bStatusOnly)
+FFicsitAIApiClient::EOp FFicsitAIApiClient::ParseOp(const FString& Op)
+{
+    struct FName2Op { const TCHAR* Name; EOp Op; };
+    static const FName2Op Known[] = {
+        { TEXT("getStatus"), EOp::GetStatus },
+        { TEXT("listMetrics"), EOp::ListMetrics },
+        { TEXT("listScopes"), EOp::ListScopes },
+        { TEXT("queryMetric"), EOp::QueryMetric },
+        { TEXT("querySeries"), EOp::QuerySeries },
+        { TEXT("chatSend"), EOp::ChatSend },
+        { TEXT("chatCancel"), EOp::ChatCancel },
+        { TEXT("chatHistory"), EOp::ChatHistory },
+    };
+    for (const FName2Op& Entry : Known)
+    {
+        // Имена — каноническая форма, регистр важен: GETSTATUS — не getStatus (Gs-109, п. 9).
+        if (Op.Equals(Entry.Name, ESearchCase::CaseSensitive))
+        {
+            return Entry.Op;
+        }
+    }
+    return EOp::Unknown;
+}
+
+bool FFicsitAIApiClient::IsAllowed(EFicsitAIApiClientKind Kind, EOp Op)
+{
+    if (Op == EOp::Unknown)
+    {
+        return false;
+    }
+    if (Kind == EFicsitAIApiClientKind::Model)
+    {
+        return Op == EOp::ListMetrics || Op == EOp::QueryMetric;
+    }
+    return true;
+}
+
+TOptional<FFicsitAIApiError> FFicsitAIApiClient::Admit(EOp Op, const FString& OpName)
 {
     const TSharedPtr<FFicsitAIApiCore> Api = Core.Pin();
     if (!Api.IsValid())
@@ -134,16 +171,18 @@ TOptional<FFicsitAIApiError> FFicsitAIApiClient::Admit(bool bStatusOnly)
     }
     Tokens -= 1.0;
 
-    if (bStatusOnly)
-    {
-        return {};
-    }
-    if (Api->IsInert())
+    if (Op != EOp::GetStatus && Api->IsInert())
     {
         return FFicsitAIApiError(FicsitAIApiErrors::ModInert, TEXT("мод в инертном режиме: мультиплеерная сессия"));
     }
+    if (!IsAllowed(Info.Kind, Op))
+    {
+        return FFicsitAIApiError(FicsitAIApiErrors::UnknownOp, Op == EOp::Unknown
+            ? FString::Printf(TEXT("запроса «%s» нет в API v0"), *OpName)
+            : FString::Printf(TEXT("запрос «%s» модели недоступен: у неё только list_metrics и query_metric"), *OpName));
+    }
     // При расхождении мажорной версии AI-функции отключаются, ручные продолжают работать (§5.5).
-    if (Info.Kind == EFicsitAIApiClientKind::Model)
+    if (Info.Kind == EFicsitAIApiClientKind::Model && Op != EOp::GetStatus)
     {
         const FString Mismatch = FFicsitAIApiCore::VersionMismatch(Info);
         if (!Mismatch.IsEmpty())
@@ -154,9 +193,20 @@ TOptional<FFicsitAIApiError> FFicsitAIApiClient::Admit(bool bStatusOnly)
     return {};
 }
 
+bool FFicsitAIApiClient::AcceptsEvent(const FString& Event) const
+{
+    // Несовместимая модель узнаёт о состоянии (api.status, mod.inert), но данных не получает: её запросы данных
+    // всё равно отклоняются, а рассылка снимков ей — работа впустую.
+    if (Info.Kind == EFicsitAIApiClientKind::Model && Event == TEXT("metrics.snapshot"))
+    {
+        return FFicsitAIApiCore::VersionMismatch(Info).IsEmpty();
+    }
+    return true;
+}
+
 FFicsitAIApiClient::TResult<FFicsitAIApiStatus> FFicsitAIApiClient::GetStatus()
 {
-    if (TOptional<FFicsitAIApiError> Denied = Admit(true))
+    if (TOptional<FFicsitAIApiError> Denied = Admit(EOp::GetStatus, TEXT("getStatus")))
     {
         return MakeError(Denied.GetValue());
     }
@@ -165,7 +215,7 @@ FFicsitAIApiClient::TResult<FFicsitAIApiStatus> FFicsitAIApiClient::GetStatus()
 
 FFicsitAIApiClient::TResult<FFicsitAIMetricPage> FFicsitAIApiClient::ListMetrics(const FFicsitAIListMetricsArgs& Args)
 {
-    if (TOptional<FFicsitAIApiError> Denied = Admit(false))
+    if (TOptional<FFicsitAIApiError> Denied = Admit(EOp::ListMetrics, TEXT("listMetrics")))
     {
         return MakeError(Denied.GetValue());
     }
@@ -174,7 +224,7 @@ FFicsitAIApiClient::TResult<FFicsitAIMetricPage> FFicsitAIApiClient::ListMetrics
 
 FFicsitAIApiClient::TResult<FFicsitAIScopePage> FFicsitAIApiClient::ListScopes(const FFicsitAIListScopesArgs& Args)
 {
-    if (TOptional<FFicsitAIApiError> Denied = Admit(false))
+    if (TOptional<FFicsitAIApiError> Denied = Admit(EOp::ListScopes, TEXT("listScopes")))
     {
         return MakeError(Denied.GetValue());
     }
@@ -183,7 +233,7 @@ FFicsitAIApiClient::TResult<FFicsitAIScopePage> FFicsitAIApiClient::ListScopes(c
 
 FFicsitAIApiClient::TResult<FFicsitAIValue> FFicsitAIApiClient::QueryMetric(const FString& MetricId, const FString& ScopeId)
 {
-    if (TOptional<FFicsitAIApiError> Denied = Admit(false))
+    if (TOptional<FFicsitAIApiError> Denied = Admit(EOp::QueryMetric, TEXT("queryMetric")))
     {
         return MakeError(Denied.GetValue());
     }
@@ -192,7 +242,7 @@ FFicsitAIApiClient::TResult<FFicsitAIValue> FFicsitAIApiClient::QueryMetric(cons
 
 FFicsitAIApiClient::TResult<FFicsitAISeries> FFicsitAIApiClient::QuerySeries(const FString& MetricId, EFicsitAISeriesWindow Window, const FString& ScopeId)
 {
-    if (TOptional<FFicsitAIApiError> Denied = Admit(false))
+    if (TOptional<FFicsitAIApiError> Denied = Admit(EOp::QuerySeries, TEXT("querySeries")))
     {
         return MakeError(Denied.GetValue());
     }
@@ -201,13 +251,20 @@ FFicsitAIApiClient::TResult<FFicsitAISeries> FFicsitAIApiClient::QuerySeries(con
 
 FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args)
 {
-    if (Op == TEXT("getStatus"))
+    // Сначала допуск, потом аргументы: иначе ошибочные запросы шли бы мимо лимита и инертного режима (Gs-109, п. 2).
+    const EOp Kind = ParseOp(Op);
+    if (TOptional<FFicsitAIApiError> Denied = Admit(Kind, Op))
     {
-        TResult<FFicsitAIApiStatus> Status = GetStatus();
-        return ToBody(MoveTemp(Status));
+        return MakeError(Denied.GetValue());
     }
+    const TSharedPtr<FFicsitAIApiCore> Api = Core.Pin();
 
-    if (Op == TEXT("listMetrics"))
+    switch (Kind)
+    {
+    case EOp::GetStatus:
+        return MakeValue(FicsitAI::ApiJson::ToJson(Api->BuildStatus(Info)));
+
+    case EOp::ListMetrics:
     {
         FFicsitAIListMetricsArgs Typed;
         TOptional<FString> Scope;
@@ -234,10 +291,10 @@ FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatc
         {
             return MakeError(Bad.GetValue());
         }
-        return ToBody(ListMetrics(Typed));
+        return ToBody(Api->ListMetrics(Typed));
     }
 
-    if (Op == TEXT("listScopes"))
+    case EOp::ListScopes:
     {
         FFicsitAIListScopesArgs Typed;
         TOptional<FFicsitAIApiError> Bad = RequireMetricId(*Args, Typed.MetricId);
@@ -248,11 +305,12 @@ FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatc
         {
             return MakeError(Bad.GetValue());
         }
-        return ToBody(ListScopes(Typed));
+        return ToBody(Api->ListScopes(Typed));
     }
 
     // queryMetric с окном — ряд: так его видит модель, у которой одна операция query_metric (раздел «Операции v0»).
-    if (Op == TEXT("queryMetric") || Op == TEXT("querySeries"))
+    case EOp::QueryMetric:
+    case EOp::QuerySeries:
     {
         FString MetricId;
         FString ScopeId;
@@ -260,7 +318,7 @@ FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatc
         TOptional<FFicsitAIApiError> Bad = RequireMetricId(*Args, MetricId);
         Bad = Bad ? Bad : ReadString(*Args, TEXT("scopeId"), ScopeId);
         Bad = Bad ? Bad : ReadWindow(*Args, Window);
-        if (!Bad && Op == TEXT("querySeries") && !Window.IsSet())
+        if (!Bad && Kind == EOp::QuerySeries && !Window.IsSet())
         {
             Bad = BadArg(TEXT("querySeries требует window"));
         }
@@ -270,20 +328,19 @@ FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatc
         }
         if (Window.IsSet())
         {
-            return ToBody(QuerySeries(MetricId, Window.GetValue(), ScopeId));
+            return ToBody(Api->QuerySeries(MetricId, Window.GetValue(), ScopeId));
         }
-        return ToBody(QueryMetric(MetricId, ScopeId));
+        return ToBody(Api->QueryMetric(MetricId, ScopeId));
     }
 
-    if (Op == TEXT("chatSend") || Op == TEXT("chatCancel") || Op == TEXT("chatHistory"))
-    {
-        if (TOptional<FFicsitAIApiError> Denied = Admit(false))
-        {
-            return MakeError(Denied.GetValue());
-        }
+    case EOp::ChatSend:
+    case EOp::ChatCancel:
+    case EOp::ChatHistory:
         // Без связи с сайдкаром все три запроса чата отвечают сразу, без ожидания (0.5.0).
         return MakeError(FFicsitAIApiError(FicsitAIApiErrors::SidecarUnavailable, TEXT("нет связи с сайдкаром")));
-    }
 
+    case EOp::Unknown:
+        break;
+    }
     return MakeError(FFicsitAIApiError(FicsitAIApiErrors::UnknownOp, FString::Printf(TEXT("запроса «%s» нет в API v0"), *Op)));
 }
