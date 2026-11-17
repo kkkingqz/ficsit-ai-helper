@@ -78,7 +78,7 @@ node web/screens/api/dist/dev/cli.js --root web \
 
 ### Источник Save
 
-`--source save` (или `--saveEstimated`) подключает библиотеку Cf3 `sidecar/save-source/` и отдаёт экранам числа из файла сохранения — без игры, без сайдкара и без мода.
+`--source save` — или `--source saveEstimated` для оценочных скоростей — подключает библиотеку Cf3 `sidecar/save-source/` и отдаёт экранам числа из файла сохранения — без игры, без сайдкара и без мода.
 
 | Флаг | Переменная | Что это |
 | --- | --- | --- |
@@ -102,7 +102,8 @@ node web/screens/api/dist/dev/cli.js --root web \
 `example/index.html` — страница на фасаде: статус, каталог, значения и перерисовка по событию снимка. Она же проверка связки в браузере:
 
 ```bash
-node dist/dev/cli.js --root . --port 5173
+# из корня репозитория, как и остальные команды выше
+node web/screens/api/dist/dev/cli.js --root web/screens/api --port 5173
 # http://127.0.0.1:5173/example/index.html
 ```
 
