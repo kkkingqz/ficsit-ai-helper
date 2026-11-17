@@ -13,14 +13,23 @@ namespace
         { TEXT("Statistics"), TEXT("/screens/statistics/index.html") },
         { TEXT("Chat"), TEXT("/screens/chat/index.html") },
     };
+
+    /**
+     * Веб-экран регистрируется, только если его страница запустится: браузер есть, страница собрана и не
+     * опирается на встроенные скрипты (ревью #69, P1). Иначе E остаётся на рабочем модуле без браузера.
+     */
+    bool IsWebScreenReady(const FWebScreen& Screen)
+    {
+        return UFicsitAIWebScreenModule::IsWebAvailable() && UFicsitAIWebScreenModule::IsPageReady(Screen.Page);
+    }
 }
 
 TArray<FName> UFicsitAIScreenModuleFactoryImpl::GetRegisteredModules() const
 {
     TArray<FName> Modules = { FName(TEXT("Notes")), FName(TEXT("Status")), FName(TEXT("Incompatible")) };
-    if (UFicsitAIWebScreenModule::IsWebAvailable())
+    for (const FWebScreen& Screen : WebScreens)
     {
-        for (const FWebScreen& Screen : WebScreens)
+        if (IsWebScreenReady(Screen))
         {
             Modules.Add(FName(Screen.Id));
         }
@@ -55,22 +64,19 @@ TScriptInterface<IFicsitAIScreenModule> UFicsitAIScreenModuleFactoryImpl::Create
         return Result;
     }
 
-    if (UFicsitAIWebScreenModule::IsWebAvailable())
+    for (const FWebScreen& Screen : WebScreens)
     {
-        for (const FWebScreen& Screen : WebScreens)
+        if (ModuleId == FName(Screen.Id) && IsWebScreenReady(Screen))
         {
-            if (ModuleId == FName(Screen.Id))
-            {
-                UFicsitAIWebScreenModule* Module = NewObject<UFicsitAIWebScreenModule>(Outer);
-                const FText Name = ModuleId == FName(TEXT("Chat"))
-                    ? NSLOCTEXT("FicsitAI", "ChatModuleTitle", "Чат с ИИ")
-                    : NSLOCTEXT("FicsitAI", "StatisticsModuleTitle", "Статистика");
-                Module->Configure(ModuleId, Screen.Page, Name);
-                TScriptInterface<IFicsitAIScreenModule> Result;
-                Result.SetObject(Module);
-                Result.SetInterface(Cast<IFicsitAIScreenModule>(Module));
-                return Result;
-            }
+            UFicsitAIWebScreenModule* Module = NewObject<UFicsitAIWebScreenModule>(Outer);
+            const FText Name = ModuleId == FName(TEXT("Chat"))
+                ? NSLOCTEXT("FicsitAI", "ChatModuleTitle", "Чат с ИИ")
+                : NSLOCTEXT("FicsitAI", "StatisticsModuleTitle", "Статистика");
+            Module->Configure(ModuleId, Screen.Page, Name);
+            TScriptInterface<IFicsitAIScreenModule> Result;
+            Result.SetObject(Module);
+            Result.SetInterface(Cast<IFicsitAIScreenModule>(Module));
+            return Result;
         }
     }
     return nullptr;

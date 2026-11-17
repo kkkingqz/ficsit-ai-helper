@@ -157,6 +157,8 @@ public:
 
     UFUNCTION(BlueprintPure, Category = "FICSIT AI|Terminal")
     bool IsWorldScreenDirty() const { return bWorldScreenDirty; }
+    /** Модуль экрана в мире снят по расстоянию, экран показывает последний кадр (для проверок). */
+    bool IsWorldModuleParked() const { return bWorldModuleParked; }
 
     uint64 GetWorldScreenRenderRevision() const { return WorldScreenRenderRevision; }
     uint64 GetWorldScreenDrawCount() const { return WorldScreenDrawCount; }
@@ -227,7 +229,32 @@ protected:
     uint64 WorldScreenRenderRevision = 0;
     uint64 WorldScreenDrawCount = 0;
 
+    /**
+     * Живой модуль на экране в мире — только у ближнего терминала (§6.3.1, условие 4; ревью #69, P2). Дальше
+     * ParkDistance модуль снимается (OnDetach, у веб-модуля закрывается браузер), а render target хранит последний
+     * кадр: экран показывает кэшированную картинку. Ближе WakeDistance модуль возвращается. Разрыв между
+     * расстояниями не даёт модулю мигать на границе. Проверка — раз в ProximityCheckInterval секунд.
+     */
+    UPROPERTY(EditDefaultsOnly, Category = "Screen")
+    float LiveScreenParkDistance = 3000.0f;
+
+    UPROPERTY(EditDefaultsOnly, Category = "Screen")
+    float LiveScreenWakeDistance = 2500.0f;
+
+    static constexpr float ProximityCheckInterval = 0.5f;
+    float ProximityCheckCountdown = 0.0f;
+
+    /** Модуль снят по расстоянию: ActiveModuleId сохранён, экземпляра на поверхности нет. */
+    bool bWorldModuleParked = false;
+
+    /** Клавиши действия «Назад» по текущим привязкам игрока; уходят модулю в интерактивном контексте. */
+    TArray<FKey> HostBackKeys;
+
     void InitializeWorldScreen();
     void UpdateWorldScreenMaterialParameters();
     void TeardownActiveModule();
+    void UpdateWorldModuleProximity(float DeltaSeconds);
+    void ParkWorldModule();
+    bool UnparkWorldModule();
+    void RefreshBackKeys(class UEnhancedInputLocalPlayerSubsystem* Subsystem);
 };

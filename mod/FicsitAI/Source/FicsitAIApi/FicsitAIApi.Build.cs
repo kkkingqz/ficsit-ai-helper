@@ -12,7 +12,9 @@ public class FicsitAIApi : ModuleRules
             // Подсистема мира (FicsitAIApiSubsystem). Только движок: без игры и SML, чтобы экраны жили и вне игры (S6).
             "Engine",
             // Каноническая форма запросов и событий: мост страниц и канал адаптера говорят JSON.
-            "Json"
+            "Json",
+            // FKey в контексте экрана (клавиши действия «Назад», ревью #69).
+            "InputCore"
         });
 
         PrivateDependencyModuleNames.AddRange(new string[] {

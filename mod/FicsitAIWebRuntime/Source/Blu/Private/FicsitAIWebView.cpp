@@ -4,6 +4,7 @@
 #include "IBlu.h"
 #include "Engine/Texture2D.h"
 #include "Rendering/DrawElements.h"
+#include "InputCoreTypes.h"
 
 #if PLATFORM_WINDOWS
 #include "Windows/AllowWindowsPlatformTypes.h"
@@ -67,8 +68,7 @@ void SFicsitAIWebView::Construct(const FArguments& InArgs)
 	Eye = InArgs._Eye;
 	Brush.DrawAs = ESlateBrushDrawType::Image;
 	bFollowPixelSize = InArgs._FollowPixelSize;
-	HostKeys = InArgs._HostKeys;
-	bHostEscape = HostKeys.Contains(EKeys::Escape);
+	SetHostKeys(InArgs._HostKeys);
 	// Желаемый размер не следует за размером страницы: иначе при FollowPixelSize размер виджета зависел бы
 	// от размера браузера, а тот — от размера виджета.
 	const FIntPoint Size = PageSize();
@@ -230,6 +230,30 @@ namespace
 		const uint32 Ch = FChar::ToUpper(static_cast<TCHAR>(Event.GetCharacter()));
 		return ((Ch >= 'A' && Ch <= 'Z') || (Ch >= '0' && Ch <= '9')) ? static_cast<int32>(Ch) : 0;
 	}
+
+	/** Код виртуальной клавиши для FKey; 0 — у клавиши его нет (геймпад, мышь). */
+	int32 KeyCodeOf(const FKey& Key)
+	{
+		const uint32* KeyCode = nullptr;
+		const uint32* CharCode = nullptr;
+		FInputKeyManager::Get().GetCodesFromKey(Key, KeyCode, CharCode);
+		if (KeyCode) { return static_cast<int32>(*KeyCode); }
+		return CharCode ? static_cast<int32>(FChar::ToUpper(static_cast<TCHAR>(*CharCode))) : 0;
+	}
+
+	/** Символ, который клавиша присылает событием OnKeyChar без модификаторов; 0 — не присылает. */
+	TCHAR CharOf(const FKey& Key)
+	{
+		if (Key == EKeys::Escape) { return 0x1B; }
+		if (Key == EKeys::BackSpace) { return 0x08; }
+		if (Key == EKeys::Enter) { return TEXT('\r'); }
+		if (Key == EKeys::Tab) { return TEXT('\t'); }
+		if (Key == EKeys::SpaceBar) { return TEXT(' '); }
+		const uint32* KeyCode = nullptr;
+		const uint32* CharCode = nullptr;
+		FInputKeyManager::Get().GetCodesFromKey(Key, KeyCode, CharCode);
+		return CharCode ? static_cast<TCHAR>(*CharCode) : 0;
+	}
 }
 
 FReply SFicsitAIWebView::OnKeyDown(const FGeometry& Geometry, const FKeyEvent& Event)
@@ -266,13 +290,45 @@ FReply SFicsitAIWebView::OnKeyUp(const FGeometry& Geometry, const FKeyEvent& Eve
 	return FReply::Handled();
 }
 
+void SFicsitAIWebView::SetHostKeys(const TArray<FKey>& InKeys)
+{
+	HostKeys.Reset();
+	HostChars.Reset();
+	for (const FKey& Key : InKeys)
+	{
+		if (!Key.IsValid() || HostKeys.Contains(Key))
+		{
+			continue;
+		}
+		HostKeys.Add(Key);
+		const int32 Vk = KeyCodeOf(Key);
+		// Если страница держит эту клавишу нажатой, отпускаем: её отпускание теперь уйдёт хосту.
+		if (Vk != 0 && PressedKeys.Remove(Vk) > 0)
+		{
+			if (CefRefPtr<CefBrowserHost> Host = Eye.IsValid() ? Eye->GetBrowserHost() : nullptr)
+			{
+				CefKeyEvent Up;
+				Up.type = KEYEVENT_KEYUP;
+				Up.windows_key_code = Vk;
+				Up.native_key_code = NativeKeyCode(Vk);
+				Host->SendKeyEvent(Up);
+			}
+		}
+		const TCHAR Ch = CharOf(Key);
+		if (Ch != 0)
+		{
+			HostChars.Add(FChar::ToLower(Ch));
+		}
+	}
+}
+
 FReply SFicsitAIWebView::OnKeyChar(const FGeometry& Geometry, const FCharacterEvent& Event)
 {
 	CefRefPtr<CefBrowserHost> Host = Eye.IsValid() ? Eye->GetBrowserHost() : nullptr;
 	if (!Host) { return FReply::Unhandled(); }
 	const TCHAR Ch = Event.GetCharacter();
-	// Windows присылает Esc ещё и символом 0x1B: его тоже оставляем хосту.
-	if (bHostEscape && Ch == 0x1B) { return FReply::Unhandled(); }
+	// Windows присылает Esc, Backspace и буквы ещё и символом: символ клавиши хоста тоже остаётся хосту.
+	if (IsHostChar(Ch)) { return FReply::Unhandled(); }
 	CefKeyEvent Key;
 	Key.type = KEYEVENT_CHAR;
 	Key.windows_key_code = static_cast<int>(Ch);

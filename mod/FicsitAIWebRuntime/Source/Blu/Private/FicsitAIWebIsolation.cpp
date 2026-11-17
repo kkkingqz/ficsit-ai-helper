@@ -1,5 +1,7 @@
 // FicsitAI: изоляция страниц. См. FicsitAIWebIsolation.h.
 #include "FicsitAIWebIsolation.h"
+
+#include <atomic>
 #include "IBlu.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
@@ -299,6 +301,18 @@ namespace
 
 namespace FicsitAIWeb
 {
+	static std::atomic<bool> GCefReady{ false };
+
+	bool IsCefReady()
+	{
+		return GCefReady.load();
+	}
+
+	void MarkCefReady()
+	{
+		GCefReady.store(true);
+	}
+
 	void SetWebRoot(const FString& AbsoluteDir)
 	{
 		FString Normalized = FPaths::ConvertRelativePathToFull(AbsoluteDir);
