@@ -116,12 +116,18 @@ function sse(res: ServerResponse): Held {
 }
 
 const playthroughJson = (req: IncomingMessage, res: ServerResponse): boolean => {
-  if (req.method === "GET" && !req.url?.endsWith("/messages")) {
+  if (req.method !== "GET") return false;
+  // Записи истории: адаптер читает их до и после хода, чтобы связать записи
+  // с его номером (Co-129). Прежде этот путь падал в ветку потока, и ход
+  // вставал, не начавшись.
+  if (req.url?.endsWith("/messages") === true) {
     res.writeHead(200, { "content-type": "application/json" });
-    res.end(JSON.stringify({ id: "playthrough" }));
+    res.end("[]");
     return true;
   }
-  return false;
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(JSON.stringify({ id: "playthrough" }));
+  return true;
 };
 
 /** Foreman, которому в проверке делать нечего. */
@@ -606,6 +612,132 @@ describe("чат по каналу", () => {
     expect(history).toHaveLength(10);
     expect(history[0]?.text).toBe("сообщение 70");
     expect(history[9]?.text).toBe("сообщение 79");
+  });
+
+  /**
+   * Foreman с настоящим порядком записи: вопрос игрока — до потока, ответ
+   * модели — после (`packages/ff-server/src/routes/chat.ts`).
+   */
+  const storingForeman = async (
+    stored: { id: string; role: string; content: string; createdAt: string }[],
+    options: { foreignWriter?: boolean; failChat?: boolean } = {},
+  ) => {
+    let seq = stored.length;
+    const append = (role: string, content: string): void => {
+      seq += 1;
+      stored.push({ id: `s${seq}`, role, content, createdAt: new Date(seq).toISOString() });
+    };
+    return await fakeForeman((req, res, hold) => {
+      if (req.method === "GET" && req.url?.endsWith("/messages") === true) {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify(stored));
+        return;
+      }
+      if (req.method === "GET") {
+        res.writeHead(200, { "content-type": "application/json" });
+        res.end(JSON.stringify({ id: "playthrough" }));
+        return;
+      }
+      if (req.url?.endsWith("/chat") === true) {
+        if (options.failChat === true) {
+          // Проба Gs: ход падает до записи, а в тот же playthrough пишет
+          // чужой клиент — ровно вопросом и ответом.
+          if (options.foreignWriter === true) {
+            append("user", "вопрос из веб-клиента Foreman");
+            append("assistant", "ответ чужому клиенту");
+          }
+          res.writeHead(500, { "content-type": "application/json" });
+          res.end("{}");
+          return;
+        }
+        append("user", "вопрос игрока");
+        if (options.foreignWriter === true) append("user", "вопрос из веб-клиента Foreman");
+        const stream = sse(res);
+        stream.send("text", { delta: "ответ" });
+        hold({
+          send: (event, data) => {
+            if (event === "done") append("assistant", "полный ответ");
+            stream.send(event, data);
+          },
+          end: stream.end,
+        });
+        return;
+      }
+      res.end("{}");
+    });
+  };
+
+  const historyOf = async (mod: ModClient, id: string) => {
+    await mod.send([mod.next("chat.history", { saveId: SAVE_ID }, id)]);
+    const reply = await mod.wait("reply", id);
+    return (reply.body as { messages: { id: string; role: string; turnId?: string }[] }).messages;
+  };
+
+  it("история не несёт номера хода: происхождение записи не доказано (Co-129)", async () => {
+    // Поле есть в протоколе, но адаптер его не заполняет: Foreman не
+    // возвращает идентификатор при записи, и доказать, что запись сделал
+    // именно наш ход, нечем.
+    const fake = await storingForeman([]);
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "вопрос" }, "m-1")]);
+    await mod.wait("reply", "m-1");
+    await mod.wait("chat.text");
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await mod.wait("chat.done");
+
+    const history = await historyOf(mod, "m-2");
+    expect(history.map((item) => item.role)).toEqual(["user", "assistant"]);
+    // Ни у одной записи — и пустой строки вместо номера тоже нет.
+    expect(history.some((item) => "turnId" in item)).toBe(false);
+  });
+
+  it("чужие записи не получают номер упавшего хода (проба Gs на #70)", async () => {
+    // То, что ловила связь по окну появления записей: ход падает с 500 до
+    // записи, чужой клиент пишет вопрос и ответ, и прежняя версия вешала на
+    // них номер неудавшегося хода. Состав `user, assistant` подтверждает
+    // форму, но не происхождение.
+    const fake = await storingForeman([], { failChat: true, foreignWriter: true });
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "мой вопрос" }, "m-1")]);
+    await mod.wait("reply", "m-1");
+    await mod.wait("chat.failed");
+
+    const history = await historyOf(mod, "m-2");
+    expect(history).toHaveLength(2);
+    expect(history.some((item) => item.turnId !== undefined)).toBe(false);
+    // И чужой текст, конечно, остаётся чужим.
+    expect(history[0]?.role).toBe("user");
+  });
+
+  it("после chat.done следующий ход принимается сразу", async () => {
+    // Клиент по `done` уже разрешает отправить следующий вопрос, поэтому
+    // слот не должен держаться вспомогательной работой (ревью Gs на #70).
+    const fake = await storingForeman([]);
+    const { base } = await adapterFor(fake);
+    const mod = new ModClient(base);
+    await mod.hello();
+    await mod.openStream();
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "первый" }, "m-1")]);
+    await mod.wait("reply", "m-1");
+    await mod.wait("chat.text");
+    fake.held()?.send("done", { ok: true });
+    fake.held()?.end();
+    await mod.wait("chat.done");
+
+    await mod.send([mod.next("chat.send", { saveId: SAVE_ID, text: "второй" }, "m-2")]);
+    const reply = await mod.wait("reply", "m-2");
+    expect(reply.error?.code).toBeUndefined();
+    expect((reply.body as { turnId?: string }).turnId).toBeTypeOf("string");
   });
 
   it("пустой текст хода — INVALID_ARGUMENT, до Foreman не идёт", async () => {

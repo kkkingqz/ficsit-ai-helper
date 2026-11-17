@@ -98,6 +98,16 @@ export interface HistoryMessage {
   role: string;
   text: string;
   createdAt: string;
+  /**
+   * Ход, которому принадлежит запись.
+   *
+   * Поле есть в протоколе и в API v0 0.5.1 (`chat.history`, Co-129), но
+   * адаптер его **не заполняет**: Foreman не возвращает идентификатор при
+   * записи, и доказать происхождение записи нечем. Поле объявлено, чтобы
+   * форма совпадала с контрактом и заполнилась без правки типов, когда
+   * источник связи появится (Co2-78).
+   */
+  turnId?: string;
 }
 
 interface StoredMessage {
@@ -368,26 +378,47 @@ export class ChatTurns {
     return "cancelled";
   }
 
+  /**
+   * Записи истории playthrough, как их отдаёт Foreman.
+   *
+   * Отдельным методом, хотя читает его теперь только история: форма ответа
+   * Foreman описана в одном месте, и разбор её не размазан по файлу.
+   */
+  private async storedMessages(playthroughId: string): Promise<StoredMessage[]> {
+    const response = await this.foreman.request(`/api/playthroughs/${playthroughId}/messages`);
+    if (!response.ok) {
+      throw new TurnError("FOREMAN_UNAVAILABLE", `история недоступна: ${response.status}`);
+    }
+    return (await response.json()) as StoredMessage[];
+  }
+
   /** История разговора: от старых к новым, хвостом нужной длины. */
   public async history(args: z.infer<typeof chatHistorySchema>): Promise<HistoryMessage[]> {
     const playthroughId = await this.playthroughFor(args.saveId);
     const limit = args.limit ?? DEFAULT_HISTORY_LIMIT;
 
-    let response: Response;
+    let all: StoredMessage[];
     try {
-      response = await this.foreman.request(`/api/playthroughs/${playthroughId}/messages`);
+      all = await this.storedMessages(playthroughId);
     } catch (err: unknown) {
+      if (err instanceof TurnError) throw err;
       throw new TurnError(
         "FOREMAN_UNAVAILABLE",
         `история недоступна: ${err instanceof Error ? err.message : String(err)}`,
       );
     }
-    if (!response.ok) {
-      throw new TurnError("FOREMAN_UNAVAILABLE", `история недоступна: ${response.status}`);
-    }
 
     // Foreman отдаёт до 500 сообщений по возрастанию времени; моду нужен хвост.
-    const all = (await response.json()) as StoredMessage[];
+    //
+    // `turnId` адаптер не заполняет, и это решение, а не недоделка. Foreman
+    // не возвращает идентификатор при записи (его `appendMessage` отдаёт их
+    // только в базу), поэтому доказать, что запись сделал именно наш ход,
+    // нечем. Связь по окну появления записей я пробовал — Gs показал, чего
+    // она стоит: пока ход падал с 500, в тот же playthrough писал чужой
+    // клиент, и его вопрос с ответом получили номер неудавшегося хода.
+    // Состав записей подтверждает форму, но не происхождение. По Co-129
+    // поле остаётся пустым, пока не появится подтверждённый источник связи
+    // (спросил Co — Co2-78).
     return all.slice(-limit).map((message) => ({
       id: message.id,
       role: message.role,
