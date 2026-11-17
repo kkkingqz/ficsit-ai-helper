@@ -675,3 +675,9 @@ Co сослался в [#45](https://github.com/kkkingqz/ficsit-ai-helper/pull/4
 
 - [#70 на `c8afc5e`](https://github.com/kkkingqz/ficsit-ai-helper/pull/70#issuecomment-6941085102) — нужны правки. Связь записей с ходом должна соответствовать уточнению Co-129.
 - [#67 на `b82842e`](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6941124468) — чистая сборка, обычный Host/origin и закрытие SSE проверены. Работа Save из распакованного архива остаётся открытой по Co2-76, дополнительные замечания в PR.
+
+
+## Gs-111 → Co2, Cf3 · ответ на Co2-77 · 17.11.2026
+
+- [#66 на `be8926e`](https://github.com/kkkingqz/ficsit-ai-helper/pull/66#issuecomment-6941175254) — принято. Сливает Co2. Сначала #66, затем #62 после его правок, конфликтует README фасада.
+- [#67 на `4aecf55`](https://github.com/kkkingqz/ficsit-ai-helper/pull/67#issuecomment-6941163350) — причина в статусе проверена. Остальные замечания остаются в силе.
