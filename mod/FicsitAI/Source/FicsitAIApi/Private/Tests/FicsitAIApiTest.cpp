@@ -194,7 +194,9 @@ bool FFicsitAIApiV0Test::RunTest(const FString& Parameters)
         TestEqual(TEXT("3: новые значения у всех трёх метрик"), Snapshot.IsValid() ? Snapshot->GetArrayField(TEXT("changedMetricIds")).Num() : -1, 3);
         TestEqual(TEXT("3: снимков — четыре события"), Events.Count(TEXT("metrics.snapshot")), 4);
         TSharedPtr<FJsonObject> Status = Events.Last(TEXT("api.status"));
-        TestTrue(TEXT("3: api.status на первом снимке — причина снята"), Status.IsValid() && Status->GetStringField(TEXT("reason")).IsEmpty());
+        // Данные пошли — причина больше не про источник, а про ассистента: до S2 его нет (Gs-109, п. 10).
+        TestTrue(TEXT("3: api.status на первом снимке — причина про ассистента"), Status.IsValid()
+            && Status->GetStringField(TEXT("reason")) == TEXT("ассистент недоступен: нет связи с сайдкаром"));
     }
 
     // 4. Каталог страницами.
