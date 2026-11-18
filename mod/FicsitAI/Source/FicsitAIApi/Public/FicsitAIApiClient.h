@@ -29,7 +29,10 @@ public:
      * Подписка на события. Один обработчик на подключение; пустой — отписка. Обработчик может сам отписаться или
      * отключиться: вызов доживёт до конца на своей копии (ревью #71, P2).
      */
-    void SetEventHandler(FEventHandler Handler) { OnEvent = MoveTemp(Handler); }
+    void SetEventHandler(FEventHandler Handler)
+    {
+        OnEvent = Handler ? MakeShared<FEventHandler>(MoveTemp(Handler)) : TSharedPtr<FEventHandler>();
+    }
 
     /** Отключиться: события больше не приходят, запросы отвечают SOURCE_UNAVAILABLE. */
     void Disconnect();
@@ -75,7 +78,9 @@ private:
 
     TWeakPtr<FFicsitAIApiCore> Core;
     FFicsitAIApiClientInfo Info;
-    FEventHandler OnEvent;
+    /** Один экземпляр обработчика на подключение: его состояние живёт между событиями, а рассылка удерживает
+     *  его ссылкой до выхода из вызова, даже если внутри клиент отключился (ревью #71). */
+    TSharedPtr<FEventHandler> OnEvent;
 
     /** Ведро токенов: ёмкость — лимит в секунду, пополнение непрерывное (§7.4). */
     double Tokens = 0.0;

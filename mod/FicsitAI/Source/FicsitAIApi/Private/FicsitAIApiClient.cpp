@@ -110,7 +110,7 @@ FFicsitAIApiClient::FFicsitAIApiClient(const TSharedRef<FFicsitAIApiCore>& InCor
 
 void FFicsitAIApiClient::Disconnect()
 {
-    OnEvent = nullptr;
+    OnEvent.Reset();
     Core.Reset();
 }
 

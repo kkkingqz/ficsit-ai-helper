@@ -441,7 +441,7 @@ bool FFicsitAIApiV0Test::RunTest(const FString& Parameters)
         TestEqual(TEXT("14: событий нет"), Events.Names.Num(), Before);
     }
 
-    // 15–21: правки по ревью #71 (Gs-109) — на отдельном ядре, чтобы не зависеть от шагов выше.
+    // 15–24: правки по ревью #71 (Gs-109 и повторная проверка) — на отдельном ядре, чтобы не зависеть от шагов выше.
     {
         double T = 5000.0;
         TSharedRef<FFicsitAIApiCore> Api = MakeShared<FFicsitAIApiCore>([&T] { return T; });
@@ -571,6 +571,40 @@ bool FFicsitAIApiV0Test::RunTest(const FString& Parameters)
         TestTrue(TEXT("21: статус inert"), !NetStatus.HasError() && NetStatus.GetValue()->GetBoolField(TEXT("inert")));
         Api->SetNetInertProbe(nullptr);
         TestEqual(TEXT("21: одиночная — снова можно"), Code(Do(Scr, TEXT("listMetrics"), MakeShared<FJsonObject>())), FString(TEXT("OK")));
+
+        // 22. Обработчик — один экземпляр: состояние захвата живёт между событиями (ревью #71 на 26ee565).
+        TSharedRef<FFicsitAIApiClient> Counter = Api->Connect(ClientInfo(EFicsitAIApiClientKind::Screen));
+        int32 Seen = 0;
+        Counter->SetEventHandler([Count = 0, &Seen](const FString& Name, const TSharedRef<FJsonObject>&) mutable
+        {
+            if (Name == TEXT("metrics.snapshot")) { Seen = ++Count; }
+        });
+        Src->Sink->PublishSnapshot(MakeSnapshot(20.0, 1.0));
+        Src->Sink->PublishSnapshot(MakeSnapshot(21.0, 2.0));
+        TestEqual(TEXT("22: счётчик в захвате дошёл до двух"), Seen, 2);
+        Counter->Disconnect();
+
+        // 23. cursor с metricId — отказ, даже пустой: важно наличие поля, а не значение.
+        TestEqual(TEXT("23: metricId и пустой cursor"), Code(Do(Scr, TEXT("listMetrics"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}, {TEXT("cursor"), Str(TEXT(""))}}))), FString(TEXT("INVALID_ARGUMENT")));
+        TestEqual(TEXT("23: пустой cursor без metricId — первая страница"), Code(Do(Scr, TEXT("listMetrics"), Args({{TEXT("cursor"), Str(TEXT(""))}}))), FString(TEXT("OK")));
+
+        // 24. ID областей с учётом регистра: ScopeA и scopea — разные области со своими значениями и рядами.
+        {
+            FFicsitAISnapshot Cased = MakeSnapshot(22.0, 3.0);
+            FFicsitAIMetricSnapshot& Items = Cased.Metrics[2];
+            Items.Descriptor.AvailableScopes = {{TEXT("ScopeA"), FText::FromString(TEXT("A"))}, {TEXT("scopea"), FText::FromString(TEXT("a"))}};
+            Items.Samples = {Sample(TEXT("ScopeA"), 10.0, 22.0), Sample(TEXT("scopea"), 20.0, 22.0)};
+            Src->Sink->PublishSnapshot(Cased);
+            auto Upper = Do(Scr, TEXT("queryMetric"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}, {TEXT("scopeId"), Str(TEXT("ScopeA"))}}));
+            auto Lower = Do(Scr, TEXT("queryMetric"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}, {TEXT("scopeId"), Str(TEXT("scopea"))}}));
+            TestTrue(TEXT("24: ScopeA — своё значение"), !Upper.HasError() && Upper.GetValue()->GetNumberField(TEXT("value")) == 10.0);
+            TestTrue(TEXT("24: scopea — своё значение"), !Lower.HasError() && Lower.GetValue()->GetNumberField(TEXT("value")) == 20.0);
+            auto LowerSeries = Do(Scr, TEXT("querySeries"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}, {TEXT("scopeId"), Str(TEXT("scopea"))}, {TEXT("window"), Str(TEXT("last5Min"))}}));
+            TestTrue(TEXT("24: ряд scopea — одна своя точка"), !LowerSeries.HasError() && LowerSeries.GetValue()->GetArrayField(TEXT("values")).Num() == 1
+                && LowerSeries.GetValue()->GetArrayField(TEXT("values"))[0]->AsNumber() == 20.0);
+            TestEqual(TEXT("24: SCOPEA — такой области нет"), Code(Do(Scr, TEXT("queryMetric"), Args({{TEXT("metricId"), Str(TEXT("items.produced"))}, {TEXT("scopeId"), Str(TEXT("SCOPEA"))}}))), FString(TEXT("SCOPE_NOT_FOUND")));
+            TestEqual(TEXT("24: метрика с другим регистром — неизвестна"), Code(Do(Scr, TEXT("queryMetric"), Args({{TEXT("metricId"), Str(TEXT("POWER.CONSUMPTION"))}}))), FString(TEXT("UNKNOWN_METRIC")));
+        }
         Api->Shutdown();
     }
     return true;
