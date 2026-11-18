@@ -3,6 +3,9 @@
 #include "Buildables/FGBuildableAutomatedWorkBench.h"
 #include "GameFacade/Lines/FicsitAILineRegistry.h"
 #include "GameFramework/Actor.h"
+#include "Engine/World.h"
+#include "Engine/Level.h"
+#include "UObject/Package.h"
 #include "UObject/StrongObjectPtr.h"
 #include "UObject/GarbageCollection.h"
 
@@ -210,6 +213,29 @@ bool FBuildingIndexActorEligibilityTest::RunTest(const FString&)
     Entry.BuildingId = TEXT("previous");
     TestFalse(TEXT("An owned internal actor is not a standalone building"), TryReadPersistentActor(Building.Get(), Entry));
     TestEqual(TEXT("Rejected internal actor preserves prior identity"), Entry.BuildingId, FString(TEXT("previous")));
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBuildingIndexSavedIdentityTest, "FicsitAI.BuildingIndex.SavedIdentity",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBuildingIndexSavedIdentityTest::RunTest(const FString&)
+{
+    // Regression: absolute UObject paths are stable within Live but cannot match keys stored in Save.
+    const FString PackageName = TEXT("/Game/FicsitAI/Tests/BuildingIndexIdentity_") + FGuid::NewGuid().ToString(EGuidFormats::Digits);
+    TStrongObjectPtr<UPackage> Package(CreatePackage(*PackageName));
+    TStrongObjectPtr<UWorld> World(NewObject<UWorld>(Package.Get(), TEXT("Persistent_Level")));
+    TStrongObjectPtr<ULevel> Level(NewObject<ULevel>(World.Get(), TEXT("PersistentLevel")));
+    TStrongObjectPtr<AFGBuildableAutomatedWorkBench> Building(NewObject<AFGBuildableAutomatedWorkBench>(
+        Level.Get(), TEXT("Build_AutomatedWorkBench_C_SaveIdentity")));
+
+    TestTrue(TEXT("The fixture has an absolute package path"), Building->GetPathName().StartsWith(PackageName + TEXT(".")));
+    FEntry Entry;
+    TestTrue(TEXT("The persistent actor supplies identity"), TryReadPersistentActor(Building.Get(), Entry));
+    TestEqual(TEXT("Identity matches the Save object reference"), Entry.BuildingId,
+        FString(TEXT("Persistent_Level:PersistentLevel.Build_AutomatedWorkBench_C_SaveIdentity")));
+    TestFalse(TEXT("Identity excludes the absolute package path"), Entry.BuildingId.StartsWith(TEXT("/")));
+    TestTrue(TEXT("Identity retains the persistent level"), Entry.BuildingId.Contains(TEXT(":PersistentLevel.")));
     return true;
 }
 

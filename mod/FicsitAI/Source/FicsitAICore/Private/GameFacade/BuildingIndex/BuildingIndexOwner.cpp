@@ -102,7 +102,8 @@ bool TryReadPersistentActor(AFGBuildable* Buildable, FEntry& OutEntry)
         return false;
     }
     FEntry Entry;
-    Entry.BuildingId = Buildable->GetPathName();
+    // Save object references are relative to the map package; the absolute asset path is not part of buildingId.
+    Entry.BuildingId = Buildable->GetPathName(Buildable->GetOutermost());
     Entry.ClassName = Buildable->GetClass()->GetFName();
     Entry.ClassPath = Buildable->GetClass()->GetPathName();
     Entry.Position = Buildable->GetActorLocation();
