@@ -249,6 +249,13 @@ FFicsitAIApiClient::TResult<FFicsitAISeries> FFicsitAIApiClient::QuerySeries(con
     return Core.Pin()->QuerySeries(MetricId, Window, ScopeId);
 }
 
+FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::DenyUnknown(const FString& Name)
+{
+    // Admit для Unknown всегда отказывает: лимит, затем инертный режим, затем UNKNOWN_OP по правам.
+    TOptional<FFicsitAIApiError> Denied = Admit(EOp::Unknown, Name);
+    return MakeError(Denied.IsSet() ? Denied.GetValue() : FFicsitAIApiError(FicsitAIApiErrors::UnknownOp, Name));
+}
+
 FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> FFicsitAIApiClient::Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args)
 {
     return Dispatch(Op, Args, [] { return TOptional<FFicsitAIApiError>(); });

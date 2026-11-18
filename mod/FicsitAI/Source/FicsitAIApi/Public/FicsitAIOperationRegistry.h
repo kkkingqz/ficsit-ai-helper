@@ -80,6 +80,13 @@ public:
      */
     TResult<TSharedRef<FJsonObject>> Invoke(const FString& Id, const TSharedRef<FJsonObject>& Args, FFicsitAIApiClient& Client) const;
 
+    /**
+     * Ручной путь экрана: запрос API по его имени ("queryMetric"). Если запрос выполняет операция реестра, аргументы
+     * проходят тот же Validator, что у инструмента модели (§7.5, правило 1); остальные запросы — как в Dispatch.
+     * Через этот путь ходит мост веб-экранов.
+     */
+    TResult<TSharedRef<FJsonObject>> DispatchApi(const FString& ApiOp, const TSharedRef<FJsonObject>& Args, FFicsitAIApiClient& Client) const;
+
 private:
     struct FEntry
     {

@@ -98,11 +98,24 @@ FFicsitAIOperationRegistry::TResult<TSharedRef<FJsonObject>> FFicsitAIOperationR
     const bool bModel = Client.GetInfo().Kind == EFicsitAIApiClientKind::Model;
     if (!Entry || (bModel && !Entry->Operation.bExposedToModel))
     {
-        // Имя операции — не имя запроса API: подключение пропустит его через допуск и ответит UNKNOWN_OP.
-        return Client.Dispatch(Id, Args);
+        // Имя вне реестра — отказ через допуск подключения, без разбора как запроса API: иначе внутреннее имя
+        // «listMetrics» прошло бы мимо Validator (ревью #72, P1).
+        return Client.DenyUnknown(Id);
     }
     const FFicsitAIJsonSchema& Schema = Entry->Schema;
     return Client.Dispatch(Entry->Operation.ApiOp, Args, [&Schema, &Args] { return Schema.Validate(Args); });
+}
+
+FFicsitAIOperationRegistry::TResult<TSharedRef<FJsonObject>> FFicsitAIOperationRegistry::DispatchApi(
+    const FString& ApiOp, const TSharedRef<FJsonObject>& Args, FFicsitAIApiClient& Client) const
+{
+    const FEntry* Entry = Entries.FindByPredicate([&ApiOp](const FEntry& E) { return E.Operation.ApiOp.Equals(ApiOp, ESearchCase::CaseSensitive); });
+    if (!Entry)
+    {
+        return Client.Dispatch(ApiOp, Args);
+    }
+    const FFicsitAIJsonSchema& Schema = Entry->Schema;
+    return Client.Dispatch(ApiOp, Args, [&Schema, &Args] { return Schema.Validate(Args); });
 }
 
 const FFicsitAIOperationRegistry& FFicsitAIOperationRegistry::V0()

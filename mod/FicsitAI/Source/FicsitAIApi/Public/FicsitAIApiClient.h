@@ -55,6 +55,10 @@ public:
      *  как любой ошибочный запрос, и в инертном режиме уступает MOD_INERT. */
     TResult<TSharedRef<FJsonObject>> Dispatch(const FString& Op, const TSharedRef<FJsonObject>& Args, FArgsCheck Check);
 
+    /** Отказ запросу, которого для этого клиента нет (имя вне реестра операций): тот же допуск — лимит и инертный
+     *  режим раньше, затем UNKNOWN_OP. Имя не разбирается как запрос API (ревью #72). */
+    TResult<TSharedRef<FJsonObject>> DenyUnknown(const FString& Name);
+
     /** Запросы API v0. Unknown — имени нет в контракте. */
     enum class EOp : uint8 { Unknown, GetStatus, ListMetrics, ListScopes, QueryMetric, QuerySeries, ChatSend, ChatCancel, ChatHistory };
     static EOp ParseOp(const FString& Op);

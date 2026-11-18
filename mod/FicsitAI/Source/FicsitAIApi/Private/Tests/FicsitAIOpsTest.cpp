@@ -193,6 +193,44 @@ bool FFicsitAIOpsV0Test::RunTest(const FString& Parameters)
         TSharedRef<FFicsitAIApiClient> Screen = Core->Connect(Info(EFicsitAIApiClientKind::Screen));
         Now += 1.0;
         TestEqual(TEXT("5: экран — та же схема"), Code(Registry.Invoke(TEXT("list_metrics"), Obj(TEXT("{\"pageSize\":0}")), *Screen)), FString(TEXT("INVALID_ARGUMENT")));
+
+        // 6. Имя вне реестра не разбирается как запрос API (ревью #72, P1): внутреннее «listMetrics» мимо Validator не идёт.
+        Now += 1.0;
+        TestEqual(TEXT("6: модель — внутреннее имя listMetrics"), Code(Registry.Invoke(TEXT("listMetrics"), Obj(TEXT("{\"unexpected\":1}")), *Model)), FString(TEXT("UNKNOWN_OP")));
+        Now += 1.0;
+        TestEqual(TEXT("6: экран — внутреннее имя listMetrics"), Code(Registry.Invoke(TEXT("listMetrics"), Obj(TEXT("{\"unexpected\":1}")), *Screen)), FString(TEXT("UNKNOWN_OP")));
+        {
+            FFicsitAIOperationRegistry Hidden;
+            FFicsitAIOperation Op;
+            Op.Id = TEXT("list_scopes");
+            Op.ApiOp = TEXT("listScopes");
+            Op.InputSchemaText = TEXT("{\"type\":\"object\",\"required\":[\"metricId\"],\"properties\":{\"metricId\":{\"type\":\"string\"}},\"additionalProperties\":false}");
+            TestFalse(TEXT("6: операция только для ручного пути"), Hidden.Register(Op).IsSet());
+            Now += 1.0;
+            TestEqual(TEXT("6: модели невыставленная операция — UNKNOWN_OP"), Code(Hidden.Invoke(TEXT("list_scopes"), Obj(TEXT("{\"metricId\":\"power.consumption\"}")), *Model)), FString(TEXT("UNKNOWN_OP")));
+            Now += 1.0;
+            TestEqual(TEXT("6: экрану — выполняется"), Code(Hidden.Invoke(TEXT("list_scopes"), Obj(TEXT("{\"metricId\":\"power.consumption\"}")), *Screen)), FString(TEXT("OK")));
+        }
+        // Отказ имени вне реестра тоже тратит токен и уступает MOD_INERT.
+        Now += 10.0;
+        Registry.Invoke(TEXT("nope"), Obj(TEXT("{}")), *Model);
+        Registry.Invoke(TEXT("nope"), Obj(TEXT("{}")), *Model);
+        TestEqual(TEXT("6: отказы тратят токены"), Code(Registry.Invoke(TEXT("list_metrics"), Obj(TEXT("{}")), *Model)), FString(TEXT("RATE_LIMITED")));
+        Core->SetModState(TEXT("s"), true, FText::FromString(TEXT("мультиплеер")));
+        Now += 1.0;
+        TestEqual(TEXT("6: инертный режим раньше UNKNOWN_OP"), Code(Registry.Invoke(TEXT("nope"), Obj(TEXT("{}")), *Model)), FString(TEXT("MOD_INERT")));
+        Core->SetModState(TEXT("s"), false, FText::GetEmpty());
+
+        // 7. Ручной путь экрана (мост веб-экранов) — общий Validator для операций реестра (ревью #72, P2).
+        Now += 1.0;
+        auto Manual = Registry.DispatchApi(TEXT("listMetrics"), Obj(TEXT("{\"unexpected\":1}")), *Screen);
+        TestTrue(TEXT("7: listMetrics экрана — схема операции"), Manual.HasError() && Manual.GetError().Code == TEXT("INVALID_ARGUMENT") && Manual.GetError().Message.StartsWith(TEXT("unexpected")));
+        Now += 1.0;
+        TestEqual(TEXT("7: queryMetric экрана с окном — проходит схему"), Code(Registry.DispatchApi(TEXT("queryMetric"), Obj(TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\"}")), *Screen)), FString(TEXT("OK")));
+        Now += 1.0;
+        TestEqual(TEXT("7: запрос вне реестра — как раньше"), Code(Registry.DispatchApi(TEXT("getStatus"), Obj(TEXT("{\"x\":1}")), *Screen)), FString(TEXT("OK")));
+        Now += 1.0;
+        TestEqual(TEXT("7: querySeries — свой разбор"), Code(Registry.DispatchApi(TEXT("querySeries"), Obj(TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\"}")), *Screen)), FString(TEXT("OK")));
         Core->Shutdown();
     }
     return true;
