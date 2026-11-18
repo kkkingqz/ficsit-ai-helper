@@ -59,7 +59,6 @@ export class StatisticsController implements StatisticsActions {
   private metricsState: MetricsStateManager;
   private catalog: MetricDescriptor[] = [];
   private resourceScopes: ScopeRef[] = [];
-  private generatorScopes: ScopeRef[] = [];
   private unsubscribeSnapshot: (() => void) | null = null;
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private isDestroyed = false;
@@ -170,14 +169,6 @@ export class StatisticsController implements StatisticsActions {
       }
     } catch {
       this.resourceScopes = [];
-    }
-
-    // Discover generator scopes (machineType)
-    try {
-      const genScopesRes = await this.api.listScopes({ metricId: "generators.total" });
-      this.generatorScopes = genScopesRes.scopes;
-    } catch {
-      this.generatorScopes = [];
     }
   }
 
@@ -403,23 +394,7 @@ export class StatisticsController implements StatisticsActions {
       }
     });
 
-    // Query generator type metrics if generator scopes exist
-    const genPromises = this.generatorScopes.map(async (scope) => {
-      try {
-        const [totalVal, runningVal, prodVal] = await Promise.all([
-          this.api.queryMetric({ metricId: "generators.total", scopeId: scope.scopeId }).catch(() => undefined),
-          this.api.queryMetric({ metricId: "generators.running", scopeId: scope.scopeId }).catch(() => undefined),
-          this.api.queryMetric({ metricId: "generators.production", scopeId: scope.scopeId }).catch(() => undefined),
-        ]);
-        if (totalVal) this.cachedValues.set(`generators.total:${scope.scopeId}`, totalVal);
-        if (runningVal) this.cachedValues.set(`generators.running:${scope.scopeId}`, runningVal);
-        if (prodVal) this.cachedValues.set(`generators.production:${scope.scopeId}`, prodVal);
-      } catch {
-        // Handled gracefully
-      }
-    });
-
-    await Promise.all([...queryPromises, ...seriesPromises, ...genPromises]);
+    await Promise.all([...queryPromises, ...seriesPromises]);
   }
 
   private async queryResourcesMetrics(changedMetricIds?: string[]): Promise<void> {
@@ -496,30 +471,6 @@ export class StatisticsController implements StatisticsActions {
 
   // --- Model building ---
 
-  private formatSource(v: MetricValue | ReadingValue | undefined, isDerived = false): string | undefined {
-    if (isDerived) return this.copy.derivedSource;
-    if (!v) return undefined;
-    if ("source" in v && v.source) {
-      switch (v.source) {
-        case "live":
-          return this.copy.liveSource;
-        case "save":
-          return this.copy.saveSource ?? "Save file";
-        case "saveEstimated":
-          return this.copy.saveEstimatedSource ?? "Save estimated";
-        case "recorded":
-          return this.copy.recordedSource ?? "Recorded session";
-        case "planned":
-          return this.copy.plannedSource ?? "Plan estimate";
-        case "fixture":
-          return this.copy.fixtureSource;
-        default:
-          return (v as any).source;
-      }
-    }
-    return undefined;
-  }
-
   public buildModel(): StatisticsModel {
     return this.currentTab === "energy"
       ? this.buildEnergyModel()
@@ -593,49 +544,15 @@ export class StatisticsController implements StatisticsActions {
             state: "notApplicable",
           };
 
-    let totalRunningGenerators = 0;
-    let anyGenValue: MetricValue | undefined;
-
-    for (const scope of this.generatorScopes) {
-      const runningVal = this.cachedValues.get(`generators.running:${scope.scopeId}`) as MetricValue | undefined;
-      const totalVal = this.cachedValues.get(`generators.total:${scope.scopeId}`) as MetricValue | undefined;
-      const prodVal = this.cachedValues.get(`generators.production:${scope.scopeId}`) as MetricValue | undefined;
-      if (!anyGenValue) {
-        anyGenValue = prodVal ?? runningVal ?? totalVal;
+    // Format tile sources
+    const formatSource = (v: MetricValue | ReadingValue | undefined, isDerived = false): string | undefined => {
+      if (isDerived) return this.copy.derivedSource;
+      if (!v) return undefined;
+      if ("source" in v && v.source) {
+        return v.source === "live" ? this.copy.liveSource : this.copy.fixtureSource;
       }
-      if (runningVal && runningVal.value !== null) {
-        totalRunningGenerators += runningVal.value;
-      }
-    }
-
-    let genReading: MetricValue | ReadingValue;
-    let genTileFreshness: FreshnessItem;
-    if (this.generatorScopes.length > 0 && anyGenValue) {
-      genReading = {
-        kind: "value",
-        metricId: "generators.running",
-        scopeId: "",
-        unit: "count",
-        precisionDigits: 0,
-        sessionTimeSec: anyGenValue.sessionTimeSec,
-        state: "value",
-        value: totalRunningGenerators,
-        source: anyGenValue.source,
-      };
-      genTileFreshness = evaluateFreshness(anyGenValue, sessionTime, 10);
-    } else if (genVal && genVal.value !== null) {
-      genReading = genVal;
-      genTileFreshness = evaluateFreshness(genVal, sessionTime, 10);
-    } else {
-      genReading = {
-        value: null,
-        unit: "count",
-        precisionDigits: 0,
-        sessionTimeSec: sessionTime,
-        state: "notApplicable",
-      };
-      genTileFreshness = { kind: "empty", label: "NO DATA" };
-    }
+      return undefined;
+    };
 
     const tiles: TileModel[] = [
       {
@@ -649,7 +566,7 @@ export class StatisticsController implements StatisticsActions {
           state: "notApplicable",
         },
         state: freshProduction,
-        source: this.formatSource(prodVal),
+        source: formatSource(prodVal),
       },
       {
         id: "consumption",
@@ -662,7 +579,7 @@ export class StatisticsController implements StatisticsActions {
           state: "notApplicable",
         },
         state: freshConsumption,
-        source: this.formatSource(consVal),
+        source: formatSource(consVal),
       },
       {
         id: "capacity",
@@ -675,28 +592,34 @@ export class StatisticsController implements StatisticsActions {
           state: "notApplicable",
         },
         state: freshCapacity,
-        source: this.formatSource(capVal),
+        source: formatSource(capVal),
       },
       {
         id: "headroom",
         label: this.copy.headroomLabel,
         reading: headroomReading,
         state: freshCapacity,
-        source: this.formatSource(headroomReading, true),
+        source: formatSource(headroomReading, true),
       },
       {
         id: "peak",
         label: this.copy.sessionPeakLabel,
         reading: peakReading,
         state: freshConsumption,
-        source: this.formatSource(peakReading, true),
+        source: formatSource(peakReading, true),
       },
       {
         id: "generators",
         label: this.copy.generatorsOnlineLabel,
-        reading: genReading,
-        state: genTileFreshness,
-        source: this.formatSource(genReading),
+        reading: genVal ?? {
+          value: null,
+          unit: "count",
+          precisionDigits: 0,
+          sessionTimeSec: sessionTime,
+          state: "notApplicable",
+        },
+        state: genVal ? evaluateFreshness(genVal, sessionTime, 5) : { kind: "empty", label: "NO DATA" },
+        source: formatSource(genVal),
       },
     ];
 
@@ -789,55 +712,44 @@ export class StatisticsController implements StatisticsActions {
       },
     ];
 
-    const genTableGroups: TableGroup[] = [];
+    const generatorTypes = [
+      { name: "Coal Generator", total: 4, running: 3, output: 225, load: 75 },
+      { name: "Fuel Generator", total: 4, running: 4, output: 600, load: 100 },
+      { name: "Geothermal Generator", total: 2, running: 2, output: 400, load: 100 },
+    ];
 
-    for (const scope of this.generatorScopes) {
-      const totalVal = this.cachedValues.get(`generators.total:${scope.scopeId}`) as MetricValue | undefined;
-      const runningVal = this.cachedValues.get(`generators.running:${scope.scopeId}`) as MetricValue | undefined;
-      const prodVal = this.cachedValues.get(`generators.production:${scope.scopeId}`) as MetricValue | undefined;
-
-      const total = totalVal?.value ?? 0;
-      const running = runningVal?.value ?? 0;
-
-      if (total === 0 && running === 0 && (!prodVal || prodVal.value === 0 || prodVal.value === null)) {
-        continue;
-      }
-
-      const isNotApplicable = prodVal?.state === "notApplicable";
-      const outputCell: ReadingValue | MetricValue = prodVal ?? {
-        value: null,
-        unit: "megawatt",
-        precisionDigits: 0,
-        state: "notApplicable",
-        sessionTimeSec: sessionTime,
-      };
-
-      const loadString = isNotApplicable || total === 0
-        ? "—"
-        : `${Math.round((running / total) * 100)} %`;
-
-      genTableGroups.push({
-        id: `type-${scope.scopeId}`,
-        summary: [
-          scope.displayName,
-          `${running} / ${total} running`,
-          outputCell,
-          loadString,
-        ],
-        selectable: true,
-        selected: this.selectedObject === `type-${scope.scopeId}`,
-        rows: [],
-      });
-    }
-
-    const genTableState: FreshnessItem = genTableGroups.length > 0 && anyGenValue
-      ? evaluateFreshness(anyGenValue, sessionTime, 10)
-      : { kind: "empty", label: "NO DATA" };
+    const genTableGroups: TableGroup[] = generatorTypes.map((gt, gIdx) => ({
+      id: `type-${gIdx}`,
+      summary: [
+        gt.name,
+        `${gt.running} / ${gt.total} running`,
+        { value: gt.output, unit: "megawatt", precisionDigits: 0, state: "value" as const, source: this.copy.fixtureSource },
+        `${gt.load} %`,
+      ],
+      selectable: true,
+      selected: this.selectedObject === `type-${gIdx}`,
+      rows: Array.from({ length: gt.total }, (_, rIdx) => {
+        const id = `GEN-${String(gIdx * 4 + rIdx + 1).padStart(2, "0")}`;
+        const isRunning = rIdx < gt.running;
+        const unitOut = isRunning ? Math.round(gt.output / gt.running) : 0;
+        return {
+          id,
+          selectable: true,
+          selected: this.selectedObject === id,
+          cells: [
+            id,
+            isRunning ? "Running" : "Standby",
+            { value: unitOut, unit: "megawatt", precisionDigits: 0, state: "value" as const, source: this.copy.fixtureSource },
+            { value: isRunning ? 100 : 0, unit: "percent", precisionDigits: 0, state: "value" as const, source: this.copy.fixtureSource },
+          ],
+        };
+      }),
+    }));
 
     const tables: (TableModel | null)[] = [
       {
         groups: genTableGroups,
-        state: genTableState,
+        state: { kind: "fresh", label: this.copy.fixtureSource },
       },
       {
         groups: [{ id: "grid-group", rows: gridRows }],
@@ -937,6 +849,15 @@ export class StatisticsController implements StatisticsActions {
       };
     }
 
+    const formatSource = (v: MetricValue | ReadingValue | undefined, isDerived = false): string | undefined => {
+      if (isDerived) return this.copy.derivedSource;
+      if (!v) return undefined;
+      if ("source" in v && v.source) {
+        return v.source === "live" ? this.copy.liveSource : this.copy.fixtureSource;
+      }
+      return undefined;
+    };
+
     const tiles: TileModel[] = [
       {
         id: "extraction",
@@ -949,7 +870,7 @@ export class StatisticsController implements StatisticsActions {
           state: "notApplicable",
         },
         state: freshProd,
-        source: this.formatSource(prodVal),
+        source: formatSource(prodVal),
       },
       {
         id: "consumption",
@@ -962,14 +883,14 @@ export class StatisticsController implements StatisticsActions {
           state: "notApplicable",
         },
         state: freshCons,
-        source: this.formatSource(consVal),
+        source: formatSource(consVal),
       },
       {
         id: "balance",
         label: `${resourceName} balance`,
         reading: balanceReading,
         state: aggregateFreshness([freshProd, freshCons]),
-        source: this.formatSource(balanceReading, !balVal),
+        source: formatSource(balanceReading, !balVal),
       },
       {
         id: "stock",
@@ -982,7 +903,7 @@ export class StatisticsController implements StatisticsActions {
           state: "notApplicable",
         },
         state: stockVal ? evaluateFreshness(stockVal, sessionTime, 15) : { kind: "empty", label: "NO DATA" },
-        source: this.formatSource(stockVal),
+        source: formatSource(stockVal),
       },
     ];
 
