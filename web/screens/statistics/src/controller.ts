@@ -595,6 +595,8 @@ export class StatisticsController implements StatisticsActions {
 
     let totalRunningGenerators = 0;
     let anyGenValue: MetricValue | undefined;
+    let applicableRunningScopes = 0;
+    let hasInapplicableRunning = false;
 
     for (const scope of this.generatorScopes) {
       const runningVal = this.cachedValues.get(`generators.running:${scope.scopeId}`) as MetricValue | undefined;
@@ -605,12 +607,15 @@ export class StatisticsController implements StatisticsActions {
       }
       if (runningVal && runningVal.state === "value" && runningVal.value !== null) {
         totalRunningGenerators += runningVal.value;
+        applicableRunningScopes++;
+      } else {
+        hasInapplicableRunning = true;
       }
     }
 
     let genReading: MetricValue | ReadingValue;
     let genTileFreshness: FreshnessItem;
-    if (this.generatorScopes.length > 0 && anyGenValue) {
+    if (this.generatorScopes.length > 0 && !hasInapplicableRunning && applicableRunningScopes > 0 && anyGenValue) {
       genReading = {
         kind: "value",
         metricId: "generators.running",
@@ -623,7 +628,7 @@ export class StatisticsController implements StatisticsActions {
         source: anyGenValue.source,
       };
       genTileFreshness = evaluateFreshness(anyGenValue, sessionTime, 10);
-    } else if (genVal && genVal.value !== null && genVal.state === "value") {
+    } else if (this.generatorScopes.length === 0 && genVal && genVal.value !== null && genVal.state === "value") {
       genReading = genVal;
       genTileFreshness = evaluateFreshness(genVal, sessionTime, 10);
     } else {
@@ -631,7 +636,7 @@ export class StatisticsController implements StatisticsActions {
         value: null,
         unit: "count",
         precisionDigits: 0,
-        sessionTimeSec: sessionTime,
+        sessionTimeSec: anyGenValue?.sessionTimeSec ?? sessionTime,
         state: "notApplicable",
       };
       genTileFreshness = { kind: "empty", label: "NO DATA" };

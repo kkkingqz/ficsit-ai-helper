@@ -706,6 +706,59 @@ describe("StatisticsController (V-5, #22)", () => {
     expect(coalSummary[0]).toBe("Coal Generator");
     expect(coalSummary[1]).toBe("NO DATA");
 
+    // Generators tile must not turn notApplicable into 0 (Co2-87 P1)
+    const genTile = model.tiles.find((t) => t.id === "generators");
+    expect(genTile).toBeDefined();
+    expect(genTile?.reading.state).toBe("notApplicable");
+    expect(genTile?.reading.value).toBe(null);
+    expect(genTile?.state).toEqual({ kind: "empty", label: "NO DATA" });
+
+    controller.destroy();
+  });
+
+  it("shows NO DATA and notApplicable on Generators online tile when any generator scope has inapplicable running metric (Co2-87 P1)", async () => {
+    const { api } = createMockApi();
+    (api.listScopes as any).mockImplementation(async ({ metricId }: { metricId: string }) => {
+      if (metricId === "generators.total") {
+        return {
+          scopes: [
+            { scopeId: "Build_GeneratorCoal_C", displayName: "Coal Generator" },
+            { scopeId: "Build_GeneratorFuel_C", displayName: "Fuel Generator" },
+          ],
+          nextCursor: "",
+        };
+      }
+      return { scopes: [], nextCursor: "" };
+    });
+
+    (api.queryMetric as any).mockImplementation(async (args: any) => {
+      if (args.metricId === "generators.total") {
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "value", value: 4, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      if (args.metricId === "generators.running") {
+        if (args.scopeId === "Build_GeneratorFuel_C") {
+          return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "notApplicable", value: null, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+        }
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "value", value: 3, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      return { kind: "value", metricId: args.metricId, scopeId: args.scopeId || "", state: "value", value: 100, unit: "megawatt", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+    });
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+
+    // Generators tile must NOT show partial sum (3), but must show notApplicable and NO DATA
+    const genTile = model.tiles.find((t) => t.id === "generators");
+    expect(genTile).toBeDefined();
+    expect(genTile?.reading.state).toBe("notApplicable");
+    expect(genTile?.reading.value).toBe(null);
+    expect(genTile?.state).toEqual({ kind: "empty", label: "NO DATA" });
+
     controller.destroy();
   });
 
