@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SourceError, type DevSource } from "./source.js";
+import { API_VERSION } from "../types.js";
 import type {
   ApiStatus,
   ListMetricsArgs,
@@ -125,10 +126,12 @@ async function loadModule(modulePath: string): Promise<SaveSourceModule> {
 /**
  * Собирает {@link DevSource} поверх библиотеки Save.
  *
- * Версию API пакету не объявляем: он сверяет `expectedApiVersion` строгим
- * равенством и на 0.5.0 отказал бы всему `API_VERSION_MISMATCH`, хотя
- * мажор тот же и чтения не менялись. Расхождение версий видно в статусе —
- * там его и место (§5.5).
+ * Версию API пакету объявляем — с 18.11.2026. Прежде не объявляли: он
+ * сверял `expectedApiVersion` строгим равенством и на 0.5.0 отказал бы
+ * всему `API_VERSION_MISMATCH`, хотя мажор тот же. По замечанию Co2-71 Cf3
+ * поднял версию пакета до 0.5.0 и свёл проверку к мажору, как требует §5.5,
+ * — и теперь объявить её полезно: расхождение мажора станет громким
+ * отказом, а не тихо другой формой ответа (Co2-85).
  */
 export async function createSaveDevSource(options: SaveDevSourceOptions = {}): Promise<DevSource> {
   const mode = options.sourceMode ?? "save";
@@ -144,7 +147,8 @@ export async function createSaveDevSource(options: SaveDevSourceOptions = {}): P
     );
   }
 
-  const passed: Record<string, unknown> = { sourceMode: mode };
+  // Версия, с которой совместим фасад. Пакет сверяет мажор (§5.5).
+  const passed: Record<string, unknown> = { sourceMode: mode, expectedApiVersion: API_VERSION };
   if (options.saveDataDir !== undefined) passed["saveDataDir"] = options.saveDataDir;
   if (options.saveId !== undefined) passed["saveId"] = options.saveId;
   if (options.saveFilePath !== undefined) passed["saveFilePath"] = options.saveFilePath;

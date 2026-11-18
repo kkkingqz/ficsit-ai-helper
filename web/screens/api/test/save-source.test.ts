@@ -5,7 +5,7 @@ import {
   type SaveSourceModule,
 } from "../src/dev/save-source.js";
 import { SourceError } from "../src/dev/source.js";
-import type { ApiStatus } from "../src/types.js";
+import { API_VERSION, type ApiStatus } from "../src/types.js";
 
 /**
  * Обёртка источника Save: что dev-сервер делает с библиотекой Cf3.
@@ -160,7 +160,12 @@ describe("источник Save в dev-сервере", () => {
     const fake = fakeModule();
     await createSaveDevSource({ saveId: "save_a_starter", load: async () => fake.module });
 
-    expect(fake.passed[0]).toEqual({ sourceMode: "save", saveId: "save_a_starter" });
+    expect(fake.passed[0]).toEqual({
+      sourceMode: "save",
+      saveId: "save_a_starter",
+      // Версия объявляется с 18.11.2026: пакет сверяет мажор (§5.5, Co2-85).
+      expectedApiVersion: API_VERSION,
+    });
     expect(Object.keys(fake.passed[0] ?? {})).not.toContain("saveDataDir");
   });
 
