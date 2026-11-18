@@ -94,7 +94,7 @@ fa_check_build_env() {
 fa_sync_mod_source() {
     local src="$1" dst="$2"; shift 2
     local keep=(Binaries Intermediate Saved "$@") entry name k skip hash path
-    local -A before=()
+    local -A before=() stamp=()
     mkdir -p "$dst" || return 1
     _fa_sync_hashes() {
         local e n k2 s2
@@ -106,6 +106,10 @@ fa_sync_mod_source() {
         done | xargs -0 -r sha1sum
     }
     while read -r hash path; do before["$path"]="$hash"; done < <(_fa_sync_hashes)
+    # Время файла копии до синхронизации. Файл с прежним содержимым получает своё прежнее время, а не время из
+    # репозитория: иначе после прерванной сборки повтор через cp -a вернул бы изменённому файлу старое время,
+    # и объектный файл от прежнего содержимого снова выглядел бы новее (ревью #69).
+    for path in "${!before[@]}"; do stamp["$path"]="$(stat -c '%.9Y' "$path" 2>/dev/null)"; done
     for entry in "$dst"/* "$dst"/.[!.]*; do
         [[ -e "$entry" || -L "$entry" ]] || continue
         name="$(basename "$entry")"; skip=0
@@ -119,7 +123,11 @@ fa_sync_mod_source() {
         [[ $skip -eq 1 ]] || cp -a "$entry" "$dst/" || return 1
     done
     while read -r hash path; do
-        [[ "${before[$path]:-}" == "$hash" ]] || touch "$path" || return 1
+        if [[ "${before[$path]:-}" == "$hash" && -n "${stamp[$path]:-}" ]]; then
+            touch -d "@${stamp[$path]}" "$path" || return 1
+        else
+            touch "$path" || return 1
+        fi
     done < <(_fa_sync_hashes)
     [[ -f "$dst/$(basename "$src").uplugin" ]] || return 1
 }

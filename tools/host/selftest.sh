@@ -309,10 +309,18 @@ sync_mod() { ( source "$T/repo/tools/host/lib.sh" >/dev/null 2>&1; fa_sync_mod_s
 sync_mod; touch -d '2026-01-01 00:00' "$SR/Source/a.cpp" "$SR/Source/b.cpp"; sync_mod
 touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
 echo 'int changed;' > "$SR/Source/a.cpp"; touch -d '2026-01-02 00:00' "$SR/Source/a.cpp"
+touch -d '2026-01-01 00:00' "$SD/Source/b.cpp"
 check "синхронизация успешна" "$(sync_mod; echo $?)" 0
 check "изменённый файл новее объектного" "$([[ "$SD/Source/a.cpp" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+# Неизменённый файл сохраняет время своей копии, а не берёт время из репозитория.
 check "неизменённый файл сохранил время" "$(date -r "$SD/Source/b.cpp" +%F)" 2026-01-01
 check "содержимое обновлено" "$(cat "$SD/Source/a.cpp")" "int changed;"
+# Сборка прервана: объектный файл остался от прежнего содержимого. Повторная синхронизация не должна вернуть
+# изменённому файлу старое время из репозитория (ревью #69 на bf21335).
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"; touch -d '2026-06-02 00:00' "$SD/Source/a.cpp"
+check "повтор синхронизации успешен" "$(sync_mod; echo $?)" 0
+check "после повтора изменённый файл всё ещё новее объектного" "$([[ "$SD/Source/a.cpp" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+check "после повтора неизменённый файл сохранил время" "$(date -r "$SD/Source/b.cpp" +%F)" 2026-01-01
 
 # --- страницы веб-экранов (S8 3.4) ------------------------------------------------------------------
 W="$T/webrepo"; WD="$T/webdst"

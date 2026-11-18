@@ -720,7 +720,8 @@ FReply UFicsitAIScreenSurfaceWidget::NativeOnKeyDown(const FGeometry& InGeometry
     const FKey NotesKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Notes")));
     const FKey StatusKey = GetKeyForAction(FName(TEXT("IA_FicsitAI_Status")));
 
-    const bool bCloseKey = Key == EKeys::Escape
+    // Все назначенные клавиши «Назад», а не только первая привязка: веб-вид отдаёт хосту каждую из BackKeys.
+    const bool bCloseKey = Key == EKeys::Escape || BackKeys.Contains(Key)
         || (BackKey.IsValid() && Key == BackKey) || (OpenKey.IsValid() && Key == OpenKey);
     const bool bNotesKey = NotesKey.IsValid() && Key == NotesKey;
     const bool bStatusKey = StatusKey.IsValid() && Key == StatusKey;

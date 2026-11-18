@@ -596,6 +596,10 @@ void AFicsitAITerminal::HandleControlMappingsRebuilt()
                         // Переназначенное «Назад» — модулю тоже: веб-страница не должна забирать новую клавишу.
                         const TArray<FKey> OldBackKeys = HostBackKeys;
                         RefreshBackKeys(Subsystem);
+                        if (UFicsitAIScreenSurfaceWidget* Surface = Cast<UFicsitAIScreenSurfaceWidget>(ScreenSurface.GetObject()))
+                        {
+                            Surface->SetBackKeys(HostBackKeys);
+                        }
                         if (HostBackKeys != OldBackKeys && ActiveModuleInstance && IsInteractiveScreenOpen())
                         {
                             ActiveModuleInstance->OnContextChanged(GetInteractiveScreenContext());
@@ -656,6 +660,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         if (Widget)
         {
             Widget->SetActionKeyBindings(CurrentBindings);
+            Widget->SetBackKeys(HostBackKeys);
             OpenInteractiveScreen(Widget);
         }
         return;
@@ -668,6 +673,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
         if (Widget)
         {
             Widget->SetActionKeyBindings(CurrentBindings);
+            Widget->SetBackKeys(HostBackKeys);
             OpenInteractiveScreen(Widget);
         }
         return;
@@ -689,6 +695,7 @@ void AFicsitAITerminal::OnUse_Implementation(AFGCharacterPlayer* byCharacter, co
     if (Widget)
     {
         Widget->SetActionKeyBindings(CurrentBindings);
+        Widget->SetBackKeys(HostBackKeys);
         OpenInteractiveScreen(Widget);
     }
 }
