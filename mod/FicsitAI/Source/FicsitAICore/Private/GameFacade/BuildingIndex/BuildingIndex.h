@@ -5,6 +5,7 @@
 #include "UObject/ObjectKey.h"
 
 class AActor;
+class AFGBuildable;
 
 namespace FicsitAI::Lines { class FFicsitAILineRegistry; }
 
@@ -21,6 +22,9 @@ struct FEntry
     FString LineId;
 };
 
+// Read identification only; failure preserves OutEntry. World/authority gating belongs to the owner.
+bool TryReadPersistentActor(AFGBuildable* Buildable, FEntry& OutEntry);
+
 template<typename ValueType>
 struct TBuildingIdKeyFuncs : BaseKeyFuncs<TPair<FString, ValueType>, FString, false>
 {
@@ -36,19 +40,23 @@ struct TBuildingIdKeyFuncs : BaseKeyFuncs<TPair<FString, ValueType>, FString, fa
 class FIndex
 {
 public:
-    explicit FIndex(Lines::FFicsitAILineRegistry* InLines = nullptr) : Lines(InLines) {}
+    explicit FIndex(Lines::FFicsitAILineRegistry* InLines = nullptr);
+    ~FIndex();
+    FIndex(const FIndex&) = delete;
+    FIndex& operator=(const FIndex&) = delete;
     bool Upsert(FEntry Entry);
     bool RemoveActor(AActor* Actor);
     TOptional<FEntry> Find(const FString& BuildingId) const;
     // Visitor must not mutate the index.
     void ForEach(TFunctionRef<void(const FEntry&)> Visitor) const;
-    int32 Num() const { return Entries.Num(); }
+    int32 Num() const { check(IsInGameThread()); return Entries.Num(); }
     // Clearing a session does not dismantle its saved buildings or erase line membership.
     void Reset();
     // The registry must outlive its attachment; mutations while attached must also use the game thread.
     void SetLineRegistry(Lines::FFicsitAILineRegistry* InLines) { Lines = InLines; }
 
 private:
+    void PruneExpired();
     void DetachLine(const FString& BuildingId);
     FEntry WithLine(const FEntry& Entry) const;
 
@@ -60,5 +68,6 @@ private:
     TMap<FString, FStoredEntry, FDefaultSetAllocator, TBuildingIdKeyFuncs<FStoredEntry>> Entries;
     TMap<TObjectKey<AActor>, FString> IdByActor;
     Lines::FFicsitAILineRegistry* Lines;
+    FDelegateHandle GcHandle;
 };
 }

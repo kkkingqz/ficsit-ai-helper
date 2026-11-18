@@ -1,5 +1,6 @@
 #include "../BuildingIndex.h"
 #include "../BuildingIndexOwner.h"
+#include "Buildables/FGBuildableAutomatedWorkBench.h"
 #include "GameFacade/Lines/FicsitAILineRegistry.h"
 #include "GameFramework/Actor.h"
 #include "UObject/StrongObjectPtr.h"
@@ -86,6 +87,7 @@ bool FBuildingIndexEntriesTest::RunTest(const FString&)
     }
     CollectGarbage(RF_NoFlags);
     TestFalse(TEXT("The index does not keep an actor alive"), Weak.IsValid());
+    TestEqual(TEXT("GC removes expired records from the count"), Index.Num(), 0);
     TestFalse(TEXT("A dead actor is not returned"), Index.Find(TEXT("Temporary")).IsSet());
     Visited = 0;
     Index.ForEach([&](const FEntry&) { ++Visited; });
@@ -135,6 +137,14 @@ bool FBuildingIndexLinesTest::RunTest(const FString&)
     Index.Reset();
     TestTrue(TEXT("Ending a session preserves saved membership"), Lines.FindLineForBuilding(TEXT("Machine"), Removed));
     TestEqual(TEXT("Preserved membership still belongs to line A"), Removed.LineId, FString(TEXT("line-a")));
+    {
+        TStrongObjectPtr<AActor> Collectible(NewObject<AActor>());
+        Index.Upsert(MakeEntry(Collectible.Get(), TEXT("Collected")));
+        Lines.AddBuildingToLine(TEXT("line-a"), {TEXT("Collected"), TEXT("Build_Constructor_C")});
+    }
+    CollectGarbage(RF_NoFlags);
+    TestEqual(TEXT("Expired line members leave no index records"), Index.Num(), 0);
+    TestTrue(TEXT("GC alone does not dismantle a saved line member"), Lines.FindLineForBuilding(TEXT("Collected"), Removed));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBuildingIndexUnavailableTest, "FicsitAI.BuildingIndex.UnavailableWorld",
@@ -145,7 +155,10 @@ bool FBuildingIndexUnavailableTest::RunTest(const FString&)
     TestFalse(TEXT("A worldless owner cannot initialize"), Owner->TryInitialize());
     TestNull(TEXT("A worldless owner cannot expose records"), Owner->GetIndex());
     TestNull(TEXT("A missing context cannot resolve an owner"), AFicsitAIBuildingIndexOwner::Get(nullptr));
+    Owner->SetActorTickEnabled(true);
+    TestTrue(TEXT("The startup retry tick is enabled"), Owner->IsActorTickEnabled());
     Owner->StopIndex();
+    TestFalse(TEXT("Stopping before initialization disables retries"), Owner->IsActorTickEnabled());
     Owner->StopIndex();
     TestNull(TEXT("Stopping twice leaves the index unavailable"), Owner->GetIndex());
     return true;
@@ -173,6 +186,23 @@ bool FBuildingIndexLineCaseTest::RunTest(const FString&)
     Index.RemoveActor(Lower.Get());
     TestTrue(TEXT("Dismantling another ID preserves the bound building"), Lines.FindLineForBuilding(TEXT("Machine"), Line));
     TestEqual(TEXT("The original line still has one member"), Line.Members.Num(), 1);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBuildingIndexActorEligibilityTest, "FicsitAI.BuildingIndex.ActorEligibility",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBuildingIndexActorEligibilityTest::RunTest(const FString&)
+{
+    TStrongObjectPtr<AFGBuildableAutomatedWorkBench> Building(NewObject<AFGBuildableAutomatedWorkBench>());
+    FEntry Entry;
+    TestTrue(TEXT("An ordinary buildable can supply identity"), TryReadPersistentActor(Building.Get(), Entry));
+    TestFalse(TEXT("A missing actor cannot supply identity"), TryReadPersistentActor(nullptr, Entry));
+    Building->SetFlags(RF_Transient);
+    Entry.BuildingId = TEXT("previous");
+    Entry.Position = FVector(700, 800, 900);
+    TestFalse(TEXT("A transient actor is not a persistent building"), TryReadPersistentActor(Building.Get(), Entry));
+    TestEqual(TEXT("Rejected transient actor preserves prior identity"), Entry.BuildingId, FString(TEXT("previous")));
+    TestEqual(TEXT("Rejected transient actor preserves prior position"), Entry.Position, FVector(700, 800, 900));
     return true;
 }
 

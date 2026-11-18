@@ -90,20 +90,31 @@ const FicsitAI::Buildings::FIndex* AFicsitAIBuildingIndexOwner::GetIndex() const
     return bInitialized && IsModActive() ? &Index : nullptr;
 }
 
-void AFicsitAIBuildingIndexOwner::AddBuildable(AFGBuildable* Buildable)
+namespace FicsitAI::Buildings
 {
-    if (!IsValid(Buildable) || Buildable->GetWorld() != GetWorld() ||
-        Buildable->GetIsLightweightTemporary() || Buildable->ShouldConvertToLightweight())
+bool TryReadPersistentActor(AFGBuildable* Buildable, FEntry& OutEntry)
+{
+    check(IsInGameThread());
+    if (!IsValid(Buildable) || Buildable->HasAnyFlags(RF_Transient) || Buildable->GetIsLightweightTemporary() || Buildable->ShouldConvertToLightweight())
     {
-        return;
+        return false;
     }
-    FicsitAI::Buildings::FEntry Entry;
+    FEntry Entry;
     Entry.BuildingId = Buildable->GetPathName();
     Entry.ClassName = Buildable->GetClass()->GetFName();
     Entry.ClassPath = Buildable->GetClass()->GetPathName();
     Entry.Position = Buildable->GetActorLocation();
     Entry.Actor = Buildable;
-    Index.Upsert(MoveTemp(Entry));
+    OutEntry = MoveTemp(Entry);
+    return true;
+}
+}
+
+void AFicsitAIBuildingIndexOwner::AddBuildable(AFGBuildable* Buildable)
+{
+    if (!IsValid(Buildable) || Buildable->GetWorld() != GetWorld()) return;
+    FicsitAI::Buildings::FEntry Entry;
+    if (FicsitAI::Buildings::TryReadPersistentActor(Buildable, Entry)) Index.Upsert(MoveTemp(Entry));
 }
 
 void AFicsitAIBuildingIndexOwner::HandleAdded(AFGBuildable* Buildable)
@@ -124,6 +135,7 @@ void AFicsitAIBuildingIndexOwner::HandleRemoved(AFGBuildable* Buildable)
 void AFicsitAIBuildingIndexOwner::StopIndex()
 {
     check(IsInGameThread());
+    SetActorTickEnabled(false);
     if (auto* Subsystem = Buildables.Get())
     {
         Subsystem->mBuildableAddedDelegate.RemoveDynamic(this, &ThisClass::HandleAdded);

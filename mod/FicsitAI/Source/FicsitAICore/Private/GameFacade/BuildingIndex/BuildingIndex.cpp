@@ -2,6 +2,7 @@
 
 #include "GameFacade/Lines/FicsitAILineRegistry.h"
 #include "GameFramework/Actor.h"
+#include "UObject/UObjectGlobals.h"
 
 namespace FicsitAI::Buildings
 {
@@ -15,6 +16,31 @@ bool FindExactLine(Lines::FFicsitAILineRegistry* Registry, const FString& Buildi
             return Ref.BuildingId.Equals(BuildingId, ESearchCase::CaseSensitive);
         });
 }
+}
+
+FIndex::FIndex(Lines::FFicsitAILineRegistry* InLines) : Lines(InLines)
+{
+    // Actor default objects can be constructed during loading. Subscribe only on the first game-thread insert.
+}
+
+FIndex::~FIndex()
+{
+    if (GcHandle.IsValid()) FCoreUObjectDelegates::GetPostGarbageCollect().Remove(GcHandle);
+}
+
+void FIndex::PruneExpired()
+{
+    check(IsInGameThread());
+    // GC is not a demolition event. Reclaim weak records without erasing saved line assignments.
+    for (auto It = Entries.CreateIterator(); It; ++It)
+    {
+        if (!It.Value().Entry.Actor.IsValid())
+        {
+            IdByActor.Remove(It.Value().ActorKey);
+            It.RemoveCurrent();
+        }
+    }
+    if (Entries.IsEmpty()) Reset();
 }
 
 bool FIndex::Upsert(FEntry Entry)
@@ -45,6 +71,10 @@ bool FIndex::Upsert(FEntry Entry)
     IdByActor.Add(ActorKey, Entry.BuildingId);
     const FString Id = Entry.BuildingId;
     Entries.Add(Id, {MoveTemp(Entry), ActorKey});
+    if (!GcHandle.IsValid())
+    {
+        GcHandle = FCoreUObjectDelegates::GetPostGarbageCollect().AddRaw(this, &FIndex::PruneExpired);
+    }
     return true;
 }
 
@@ -59,6 +89,7 @@ bool FIndex::RemoveActor(AActor* Actor)
     {
         Entries.Remove(Id);
         DetachLine(Id);
+        if (Entries.IsEmpty()) Reset();
         return true;
     }
     return false;
@@ -100,6 +131,11 @@ void FIndex::Reset()
     check(IsInGameThread());
     Entries.Reset();
     IdByActor.Reset();
+    if (GcHandle.IsValid())
+    {
+        FCoreUObjectDelegates::GetPostGarbageCollect().Remove(GcHandle);
+        GcHandle.Reset();
+    }
 }
 
 void FIndex::DetachLine(const FString& BuildingId)
