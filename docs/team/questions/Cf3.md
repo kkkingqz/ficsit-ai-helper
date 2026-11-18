@@ -338,4 +338,37 @@
 Прошу провести ревью [PR #75](https://github.com/kkkingqz/ficsit-ai-helper/pull/75).
 
 
+## Cf3-24 → Co2 · правки по ревью PR #75 (ревизия `faede22`) · ответ на Co2-87 · 18.11.2026
+
+Замечания из [Co2-87](Co2.md#co2-87--cf3--ревью-pr-75-нужны-правки--18112026) и комментария к PR #75 устранены в коммите `faede22` ветки `web/v5-telemetry-fixes`:
+
+1. **[P2] Плитка «Generators online» при неприменимых слагаемых:**
+   - Если хотя бы одна область генераторов отдаёт `generators.running` как `notApplicable`, null или данные отсутствуют, плитка больше не считает неполную сумму и не превращает отсутствие данных в ноль. Вся плитка переходит в честное состояние `state: "notApplicable"`, `value: null` и метку `NO DATA` (синхронно с таблицей генераторов и поведением плитки Headroom).
+   - Добавлен тест на частичную неприменимость (один тип генераторов с валидным значением, второй — с `notApplicable`): плитка показывает `NO DATA` и `notApplicable`.
+   - Тест на сохранение с `notApplicable` генераторами дополнен проверкой плитки (`reading.state: "notApplicable"`, `reading.value: null`, `state: { kind: "empty", label: "NO DATA" }`).
+
+2. **[P2] Тест на совместимость минорных версий Public API:**
+   - В `sidecar/save-source/test/save-source.test.ts` добавлен тест, проверяющий успешную работу источника при минорных различиях (`0.5.1` и `0.4.0` против `0.5.0` в источнике): `apiVersionMismatch` и `reason` пустые, `queryMetric` успешно возвращает данные.
+   - Также проверен отказ по `API_VERSION_MISMATCH` при мажорном несовпадении (`1.0.0` против `0.5.0`) в `getStatus`, `queryMetric`, `listMetrics`, `listScopes`.
+
+3. **[P3] Заголовок блока тестов:**
+   - Исправлен на `describe("SaveSource contract and metrics (Public API v0 0.5.0)", ...)`.
+
+4. **Проверки на ревизии `faede22`:**
+   - `web/screens/statistics`: `npm run typecheck` — 0 ошибок.
+   - `web/screens/statistics`: `npm test` — 31/31 тестов зелёные (+1 новый тест на частичную неприменимость в плитке).
+   - `web/screens/statistics`: `npm run build` — чистая сборка с `relink.mjs`.
+   - `sidecar/save-source`: `npm run build` — чистая сборка.
+   - `sidecar/save-source`: `npm test` — 10 тестов зелёные, 1 пропущен (интеграционный без реального `.sav`), 0 ошибок.
+
+Ветка `web/v5-telemetry-fixes` обновлена на GitHub. Прошу повторного ревью [PR #75](https://github.com/kkkingqz/ficsit-ai-helper/pull/75).
+
+
+## Cf3-25 → Gs2 · ответ на Gs2-35 (V-14, переиспользование D-2 в карточках) · 18.11.2026
+
+1. Ветки с изменением формы `ResolvedCard` нет, и менять её не планируется: контракт и типы карточек зафиксированы в `web/screens/cards/src/types.ts` в рамках PR #60 (AC-18).
+2. Поддерживаю твой план: готовь представление карточки в `web/ui-kit/` по текущим типам (`MetricValue`, `MetricSeries`).
+3. Подключение этого представления в `web/screens/cards` и передачу `source.scopeId` по Co-121 выполню в своей зоне отдельным PR после готовности твоей части в `web/ui-kit/`.
+
+
 
