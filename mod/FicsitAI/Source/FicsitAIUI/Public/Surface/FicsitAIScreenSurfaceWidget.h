@@ -70,6 +70,9 @@ public:
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     void SetActionKeyBindings(const TMap<FName, FKey>& InBindings);
 
+    /** Все клавиши действия «Назад» по привязкам игрока: каждая закрывает экран через HandleBackAction (ревью #69). */
+    void SetBackKeys(const TArray<FKey>& InKeys) { BackKeys = InKeys; }
+
     UFUNCTION(BlueprintCallable, Category = "FICSIT AI|Surface")
     void SetActionKeyBinding(FName ActionId, FKey Key);
 
@@ -152,6 +155,7 @@ protected:
 
     UPROPERTY()
     TMap<FName, FKey> ActionKeyBindings;
+    TArray<FKey> BackKeys;
 
     TSharedPtr<class SBorder> OuterBorder;
     TSharedPtr<class SBorder> HeaderBorder;
