@@ -45,7 +45,7 @@ public:
     int32 Num() const { return Entries.Num(); }
     // Clearing a session does not dismantle its saved buildings or erase line membership.
     void Reset();
-    // The registry must outlive its attachment. The caller retains ownership.
+    // The registry must outlive its attachment; mutations while attached must also use the game thread.
     void SetLineRegistry(Lines::FFicsitAILineRegistry* InLines) { Lines = InLines; }
 
 private:

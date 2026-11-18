@@ -1,4 +1,5 @@
 #include "../BuildingIndex.h"
+#include "../BuildingIndexOwner.h"
 #include "GameFacade/Lines/FicsitAILineRegistry.h"
 #include "GameFramework/Actor.h"
 #include "UObject/StrongObjectPtr.h"
@@ -116,6 +117,12 @@ bool FBuildingIndexLinesTest::RunTest(const FString&)
     Lines.AddBuildingToLine(TEXT("line-b"), {TEXT("Machine"), TEXT("Build_Constructor_C")});
     Found = Index.Find(TEXT("Machine"));
     TestTrue(TEXT("A reassignment is visible without rebuilding the index"), Found.IsSet() && Found->LineId == TEXT("line-b"));
+    int32 Assigned = 0;
+    Index.ForEach([&](const FEntry& Item) {
+        ++Assigned;
+        TestEqual(TEXT("Traversal exposes the current line"), Item.LineId, FString(TEXT("line-b")));
+    });
+    TestEqual(TEXT("Traversal visits the assigned building once"), Assigned, 1);
 
     Index.RemoveActor(Actor.Get());
     FProductionLine Removed;
@@ -130,5 +137,44 @@ bool FBuildingIndexLinesTest::RunTest(const FString&)
     TestEqual(TEXT("Preserved membership still belongs to line A"), Removed.LineId, FString(TEXT("line-a")));
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBuildingIndexUnavailableTest, "FicsitAI.BuildingIndex.UnavailableWorld",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBuildingIndexUnavailableTest::RunTest(const FString&)
+{
+    TStrongObjectPtr<AFicsitAIBuildingIndexOwner> Owner(NewObject<AFicsitAIBuildingIndexOwner>());
+    TestFalse(TEXT("A worldless owner cannot initialize"), Owner->TryInitialize());
+    TestNull(TEXT("A worldless owner cannot expose records"), Owner->GetIndex());
+    TestNull(TEXT("A missing context cannot resolve an owner"), AFicsitAIBuildingIndexOwner::Get(nullptr));
+    Owner->StopIndex();
+    Owner->StopIndex();
+    TestNull(TEXT("Stopping twice leaves the index unavailable"), Owner->GetIndex());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FBuildingIndexLineCaseTest, "FicsitAI.BuildingIndex.LineCaseIsolation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FBuildingIndexLineCaseTest::RunTest(const FString&)
+{
+    TStrongObjectPtr<AActor> Upper(NewObject<AActor>());
+    TStrongObjectPtr<AActor> Lower(NewObject<AActor>());
+    FicsitAI::Lines::FFicsitAILineRegistry Lines;
+    FicsitAI::Lines::FProductionLine Line; Line.LineId = TEXT("line");
+    Lines.RegisterLine(Line);
+    Lines.AddBuildingToLine(TEXT("line"), {TEXT("Machine"), TEXT("Build_Constructor_C")});
+    FIndex Index(&Lines);
+    Index.Upsert(MakeEntry(Upper.Get(), TEXT("Machine")));
+    Index.Upsert(MakeEntry(Lower.Get(), TEXT("machine")));
+    const auto Found = Index.Find(TEXT("machine"));
+    TestTrue(TEXT("A case-distinct building does not inherit another binding"), Found.IsSet() && Found->LineId.IsEmpty());
+    Index.ForEach([&](const FEntry& Item) {
+        TestEqual(TEXT("Traversal preserves exact assignment keys"), Item.LineId,
+            Item.BuildingId.Equals(TEXT("Machine"), ESearchCase::CaseSensitive) ? FString(TEXT("line")) : FString());
+    });
+    Index.RemoveActor(Lower.Get());
+    TestTrue(TEXT("Dismantling another ID preserves the bound building"), Lines.FindLineForBuilding(TEXT("Machine"), Line));
+    TestEqual(TEXT("The original line still has one member"), Line.Members.Num(), 1);
+    return true;
+}
+
 }
 #endif

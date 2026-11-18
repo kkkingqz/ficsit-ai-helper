@@ -75,9 +75,23 @@ TOptional<FEntry> FIndex::Find(const FString& BuildingId) const
 void FIndex::ForEach(TFunctionRef<void(const FEntry&)> Visitor) const
 {
     check(IsInGameThread());
+    // Resolve line assignments once per traversal, not by copying an entire line per building.
+    TMap<FString, FString, FDefaultSetAllocator, TBuildingIdKeyFuncs<FString>> LineIds;
+    if (Lines)
+    {
+        for (const auto& Line : Lines->GetAllLines())
+        {
+            for (const auto& Member : Line.Members) LineIds.Add(Member.BuildingId, Line.LineId);
+        }
+    }
     for (const auto& Pair : Entries)
     {
-        if (Pair.Value.Entry.Actor.IsValid()) Visitor(WithLine(Pair.Value.Entry));
+        const FEntry& Entry = Pair.Value.Entry;
+        if (!Entry.Actor.IsValid()) continue;
+        if (!Lines) { Visitor(Entry); continue; }
+        FEntry Result = Entry;
+        if (const FString* LineId = LineIds.Find(Entry.BuildingId)) Result.LineId = *LineId;
+        Visitor(Result);
     }
 }
 
