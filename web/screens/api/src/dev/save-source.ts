@@ -1,6 +1,7 @@
 import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { SourceError, type DevSource } from "./source.js";
+import { API_VERSION } from "../types.js";
 import type {
   ApiStatus,
   ListMetricsArgs,
@@ -125,10 +126,15 @@ async function loadModule(modulePath: string): Promise<SaveSourceModule> {
 /**
  * Собирает {@link DevSource} поверх библиотеки Save.
  *
- * Версию API пакету не объявляем: он сверяет `expectedApiVersion` строгим
- * равенством и на 0.5.0 отказал бы всему `API_VERSION_MISMATCH`, хотя
- * мажор тот же и чтения не менялись. Расхождение версий видно в статусе —
- * там его и место (§5.5).
+ * **Версию API пакету объявляем** — с 18.11.2026, после слияния
+ * [#75](https://github.com/kkkingqz/ficsit-ai-helper/pull/75). Прежде не
+ * объявляли: пакет сверял `expectedApiVersion` строгим равенством и на нашей
+ * 0.5.0 отказал бы всему кодом `API_VERSION_MISMATCH`, хотя мажор тот же и
+ * чтения не менялись. По замечанию Co2-71 Cf3 поднял версию до 0.5.0 и свёл
+ * сверку к мажору, как требует §5.5, и доказал это тестом на минорную
+ * разницу (Co2-89) — объявлять её теперь полезно: расхождение мажора станет
+ * громким отказом, а не тихо другой формой ответа. Минорная разница по-прежнему
+ * ничего не ломает.
  */
 export async function createSaveDevSource(options: SaveDevSourceOptions = {}): Promise<DevSource> {
   const mode = options.sourceMode ?? "save";
@@ -144,7 +150,7 @@ export async function createSaveDevSource(options: SaveDevSourceOptions = {}): P
     );
   }
 
-  const passed: Record<string, unknown> = { sourceMode: mode };
+  const passed: Record<string, unknown> = { sourceMode: mode, expectedApiVersion: API_VERSION };
   if (options.saveDataDir !== undefined) passed["saveDataDir"] = options.saveDataDir;
   if (options.saveId !== undefined) passed["saveId"] = options.saveId;
   if (options.saveFilePath !== undefined) passed["saveFilePath"] = options.saveFilePath;

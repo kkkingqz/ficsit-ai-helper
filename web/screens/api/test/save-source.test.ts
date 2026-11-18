@@ -143,6 +143,19 @@ describe("источник Save в dev-сервере", () => {
       .toMatchObject({ body: { code: "SERIES_NOT_AVAILABLE" } });
   });
 
+  it("версия API объявлена пакету: мажор сверяется, минор не ломает", async () => {
+    // Пакет сверяет `expectedApiVersion` по мажору с 18.11.2026 (#75,
+    // проверено тестом Cf3 на 0.5.1 и 0.4.0 против 0.5.0). Пока сверка была
+    // строгим равенством, объявлять версию значило отказывать всем чтениям
+    // кодом `API_VERSION_MISMATCH` на любой минорной разнице, поэтому поле не
+    // заполнялось. Теперь оно заполняется, и расхождение мажора станет
+    // громким отказом вместо тихо другой формы ответа.
+    const fake = fakeModule();
+    await createSaveDevSource({ load: async () => fake.module });
+
+    expect(fake.passed[0]).toMatchObject({ expectedApiVersion: "0.5.0" });
+  });
+
   it("имя источника — режим: его видно в строке запуска и в журнале", async () => {
     const fake = fakeModule();
     const plain = await createSaveDevSource({ load: async () => fake.module });
@@ -160,7 +173,11 @@ describe("источник Save в dev-сервере", () => {
     const fake = fakeModule();
     await createSaveDevSource({ saveId: "save_a_starter", load: async () => fake.module });
 
-    expect(fake.passed[0]).toEqual({ sourceMode: "save", saveId: "save_a_starter" });
+    expect(fake.passed[0]).toEqual({
+      sourceMode: "save",
+      saveId: "save_a_starter",
+      expectedApiVersion: "0.5.0",
+    });
     expect(Object.keys(fake.passed[0] ?? {})).not.toContain("saveDataDir");
   });
 
