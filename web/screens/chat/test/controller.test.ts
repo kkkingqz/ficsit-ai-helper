@@ -30,6 +30,16 @@ interface FakeApi {
   calls: string[];
   /** Задержать ответ на отправку; вернувшаяся функция его отпускает. */
   holdSend(): () => void;
+  /** Задержать ответы истории. Снимок берётся на момент запроса, не ответа. */
+  holdHistory(): void;
+  /** Сколько ответов истории ждут отпускания. */
+  historyPending(): number;
+  /** Отпустить ответ истории по номеру запроса, в любом порядке. */
+  releaseHistory(index: number): void;
+  /** Задержать ответ отмены; вернувшаяся функция его отпускает. */
+  holdCancel(): () => void;
+  /** Следующая отмена отказывает этим кодом. */
+  failNextCancel(error: ApiError): void;
   /** Что делает мод в тот момент, когда принимает ход (Foreman дописал). */
   onSend(hook: () => void): void;
 }
@@ -46,6 +56,11 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
   let gate: Promise<void> | null = null;
   let openGate: (() => void) | null = null;
   let sendHook: (() => void) | null = null;
+  let historyHold = false;
+  const historyGates: (() => void)[] = [];
+  let cancelGate: Promise<void> | null = null;
+  let openCancel: (() => void) | null = null;
+  let cancelError: ApiError | null = null;
 
   const api = {
     transport: "http" as const,
@@ -84,12 +99,26 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
     },
     chatCancel: async ({ turnId }: { turnId: string }) => {
       cancelled.push(turnId);
+      if (cancelGate !== null) await cancelGate;
+      if (cancelError !== null) {
+        const err = cancelError;
+        cancelError = null;
+        throw err;
+      }
       return { state: "cancelled" as const };
     },
     chatHistory: async (): Promise<ChatHistoryResult> => {
       calls.push("history");
       if (historyError !== null) throw historyError;
-      return { messages: history };
+      // Снимок берётся на момент запроса: именно так ведёт себя мод, и именно
+      // поэтому запоздавший ответ несёт устаревшую ленту.
+      const snapshot = history;
+      if (historyHold) {
+        await new Promise<void>((resolve) => {
+          historyGates.push(resolve);
+        });
+      }
+      return { messages: snapshot };
     },
     on: (event: string, handler: (data: never) => void) => {
       listeners.set(event, [...(listeners.get(event) ?? []), handler as (data: unknown) => void]);
@@ -132,6 +161,26 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
     },
     onSend(hook) {
       sendHook = hook;
+    },
+    holdHistory() {
+      historyHold = true;
+    },
+    historyPending: () => historyGates.length,
+    releaseHistory(index) {
+      historyGates[index]?.();
+    },
+    holdCancel() {
+      cancelGate = new Promise<void>((resolve) => {
+        openCancel = resolve;
+      });
+      return () => {
+        openCancel?.();
+        cancelGate = null;
+        openCancel = null;
+      };
+    },
+    failNextCancel(error) {
+      cancelError = error;
     },
   };
 }
@@ -699,5 +748,166 @@ describe("контроллер чата", () => {
     controller.actions.send("набираю");
     await settle();
     expect(controller.getModel().draft).toBe("");
+  });
+
+  /**
+   * Отложенные и переставленные ответы истории.
+   *
+   * Ревью Gs на #62 воспроизвело две последовательности на собранном
+   * контроллере: запоздавший снимок удваивал вопрос нового хода и стирал уже
+   * показанный завершённый. Причина в обоих случаях одна — ответ применялся
+   * без проверки, к какому состоянию ленты он относится.
+   */
+  const entry = (id: string, role: "operator" | "assistant", text: string) => ({
+    id,
+    role: role === "operator" ? ("user" as const) : ("assistant" as const),
+    text,
+    createdAt: "2026-11-16T09:40:00Z",
+  });
+
+  it("запоздавший снимок не удваивает вопрос начавшегося хода", async () => {
+    const fake = createFakeApi();
+    const controller = create(fake, createFakeView());
+    await settle();
+
+    // Ход A отменён — именно это помечает историю устаревшей.
+    controller.actions.send("A");
+    await settle();
+    controller.actions.stop();
+    await settle();
+    fake.emit("chat.cancelled", { turnId: "t-1" });
+
+    // Ход B прошёл целиком. На `chat.done` начинается чтение истории, и мод
+    // отдаёт снимок, в котором уже записан и вопрос C — он успел дойти.
+    controller.actions.send("B");
+    await settle();
+    fake.holdHistory();
+    fake.setHistory([
+      entry("s1", "operator", "A"),
+      entry("s2", "assistant", "дочитанный A"),
+      entry("s3", "operator", "B"),
+      entry("s4", "assistant", "ответ B"),
+      entry("s5", "operator", "C"),
+    ]);
+    fake.emit("chat.done", { turnId: "t-2", model: "demo-echo", latencyMs: 12 });
+    await settle();
+    expect(fake.historyPending()).toBe(1);
+
+    // Ход C начался до того, как чтение вернулось.
+    controller.actions.send("C");
+    await settle();
+    fake.releaseHistory(0);
+    await settle();
+
+    // Вопрос C в ленте один: снимок относился к состоянию до начала C и
+    // применяться не должен.
+    const texts = controller.getModel().messages.map((item) => item.text);
+    expect(texts.filter((text) => text === "C")).toHaveLength(1);
+
+    // Нужда перечитать сохранилась: после C история читается снова и
+    // становится лентой целиком.
+    fake.setHistory([
+      entry("s1", "operator", "A"),
+      entry("s2", "assistant", "дочитанный A"),
+      entry("s3", "operator", "B"),
+      entry("s4", "assistant", "ответ B"),
+      entry("s5", "operator", "C"),
+      entry("s6", "assistant", "ответ C"),
+    ]);
+    fake.emit("chat.done", { turnId: "t-3", model: "demo-echo", latencyMs: 12 });
+    await settle();
+    fake.releaseHistory(1);
+    await settle();
+
+    const after = controller.getModel().messages.map((item) => item.text);
+    expect(after).toEqual(["A", "дочитанный A", "B", "ответ B", "C", "ответ C"]);
+  });
+
+  it("переставленные ответы: запоздавший снимок не стирает показанное", async () => {
+    const fake = createFakeApi();
+    const controller = create(fake, createFakeView());
+    await settle();
+
+    fake.holdHistory();
+    fake.setHistory([entry("s1", "operator", "A"), entry("s2", "assistant", "ответ A")]);
+    void controller.refreshHistory();
+    await settle();
+
+    fake.setHistory([
+      entry("s1", "operator", "A"),
+      entry("s2", "assistant", "ответ A"),
+      entry("s3", "operator", "C"),
+      entry("s4", "assistant", "ответ C"),
+    ]);
+    void controller.refreshHistory();
+    await settle();
+    expect(fake.historyPending()).toBe(2);
+
+    // Второе чтение вернулось первым, первое — следом.
+    fake.releaseHistory(1);
+    await settle();
+    fake.releaseHistory(0);
+    await settle();
+
+    // Побеждает последнее начатое чтение, а не последний пришедший ответ.
+    expect(controller.getModel().messages.map((item) => item.text)).toEqual([
+      "A",
+      "ответ A",
+      "C",
+      "ответ C",
+    ]);
+  });
+
+  it("запоздавший ответ отмены A не гасит поток хода B", async () => {
+    const fake = createFakeApi();
+    const controller = create(fake, createFakeView());
+    await settle();
+
+    controller.actions.send("A");
+    await settle();
+    const releaseCancel = fake.holdCancel();
+    controller.actions.stop();
+    await settle();
+    fake.emit("chat.cancelled", { turnId: "t-1" });
+
+    controller.actions.send("B");
+    await settle();
+    expect(controller.getModel().streaming).toBe(true);
+
+    releaseCancel();
+    await settle();
+
+    // Поток B жив, и его номер хода цел: Stop отменяет именно B.
+    expect(controller.getModel().streaming).toBe(true);
+    controller.actions.stop();
+    await settle();
+    expect(fake.cancelled).toEqual(["t-1", "t-2"]);
+  });
+
+  it("запоздавший отказ отмены не стирает номер нового хода", async () => {
+    const fake = createFakeApi();
+    const controller = create(fake, createFakeView());
+    await settle();
+
+    controller.actions.send("A");
+    await settle();
+    const releaseCancel = fake.holdCancel();
+    fake.failNextCancel(new ApiError({ code: "NO_TURN", message: "хода нет" }));
+    controller.actions.stop();
+    await settle();
+    fake.emit("chat.cancelled", { turnId: "t-1" });
+
+    controller.actions.send("B");
+    await settle();
+    releaseCancel();
+    await settle();
+
+    // Отказ относился к ходу A: ни поток B, ни его номер он не трогает, и
+    // ошибки игроку не показывает.
+    expect(controller.getModel().streaming).toBe(true);
+    expect(controller.getModel().error).toBeNull();
+    controller.actions.stop();
+    await settle();
+    expect(fake.cancelled).toEqual(["t-1", "t-2"]);
   });
 });

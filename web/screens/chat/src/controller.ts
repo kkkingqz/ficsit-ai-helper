@@ -95,6 +95,15 @@ export function createChatController(options: ChatControllerOptions): ChatContro
   let rateLimit: string | null = null;
   /** Ход отменён — историю надо перечитать, там окажется дочитанный ответ. */
   let historyStale = false;
+  /**
+   * Номер последнего начатого чтения истории.
+   *
+   * HTTP-ответы приходят не в том порядке, в каком их просили: ревью Gs на #62
+   * воспроизвело случай, когда запоздавший снимок `A+B` ложился поверх уже
+   * показанного `A+B+C` и завершённый ход исчезал с экрана. Поэтому ответ
+   * применяет только **последнее** чтение, а остальные отбрасываются.
+   */
+  let historyRead = 0;
   let destroyed = false;
   /** Отправка в полёте: мод ещё не назвал номер хода, а события уже идут. */
   let awaitingTurn = false;
@@ -209,13 +218,32 @@ export function createChatController(options: ChatControllerOptions): ChatContro
   /**
    * Перечитывает историю и делает её лентой.
    *
-   * Живой ход при этом не теряется и не удваивается: его сообщения опознаются
-   * по **своим** идентификаторам (`${turnId}-ask` и `turnId`) — их ставим мы,
-   * и путать их с записями мода не на чем. Всё остальное приходит из снимка.
+   * **Снимок и живой ход не смешиваются вовсе** — ни по идентификаторам, ни по
+   * тексту. Пока ход идёт, лента принадлежит событиям; снимок становится
+   * лентой целиком, когда живого хода нет. Прежде живой ход опознавался по
+   * своим идентификаторам и дописывался к снимку, но Foreman пишет вопрос
+   * игрока **до** потока: снимок, прочитанный при живом ходе, уже содержал
+   * этот вопрос, и к нему добавлялся наш — два одинаковых вопроса в ленте
+   * (ревью Gs на #62, п. 1).
+   *
+   * Отброшенный снимок не отменяет нужды перечитать: пометка остаётся, и
+   * чтение повторится на `chat.done`.
    */
   const loadHistory = async (): Promise<void> => {
+    if (turnId !== null) {
+      // Ход идёт — снимок ждёт его конца, спрашивать нечего.
+      historyStale = true;
+      return;
+    }
+    const read = (historyRead += 1);
     try {
       const page = await api.chatHistory({ limit: historyLimit });
+      if (read !== historyRead || turnId !== null) {
+        // Ответ опоздал: за время чтения началось новое чтение или новый ход.
+        // Применить его значит показать не то, что есть сейчас.
+        historyStale = true;
+        return;
+      }
       const shown = messages;
       if (page.messages.length === 0 && shown.length > 0) {
         // Пустой снимок не стирает показанное: разговор у мода есть — мы его
@@ -223,12 +251,6 @@ export function createChatController(options: ChatControllerOptions): ChatContro
         // не о пустой истории. Лента остаётся, и пометка «перечитать» тоже.
         return;
       }
-      // Живой ход опознаётся по **своим** идентификаторам: их ставим мы, и
-      // спутать их с записями мода не на чем. Остальное приходит из снимка.
-      const live =
-        turnId === null
-          ? []
-          : shown.filter((item) => item.id === `${turnId}-ask` || item.id === turnId);
       const stored = page.messages.map((entry) => {
         const at = new Date(entry.createdAt);
         return message(
@@ -238,7 +260,7 @@ export function createChatController(options: ChatControllerOptions): ChatContro
           Number.isNaN(at.getTime()) ? now() : at,
         );
       });
-      messages = [...stored, ...live];
+      messages = stored;
       history = messages.length === 0 ? "empty" : "ready";
       historyStale = false;
     } catch (err: unknown) {
@@ -445,12 +467,21 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       void api
         .chatCancel({ turnId: current })
         .then(() => {
+          // Ответ применяется только к тому ходу, который отменяли. Ревью Gs
+          // на #62 (п. 2) показало, чего стоит обратное: ответ отмены A
+          // задержался, `chat.cancelled(A)` пришёл, игрок отправил B — и
+          // запоздавший ответ снимал поток **у B**, после чего экран
+          // разрешал отправить C при живом B.
+          if (turnId !== current) return;
           // Событие `chat.cancelled` придёт следом и пометит сообщение;
           // здесь только снимаем поток, чтобы кнопка не ждала сети.
           streaming = false;
           render();
         })
         .catch((err: unknown) => {
+          // Тот же случай с другой стороны: запоздавший отказ отмены A не
+          // имеет права ни гасить поток B, ни стирать его номер хода.
+          if (turnId !== current) return;
           if (err instanceof ApiError && (err.code === "NO_TURN" || err.code === "TURN_MISMATCH")) {
             // Хода уже нет: экран отстал от мода, а не сломался.
             streaming = false;
