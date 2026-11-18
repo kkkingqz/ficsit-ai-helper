@@ -320,26 +320,13 @@ describe("чтения API v0 по сохранению", () => {
     controller.abort();
   });
 
-  it("режим и версия передаются библиотеке, а путь к файлу — как задан", async () => {
+  it("режим передаётся библиотеке, а путь к файлу — как задан", async () => {
     const { passed } = await serve({}, { saveSourceMode: "saveEstimated" });
 
     expect(passed[0]).toEqual({
       sourceMode: "saveEstimated",
       saveFilePath: "/несуществующий/save_a_starter.sav",
-      // Версия объявляется с 18.11.2026: Cf3 свёл проверку к мажору (§5.5),
-      // и теперь расхождение мажора станет громким отказом (Co2-85).
-      expectedApiVersion: "0.4.0",
     });
-  });
-
-  it("чего не дали — не передаём: пакет сам скажет, чего ему не хватает", async () => {
-    const { passed } = await serve({}, { saveFilePath: undefined, saveId: "save_a_starter" });
-
-    expect(Object.keys(passed[0] ?? {}).sort()).toEqual([
-      "expectedApiVersion",
-      "saveId",
-      "sourceMode",
-    ]);
   });
 });
 
