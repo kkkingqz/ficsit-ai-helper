@@ -71,6 +71,9 @@ struct FBuilding
 
 struct FSnapshot
 {
+    // Stable across reads of the same catalog. Zero means no revision has been computed.
+    uint64 CatalogRevision = 0;
+
     // Session setting when the game state is available. The game applies it only to eligible recipes.
     TOptional<float> PartsCostMultiplier;
     TArray<FRecipe> Recipes;
@@ -78,6 +81,12 @@ struct FSnapshot
     TArray<FBuilding> Buildings;
 };
 
+// Identifies catalog content and availability, independent of registry iteration order.
+uint64 ComputeCatalogRevision(const FSnapshot& Snapshot);
+
 // Read on the game thread after the save has started. Failure leaves OutSnapshot intact.
 bool TryReadCatalog(UWorld* World, FSnapshot& OutSnapshot);
+
+// Refresh availability in place after an unlock event. No registry enumeration or asset loading.
+bool TryRefreshCatalogUnlocks(UWorld* World, FSnapshot& Snapshot);
 }

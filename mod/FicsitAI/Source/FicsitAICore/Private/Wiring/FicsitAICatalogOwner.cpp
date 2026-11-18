@@ -1,6 +1,7 @@
 #include "FicsitAICatalogOwner.h"
 
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
+#include "GameFacade/Catalog/CatalogChangeListener.h"
 
 #include "Engine/World.h"
 #include "HAL/PlatformTime.h"
@@ -97,8 +98,50 @@ bool AFicsitAICatalogOwner::RefreshCatalog()
         Ms, Fresh.Recipes.Num(), Unlocked, Fresh.Items.Num(), Fresh.Buildings.Num(),
         Fresh.PartsCostMultiplier.IsSet() ? *FString::SanitizeFloat(Fresh.PartsCostMultiplier.GetValue()) : TEXT("нет"));
 
+    if (!ChangeListener)
+    {
+        UFicsitAICatalogChangeListener* Listener = NewObject<UFicsitAICatalogChangeListener>(this);
+        if (!Listener->Start(*GetWorld(), FicsitAI::Catalog::FOnCatalogChanged::CreateUObject(
+                this, &AFicsitAICatalogOwner::HandleCatalogChanged)))
+        {
+            return false;
+        }
+        ChangeListener = Listener;
+    }
+
     Snapshot = MoveTemp(Fresh);
     return true;
+}
+
+void AFicsitAICatalogOwner::HandleCatalogChanged(bool bContentChanged)
+{
+    if (!IsModActive() || !Snapshot.IsSet())
+    {
+        return;
+    }
+    if (bContentChanged)
+    {
+        RefreshCatalog();
+        return;
+    }
+
+    const uint64 PreviousRevision = Snapshot->CatalogRevision;
+    if (FicsitAI::Catalog::TryRefreshCatalogUnlocks(GetWorld(), Snapshot.GetValue())
+        && Snapshot->CatalogRevision != PreviousRevision)
+    {
+        UE_LOG(LogFicsitAICatalog, Log, TEXT("FicsitAI: разблокировки каталога обновлены, ревизия %llu"),
+            static_cast<unsigned long long>(Snapshot->CatalogRevision));
+    }
+}
+
+void AFicsitAICatalogOwner::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (ChangeListener)
+    {
+        ChangeListener->Stop();
+        ChangeListener = nullptr;
+    }
+    Super::EndPlay(EndPlayReason);
 }
 
 AFicsitAICatalogOwner* AFicsitAICatalogOwner::Get(const UObject* WorldContext)
