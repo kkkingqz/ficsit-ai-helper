@@ -26,6 +26,20 @@ TOptional<FString> FFicsitAIOperationRegistry::Register(const FFicsitAIOperation
     {
         return FString::Printf(TEXT("операция «%s»: запроса «%s» нет в API v0"), *Id, *Operation.ApiOp);
     }
+    // Один запрос API — одна схема: иначе ручной путь не знал бы, чьим Validator проверять аргументы.
+    TArray<FString> ApiOps{Operation.ApiOp};
+    ApiOps.Append(Operation.ManualApiOps);
+    for (const FString& Api : ApiOps)
+    {
+        if (Api != Operation.ApiOp && FFicsitAIApiClient::ParseOp(Api) == FFicsitAIApiClient::EOp::Unknown)
+        {
+            return FString::Printf(TEXT("операция «%s»: запроса «%s» нет в API v0"), *Id, *Api);
+        }
+        if (const FEntry* Other = FindByApiOp(Api))
+        {
+            return FString::Printf(TEXT("операция «%s»: запрос «%s» уже выполняет «%s»"), *Id, *Api, *Other->Operation.Id);
+        }
+    }
     TValueOrError<FFicsitAIJsonSchema, FString> Schema = FFicsitAIJsonSchema::Compile(Operation.InputSchemaText);
     if (Schema.HasError())
     {
@@ -55,6 +69,15 @@ const FFicsitAIOperationRegistry::FEntry* FFicsitAIOperationRegistry::FindEntry(
 {
     // Имена сравниваются с учётом регистра, как имена запросов API (Gs-109, п. 9).
     return Entries.FindByPredicate([&Id](const FEntry& E) { return E.Operation.Id.Equals(Id, ESearchCase::CaseSensitive); });
+}
+
+const FFicsitAIOperationRegistry::FEntry* FFicsitAIOperationRegistry::FindByApiOp(const FString& ApiOp) const
+{
+    return Entries.FindByPredicate([&ApiOp](const FEntry& E)
+    {
+        return E.Operation.ApiOp.Equals(ApiOp, ESearchCase::CaseSensitive)
+            || E.Operation.ManualApiOps.ContainsByPredicate([&ApiOp](const FString& M) { return M.Equals(ApiOp, ESearchCase::CaseSensitive); });
+    });
 }
 
 const FFicsitAIOperation* FFicsitAIOperationRegistry::Find(const FString& Id) const
@@ -109,7 +132,8 @@ FFicsitAIOperationRegistry::TResult<TSharedRef<FJsonObject>> FFicsitAIOperationR
 FFicsitAIOperationRegistry::TResult<TSharedRef<FJsonObject>> FFicsitAIOperationRegistry::DispatchApi(
     const FString& ApiOp, const TSharedRef<FJsonObject>& Args, FFicsitAIApiClient& Client) const
 {
-    const FEntry* Entry = Entries.FindByPredicate([&ApiOp](const FEntry& E) { return E.Operation.ApiOp.Equals(ApiOp, ESearchCase::CaseSensitive); });
+    // querySeries — ManualApiOps операции query_metric: графики «Статистики» идут той же схемой (ревью #72, P2).
+    const FEntry* Entry = FindByApiOp(ApiOp);
     if (!Entry)
     {
         return Client.Dispatch(ApiOp, Args);
@@ -139,6 +163,7 @@ const FFicsitAIOperationRegistry& FFicsitAIOperationRegistry::V0()
         FFicsitAIOperation QueryMetric;
         QueryMetric.Id = TEXT("query_metric");
         QueryMetric.ApiOp = TEXT("queryMetric");
+        QueryMetric.ManualApiOps = {TEXT("querySeries")};
         QueryMetric.Description = TEXT("Значение метрики из каталога list_metrics по metricId. Метрикам уровня powerNetwork, item и machineType нужен scopeId из availableScopes. ")
             TEXT("С window (last5Min, last15Min, last60Min) — временной ряд вместо значения, если у метрики hasSeries. ")
             TEXT("state notApplicable с value null — нормальный ответ: величина в этом мире не имеет смысла (например, у сети без батарей).");

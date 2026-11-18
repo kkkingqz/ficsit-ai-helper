@@ -25,6 +25,11 @@ struct FICSITAIAPI_API FFicsitAIOperation
     FString Id;
     /** Запрос API v0, который операция выполняет: "listMetrics". */
     FString ApiOp;
+    /**
+     * Другие запросы API ручного пути с теми же аргументами: "querySeries" у query_metric — ряд, который модель
+     * получает через query_metric с window. Их аргументы проходят ту же схему (§7.5, правило 1); модели они не видны.
+     */
+    TArray<FString> ManualApiOps;
     /** Описание для модели. Генерируется из реестра, адаптер своих не держит (§7.5, правило 2). */
     FString Description;
     /** JSON Schema аргументов — копия docs/contracts/schemas/<op>-request.schema.json. */
@@ -61,6 +66,7 @@ public:
     /**
      * Зарегистрировать операцию. Ошибка — почему нет:
      * - пустой или повторный Id, запрос API не из контракта;
+     * - запрос API (ApiOp или ManualApiOps) уже выполняет другая операция;
      * - схема аргументов не компилируется (незнакомое ключевое слово — тоже);
      * - операция выставлена модели без ручной точки входа (ADR-018) или запрос API модели не разрешён;
      * - у выставленной операции нет описания.
@@ -81,8 +87,9 @@ public:
     TResult<TSharedRef<FJsonObject>> Invoke(const FString& Id, const TSharedRef<FJsonObject>& Args, FFicsitAIApiClient& Client) const;
 
     /**
-     * Ручной путь экрана: запрос API по его имени ("queryMetric"). Если запрос выполняет операция реестра, аргументы
-     * проходят тот же Validator, что у инструмента модели (§7.5, правило 1); остальные запросы — как в Dispatch.
+     * Ручной путь экрана: запрос API по его имени ("queryMetric", "querySeries"). Если запрос выполняет операция
+     * реестра (ApiOp или ManualApiOps), аргументы проходят тот же Validator, что у инструмента модели (§7.5,
+     * правило 1); остальные запросы — как в Dispatch.
      * Через этот путь ходит мост веб-экранов.
      */
     TResult<TSharedRef<FJsonObject>> DispatchApi(const FString& ApiOp, const TSharedRef<FJsonObject>& Args, FFicsitAIApiClient& Client) const;
@@ -96,4 +103,5 @@ private:
     TArray<FEntry> Entries;
 
     const FEntry* FindEntry(const FString& Id) const;
+    const FEntry* FindByApiOp(const FString& ApiOp) const;
 };

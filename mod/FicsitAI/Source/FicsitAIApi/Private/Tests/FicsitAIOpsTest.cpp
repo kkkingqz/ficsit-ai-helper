@@ -230,7 +230,42 @@ bool FFicsitAIOpsV0Test::RunTest(const FString& Parameters)
         Now += 1.0;
         TestEqual(TEXT("7: запрос вне реестра — как раньше"), Code(Registry.DispatchApi(TEXT("getStatus"), Obj(TEXT("{\"x\":1}")), *Screen)), FString(TEXT("OK")));
         Now += 1.0;
-        TestEqual(TEXT("7: querySeries — свой разбор"), Code(Registry.DispatchApi(TEXT("querySeries"), Obj(TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\"}")), *Screen)), FString(TEXT("OK")));
+        TestEqual(TEXT("7: querySeries — валидный ряд проходит"), Code(Registry.DispatchApi(TEXT("querySeries"), Obj(TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\"}")), *Screen)), FString(TEXT("OK")));
+        // Графики «Статистики» шлют querySeries: те же аргументы — тот же ответ, что у модели (ревью #72 на ff09558).
+        for (const TCHAR* Args : {TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\",\"unexpected\":1}"),
+                                  TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\",\"scopeId\":\"\"}")})
+        {
+            Now += 1.0;
+            const FString ModelCode = Code(Registry.Invoke(TEXT("query_metric"), Obj(Args), *Model));
+            Now += 1.0;
+            const FString ManualCode = Code(Registry.DispatchApi(TEXT("querySeries"), Obj(Args), *Screen));
+            TestEqual(FString::Printf(TEXT("7: querySeries и query_metric одинаково — %s"), Args), ManualCode, ModelCode);
+            TestEqual(FString::Printf(TEXT("7: querySeries — схема операции — %s"), Args), ManualCode, FString(TEXT("INVALID_ARGUMENT")));
+        }
+        Now += 1.0;
+        TestEqual(TEXT("7: querySeries без окна — по-прежнему отказ"), Code(Registry.DispatchApi(TEXT("querySeries"), Obj(TEXT("{\"metricId\":\"power.consumption\"}")), *Screen)), FString(TEXT("INVALID_ARGUMENT")));
+        Now += 1.0;
+        TestEqual(TEXT("7: модели querySeries не выставлен"), Code(Registry.Invoke(TEXT("querySeries"), Obj(TEXT("{\"metricId\":\"power.consumption\",\"window\":\"last5Min\"}")), *Model)), FString(TEXT("UNKNOWN_OP")));
+        {
+            // Запрос API выполняет одна операция: вторая с тем же querySeries не регистрируется.
+            FFicsitAIOperationRegistry Clash;
+            FFicsitAIOperation A;
+            A.Id = TEXT("a");
+            A.ApiOp = TEXT("queryMetric");
+            A.ManualApiOps = {TEXT("querySeries")};
+            A.InputSchemaText = TEXT("{\"type\":\"object\"}");
+            TestFalse(TEXT("7: первая операция с ManualApiOps"), Clash.Register(A).IsSet());
+            FFicsitAIOperation B = A;
+            B.Id = TEXT("b");
+            B.ApiOp = TEXT("querySeries");
+            B.ManualApiOps.Reset();
+            TestTrue(TEXT("7: querySeries уже занят"), Clash.Register(B).IsSet());
+            FFicsitAIOperation C = A;
+            C.Id = TEXT("c");
+            C.ApiOp = TEXT("listScopes");
+            C.ManualApiOps = {TEXT("noSuchOp")};
+            TestTrue(TEXT("7: ManualApiOps вне API v0"), Clash.Register(C).IsSet());
+        }
         Core->Shutdown();
     }
     return true;
