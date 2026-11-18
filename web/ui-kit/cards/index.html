@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; base-uri 'none'; form-action 'none'">
+  <title>FICSIT AI · Cards in chat</title>
+  <link rel="stylesheet" href="../../../third_party/uplot/uPlot.min.css">
+  <link rel="stylesheet" href="../ui-kit.css">
+  <link rel="stylesheet" href="cards.css">
+  <link rel="stylesheet" href="preview.css">
+  <script defer src="../../../third_party/uplot/uPlot.iife.min.js"></script>
+  <script type="module" src="preview.js"></script>
+</head>
+<body class="d2 cards-preview">
+  <header class="cards-preview-header">
+    <div><span class="d2-label">FICSIT AI / FIXTURE</span><h1>Cards in chat</h1></div>
+    <label class="d2-label">Telemetry state
+      <select id="state">
+        <option value="fresh">Fresh</option>
+        <option value="loading">Loading</option>
+        <option value="stale">Stale</option>
+        <option value="empty">Empty</option>
+        <option value="error">Error</option>
+      </select>
+    </label>
+    <a href="../screens/?view=chat">Chat preview</a>
+  </header>
+  <main class="cards-preview-columns d2-scroll">
+    <section id="conversation" class="cards-preview-thread" aria-label="Conversation"></section>
+    <aside id="examples" class="cards-preview-examples" aria-label="Card variants"></aside>
+  </main>
+</body>
+</html>
