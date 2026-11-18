@@ -390,7 +390,7 @@ function createMockSource(options?: {
   });
 }
 
-describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
+describe("SaveSource contract and metrics (Public API v0 0.5.0)", () => {
   it("reports healthy GetStatus and handles missing file gracefully as inert", async () => {
     const okSource = createMockSource();
     const okStatus = await okSource.getStatus();
@@ -787,7 +787,7 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
     ).rejects.toMatchObject({ code: "SERIES_NOT_AVAILABLE" });
 
     // Проверка API_VERSION_MISMATCH и path traversal saveId
-    const mismatchSource = createMockSource({ expectedApiVersion: "0.3.0" });
+    const mismatchSource = createMockSource({ expectedApiVersion: "1.0.0" });
     await expect(mismatchSource.queryMetric({ metricId: "power.production" })).rejects.toBeInstanceOf(
       FicsitAIApiError,
     );
@@ -802,5 +802,40 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
     await expect(traversalSource.listMetrics()).rejects.toMatchObject({
       code: "INVALID_ARGUMENT",
     });
+  });
+
+  it("allows compatible minor API versions (0.5.1 and 0.4.0 against 0.5.0) and rejects major mismatch (Co2-87 P2)", async () => {
+    // Minor difference forward: 0.5.1 client against 0.5.0 source
+    const minorForwardSource = createMockSource({ expectedApiVersion: "0.5.1" });
+    const status1 = await minorForwardSource.getStatus();
+    expect(status1.apiVersionMismatch).toBe("");
+    expect(status1.reason).toBe("");
+    const metric1 = await minorForwardSource.queryMetric({ metricId: "power.consumption" });
+    expect(metric1.state).toBe("value");
+    expect(metric1.value).toBe(120);
+
+    // Minor difference backward: 0.4.0 client against 0.5.0 source
+    const minorBackwardSource = createMockSource({ expectedApiVersion: "0.4.0" });
+    const status2 = await minorBackwardSource.getStatus();
+    expect(status2.apiVersionMismatch).toBe("");
+    expect(status2.reason).toBe("");
+    const metric2 = await minorBackwardSource.queryMetric({ metricId: "power.consumption" });
+    expect(metric2.state).toBe("value");
+    expect(metric2.value).toBe(120);
+
+    // Major mismatch: 1.0.0 client against 0.5.0 source
+    const majorMismatchSource = createMockSource({ expectedApiVersion: "1.0.0" });
+    const majorStatus = await majorMismatchSource.getStatus();
+    expect(majorStatus.apiVersionMismatch).toBe("Expected 1.0.0, server implements 0.5.0");
+    expect(majorStatus.reason).toBe("API version mismatch");
+    await expect(
+      majorMismatchSource.queryMetric({ metricId: "power.consumption" }),
+    ).rejects.toMatchObject({ code: "API_VERSION_MISMATCH" });
+    await expect(
+      majorMismatchSource.listMetrics(),
+    ).rejects.toMatchObject({ code: "API_VERSION_MISMATCH" });
+    await expect(
+      majorMismatchSource.listScopes({ metricId: "power.network.production" }),
+    ).rejects.toMatchObject({ code: "API_VERSION_MISMATCH" });
   });
 });
