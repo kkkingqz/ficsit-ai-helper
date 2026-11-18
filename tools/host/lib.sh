@@ -122,13 +122,28 @@ fa_sync_mod_source() {
         for k in "${keep[@]}"; do [[ "$name" == $k ]] && skip=1; done
         [[ $skip -eq 1 ]] || cp -a "$entry" "$dst/" || return 1
     done
+    local -A seen=() dirs=()
     while read -r hash path; do
+        seen["$path"]=1
         if [[ "${before[$path]:-}" == "$hash" && -n "${stamp[$path]:-}" ]]; then
             touch -d "@${stamp[$path]}" "$path" || return 1
         else
             touch "$path" || return 1
+            [[ -n "${before[$path]:-}" ]] || dirs["$(dirname "$path")"]=1
         fi
     done < <(_fa_sync_hashes)
+    # Каталог, где файл появился или исчез, должен стать новее: UBT находит новые исходники по времени каталога,
+    # а cp -a вернул каталогу время из репозитория. Иначе новый .cpp не попадает в сборку модуля (ревью #72).
+    for path in "${!before[@]}"; do [[ -n "${seen[$path]:-}" ]] || dirs["$(dirname "$path")"]=1; done
+    local d
+    for d in "${!dirs[@]}"; do
+        # Каталог файла и все его родители до корня копии; исчезнувший каталог пропускается.
+        while [[ "$d" == "$dst" || "$d" == "$dst"/* ]]; do
+            if [[ -d "$d" ]]; then touch "$d" || return 1; fi
+            [[ "$d" == "$dst" ]] && break
+            d="$(dirname "$d")"
+        done
+    done
     [[ -f "$dst/$(basename "$src").uplugin" ]] || return 1
 }
 

@@ -321,6 +321,15 @@ touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"; touch -d '2026-06-02 00:00' 
 check "повтор синхронизации успешен" "$(sync_mod; echo $?)" 0
 check "после повтора изменённый файл всё ещё новее объектного" "$([[ "$SD/Source/a.cpp" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
 check "после повтора неизменённый файл сохранил время" "$(date -r "$SD/Source/b.cpp" +%F)" 2026-01-01
+# Новый и удалённый файл: каталог становится новее, иначе UBT не увидит новый исходник (ревью #72).
+touch -d '2026-06-01 00:00' "$SD/Source" "$SD/Intermediate/obj"
+echo 'int c;' > "$SR/Source/c.cpp"; touch -d '2026-01-01 00:00' "$SR/Source" "$SR/Source/c.cpp"
+check "синхронизация с новым файлом" "$(sync_mod; echo $?)" 0
+check "каталог с новым файлом новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+touch -d '2026-06-01 00:00' "$SD/Source" "$SD/Intermediate/obj"
+rm -f "$SR/Source/c.cpp"; touch -d '2026-01-01 00:00' "$SR/Source"
+check "синхронизация с удалённым файлом" "$(sync_mod; echo $?)" 0
+check "каталог с удалённым файлом новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
 
 # --- страницы веб-экранов (S8 3.4) ------------------------------------------------------------------
 W="$T/webrepo"; WD="$T/webdst"
