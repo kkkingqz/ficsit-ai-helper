@@ -203,6 +203,13 @@ bool FBuildingIndexActorEligibilityTest::RunTest(const FString&)
     TestFalse(TEXT("A transient actor is not a persistent building"), TryReadPersistentActor(Building.Get(), Entry));
     TestEqual(TEXT("Rejected transient actor preserves prior identity"), Entry.BuildingId, FString(TEXT("previous")));
     TestEqual(TEXT("Rejected transient actor preserves prior position"), Entry.Position, FVector(700, 800, 900));
+    Building->ClearFlags(RF_Transient);
+    TStrongObjectPtr<AFGBuildableAutomatedWorkBench> Parent(NewObject<AFGBuildableAutomatedWorkBench>());
+    Building->SetOwner(Parent.Get());
+    TestEqual(TEXT("The fixture has a buildable owner"), Building->GetOwner(), static_cast<AActor*>(Parent.Get()));
+    Entry.BuildingId = TEXT("previous");
+    TestFalse(TEXT("An owned internal actor is not a standalone building"), TryReadPersistentActor(Building.Get(), Entry));
+    TestEqual(TEXT("Rejected internal actor preserves prior identity"), Entry.BuildingId, FString(TEXT("previous")));
     return true;
 }
 

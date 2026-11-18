@@ -95,7 +95,9 @@ namespace FicsitAI::Buildings
 bool TryReadPersistentActor(AFGBuildable* Buildable, FEntry& OutEntry)
 {
     check(IsInGameThread());
-    if (!IsValid(Buildable) || Buildable->HasAnyFlags(RF_Transient) || Buildable->GetIsLightweightTemporary() || Buildable->ShouldConvertToLightweight())
+    if (!IsValid(Buildable) || Buildable->HasAnyFlags(RF_Transient) ||
+        Cast<AFGBuildable>(Buildable->GetOwner()) || Buildable->GetIsLightweightTemporary() ||
+        Buildable->ShouldConvertToLightweight())
     {
         return false;
     }
@@ -114,7 +116,11 @@ void AFicsitAIBuildingIndexOwner::AddBuildable(AFGBuildable* Buildable)
 {
     if (!IsValid(Buildable) || Buildable->GetWorld() != GetWorld()) return;
     FicsitAI::Buildings::FEntry Entry;
-    if (FicsitAI::Buildings::TryReadPersistentActor(Buildable, Entry)) Index.Upsert(MoveTemp(Entry));
+    if (FicsitAI::Buildings::TryReadPersistentActor(Buildable, Entry) &&
+        IFGSaveInterface::Execute_ShouldSave(Buildable))
+    {
+        Index.Upsert(MoveTemp(Entry));
+    }
 }
 
 void AFicsitAIBuildingIndexOwner::HandleAdded(AFGBuildable* Buildable)
