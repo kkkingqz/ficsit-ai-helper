@@ -158,6 +158,10 @@ export interface StatisticsStrings {
   liveSource: string;
   derivedSource: string;
   fixtureSource: string;
+  saveSource?: string;
+  saveEstimatedSource?: string;
+  recordedSource?: string;
+  plannedSource?: string;
   reports: {
     energy: {
       label: string;
