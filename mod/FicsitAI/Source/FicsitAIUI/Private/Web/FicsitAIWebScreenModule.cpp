@@ -1,6 +1,7 @@
 #include "Web/FicsitAIWebScreenModule.h"
 
 #include "FicsitAIApiClient.h"
+#include "FicsitAIOperationRegistry.h"
 #include "Framework/Application/SlateApplication.h"
 #include "IFicsitAIApi.h"
 #include "Interfaces/IPluginManager.h"
@@ -288,7 +289,8 @@ void UFicsitAIWebScreenModule::CreateBrowser()
             return;
         }
         // Остальное — запросы API v0 в канонической форме; мост только транспорт.
-        FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> Result = Self->ApiClient->Dispatch(Op, Args);
+        // Операции реестра (listMetrics, queryMetric) — через общий с моделью Validator (§7.5, правило 1; ревью #72).
+        FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> Result = FFicsitAIOperationRegistry::V0().DispatchApi(Op, Args, *Self->ApiClient);
         if (Result.HasError())
         {
             Respond.Fail(Result.GetError().Code, Result.GetError().Message);
