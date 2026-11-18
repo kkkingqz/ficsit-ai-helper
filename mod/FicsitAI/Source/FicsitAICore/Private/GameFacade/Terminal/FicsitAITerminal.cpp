@@ -1,6 +1,7 @@
 #include "GameFacade/Terminal/FicsitAITerminal.h"
 #include "GameFacade/Terminal/FicsitAISubsystem.h"
 #include "GameFacade/Terminal/FicsitAIInputMappingContext.h"
+#include "FicsitAIApiSubsystem.h"
 #include "FicsitAIScreenModuleFactoryImpl.h"
 #include "Surface/FicsitAIScreenSurfaceWidget.h"
 #include "FGCharacterPlayer.h"
@@ -164,6 +165,13 @@ void AFicsitAITerminal::InitializeHost()
     HostContext.Host.SetObject(this);
     HostContext.Host.SetInterface(Cast<IFicsitAIScreenHost>(this));
     HostContext.HostState = EFicsitAIHostState::Ready;
+
+    // API мира — единственный путь модуля к данным (§3.6, V-2). Хост его не держит, только передаёт модулям.
+    if (UFicsitAIApiSubsystem* Api = UFicsitAIApiSubsystem::Get(this))
+    {
+        HostContext.Api.SetObject(Api);
+        HostContext.Api.SetInterface(Cast<IFicsitAIApi>(Api));
+    }
 
     // Фабрика модулей по умолчанию (Notes, Status)
     if (!ModuleFactory)

@@ -1,6 +1,8 @@
 #include "Web/FicsitAIWebScreenModule.h"
 
+#include "FicsitAIApiClient.h"
 #include "Framework/Application/SlateApplication.h"
+#include "IFicsitAIApi.h"
 #include "Interfaces/IPluginManager.h"
 #include "Misc/Paths.h"
 #include "Internationalization/Regex.h"
@@ -276,21 +278,67 @@ void UFicsitAIWebScreenModule::CreateBrowser()
                 return;
             }
             Self->bBackCaptured = bActive;
-            Respond.Ok(MakeShared<FJsonValueNull>());
+            // Пустой объект, а не null: фасад считает ответ без тела битым конвертом.
+            Respond.Ok(MakeShared<FJsonValueObject>(MakeShared<FJsonObject>()));
             return;
         }
-        // API v0 в моде появится с V-2; до тех пор источник данных честно недоступен (public-api-v0, коды ошибок).
-        Respond.Fail(TEXT("SOURCE_UNAVAILABLE"), TEXT("API мода ещё не подключён к странице"));
+        if (!Self->ApiClient.IsValid())
+        {
+            Respond.Fail(TEXT("SOURCE_UNAVAILABLE"), TEXT("хост не передал экрану API мода"));
+            return;
+        }
+        // Остальное — запросы API v0 в канонической форме; мост только транспорт.
+        FFicsitAIApiClient::TResult<TSharedRef<FJsonObject>> Result = Self->ApiClient->Dispatch(Op, Args);
+        if (Result.HasError())
+        {
+            Respond.Fail(Result.GetError().Code, Result.GetError().Message);
+            return;
+        }
+        Respond.Ok(MakeShared<FJsonValueObject>(Result.GetValue()));
     });
+    ConnectApi();
     RebuildContent();
 #else
     RebuildContent();
 #endif
 }
 
+void UFicsitAIWebScreenModule::ConnectApi()
+{
+#if WITH_FICSITAI_WEB
+    IFicsitAIApi* Api = CurrentContext.Api.GetInterface();
+    if (!Api || !Bridge.IsValid())
+    {
+        UE_LOG(LogFicsitAIWebScreen, Warning, TEXT("%s: хост не передал API, запросы страницы получат SOURCE_UNAVAILABLE"),
+            *ModuleId.ToString());
+        return;
+    }
+    FFicsitAIApiClientInfo Info;
+    Info.Kind = EFicsitAIApiClientKind::Screen;
+    Info.RequiredApiVersion = GetRequiredApiVersion();
+    Info.Name = TEXT("web:") + ModuleId.ToString();
+    ApiClient = Api->Connect(Info);
+
+    // События API идут странице тем же мостом: { event, data }. Всё на GameThread.
+    TWeakPtr<FFicsitAIWebBridge, ESPMode::ThreadSafe> WeakBridge = Bridge;
+    ApiClient->SetEventHandler([WeakBridge](const FString& Event, const TSharedRef<FJsonObject>& Data)
+    {
+        if (const TSharedPtr<FFicsitAIWebBridge, ESPMode::ThreadSafe> Pinned = WeakBridge.Pin())
+        {
+            Pinned->PushEvent(Event, Data);
+        }
+    });
+#endif
+}
+
 void UFicsitAIWebScreenModule::DestroyBrowser()
 {
 #if WITH_FICSITAI_WEB
+    if (ApiClient.IsValid())
+    {
+        ApiClient->Disconnect();
+        ApiClient.Reset();
+    }
     if (Bridge.IsValid())
     {
         Bridge->Detach();
@@ -460,6 +508,11 @@ void UFicsitAIWebScreenModule::BeginDestroy()
 {
     SetWorldWatch(false);
 #if WITH_FICSITAI_WEB
+    if (ApiClient.IsValid())
+    {
+        ApiClient->Disconnect();
+        ApiClient.Reset();
+    }
     if (Bridge.IsValid())
     {
         Bridge->Detach();

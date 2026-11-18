@@ -9,6 +9,7 @@
 class SBox;
 class SWidget;
 class FFicsitAIWebBridge;
+class FFicsitAIApiClient;
 
 /**
  * Экранный модуль на веб-странице (ADR-032, ARCHITECTURE §6.3.1; S8 3.4).
@@ -57,6 +58,8 @@ public:
     int64 GetWorldNotifies() const { return WorldNotifies; }
     /** Страница заявила, что сама обработает Esc. */
     bool IsBackCaptured() const { return bBackCaptured; }
+    /** Подключена ли страница к API мода: хост передал API, браузер создан. */
+    bool IsApiConnected() const { return ApiClient.IsValid(); }
     /** Браузер этого модуля не создался: CEF отказал (для проверок и надписи на экране). */
     bool HasBrowserFailed() const { return bBrowserFailed; }
     /** Есть ли браузер: клиент Win64 с FicsitAIWebRuntime и поднятым CEF. false — сервер, Linux-редактор, отказ CEF. */
@@ -100,6 +103,8 @@ private:
     TSharedPtr<SBox> RootBox;
     TSharedPtr<SWidget> View;
     TSharedPtr<FFicsitAIWebBridge, ESPMode::ThreadSafe> Bridge;
+    /** Подключение страницы к API: своё у каждого модуля, со своим лимитом частоты (public-api-v0, «Лимиты»). */
+    TSharedPtr<FFicsitAIApiClient> ApiClient;
 
     FTSTicker::FDelegateHandle WorldTicker;
     int64 LastSeenUploads = 0;
@@ -113,6 +118,8 @@ private:
 
     void CreateBrowser();
     void DestroyBrowser();
+    /** Подключить страницу к API из контекста хоста и пустить события API в мост. */
+    void ConnectApi();
     void ApplyContext();
     void RebuildContent();
     void SetWorldWatch(bool bEnabled);
