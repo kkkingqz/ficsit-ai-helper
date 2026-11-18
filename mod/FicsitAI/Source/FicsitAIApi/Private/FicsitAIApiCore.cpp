@@ -246,7 +246,7 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
     }
 
     TArray<FMetricState> Fresh;
-    TMap<FString, int32> FreshIndex;
+    TFicsitAIIdMap<int32> FreshIndex;
     TArray<FString> Changed;
     Fresh.Reserve(Snapshot.Metrics.Num());
 
@@ -269,7 +269,7 @@ void FFicsitAIApiCore::PublishSnapshot(const FFicsitAISnapshot& Snapshot)
         bool bChanged = Previous == nullptr || !SameDescriptor(Previous->Descriptor, In.Descriptor)
             || Previous->PrecisionDigits != In.PrecisionDigits;
 
-        TSet<FString> Known;
+        FFicsitAIIdSet Known;
         Known.Reserve(In.Descriptor.AvailableScopes.Num());
         for (const FFicsitAIScopeRef& Scope : In.Descriptor.AvailableScopes)
         {
@@ -478,10 +478,10 @@ void FFicsitAIApiCore::Broadcast(const FString& Event, TFunctionRef<TSharedRef<F
         const TSharedPtr<FFicsitAIApiClient> Client = Weak.Pin();
         if (Client.IsValid() && Client->OnEvent && Client->Core.IsValid() && Client->AcceptsEvent(Event))
         {
-            // Копия обработчика: он может отключить своего клиента, и сброс OnEvent уничтожил бы захват
-            // посреди вызова (Gs-109, п. 5). Client держит само подключение до конца итерации.
-            const FFicsitAIApiClient::FEventHandler Handler = Client->OnEvent;
-            Handler(Event, Data(Client->Info));
+            // Ссылка на тот же экземпляр обработчика, не копия: состояние захвата живёт между событиями, а сброс
+            // OnEvent внутри вызова (Disconnect) не уничтожает выполняющийся обработчик (Gs-109, п. 5; ревью #71).
+            const TSharedPtr<FFicsitAIApiClient::FEventHandler> Handler = Client->OnEvent;
+            (*Handler)(Event, Data(Client->Info));
         }
     }
 }
@@ -561,7 +561,7 @@ FFicsitAIApiCore::TResult<FFicsitAIMetricPage> FFicsitAIApiCore::ListMetrics(con
     {
         return MakeError(ApiError(FicsitAIApiErrors::InvalidArgument, TEXT("scopeFilter и scopeCursor допустимы только вместе с metricId")));
     }
-    if (!Args.MetricId.IsEmpty() && !Args.Cursor.IsEmpty())
+    if (!Args.MetricId.IsEmpty() && Args.Cursor.IsSet())
     {
         // С metricId ответ — один дескриптор, курсора метрик у него нет; курсор областей идёт в scopeCursor (Gs-109, п. 1).
         return MakeError(ApiError(FicsitAIApiErrors::InvalidArgument, TEXT("с metricId курсор передаётся в scopeCursor, а не в cursor")));
@@ -598,7 +598,7 @@ FFicsitAIApiCore::TResult<FFicsitAIMetricPage> FFicsitAIApiCore::ListMetrics(con
     }
 
     int32 Offset = 0;
-    if (TOptional<FFicsitAIApiError> Bad = ParseMetricCursor(Args.Cursor, Offset))
+    if (TOptional<FFicsitAIApiError> Bad = ParseMetricCursor(Args.Cursor.Get(FString()), Offset))
     {
         return MakeError(Bad.GetValue());
     }

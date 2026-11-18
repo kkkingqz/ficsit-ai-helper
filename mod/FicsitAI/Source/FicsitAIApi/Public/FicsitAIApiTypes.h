@@ -202,7 +202,8 @@ struct FICSITAIAPI_API FFicsitAIListMetricsArgs
     FString Filter;
     TOptional<FString> ScopeFilter;
     TOptional<int32> PageSize;
-    FString Cursor;
+    /** Задан, даже пустой, — поле было в запросе: с MetricId это INVALID_ARGUMENT (ревью #71). */
+    TOptional<FString> Cursor;
     TOptional<FString> ScopeCursor;
 };
 
