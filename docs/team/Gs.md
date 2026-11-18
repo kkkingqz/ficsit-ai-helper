@@ -53,7 +53,7 @@
 Каталог из игры, индекс построек, каркас телеметрии с замерами бюджета GameThread. Ведёт Gs.
 
 - [x] Первый снимок `CatalogProvider`: состав из `UModContentRegistry`, разблокировки и числа из игровых подсистем. [Снимок (#41)](https://github.com/kkkingqz/ficsit-ai-helper/pull/41), [подключение (#44)](https://github.com/kkkingqz/ficsit-ai-helper/pull/44), [прогон на Save D](https://github.com/kkkingqz/ficsit-ai-helper/issues/11#issuecomment-6803095394)
-- [ ] `catalogRevision` и обновление разблокировок по игровым событиям ([ARCHITECTURE §5.1](../ARCHITECTURE.md#51-gamecatalog-read-only))
+- [ ] `catalogRevision` и обновление разблокировок по игровым событиям — [PR #73 на ревью Co](https://github.com/kkkingqz/ficsit-ai-helper/pull/73) ([ARCHITECTURE §5.1](../ARCHITECTURE.md#51-gamecatalog-read-only))
 - [ ] Индекс построек по событиям строительства и демонтажа
 - [ ] Каркас телеметрии с нарезкой по кадрам; сборщики электросетей
 - [ ] Замеры стоимости выборки на трёх сохранениях; «стабильность сети» — вместе с Gf2
