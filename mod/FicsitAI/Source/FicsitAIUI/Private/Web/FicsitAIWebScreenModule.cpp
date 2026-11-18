@@ -431,10 +431,10 @@ void UFicsitAIWebScreenModule::RebuildContent()
     RootBox->SetContent(
         SNew(STextBlock)
         .Text(bBrowserFailed
-            ? NSLOCTEXT("FicsitAI", "WebScreenBrowserFailed", "Встроенный браузер не запустился")
+            ? NSLOCTEXT("FicsitAI", "WebScreenBrowserFailed", "The built-in browser failed to start")
             : IsWebAvailable()
-            ? NSLOCTEXT("FicsitAI", "WebScreenNoBrowser", "Экран не открыт")
-            : NSLOCTEXT("FicsitAI", "WebScreenUnavailable", "Встроенный браузер недоступен"))
+            ? NSLOCTEXT("FicsitAI", "WebScreenNoBrowser", "Screen is not open")
+            : NSLOCTEXT("FicsitAI", "WebScreenUnavailable", "The built-in browser is unavailable"))
         .ColorAndOpacity(FLinearColor(0.7f, 0.7f, 0.7f, 1.0f)));
 }
 
