@@ -105,11 +105,25 @@ fa_sync_mod_source() {
             [[ $s2 -eq 1 ]] || find "$e" -type f -print0
         done | xargs -0 -r sha1sum
     }
+    _fa_sync_dirs() {
+        local e n k2 s2
+        printf '%s\0' "$dst"
+        for e in "$dst"/* "$dst"/.[!.]*; do
+            [[ -d "$e" && ! -L "$e" ]] || continue
+            n="$(basename "$e")"; s2=0
+            for k2 in "${keep[@]}"; do [[ "$n" == $k2 ]] && s2=1; done
+            [[ $s2 -eq 1 ]] || find "$e" -type d -print0
+        done
+    }
     while read -r hash path; do before["$path"]="$hash"; done < <(_fa_sync_hashes)
     # Время файла копии до синхронизации. Файл с прежним содержимым получает своё прежнее время, а не время из
     # репозитория: иначе после прерванной сборки повтор через cp -a вернул бы изменённому файлу старое время,
     # и объектный файл от прежнего содержимого снова выглядел бы новее (ревью #69).
     for path in "${!before[@]}"; do stamp["$path"]="$(stat -c '%.9Y' "$path" 2>/dev/null)"; done
+    # То же для каталогов: повтор синхронизации без изменений не должен вернуть каталогу, который прошлый проход
+    # сделал новее из-за нового или удалённого файла, время из репозитория (ревью #69 на 9c8a6d8).
+    local -A dstamp=()
+    while IFS= read -r -d '' path; do dstamp["$path"]="$(stat -c '%.9Y' "$path" 2>/dev/null)"; done < <(_fa_sync_dirs)
     for entry in "$dst"/* "$dst"/.[!.]*; do
         [[ -e "$entry" || -L "$entry" ]] || continue
         name="$(basename "$entry")"; skip=0
@@ -136,6 +150,10 @@ fa_sync_mod_source() {
     # а cp -a вернул каталогу время из репозитория. Иначе новый .cpp не попадает в сборку модуля (ревью #72).
     for path in "${!before[@]}"; do [[ -n "${seen[$path]:-}" ]] || dirs["$(dirname "$path")"]=1; done
     local d
+    # Прежнее время каталогов копии — до обновления изменившихся: cp -a выставил им время из репозитория.
+    while IFS= read -r -d '' d; do
+        if [[ -n "${dstamp[$d]:-}" ]]; then touch -d "@${dstamp[$d]}" "$d" || return 1; fi
+    done < <(_fa_sync_dirs)
     for d in "${!dirs[@]}"; do
         # Каталог файла и все его родители до корня копии; исчезнувший каталог пропускается.
         while [[ "$d" == "$dst" || "$d" == "$dst"/* ]]; do

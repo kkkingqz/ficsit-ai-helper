@@ -330,6 +330,24 @@ touch -d '2026-06-01 00:00' "$SD/Source" "$SD/Intermediate/obj"
 rm -f "$SR/Source/c.cpp"; touch -d '2026-01-01 00:00' "$SR/Source"
 check "синхронизация с удалённым файлом" "$(sync_mod; echo $?)" 0
 check "каталог с удалённым файлом новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+# Новый файл → синхронизация → сборка прервана → повтор без изменений: каталог и его родители остаются новее
+# объектного файла, повтор не возвращает им время из репозитория (ревью #69 на 9c8a6d8).
+mkdir -p "$SR/Source/Sub"; echo 'int s;' > "$SR/Source/Sub/s.cpp"; touch -d '2026-01-01 00:00' "$SR" "$SR/Source" "$SR/Source/Sub" "$SR/Source/Sub/s.cpp"
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
+check "синхронизация с новым вложенным файлом" "$(sync_mod; echo $?)" 0
+check "повтор без изменений успешен" "$(sync_mod; echo $?)" 0
+check "после повтора каталог нового файла новее объектного" "$([[ "$SD/Source/Sub" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+check "после повтора родитель каталога новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+rm -rf "$SR/Source/Sub"; touch -d '2026-01-01 00:00' "$SR/Source"
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
+check "синхронизация с удалённым каталогом" "$(sync_mod; echo $?)" 0
+check "повтор после удаления успешен" "$(sync_mod; echo $?)" 0
+check "после повтора каталог удалённого файла новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+# Без изменений в репозитории каталог не становится новее: иначе каждая синхронизация заставляла бы UBT
+# заново искать исходники.
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"; touch -d '2026-05-01 00:00' "$SD/Source"
+check "синхронизация без изменений" "$(sync_mod; echo $?)" 0
+check "неизменённый каталог сохранил время" "$(date -r "$SD/Source" +%F)" 2026-05-01
 
 # --- страницы веб-экранов (S8 3.4) ------------------------------------------------------------------
 W="$T/webrepo"; WD="$T/webdst"

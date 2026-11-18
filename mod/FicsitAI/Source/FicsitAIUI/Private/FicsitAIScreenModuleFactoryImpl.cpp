@@ -70,8 +70,8 @@ TScriptInterface<IFicsitAIScreenModule> UFicsitAIScreenModuleFactoryImpl::Create
         {
             UFicsitAIWebScreenModule* Module = NewObject<UFicsitAIWebScreenModule>(Outer);
             const FText Name = ModuleId == FName(TEXT("Chat"))
-                ? NSLOCTEXT("FicsitAI", "ChatModuleTitle", "Чат с ИИ")
-                : NSLOCTEXT("FicsitAI", "StatisticsModuleTitle", "Статистика");
+                ? NSLOCTEXT("FicsitAI", "ChatModuleTitle", "Chat")
+                : NSLOCTEXT("FicsitAI", "StatisticsModuleTitle", "Statistics");
             Module->Configure(ModuleId, Screen.Page, Name);
             TScriptInterface<IFicsitAIScreenModule> Result;
             Result.SetObject(Module);
