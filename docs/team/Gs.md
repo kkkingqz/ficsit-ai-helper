@@ -54,7 +54,8 @@
 
 - [x] Первый снимок `CatalogProvider`: состав из `UModContentRegistry`, разблокировки и числа из игровых подсистем. [Снимок (#41)](https://github.com/kkkingqz/ficsit-ai-helper/pull/41), [подключение (#44)](https://github.com/kkkingqz/ficsit-ai-helper/pull/44), [прогон на Save D](https://github.com/kkkingqz/ficsit-ai-helper/issues/11#issuecomment-6803095394)
 - [x] `catalogRevision` и обновление разблокировок по игровым событиям — [PR #73 слит как 2f4fbdb после ревью Co и согласия King](https://github.com/kkkingqz/ficsit-ai-helper/pull/73) ([ARCHITECTURE §5.1](../ARCHITECTURE.md#51-gamecatalog-read-only))
-- [ ] Индекс построек по событиям строительства и демонтажа — [PR #76 на ревью Co](https://github.com/kkkingqz/ficsit-ai-helper/pull/76), сохраняемые самостоятельные акторы; штатная регистрация — Gf (Gs-120). Полный R-19 остаётся открыт
+- [x] Компонент индекса сохраняемых самостоятельных построек по событиям — [PR #76 слит как b082acf после ревью Co](https://github.com/kkkingqz/ficsit-ai-helper/pull/76)
+- [ ] Штатная регистрация индекса в WorldModule — Gf (Gs-120); полная сверка с Save и R-19 остаются открыты
 - [ ] Каркас телеметрии с нарезкой по кадрам; сборщики электросетей
 - [ ] Замеры стоимости выборки на трёх сохранениях; «стабильность сети» — вместе с Gf2
 - [ ] Каталог метрик v0.1; сверка с 71 метрикой FRM Companion — вместе с Gf2
