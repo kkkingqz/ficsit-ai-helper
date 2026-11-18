@@ -561,4 +561,189 @@ describe("StatisticsController (V-5, #22)", () => {
 
     controller.destroy();
   });
+
+  it("renders empty generator table and NO DATA tile when no generators exist in save (Co2-71 P1)", async () => {
+    const { api } = createMockApi();
+    // Default mock has no generator scopes
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+
+    // Table 0 is "Generators by type"
+    const genTable = model.tables[0];
+    expect(genTable).toBeDefined();
+    expect(genTable?.groups).toEqual([]);
+    expect(genTable?.state).toEqual({ kind: "empty", label: "NO DATA" });
+
+    // Generators tile
+    const genTile = model.tiles.find((t) => t.id === "generators");
+    expect(genTile).toBeDefined();
+    expect(genTile?.reading.state).toBe("notApplicable");
+    expect(genTile?.state).toEqual({ kind: "empty", label: "NO DATA" });
+
+    controller.destroy();
+  });
+
+  it("renders real generator scopes with Geothermal notApplicable and load dash (Co2-71 P1, Co2-85 P2)", async () => {
+    const { api } = createMockApi();
+    (api.listScopes as any).mockImplementation(async ({ metricId }: { metricId: string }) => {
+      if (metricId === "generators.total") {
+        return {
+          scopes: [
+            { scopeId: "Build_GeneratorCoal_C", displayName: "Coal Generator" },
+            { scopeId: "Build_GeneratorGeoThermal_C", displayName: "Geothermal Generator" },
+          ],
+          nextCursor: "",
+        };
+      }
+      return { scopes: [], nextCursor: "" };
+    });
+
+    (api.queryMetric as any).mockImplementation(async (args: any) => {
+      if (args.metricId === "generators.total") {
+        const val = args.scopeId === "Build_GeneratorCoal_C" ? 4 : 2;
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "value", value: val, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      if (args.metricId === "generators.running") {
+        const val = args.scopeId === "Build_GeneratorCoal_C" ? 3 : 2;
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "value", value: val, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      if (args.metricId === "generators.production") {
+        if (args.scopeId === "Build_GeneratorGeoThermal_C") {
+          return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "notApplicable", value: null, unit: "megawatt", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+        }
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "value", value: 225, unit: "megawatt", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      return { kind: "value", metricId: args.metricId, scopeId: args.scopeId || "", state: "value", value: 100, unit: "megawatt", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+    });
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+
+    // Table 0: Generators by type
+    const genTable = model.tables[0];
+    expect(genTable).toBeDefined();
+    const groups = genTable?.groups ?? [];
+    expect(groups.length).toBe(2);
+
+    // Coal generator group
+    const coalGroup = groups[0];
+    expect(coalGroup).toBeDefined();
+    const coalSummary = coalGroup?.summary ?? [];
+    expect(coalSummary[0]).toBe("Coal Generator");
+    expect(coalSummary[1]).toBe("3 / 4 running");
+    expect((coalSummary[2] as any)?.value).toBe(225);
+    expect(coalSummary[3]).toBe("—");
+
+    // Geothermal generator group
+    const geoGroup = groups[1];
+    expect(geoGroup).toBeDefined();
+    const geoSummary = geoGroup?.summary ?? [];
+    expect(geoSummary[0]).toBe("Geothermal Generator");
+    expect(geoSummary[1]).toBe("2 / 2 running");
+    expect((geoSummary[2] as any)?.state).toBe("notApplicable");
+    expect((geoSummary[2] as any)?.value).toBe(null);
+    expect(geoSummary[3]).toBe("—");
+
+    // Generators tile shows sum (3 + 2 = 5)
+    const genTile = model.tiles.find((t) => t.id === "generators");
+    expect(genTile).toBeDefined();
+    expect(genTile?.reading.value).toBe(5);
+    expect(genTile?.source).toBe("Save file");
+
+    controller.destroy();
+  });
+
+  it("handles notApplicable state in generator counters without turning it to zero (Co2-85 P3)", async () => {
+    const { api } = createMockApi();
+    (api.listScopes as any).mockImplementation(async ({ metricId }: { metricId: string }) => {
+      if (metricId === "generators.total") {
+        return {
+          scopes: [
+            { scopeId: "Build_GeneratorCoal_C", displayName: "Coal Generator" },
+          ],
+          nextCursor: "",
+        };
+      }
+      return { scopes: [], nextCursor: "" };
+    });
+
+    (api.queryMetric as any).mockImplementation(async (args: any) => {
+      if (args.metricId === "generators.total") {
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "notApplicable", value: null, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      if (args.metricId === "generators.running") {
+        return { kind: "value", metricId: args.metricId, scopeId: args.scopeId, state: "notApplicable", value: null, unit: "count", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+      }
+      return { kind: "value", metricId: args.metricId, scopeId: args.scopeId || "", state: "value", value: 100, unit: "megawatt", source: "save", sessionTimeSec: 2100, precisionDigits: 0 };
+    });
+
+    const controller = new StatisticsController({
+      api,
+      view: { update: vi.fn(), unmount: vi.fn() },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const model = controller.buildModel();
+
+    const genTable = model.tables[0];
+    expect(genTable).toBeDefined();
+    const groups = genTable?.groups ?? [];
+    expect(groups.length).toBe(1);
+
+    const coalGroup = groups[0];
+    expect(coalGroup).toBeDefined();
+    const coalSummary = coalGroup?.summary ?? [];
+    expect(coalSummary[0]).toBe("Coal Generator");
+    expect(coalSummary[1]).toBe("NO DATA");
+
+    controller.destroy();
+  });
+
+  it("formats all data sources according to contract §8.5 (Co2-71 P2)", async () => {
+    const { api } = createMockApi();
+    const sourcesToTest = [
+      { source: "save" as const, expected: "Save file" },
+      { source: "saveEstimated" as const, expected: "Save estimated" },
+      { source: "recorded" as const, expected: "Recorded session" },
+      { source: "planned" as const, expected: "Plan estimate" },
+      { source: "fixture" as const, expected: "Fixture data" },
+      { source: "live" as const, expected: "Live telemetry" },
+    ];
+
+    for (const { source, expected } of sourcesToTest) {
+      (api.queryMetric as any).mockImplementation(async (args: any) => ({
+        kind: "value",
+        metricId: args.metricId,
+        scopeId: "",
+        state: "value",
+        value: 100,
+        unit: "megawatt",
+        source,
+        sessionTimeSec: 2100,
+        precisionDigits: 0,
+      }));
+
+      const controller = new StatisticsController({
+        api,
+        view: { update: vi.fn(), unmount: vi.fn() },
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const model = controller.buildModel();
+      const genTile = model.tiles.find((t) => t.id === "generation");
+      expect(genTile?.source).toBe(expected);
+
+      controller.destroy();
+    }
+  });
 });

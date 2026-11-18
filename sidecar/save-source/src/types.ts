@@ -1,5 +1,5 @@
 /** Каноническая версия замороженного контракта Public API v0. */
-export const PUBLIC_API_VERSION = "0.4.0";
+export const PUBLIC_API_VERSION = "0.5.0";
 
 /** Источник данных телеметрии. */
 export type DataSource =

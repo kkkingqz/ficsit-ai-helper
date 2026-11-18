@@ -15,6 +15,10 @@ export const DEFAULT_STRINGS: StatisticsStrings = {
   liveSource: "Live telemetry",
   derivedSource: "Derived calculation",
   fixtureSource: "Fixture data",
+  saveSource: "Save file",
+  saveEstimatedSource: "Save estimated",
+  recordedSource: "Recorded session",
+  plannedSource: "Plan estimate",
   reports: {
     energy: {
       label: "Energy",

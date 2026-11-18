@@ -787,7 +787,7 @@ describe("SaveSource contract and metrics (Public API v0 0.4.0)", () => {
     ).rejects.toMatchObject({ code: "SERIES_NOT_AVAILABLE" });
 
     // Проверка API_VERSION_MISMATCH и path traversal saveId
-    const mismatchSource = createMockSource({ expectedApiVersion: "0.3.0" });
+    const mismatchSource = createMockSource({ expectedApiVersion: "1.0.0" });
     await expect(mismatchSource.queryMetric({ metricId: "power.production" })).rejects.toBeInstanceOf(
       FicsitAIApiError,
     );

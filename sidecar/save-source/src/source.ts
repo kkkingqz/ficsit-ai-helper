@@ -87,12 +87,16 @@ export class SaveSource {
 
   private assertApiVersion(): void {
     const expected = this.options.expectedApiVersion;
-    if (expected !== undefined && expected !== PUBLIC_API_VERSION) {
-      throw new FicsitAIApiError(
-        "API_VERSION_MISMATCH",
-        `API version mismatch: client expects ${expected}, source implements ${PUBLIC_API_VERSION}`,
-        { expectedApiVersion: expected, actualApiVersion: PUBLIC_API_VERSION },
-      );
+    if (expected !== undefined) {
+      const expMajor = expected.split(".")[0];
+      const actMajor = PUBLIC_API_VERSION.split(".")[0];
+      if (expMajor !== actMajor) {
+        throw new FicsitAIApiError(
+          "API_VERSION_MISMATCH",
+          `API version mismatch: client expects ${expected}, source implements ${PUBLIC_API_VERSION}`,
+          { expectedApiVersion: expected, actualApiVersion: PUBLIC_API_VERSION },
+        );
+      }
     }
   }
 
@@ -305,8 +309,10 @@ export class SaveSource {
   async getStatus(): Promise<GetStatusResponse> {
     const location = resolveSaveLocation(this.options);
     const expected = this.options.expectedApiVersion;
+    const expMajor = expected?.split(".")[0];
+    const actMajor = PUBLIC_API_VERSION.split(".")[0];
     const apiVersionMismatch =
-      expected !== undefined && expected !== PUBLIC_API_VERSION
+      expected !== undefined && expMajor !== actMajor
         ? `Expected ${expected}, server implements ${PUBLIC_API_VERSION}`
         : "";
 
