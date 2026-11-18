@@ -24,10 +24,13 @@ import type { Logger } from "./log.js";
  * - **чата и событий.** Ход чата идёт каналом мода, а у снимка событий не
  *   бывает: он один.
  *
- * Версию API библиотеке не объявляем. Она сверяет её строгим равенством, и
- * на нашей 0.5.0 отказала бы всему кодом `API_VERSION_MISMATCH`, хотя мажор
- * тот же и чтения не менялись (§5.5). Расхождение видно в статусе и в
- * предупреждении при запуске; поднять версию попрошено у Cf3 (Co2-71).
+ * Версию API библиотеке объявляем — с 18.11.2026. Прежде не объявляли:
+ * библиотека сверяла её строгим равенством и на нашей 0.5.0 отказала бы
+ * всему кодом `API_VERSION_MISMATCH`, хотя мажор тот же и чтения не
+ * менялись. По моему замечанию (Co2-71) Cf3 поднял версию до 0.5.0 и свёл
+ * проверку к мажору, как требует §5.5, — и теперь объявить её полезно:
+ * расхождение мажора станет громким отказом, а не тихо другой формой
+ * ответа. Минорная разница по-прежнему ничего не ломает.
  */
 
 /** Операции чтения API v0. Остальное этой поверхности не принадлежит. */
@@ -206,7 +209,11 @@ export function allowedHosts(config: Config): ReadonlySet<string> {
 
 export async function createSaveApi(deps: SaveApiDeps): Promise<SaveApi> {
   const { config, log } = deps;
-  const options: Record<string, unknown> = { sourceMode: config.saveSourceMode };
+  const options: Record<string, unknown> = {
+    sourceMode: config.saveSourceMode,
+    // Версия, с которой совместим адаптер. Библиотека сверяет мажор (§5.5).
+    expectedApiVersion: config.apiVersion,
+  };
   if (config.saveDataDir !== undefined) options["saveDataDir"] = config.saveDataDir;
   if (config.saveId !== undefined) options["saveId"] = config.saveId;
   if (config.saveFilePath !== undefined) options["saveFilePath"] = config.saveFilePath;
