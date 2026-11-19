@@ -1,4 +1,9 @@
-import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import {
+  createServer,
+  request as httpRequest,
+  type IncomingMessage,
+  type ServerResponse,
+} from "node:http";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -738,6 +743,77 @@ describe("чат по каналу", () => {
     const reply = await mod.wait("reply", "m-2");
     expect(reply.error?.code).toBeUndefined();
     expect((reply.body as { turnId?: string }).turnId).toBeTypeOf("string");
+  });
+
+  /** Запрос со своими заголовками: `Host` в `fetch` подставляется сам. */
+  const rawPost = (
+    base: string,
+    path: string,
+    headers: Record<string, string>,
+    body: string,
+  ): Promise<{ status: number; text: string }> =>
+    new Promise((done, fail) => {
+      const url = new URL(base);
+      const req = httpRequest(
+        {
+          host: url.hostname,
+          port: Number(url.port),
+          path,
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "content-length": Buffer.byteLength(body),
+            ...headers,
+          },
+        },
+        (res) => {
+          let text = "";
+          res.on("data", (chunk: Buffer) => (text += chunk.toString("utf8")));
+          res.on("end", () => done({ status: res.statusCode ?? 0, text }));
+        },
+      );
+      req.on("error", fail);
+      req.write(body);
+      req.end();
+    });
+
+  it("чтения по сохранению: чужой Host отказан до разбора тела (ревью Gs #67)", async () => {
+    const { base } = await adapterFor(await quietForeman());
+
+    // Проба Gs: чужой `Host`, разрешённый `Origin` и неизвестная кодировка.
+    // Прежде первым отвечал общий парсер — HTML-страницей Express со стеком
+    // и абсолютным путём адаптера.
+    const answer = await rawPost(
+      base,
+      "/api/v0",
+      {
+        host: "ficsitai.example.com:1",
+        origin: "http://127.0.0.1:5173",
+        "content-encoding": "x-unknown",
+      },
+      JSON.stringify({ id: "h-1", op: "getStatus", args: {} }),
+    );
+    expect(answer.status).toBe(403);
+    expect(answer.text).toContain("чужим Host");
+    expect(answer.text).not.toContain("<!DOCTYPE");
+    expect(answer.text).not.toContain("adapter/dist");
+  });
+
+  it("отказ разборщика тела — короткий ответ кодом протокола, а не страница со стеком", async () => {
+    const { base } = await adapterFor(await quietForeman());
+
+    const answer = await rawPost(
+      base,
+      "/api/v0",
+      // `Host` настроенного слушателя: предмет проверки — ответ парсера.
+      { host: "127.0.0.1:8730", "content-encoding": "x-unknown" },
+      JSON.stringify({ id: "h-2", op: "getStatus", args: {} }),
+    );
+    expect(answer.status).toBeGreaterThanOrEqual(400);
+    expect(answer.status).toBeLessThan(500);
+    expect(answer.text).toContain("INVALID_ARGUMENT");
+    expect(answer.text).not.toContain("<!DOCTYPE");
+    expect(answer.text).not.toContain("adapter/dist");
   });
 
   it("пустой текст хода — INVALID_ARGUMENT, до Foreman не идёт", async () => {

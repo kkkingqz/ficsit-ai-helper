@@ -13,10 +13,17 @@ import {
   type Tool,
 } from "@modelcontextprotocol/sdk/types.js";
 import { LIMITS, ModChannel } from "./channel.js";
-import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
+import {
+  loadConfig,
+  mcpUrlFor,
+  normalizerUrlFor,
+  saveSourceConfigured,
+  type Config,
+} from "./config.js";
 import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
 import { createLogger, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
+import { allowedHosts, createSaveApi, type SaveApi } from "./save-api.js";
 import { tokenMatches } from "./token.js";
 import { ChatTurns } from "./turns.js";
 import { UpstreamMcp } from "./upstream.js";
@@ -166,12 +173,33 @@ export async function createApp(config: Config, log: Logger) {
   // Состояние входа в Foreman уходит моду сообщением `adapter.status`.
   foreman.onState = (state, reason) => channel.setForemanState(state, reason);
 
+  // Объявлено до маршрутов: его читает и `/health`, который стоит выше.
+  let saveApi: SaveApi | undefined;
+
   const app = express();
   app.disable("x-powered-by");
   // Предел тела согласован с объявленными пределами канала: одно сообщение в
   // 1 МиБ укладывается в `maxMessageBytes`, но вместе с конвертом сессии
   // выходило за глобальный лимит, и мод получал HTML-страницу 413 вместо
   // `{code:"TOO_LARGE"}` (ревью Gs на #51).
+  // Проверка `Host` для чтений по сохранению стоит **до** разбора тела.
+  // Иначе общий парсер успевает ответить первым: запрос с чужим `Host` и
+  // неизвестным `Content-Encoding` получал HTML-страницу Express со стеком и
+  // абсолютным путём адаптера (ревью Gs на #67). Данных сохранения там не
+  // было, но и этого ответа чужой получать не должен.
+  const saveHosts = allowedHosts(config);
+  app.use("/api/v0", (req: Request, res: Response, next: (error?: unknown) => void) => {
+    const host = req.headers.host ?? "";
+    if (saveHosts.has(host)) {
+      next();
+      return;
+    }
+    log.warn(`чтения по сохранению: запрос с чужим Host «${host}»`);
+    res.status(403).json({
+      error: { code: "INVALID_ARGUMENT", message: `запрос с чужим Host «${host}»` },
+    });
+  });
+
   app.use(
     express.json({
       limit: BODY_LIMIT,
@@ -195,6 +223,20 @@ export async function createApp(config: Config, log: Logger) {
       res.status(400).json({ code: "INVALID_ARGUMENT", message: "тело не разобрано как JSON" });
       return;
     }
+    // Остальные отказы разборщика тела Express отдавал HTML-страницей со
+    // стеком и абсолютным путём адаптера (ревью Gs на #67). Узнаём их по
+    // признаку самого разборщика — строковый `type` плюс свой код ответа, —
+    // а не по списку имён: у неподдерживаемой кодировки он
+    // `encoding.unsupported`, у оборванного запроса `request.aborted`, и
+    // перечислять их все значит однажды пропустить ещё один. Отвечаем
+    // коротко: чужой не должен узнавать из отказа, где у нас что лежит.
+    const status = (err as { status?: unknown; statusCode?: unknown } | null)?.status;
+    const fallback = (err as { statusCode?: unknown } | null)?.statusCode;
+    const code = typeof status === "number" ? status : typeof fallback === "number" ? fallback : 0;
+    if (typeof type === "string" && code >= 400 && code < 500) {
+      res.status(code).json({ code: "INVALID_ARGUMENT", message: "тело запроса не принято" });
+      return;
+    }
     next(err);
   });
 
@@ -213,6 +255,23 @@ export async function createApp(config: Config, log: Logger) {
         session: channel.sessionId ?? "",
         tools: channel.modTools().map((tool) => tool.name),
       },
+      // Поверхность чтения по сохранению: включена ли и готова ли.
+      //
+      // Ни пути к файлу, ни имени сохранения, ни сырой ошибки загрузки здесь
+      // нет: `/health` отвечает любому, кто дотянулся до порта, и выдавал
+      // абсолютный путь настроенного сохранения (ревью Gs на #67).
+      // Диагностике достаточно признака готовности; путь и причина лежат в
+      // журнале запуска, то есть там, где их читает тот, у кого есть доступ
+      // к машине.
+      save: saveSourceConfigured(config)
+        ? {
+            enabled: true,
+            mode: config.saveSourceMode,
+            ready: saveApi !== undefined && saveApi.loadError === "",
+            apiVersion: saveApi?.libraryApiVersion ?? "",
+            browserOrigins: config.saveAllowOrigins.length,
+          }
+        : { enabled: false },
     });
   });
 
@@ -248,18 +307,50 @@ export async function createApp(config: Config, log: Logger) {
   // остаётся только у Foreman, чей MCP-клиент заголовков не шлёт.
   app.use("/mod", channel.router());
 
+  // Чтения API v0 по сохранению (§8.5, §13): поднимаются только когда
+  // сохранение названо явно. Токена здесь нет, и это решение, а не
+  // упущение: поверхность только читает файл, на который разработчик сам
+  // указал, живёт на петле, выключена по умолчанию, а у транспорта страниц
+  // (`web/screens/api/src/http.ts`) заголовков нет вовсе — с токеном экраны
+  // не смогли бы подключиться, то есть смысл поверхности исчез бы.
+  if (saveSourceConfigured(config)) {
+    saveApi = await createSaveApi({ config, log });
+    app.use("/api/v0", saveApi.router);
+    log.info(
+      `чтения API v0 из сохранения на /api/v0 (режим «${config.saveSourceMode}», ` +
+        `${config.saveFilePath ?? `${String(config.saveDataDir)}/${String(config.saveId)}`})`,
+    );
+    if (config.saveAllowOrigins.length > 0) {
+      log.info(
+        `чтения по сохранению открыты для origin: ${config.saveAllowOrigins.join(", ")} ` +
+          "(проверка Host работает всегда)",
+      );
+    }
+    if (saveApi.loadError === "") {
+      log.info(`библиотека источника Save объявляет API ${saveApi.libraryApiVersion}`);
+    }
+    if (saveApi.loadError === "" && saveApi.libraryApiVersion !== config.apiVersion) {
+      // Минорная разница по §5.5 ничего не ломает, но молчать о ней нельзя:
+      // версию объявляют двое, и расходиться они не должны (Co2-71).
+      log.warn(
+        `библиотека Save объявляет API ${saveApi.libraryApiVersion}, адаптер — ` +
+          `${config.apiVersion}: мажор тот же, чтения не менялись (Co2-71)`,
+      );
+    }
+  }
+
   app.all("/mcp", (req: Request, res: Response) => {
     res.status(405).json({ error: "method_not_allowed", allow: "POST" });
     log.debug("не-POST на /mcp", { method: req.method });
   });
 
-  return { app, foreman, channel };
+  return { app, foreman, channel, saveApi };
 }
 
 async function main(): Promise<void> {
   const config = loadConfig();
   const log = createLogger(config.logLevel);
-  const { app, foreman, channel } = await createApp(config, log);
+  const { app, foreman, channel, saveApi } = await createApp(config, log);
 
   const httpServer = app.listen(config.port, config.host);
 
@@ -320,6 +411,7 @@ async function main(): Promise<void> {
     log.info(`${signal}: останавливаюсь`);
     // Мод должен узнать об остановке строкой `bye`, а не тишиной в потоке.
     channel.closeSession("shutdown");
+    saveApi?.close();
     normalizerServer?.close();
     httpServer.close(() => process.exit(0));
   };

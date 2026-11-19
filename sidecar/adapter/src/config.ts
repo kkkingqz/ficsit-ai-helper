@@ -70,6 +70,45 @@ const schema = z.object({
    * модель в строке состояния ассистента, а Foreman её не отдаёт (Co2-25).
    */
   model: z.string().default(""),
+  /**
+   * Источник Save (§8.5, ADR-025): чтения API v0 по файлу сохранения, без
+   * игры. Архитектура называет местом адаптер — §13: «Save — через адаптер
+   * сайдкара», — поэтому поверхность живёт здесь, а не в dev-сервере.
+   *
+   * Включается только явно: нужен либо `saveFilePath`, либо пара
+   * `saveDataDir` + `saveId`. Каталога одного мало нарочно: `SAVE_DATA_DIR`
+   * лаунчер задаёт и для Foreman, и включение по нему одному открывало бы
+   * чтение у каждого игрока, который про него не просил.
+   */
+  saveDataDir: z.string().min(1).optional(),
+  saveId: z.string().min(1).optional(),
+  saveFilePath: z.string().min(1).optional(),
+  /** `save` — номинальные скорости, `saveEstimated` — оценочные (§8.5). */
+  saveSourceMode: z.enum(["save", "saveEstimated"]).default("save"),
+  /**
+   * Чьи страницы пускать к чтениям по сохранению из браузера.
+   *
+   * По умолчанию — никого: страница с другого адреса получает отказ, а не
+   * вид разрешения. Нужно это только одному сценарию — страница экрана
+   * открыта с dev-сервера, а данные читаются из адаптера, — и он включается
+   * явно: `FICSITAI_SAVE_ALLOW_ORIGIN=http://127.0.0.1:5173`. Только петля и
+   * только http(s), по тому же правилу, что `FOREMAN_BASE_URL`: пускать к
+   * локальным данным чужой сайт нельзя даже по просьбе.
+   *
+   * Проверка `Host` работает всегда и этим флагом не отключается: чужая
+   * страница может навести своё имя на петлю (DNS rebinding), и без
+   * проверки сервер отдавал реальные числа сохранения (ревью Gs на #67).
+   */
+  saveAllowOrigins: z
+    .string()
+    .default("")
+    .transform((raw) => raw.split(",").map((item) => item.trim()).filter((item) => item !== ""))
+    .refine((list) => list.every(isLoopbackHttpUrl), {
+      message:
+        "FICSITAI_SAVE_ALLOW_ORIGIN: только http(s) на петле (127.0.0.1, ::1, localhost), " +
+        "через запятую",
+    })
+    .transform((list) => list.map((item) => new URL(item).origin)),
   logLevel: z.enum(["debug", "info", "warn", "error"]).default("info"),
 });
 
@@ -107,6 +146,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     normalizerPort: env.NORMALIZER_PORT,
     accountPath: env.FOREMAN_ACCOUNT_PATH,
     model: env.LLM_MODEL,
+    saveDataDir: env.SAVE_DATA_DIR,
+    saveId: env.FICSITAI_SAVE_ID,
+    saveFilePath: env.FICSITAI_SAVE_FILE,
+    saveSourceMode: env.FICSITAI_SAVE_MODE,
+    saveAllowOrigins: env.FICSITAI_SAVE_ALLOW_ORIGIN,
     logLevel: env.ADAPTER_LOG_LEVEL,
   });
 
@@ -122,6 +166,19 @@ export function normalizerUrlFor(config: Config): string | undefined {
   if (config.llmUpstreamBaseUrl === undefined) return undefined;
   const host = config.host === "::1" ? "[::1]" : config.host;
   return `http://${host}:${config.normalizerPort}`;
+}
+
+/**
+ * Настроен ли источник Save настолько, чтобы он мог ответить.
+ *
+ * Те же два условия, что у библиотеки: путь к файлу либо каталог плюс имя.
+ * Проверяем их здесь, а не ловим отказ на первом запросе: иначе поверхность
+ * поднималась бы и отвечала `SOURCE_UNAVAILABLE` на всё, а в журнале не было
+ * бы ни строки о том, что её включили зря.
+ */
+export function saveSourceConfigured(config: Config): boolean {
+  if (config.saveFilePath !== undefined) return true;
+  return config.saveDataDir !== undefined && config.saveId !== undefined;
 }
 
 /** Строка, которую лаунчер кладёт в MCP_URL Foreman. */
