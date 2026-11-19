@@ -104,6 +104,16 @@ export function createChatController(options: ChatControllerOptions): ChatContro
    * применяет только **последнее** чтение, а остальные отбрасываются.
    */
   let historyRead = 0;
+  /**
+   * Сколько ходов начато в этом разговоре.
+   *
+   * Отсутствия живого хода на момент ответа мало: ход успевает целиком
+   * начаться и закончиться за время одного чтения, и тогда `turnId` снова
+   * `null`, номер чтения прежний, а лента уже другая — запоздавший снимок
+   * стирал её (ревью Gs на #62, п. 1). Поколение растёт на каждом принятом
+   * ходе, и снимок, заказанный до него, к ленте не применяется.
+   */
+  let turnsStarted = 0;
   let destroyed = false;
   /** Отправка в полёте: мод ещё не назвал номер хода, а события уже идут. */
   let awaitingTurn = false;
@@ -236,11 +246,17 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       return;
     }
     const read = (historyRead += 1);
+    const generation = turnsStarted;
+    /**
+     * Ответ опоздал: за время чтения началось новое чтение, идёт ход или
+     * ход успел пройти целиком. Применить такой ответ — показать не то, что
+     * есть сейчас.
+     */
+    const stale = (): boolean =>
+      read !== historyRead || turnId !== null || turnsStarted !== generation;
     try {
       const page = await api.chatHistory({ limit: historyLimit });
-      if (read !== historyRead || turnId !== null) {
-        // Ответ опоздал: за время чтения началось новое чтение или новый ход.
-        // Применить его значит показать не то, что есть сейчас.
+      if (stale()) {
         historyStale = true;
         return;
       }
@@ -264,6 +280,13 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       history = messages.length === 0 ? "empty" : "ready";
       historyStale = false;
     } catch (err: unknown) {
+      if (stale()) {
+        // Отказ опоздавшего чтения — тоже его ответ, и правила для него те
+        // же: иначе отказ H1 гасил связь и ленту после успешно применённого
+        // H2 (ревью Gs на #62, п. 2).
+        historyStale = true;
+        return;
+      }
       // Недоступная история и пустая — разные вещи, и путать их нельзя:
       // «сообщений ещё нет» о потерянной связи соврало бы игроку.
       history = "unavailable";
@@ -421,6 +444,7 @@ export function createChatController(options: ChatControllerOptions): ChatContro
       const sent = await api.chatSend({ text: trimmed });
       draft = "";
       turnId = sent.turnId;
+      turnsStarted += 1;
       const at = now();
       messages = [
         ...messages,

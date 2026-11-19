@@ -40,6 +40,11 @@ interface FakeApi {
   holdCancel(): () => void;
   /** Следующая отмена отказывает этим кодом. */
   failNextCancel(error: ApiError): void;
+  /**
+   * Следующее чтение истории отказывает этим кодом — но в свою очередь,
+   * после отпускания: отказ тоже бывает запоздавшим.
+   */
+  failNextHistory(error: ApiError): void;
   /** Что делает мод в тот момент, когда принимает ход (Foreman дописал). */
   onSend(hook: () => void): void;
 }
@@ -61,6 +66,7 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
   let cancelGate: Promise<void> | null = null;
   let openCancel: (() => void) | null = null;
   let cancelError: ApiError | null = null;
+  let nextHistoryFailure: ApiError | null = null;
 
   const api = {
     transport: "http" as const,
@@ -113,11 +119,14 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
       // Снимок берётся на момент запроса: именно так ведёт себя мод, и именно
       // поэтому запоздавший ответ несёт устаревшую ленту.
       const snapshot = history;
+      const failWith = nextHistoryFailure;
+      nextHistoryFailure = null;
       if (historyHold) {
         await new Promise<void>((resolve) => {
           historyGates.push(resolve);
         });
       }
+      if (failWith !== null) throw failWith;
       return { messages: snapshot };
     },
     on: (event: string, handler: (data: never) => void) => {
@@ -181,6 +190,9 @@ function createFakeApi(status: Partial<ApiStatus> = {}): FakeApi {
     },
     failNextCancel(error) {
       cancelError = error;
+    },
+    failNextHistory(error) {
+      nextHistoryFailure = error;
     },
   };
 }
@@ -909,5 +921,74 @@ describe("контроллер чата", () => {
     controller.actions.stop();
     await settle();
     expect(fake.cancelled).toEqual(["t-1", "t-2"]);
+  });
+
+  it("ход, прошедший целиком за время чтения, снимок не стирает", async () => {
+    const fake = createFakeApi();
+    const controller = create(fake, createFakeView());
+    await settle();
+
+    // Ход A прошёл обычным путём, историю перечитывать нечего.
+    controller.actions.send("A");
+    await settle();
+    fake.emit("chat.text", { turnId: "t-1", text: "ответ A" });
+    fake.emit("chat.done", { turnId: "t-1", model: "demo-echo", latencyMs: 12 });
+    await settle();
+
+    // Чтение заказано, когда живого хода нет, и снимок взят на этот момент.
+    fake.holdHistory();
+    fake.setHistory([entry("s1", "operator", "A"), entry("s2", "assistant", "ответ A")]);
+    void controller.refreshHistory();
+    await settle();
+    expect(fake.historyPending()).toBe(1);
+
+    // Ход B успел целиком начаться и закончиться, пока чтение в полёте: на
+    // момент ответа `turnId` снова null, а номер чтения тот же.
+    controller.actions.send("B");
+    await settle();
+    fake.emit("chat.text", { turnId: "t-2", text: "ответ B" });
+    fake.emit("chat.done", { turnId: "t-2", model: "demo-echo", latencyMs: 12 });
+    await settle();
+    fake.releaseHistory(0);
+    await settle();
+
+    // Ход B на экране цел: снимок относился к ленте до него.
+    expect(controller.getModel().messages.map((item) => item.text)).toEqual([
+      "A",
+      "ответ A",
+      "B",
+      "ответ B",
+    ]);
+  });
+
+  it("запоздавший отказ чтения не гасит применённый снимок", async () => {
+    const fake = createFakeApi();
+    const controller = create(fake, createFakeView());
+    await settle();
+
+    // Первому чтению назначен отказ, но придёт он последним.
+    fake.holdHistory();
+    fake.failNextHistory(new ApiError({ code: "SIDECAR_UNAVAILABLE", message: "нет связи" }));
+    void controller.refreshHistory();
+    await settle();
+
+    fake.setHistory([entry("s1", "operator", "A"), entry("s2", "assistant", "ответ A")]);
+    void controller.refreshHistory();
+    await settle();
+    expect(fake.historyPending()).toBe(2);
+
+    // Второе чтение вернулось успешно и стало лентой.
+    fake.releaseHistory(1);
+    await settle();
+    expect(controller.getModel().history).toBe("ready");
+
+    // Следом отказывает устаревшее первое.
+    fake.releaseHistory(0);
+    await settle();
+
+    // Ни связь, ни лента от него не страдают.
+    expect(controller.getModel().history).toBe("ready");
+    expect(controller.getModel().connected).toBe(true);
+    expect(controller.getModel().messages.map((item) => item.text)).toEqual(["A", "ответ A"]);
   });
 });
