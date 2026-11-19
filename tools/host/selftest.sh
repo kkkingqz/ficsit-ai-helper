@@ -7,7 +7,7 @@
 # Подменяет UAT, Flatpak, wine и установку Steam заглушками во временном каталоге и проверяет ветки отказа,
 # найденные на ревью #42: ошибка копирования исходников, устаревший архив, зависание до главного меню,
 # критическая ошибка в журнале, неполученная блокировка, неопределённая роль, два запуска одной роли;
-# ветки отказа подготовки CEF (ревью #54).
+# ветки отказа подготовки CEF (ревью #54); раскладка страниц веб-экранов (S8 3.4).
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 T="$(mktemp -d)"; trap 'rm -rf "$T"' EXIT
@@ -300,6 +300,72 @@ wait
 check "в выводе — ожидание очереди" "$(grep -c "очередь 'build' занята" "$T/out.txt")" 1
 check "CEF заменён" "$(cat "$CW/shipping/libcef.dll")" new
 rm -f "$T/bin/7z"
+
+# --- синхронизация: изменённый файл новее объектных файлов (S8 3.4) ---------------------------------
+SR="$T/syncrepo/SyncMod"; SD="$T/syncproj/SyncMod"
+mkdir -p "$SR/Source" "$SD/Intermediate" && echo '{}' > "$SR/SyncMod.uplugin"
+echo 'int a;' > "$SR/Source/a.cpp"; echo 'int b;' > "$SR/Source/b.cpp"
+sync_mod() { ( source "$T/repo/tools/host/lib.sh" >/dev/null 2>&1; fa_sync_mod_source "$SR" "$SD" ); }
+sync_mod; touch -d '2026-01-01 00:00' "$SR/Source/a.cpp" "$SR/Source/b.cpp"; sync_mod
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
+echo 'int changed;' > "$SR/Source/a.cpp"; touch -d '2026-01-02 00:00' "$SR/Source/a.cpp"
+touch -d '2026-01-01 00:00' "$SD/Source/b.cpp"
+check "синхронизация успешна" "$(sync_mod; echo $?)" 0
+check "изменённый файл новее объектного" "$([[ "$SD/Source/a.cpp" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+# Неизменённый файл сохраняет время своей копии, а не берёт время из репозитория.
+check "неизменённый файл сохранил время" "$(date -r "$SD/Source/b.cpp" +%F)" 2026-01-01
+check "содержимое обновлено" "$(cat "$SD/Source/a.cpp")" "int changed;"
+# Сборка прервана: объектный файл остался от прежнего содержимого. Повторная синхронизация не должна вернуть
+# изменённому файлу старое время из репозитория (ревью #69 на bf21335).
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"; touch -d '2026-06-02 00:00' "$SD/Source/a.cpp"
+check "повтор синхронизации успешен" "$(sync_mod; echo $?)" 0
+check "после повтора изменённый файл всё ещё новее объектного" "$([[ "$SD/Source/a.cpp" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+check "после повтора неизменённый файл сохранил время" "$(date -r "$SD/Source/b.cpp" +%F)" 2026-01-01
+# Новый и удалённый файл: каталог становится новее, иначе UBT не увидит новый исходник (ревью #72).
+touch -d '2026-06-01 00:00' "$SD/Source" "$SD/Intermediate/obj"
+echo 'int c;' > "$SR/Source/c.cpp"; touch -d '2026-01-01 00:00' "$SR/Source" "$SR/Source/c.cpp"
+check "синхронизация с новым файлом" "$(sync_mod; echo $?)" 0
+check "каталог с новым файлом новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+touch -d '2026-06-01 00:00' "$SD/Source" "$SD/Intermediate/obj"
+rm -f "$SR/Source/c.cpp"; touch -d '2026-01-01 00:00' "$SR/Source"
+check "синхронизация с удалённым файлом" "$(sync_mod; echo $?)" 0
+check "каталог с удалённым файлом новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+# Новый файл → синхронизация → сборка прервана → повтор без изменений: каталог и его родители остаются новее
+# объектного файла, повтор не возвращает им время из репозитория (ревью #69 на 9c8a6d8).
+mkdir -p "$SR/Source/Sub"; echo 'int s;' > "$SR/Source/Sub/s.cpp"; touch -d '2026-01-01 00:00' "$SR" "$SR/Source" "$SR/Source/Sub" "$SR/Source/Sub/s.cpp"
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
+check "синхронизация с новым вложенным файлом" "$(sync_mod; echo $?)" 0
+check "повтор без изменений успешен" "$(sync_mod; echo $?)" 0
+check "после повтора каталог нового файла новее объектного" "$([[ "$SD/Source/Sub" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+check "после повтора родитель каталога новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+rm -rf "$SR/Source/Sub"; touch -d '2026-01-01 00:00' "$SR/Source"
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"
+check "синхронизация с удалённым каталогом" "$(sync_mod; echo $?)" 0
+check "повтор после удаления успешен" "$(sync_mod; echo $?)" 0
+check "после повтора каталог удалённого файла новее объектного" "$([[ "$SD/Source" -nt "$SD/Intermediate/obj" ]] && echo yes || echo no)" yes
+# Без изменений в репозитории каталог не становится новее: иначе каждая синхронизация заставляла бы UBT
+# заново искать исходники.
+touch -d '2026-06-01 00:00' "$SD/Intermediate/obj"; touch -d '2026-05-01 00:00' "$SD/Source"
+check "синхронизация без изменений" "$(sync_mod; echo $?)" 0
+check "неизменённый каталог сохранил время" "$(date -r "$SD/Source" +%F)" 2026-05-01
+
+# --- страницы веб-экранов (S8 3.4) ------------------------------------------------------------------
+W="$T/webrepo"; WD="$T/webdst"
+mkdir -p "$W/web/screens/statistics/dist" "$W/web/screens/chat/src" "$W/web/screens/api/dist" "$W/web/ui-kit/screens" "$W/third_party/uplot"
+echo '<html>' > "$W/web/screens/statistics/index.html"; echo 'export{}' > "$W/web/screens/statistics/dist/main.js"
+echo '<html>' > "$W/web/screens/chat/index.html"; echo 'x' > "$W/web/screens/chat/src/main.ts"
+echo 'export{}' > "$W/web/screens/api/dist/index.js"; echo 'x' > "$W/web/ui-kit/screens/statistics.js"; echo 'x' > "$W/third_party/uplot/uPlot.iife.min.js"
+mkdir -p "$WD/stale" && echo old > "$WD/stale/old.html"
+mkdir -p "$T/webextra/spikes" && echo probe > "$T/webextra/spikes/probe.html"
+stage() { ( source "$T/repo/tools/host/lib.sh" >/dev/null 2>&1; fa_stage_web "$W" "$WD" || exit 1; echo "$FA_WEB_PAGES|$FA_WEB_MISSING" ); }
+check "раскладка: собранные и несобранные экраны" "$(stage)" "statistics|chat"
+check "страница и dist на месте" "$([[ -f "$WD/screens/statistics/index.html" && -f "$WD/screens/statistics/dist/main.js" ]] && echo yes || echo no)" yes
+check "фасад без index.html — только dist" "$([[ -f "$WD/screens/api/dist/index.js" && ! -e "$WD/screens/api/index.html" ]] && echo yes || echo no)" yes
+check "исходники TypeScript не едут" "$([[ -e "$WD/screens/chat/src" ]] && echo yes || echo no)" no
+check "ui-kit и uPlot на месте" "$([[ -f "$WD/ui-kit/screens/statistics.js" && -f "$WD/third_party/uplot/uPlot.iife.min.js" ]] && echo yes || echo no)" yes
+check "старое содержимое Web/ убрано" "$([[ -e "$WD/stale" ]] && echo yes || echo no)" no
+check "FICSITAI_WEB_EXTRA кладётся поверх" "$(FICSITAI_WEB_EXTRA="$T/webextra" stage >/dev/null; cat "$WD/spikes/probe.html" 2>/dev/null)" probe
+check "несуществующий FICSITAI_WEB_EXTRA — отказ" "$(FICSITAI_WEB_EXTRA="$T/nowhere" stage >/dev/null 2>&1; echo $?)" 1
 
 echo; echo "Итог: пройдено $pass, не пройдено $fail"
 [[ $fail -eq 0 ]]

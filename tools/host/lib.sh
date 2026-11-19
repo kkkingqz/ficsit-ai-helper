@@ -87,11 +87,43 @@ fa_check_build_env() {
 # fa_sync_mod_source <каталог в репозитории> <каталог мода в проекте SML> [шаблон для сохранения]...
 # Приводит исходники мода в проекте к дереву репозитория. Binaries, Intermediate и Saved не трогает;
 # дополнительные шаблоны — для того, чего в репозитории быть не должно (бинарники CEF в ThirdParty).
+# Файл, содержимое которого изменилось, получает текущее время: cp -a сохраняет время из репозитория, а оно
+# бывает старше объектных файлов, собранных из прежней копии, — например, сборка другого мода того же проекта
+# пересобрала этот мод между синхронизациями. Тогда UBT считает модуль собранным и линкует старый код (S8 3.4).
 # Любая ошибка удаления или копирования — код 1: собирать неполное дерево нельзя.
 fa_sync_mod_source() {
     local src="$1" dst="$2"; shift 2
-    local keep=(Binaries Intermediate Saved "$@") entry name k skip
+    local keep=(Binaries Intermediate Saved "$@") entry name k skip hash path
+    local -A before=() stamp=()
     mkdir -p "$dst" || return 1
+    _fa_sync_hashes() {
+        local e n k2 s2
+        for e in "$dst"/* "$dst"/.[!.]*; do
+            [[ -e "$e" ]] || continue
+            n="$(basename "$e")"; s2=0
+            for k2 in "${keep[@]}"; do [[ "$n" == $k2 ]] && s2=1; done
+            [[ $s2 -eq 1 ]] || find "$e" -type f -print0
+        done | xargs -0 -r sha1sum
+    }
+    _fa_sync_dirs() {
+        local e n k2 s2
+        printf '%s\0' "$dst"
+        for e in "$dst"/* "$dst"/.[!.]*; do
+            [[ -d "$e" && ! -L "$e" ]] || continue
+            n="$(basename "$e")"; s2=0
+            for k2 in "${keep[@]}"; do [[ "$n" == $k2 ]] && s2=1; done
+            [[ $s2 -eq 1 ]] || find "$e" -type d -print0
+        done
+    }
+    while read -r hash path; do before["$path"]="$hash"; done < <(_fa_sync_hashes)
+    # Время файла копии до синхронизации. Файл с прежним содержимым получает своё прежнее время, а не время из
+    # репозитория: иначе после прерванной сборки повтор через cp -a вернул бы изменённому файлу старое время,
+    # и объектный файл от прежнего содержимого снова выглядел бы новее (ревью #69).
+    for path in "${!before[@]}"; do stamp["$path"]="$(stat -c '%.9Y' "$path" 2>/dev/null)"; done
+    # То же для каталогов: повтор синхронизации без изменений не должен вернуть каталогу, который прошлый проход
+    # сделал новее из-за нового или удалённого файла, время из репозитория (ревью #69 на 9c8a6d8).
+    local -A dstamp=()
+    while IFS= read -r -d '' path; do dstamp["$path"]="$(stat -c '%.9Y' "$path" 2>/dev/null)"; done < <(_fa_sync_dirs)
     for entry in "$dst"/* "$dst"/.[!.]*; do
         [[ -e "$entry" || -L "$entry" ]] || continue
         name="$(basename "$entry")"; skip=0
@@ -104,7 +136,70 @@ fa_sync_mod_source() {
         for k in "${keep[@]}"; do [[ "$name" == $k ]] && skip=1; done
         [[ $skip -eq 1 ]] || cp -a "$entry" "$dst/" || return 1
     done
+    local -A seen=() dirs=()
+    while read -r hash path; do
+        seen["$path"]=1
+        if [[ "${before[$path]:-}" == "$hash" && -n "${stamp[$path]:-}" ]]; then
+            touch -d "@${stamp[$path]}" "$path" || return 1
+        else
+            touch "$path" || return 1
+            [[ -n "${before[$path]:-}" ]] || dirs["$(dirname "$path")"]=1
+        fi
+    done < <(_fa_sync_hashes)
+    # Каталог, где файл появился или исчез, должен стать новее: UBT находит новые исходники по времени каталога,
+    # а cp -a вернул каталогу время из репозитория. Иначе новый .cpp не попадает в сборку модуля (ревью #72).
+    for path in "${!before[@]}"; do [[ -n "${seen[$path]:-}" ]] || dirs["$(dirname "$path")"]=1; done
+    local d
+    # Прежнее время каталогов копии — до обновления изменившихся: cp -a выставил им время из репозитория.
+    while IFS= read -r -d '' d; do
+        if [[ -n "${dstamp[$d]:-}" ]]; then touch -d "@${dstamp[$d]}" "$d" || return 1; fi
+    done < <(_fa_sync_dirs)
+    for d in "${!dirs[@]}"; do
+        # Каталог файла и все его родители до корня копии; исчезнувший каталог пропускается.
+        while [[ "$d" == "$dst" || "$d" == "$dst"/* ]]; do
+            if [[ -d "$d" ]]; then touch "$d" || return 1; fi
+            [[ "$d" == "$dst" ]] && break
+            d="$(dirname "$d")"
+        done
+    done
     [[ -f "$dst/$(basename "$src").uplugin" ]] || return 1
+}
+
+# fa_stage_web <корень репозитория> <каталог Web/ мода>
+# Страницы веб-экранов для мода, который зависит от FicsitAIWebRuntime (ADR-032, S8 3.4). Корень страниц —
+# содержимое web/ (как у dev-сервера фасада), uPlot — в /third_party/uplot/: так и абсолютные адреса страниц
+# (/ui-kit/…, /screens/api/…), и относительные (../../ui-kit/…, ../../../third_party/…) ведут в одно место
+# в браузере и в игре. Берётся: screens/<экран>/{index.html,dist/}, ui-kit/, third_party/uplot/.
+# TypeScript здесь не собирается — dist/ собирает роль заранее (`npm run build` в каталоге экрана). Экран
+# с index.html без dist/ попадает в FA_WEB_MISSING, и протокол называет его. FICSITAI_WEB_EXTRA — каталог,
+# который кладётся поверх (страницы проверок, не продукт). Результат: FA_WEB_PAGES, FA_WEB_MISSING;
+# код 1 — ошибка копирования.
+fa_stage_web() {
+    local repo="$1" dst="$2" d name
+    FA_WEB_PAGES=""; FA_WEB_MISSING=""
+    rm -rf "${dst:?}" && mkdir -p "$dst/screens" || return 1
+    if [[ -d "$repo/web/ui-kit" ]]; then cp -a "$repo/web/ui-kit" "$dst/ui-kit" || return 1; fi
+    if [[ -d "$repo/third_party/uplot" ]]; then
+        mkdir -p "$dst/third_party" && cp -a "$repo/third_party/uplot" "$dst/third_party/uplot" || return 1
+    fi
+    for d in "$repo"/web/screens/*/; do
+        [[ -d "$d" ]] || continue
+        name="$(basename "$d")"
+        [[ -f "$d/index.html" || -d "$d/dist" ]] || continue
+        mkdir -p "$dst/screens/$name" || return 1
+        if [[ -f "$d/index.html" ]]; then cp -a "$d/index.html" "$dst/screens/$name/" || return 1; fi
+        if [[ -d "$d/dist" ]]; then
+            cp -a "$d/dist" "$dst/screens/$name/dist" || return 1
+            [[ -f "$d/index.html" ]] && FA_WEB_PAGES+="${FA_WEB_PAGES:+, }$name"
+        else
+            FA_WEB_MISSING+="${FA_WEB_MISSING:+, }$name"
+        fi
+    done
+    if [[ -n "${FICSITAI_WEB_EXTRA:-}" ]]; then
+        [[ -d "$FICSITAI_WEB_EXTRA" ]] || return 1
+        cp -a "$FICSITAI_WEB_EXTRA/." "$dst/" || return 1
+    fi
+    return 0
 }
 
 # fa_build_mod <ModName> <проект SML> <каталог результата> <sync: 0|1> [шаблон для сохранения]...
@@ -116,7 +211,8 @@ fa_sync_mod_source() {
 # правка или коммит в проекте во время сборки делают архив непроверенным (ревью #45).
 # Результат: FA_BUILD_EXIT (0 — успех), FA_BUILD_STAGE (где остановилось), FA_BUILD_ORIGIN,
 # FA_BUILD_ARCHIVE (копия в каталоге результата), FA_BUILD_SHA, FA_BUILD_SIZE_MB, FA_BUILD_LOG;
-# заголовки этого архива — FA_BUILD_HCL, FA_BUILD_HCL_SRC, FA_BUILD_HCL_PROBLEM, ревизия проекта — FA_BUILD_PROJECT_REV.
+# заголовки этого архива — FA_BUILD_HCL, FA_BUILD_HCL_SRC, FA_BUILD_HCL_PROBLEM, ревизия проекта — FA_BUILD_PROJECT_REV;
+# страницы веб-экранов (fa_stage_web) — FA_BUILD_WEB, пусто, если мод без FicsitAIWebRuntime.
 fa_build_mod() {
     local mod="$1" project="$2" out="$3" sync="$4"; shift 4
     local keeps=("$@") uproject="$project/FactoryGame.uproject" src="$FA_REPO_ROOT/mod/$mod"
@@ -124,7 +220,7 @@ fa_build_mod() {
     fa_check_build_env
     mkdir -p "$out" || fa_die "не создаётся $out"
     FA_BUILD_LOG="$out/build-$mod.log"; FA_BUILD_EXIT=1; FA_BUILD_STAGE=""; FA_BUILD_ARCHIVE=""; FA_BUILD_SHA=""; FA_BUILD_SIZE_MB=""
-    FA_BUILD_HCL=""; FA_BUILD_HCL_SRC=""; FA_BUILD_HCL_PROBLEM=""; FA_BUILD_PROJECT_REV=""
+    FA_BUILD_HCL=""; FA_BUILD_HCL_SRC=""; FA_BUILD_HCL_PROBLEM=""; FA_BUILD_PROJECT_REV=""; FA_BUILD_WEB=""
     FA_BUILD_ORIGIN="каталог проекта SML, вне репозитория"
     local unused pct cook
     # Число процессов компиляции шейдеров (Gs-26): при 16 упирается в память.
@@ -133,18 +229,26 @@ fa_build_mod() {
     cook="-ini:Engine:[DevOptions.Shaders]:NumUnusedShaderCompilingThreads=$unused -ini:Engine:[DevOptions.Shaders]:PercentageUnusedShaderCompilingThreads=$pct"
 
     _fa_build_locked() {
-        local attempt started produced rev_after
+        local attempt started produced rev_after synced=0
         fa_sml_headers "$project"
         FA_BUILD_HCL="$FA_HCL"; FA_BUILD_HCL_SRC="$FA_HCL_SRC"; FA_BUILD_HCL_PROBLEM="$FA_HCL_PROBLEM"
         FA_BUILD_PROJECT_REV="$("$FA_GIT" -C "$project" rev-parse -q --verify HEAD 2>/dev/null || true)"
         if [[ "$sync" == 1 && -f "$src/$mod.uplugin" ]]; then
             FA_BUILD_ORIGIN="репозиторий, \`mod/$mod\`"
+            synced=1
             if ! fa_sync_mod_source "$src" "$project/Mods/$mod" "${keeps[@]}"; then
                 FA_BUILD_STAGE="подготовка исходников: копирование из репозитория в проект SML не удалось"; FA_BUILD_EXIT=4; return 4
             fi
         fi
         if [[ ! -f "$project/Mods/$mod/$mod.uplugin" ]]; then
             FA_BUILD_STAGE="подготовка исходников: нет $mod.uplugin в проекте SML"; FA_BUILD_EXIT=4; return 4
+        fi
+        # Моду с веб-экранами — каталог страниц из репозитория (только если исходники взяты из репозитория).
+        if [[ $synced -eq 1 ]] && grep -q '"FicsitAIWebRuntime"' "$project/Mods/$mod/$mod.uplugin"; then
+            if ! fa_stage_web "$FA_REPO_ROOT" "$project/Mods/$mod/Web"; then
+                FA_BUILD_STAGE="подготовка исходников: страницы веб-экранов не скопированы в Web/"; FA_BUILD_EXIT=4; return 4
+            fi
+            FA_BUILD_WEB="собраны: ${FA_WEB_PAGES:-нет}${FA_WEB_MISSING:+; **без dist/**: $FA_WEB_MISSING}${FICSITAI_WEB_EXTRA:+; поверх — \`$FICSITAI_WEB_EXTRA\`}"
         fi
         # Cook идёт в редакторе Linux и грузит модули мода. UAT с -nocompileeditor их не собирает,
         # поэтому редактор пересобирается здесь же: инкрементально, секунды, если исходники не менялись.

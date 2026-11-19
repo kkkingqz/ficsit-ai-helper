@@ -36,6 +36,7 @@ hcl=""; hcl_src=""; hcl_problem=""; hcl_rev=""
 for mod in "${mods[@]}"; do
     if fa_build_mod "$mod" "$project" "$out" "$sync" "${keeps[@]}"; then
         lines+=("- Сборка Win64 Shipping, \`$mod\`: успешно; исходники — $FA_BUILD_ORIGIN; архив ${FA_BUILD_SIZE_MB} МБ, sha256 \`${FA_BUILD_SHA}…\`")
+        [[ -n "$FA_BUILD_WEB" ]] && lines+=("- Страницы веб-экранов \`$mod\`: $FA_BUILD_WEB")
         zips+=("$FA_BUILD_ARCHIVE")
         d="$(_fa_mod_descriptor "$FA_BUILD_ARCHIVE" 2>/dev/null)" && want[$mod]="${d##*$'\t'}"
     else
