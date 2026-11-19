@@ -1,5 +1,13 @@
 import { SourceError, type DevSource } from "./source.js";
+import { API_VERSION } from "../types.js";
 import type {
+  ChatCancelArgs,
+  ChatCancelResult,
+  ChatHistoryArgs,
+  ChatHistoryResult,
+  ChatMessage,
+  ChatSendArgs,
+  ChatSendResult,
   ListMetricsArgs,
   ListMetricsResult,
   ListScopesArgs,
@@ -93,6 +101,21 @@ const ITEMS: ScopeRef[] = Array.from({ length: 60 }, (_unused, index) => ({
 
 const MAX_INLINE_SCOPES = 50;
 
+/**
+ * Демонстрационный ассистент: отвечает заранее известным текстом по частям,
+ * чтобы экран чата можно было отлаживать в браузере.
+ *
+ * Он ничего не знает про фабрику и не выдаёт себя за ассистента: модель
+ * называется `demo-echo`, а текст ответа собирается из вопроса. Ценность здесь
+ * в поведении хода, а не в словах: один ход на источник, отмена останавливает
+ * показ, но ответ всё равно ложится в историю — ровно та семантика, о которую
+ * спотыкается экран.
+ */
+const CHAT_MODEL = "demo-echo";
+const CHAT_CHUNK_MS = 200;
+const CHAT_HISTORY_DEFAULT = 50;
+const CHAT_HISTORY_MAX = 100;
+
 /** Окна ряда из контракта: другое значение — `INVALID_ARGUMENT`. */
 const WINDOWS: ReadonlySet<string> = new Set<SeriesWindow>(["last5Min", "last15Min", "last60Min"]);
 
@@ -176,22 +199,60 @@ function withScopes(metric: MetricDescriptor, offset = 0, all = scopesOf(metric.
   };
 }
 
-export function createDemoSource(): DevSource {
+export interface DemoSourceOptions {
+  /**
+   * Пауза между кусками ответа. По умолчанию такая, чтобы на экране было
+   * видно, как ответ пишется; проверкам нужна маленькая, иначе они ждут
+   * демонстрацию вместо того, чтобы её проверять.
+   */
+  chatChunkMs?: number;
+}
+
+export function createDemoSource(options: DemoSourceOptions = {}): DevSource {
+  const chunkMs = options.chatChunkMs ?? CHAT_CHUNK_MS;
   let tick = 0;
+
+  /** Куда уходят события. Пока на поток никто не подписан — некуда. */
+  let emitEvent: ((event: string, data: unknown) => void) | null = null;
+  const timers = new Set<ReturnType<typeof setTimeout>>();
+  const history: ChatMessage[] = [];
+  let turnSeq = 0;
+  /** Текущий ход. `cancelled` — показ остановлен, но ход ещё дочитывается. */
+  let turn: { id: string; cancelled: boolean } | null = null;
+
+  const emit = (event: string, data: unknown): void => {
+    emitEvent?.(event, data);
+  };
+
+  const later = (ms: number, run: () => void): void => {
+    const timer = setTimeout(() => {
+      timers.delete(timer);
+      run();
+    }, ms);
+    timers.add(timer);
+  };
+
+  const answerFor = (question: string): string =>
+    `Демонстрационный ответ dev-сервера. Вопрос принят: «${question.trim()}». ` +
+    `Настоящие числа придут из мода: выработка 412.5 МВт, потребление 388.1 МВт.`;
 
   return {
     name: "demo",
 
     getStatus() {
       return {
-        apiVersion: "0.4.0",
+        apiVersion: API_VERSION,
         saveId: "demo-save",
         source: "fixture",
         inert: false,
         lastSnapshotSessionTimeSec: SESSION_START + tick * 5,
-        sidecarConnected: false,
+        // Ассистент здесь есть — демонстрационный, но запросы чата он
+        // обслуживает, поэтому экран видит связь, а не офлайн.
+        sidecarConnected: true,
         apiVersionMismatch: "",
         reason: "демонстрационный источник dev-сервера",
+        assistantState: "ready",
+        assistantModel: CHAT_MODEL,
       };
     },
 
@@ -317,18 +378,108 @@ export function createDemoSource(): DevSource {
       };
     },
 
-    subscribe(emit: (event: string, data: unknown) => void): () => void {
+    chatSend(args: ChatSendArgs): ChatSendResult {
+      const text = typeof args.text === "string" ? args.text.trim() : "";
+      if (text === "") {
+        throw new SourceError("INVALID_ARGUMENT", "пустой текст хода");
+      }
+      if (turn !== null) {
+        // Два разных кода нарочно: пока ход идёт — `TURN_IN_PROGRESS`, после
+        // отмены, пока ответ дочитывается, — `TURN_DRAINING`. Экран должен
+        // различать «идёт» и «доигрывает»: во втором случае следующий ход
+        // можно будет отправить через мгновение.
+        throw new SourceError(
+          turn.cancelled ? "TURN_DRAINING" : "TURN_IN_PROGRESS",
+          turn.cancelled ? "прежний ход ещё дочитывается" : "ход уже идёт",
+        );
+      }
+
+      turnSeq += 1;
+      const turnId = `t-${turnSeq}`;
+      turn = { id: turnId, cancelled: false };
+      history.push({
+        id: `m-${history.length + 1}`,
+        role: "user",
+        text,
+        createdAt: new Date().toISOString(),
+      });
+
+      const answer = answerFor(text);
+      const chunks = answer.split(" ").map((word, index) => (index === 0 ? word : ` ${word}`));
+      const startedAt = Date.now();
+
+      chunks.forEach((chunk, index) => {
+        later(chunkMs * (index + 1), () => {
+          // После отмены куски не вещаются: отмена — это «перестать
+          // показывать». Ход при этом продолжается.
+          if (turn?.id !== turnId || turn.cancelled) return;
+          emit("chat.text", { turnId, text: chunk });
+        });
+      });
+
+      later(chunkMs * (chunks.length + 1), () => {
+        if (turn?.id !== turnId) return;
+        const cancelled = turn.cancelled;
+        // Ответ ложится в историю в обоих случаях — и это главное, что
+        // показывает демонстрация: отменённый ход не исчезает.
+        history.push({
+          id: `m-${history.length + 1}`,
+          role: "assistant",
+          text: answer,
+          createdAt: new Date().toISOString(),
+        });
+        turn = null;
+        if (!cancelled) {
+          emit("chat.done", { turnId, model: CHAT_MODEL, latencyMs: Date.now() - startedAt });
+        }
+      });
+
+      return { turnId };
+    },
+
+    chatCancel(args: ChatCancelArgs): ChatCancelResult {
+      if (turn === null) {
+        throw new SourceError("NO_TURN", "отменять нечего: хода нет");
+      }
+      if (turn.id !== args.turnId) {
+        throw new SourceError("TURN_MISMATCH", `ход «${String(args.turnId)}» не текущий`);
+      }
+      if (turn.cancelled) return { state: "alreadyCancelled" };
+      turn.cancelled = true;
+      emit("chat.cancelled", { turnId: turn.id });
+      return { state: "cancelled" };
+    },
+
+    chatHistory(args: ChatHistoryArgs): ChatHistoryResult {
+      const limit = args.limit ?? CHAT_HISTORY_DEFAULT;
+      if (!Number.isInteger(limit) || limit < 1 || limit > CHAT_HISTORY_MAX) {
+        throw new SourceError("INVALID_ARGUMENT", `limit вне диапазона 1–${CHAT_HISTORY_MAX}`);
+      }
+      // От старых к новым, последние `limit` — как в контракте.
+      return { messages: history.slice(-limit) };
+    },
+
+    subscribe(emitTo: (event: string, data: unknown) => void): () => void {
+      emitEvent = emitTo;
       // Снимок раз в пять секунд: экран должен перерисовываться по событию,
       // а не по своему таймеру (§8.2).
       const timer = setInterval(() => {
         tick += 1;
-        emit("metrics.snapshot", {
+        emitTo("metrics.snapshot", {
           sessionTimeSec: SESSION_START + tick * 5,
           changedMetricIds: ["power.production", "power.consumption"],
           source: "fixture",
         });
       }, 5000);
-      return () => clearInterval(timer);
+      return () => {
+        clearInterval(timer);
+        // Таймеры хода снимаются вместе с подпиской: иначе закрытый сервер
+        // держал бы процесс до конца последнего ответа.
+        for (const pending of timers) clearTimeout(pending);
+        timers.clear();
+        turn = null;
+        emitEvent = null;
+      };
     },
   };
 }

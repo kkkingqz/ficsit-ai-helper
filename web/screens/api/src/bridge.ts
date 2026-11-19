@@ -63,9 +63,27 @@ export interface BridgeOptions {
    * 13 мс), поэтому молчание дольше секунд — это не медленно, а потеряно:
    * испорченный конверт мод отбрасывает без ответа. Без срока промис висел
    * бы вечно и экран замер бы молча.
+   *
+   * Операции, которым этого срока мало по протоколу, перечислены в
+   * {@link OP_TIMEOUT_MS} и общий срок на них не распространяется.
    */
   timeoutMs?: number;
+  /** Сроки отдельных операций — поверх {@link OP_TIMEOUT_MS}. Для проверок. */
+  opTimeoutMs?: Readonly<Record<string, number>>;
 }
+
+/**
+ * Операции, у которых ожидание заложено в протокол.
+ *
+ * `chatSend` после отмены ждёт у мода до 30 с, пока отменённый ход
+ * допишется в историю ([протокол канала](../../../../docs/interfaces/mod-adapter-channel.md#ход-чата),
+ * «следующий ход ждёт… до 30 с»). Это согласованное ожидание, а не потеря:
+ * мод сам ответит `TURN_DRAINING`, когда срок выйдет. Снять ожидание
+ * раньше нельзя — игрок увидел бы ошибку, хотя ход у Foreman уже начался, и
+ * повторная отправка ушла бы вторым ходом (ревью Gs на #62, P1-1). Запас
+ * поверх 30 с — на дорогу запроса и ответа через мост.
+ */
+export const OP_TIMEOUT_MS: Readonly<Record<string, number>> = { chatSend: 35_000 };
 
 /**
  * Один диспетчер ответов на страницу.
@@ -155,6 +173,8 @@ function install(): void {
 
 export function createBridgeTransport(options: BridgeOptions = {}): Transport {
   const timeoutMs = options.timeoutMs ?? 10_000;
+  const opTimeout = (op: string): number =>
+    options.opTimeoutMs?.[op] ?? OP_TIMEOUT_MS[op] ?? timeoutMs;
   const prefix = Math.random().toString(36).slice(2, 8);
   const hub = new EventHub();
   const owner = {};
@@ -186,13 +206,14 @@ export function createBridgeTransport(options: BridgeOptions = {}): Transport {
       }
 
       const state = shared();
+      const limit = opTimeout(op);
       return await new Promise<unknown>((resolve, reject) => {
         const timer = setTimeout(() => {
           state.pending.delete(id);
           reject(
-            transportError("TRANSPORT_UNAVAILABLE", `мод не ответил на «${op}» за ${timeoutMs} мс`),
+            transportError("TRANSPORT_UNAVAILABLE", `мод не ответил на «${op}» за ${limit} мс`),
           );
-        }, timeoutMs);
+        }, limit);
         state.pending.set(id, { resolve, reject, timer, owner });
         send(CHANNEL, text);
       });

@@ -7,7 +7,7 @@ import { createDemoSource } from "../src/dev/demo-source.js";
 import { startDevServer, type DevServer } from "../src/dev/server.js";
 import { createApi } from "../src/facade.js";
 import { createHttpTransport } from "../src/http.js";
-import { ApiError } from "../src/types.js";
+import { API_VERSION, ApiError } from "../src/types.js";
 
 /**
  * Dev-сервер и фасад поверх HTTP: тот же экран, что в игре, но в браузере.
@@ -44,7 +44,7 @@ describe("фасад поверх dev-сервера", () => {
     expect(api.transport).toBe("http");
 
     const status = await api.getStatus();
-    expect(status).toMatchObject({ apiVersion: "0.4.0", source: "fixture", inert: false });
+    expect(status).toMatchObject({ apiVersion: API_VERSION, source: "fixture", inert: false });
 
     const catalog = await api.listMetrics();
     expect(catalog.metrics.map((metric) => metric.id)).toContain("power.production");

@@ -35,6 +35,16 @@ const OPERATIONS: ReadonlySet<string> = new Set<ApiOperation>([
   "listScopes",
   "queryMetric",
   "querySeries",
+  "chatSend",
+  "chatCancel",
+  "chatHistory",
+]);
+
+/** Запросы чата: источник может их не реализовывать (`DevSource`). */
+const CHAT_OPERATIONS: ReadonlySet<string> = new Set<ApiOperation>([
+  "chatSend",
+  "chatCancel",
+  "chatHistory",
 ]);
 
 /** Клиент горячей перезагрузки: страница подключает его одной строкой. */
@@ -175,8 +185,33 @@ export async function startDevServer(options: DevServerOptions): Promise<DevServ
       return;
     }
 
+    const source = options.source as unknown as Record<
+      string,
+      ((a: unknown) => unknown) | undefined
+    >;
+    if (typeof source[op] !== "function") {
+      // Чат у источника необязателен: набор Fixture, запись и сохранение
+      // ассистента не содержат. Это не «запрос не из API» — по контракту
+      // запрос чата без связи с сайдкаром отвечает `SIDECAR_UNAVAILABLE`
+      // сразу, без ожидания, и экран показывает офлайн-состояние, а не ошибку
+      // сборки.
+      const unavailable = CHAT_OPERATIONS.has(op);
+      sendJson(res, 200, {
+        re: id,
+        error: unavailable
+          ? {
+              code: "SIDECAR_UNAVAILABLE",
+              message: `у источника «${options.source.name}» нет ассистента`,
+            }
+          : {
+              code: "SOURCE_UNAVAILABLE",
+              message: `источник «${options.source.name}» не отвечает на «${op}»`,
+            },
+      });
+      return;
+    }
+
     try {
-      const source = options.source as unknown as Record<string, (a: unknown) => unknown>;
       const body = await source[op]?.(args);
       sendJson(res, 200, { re: id, body });
     } catch (err: unknown) {

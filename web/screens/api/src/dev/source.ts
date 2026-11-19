@@ -1,6 +1,12 @@
 import type {
   ApiErrorBody,
   ApiStatus,
+  ChatCancelArgs,
+  ChatCancelResult,
+  ChatHistoryArgs,
+  ChatHistoryResult,
+  ChatSendArgs,
+  ChatSendResult,
   ListMetricsArgs,
   ListMetricsResult,
   ListScopesArgs,
@@ -26,6 +32,15 @@ export interface DevSource {
   listScopes(args: ListScopesArgs): Promise<ListScopesResult> | ListScopesResult;
   queryMetric(args: QueryMetricArgs): Promise<MetricValue> | MetricValue;
   querySeries(args: QuerySeriesArgs): Promise<MetricSeries> | MetricSeries;
+  /**
+   * Чат (0.5.0) — необязательная часть источника. У наборов Fixture, записи и
+   * сохранения ассистента нет, и это не пробел, а правда: без связи с
+   * сайдкаром контракт требует отвечать `SIDECAR_UNAVAILABLE` сразу. Сервер
+   * так и отвечает за источник, который этих методов не реализует.
+   */
+  chatSend?(args: ChatSendArgs): Promise<ChatSendResult> | ChatSendResult;
+  chatCancel?(args: ChatCancelArgs): Promise<ChatCancelResult> | ChatCancelResult;
+  chatHistory?(args: ChatHistoryArgs): Promise<ChatHistoryResult> | ChatHistoryResult;
   /** Необязательная подписка: источник сам шлёт события API v0. */
   subscribe?(emit: (event: string, data: unknown) => void): () => void;
 }

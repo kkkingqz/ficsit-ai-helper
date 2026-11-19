@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FICSIT AI — Chat</title>
+    <link rel="stylesheet" href="/ui-kit/ui-kit.css" />
+    <link rel="stylesheet" href="/ui-kit/screens/screens.css" />
+  </head>
+  <body class="d2-screen">
+    <!-- Корень экрана: его имя зафиксировано в Co2-48 §1. -->
+    <div id="ficsitai-chat"></div>
+
+    <!--
+      Ни одного встроенного скрипта: страницы в игре отдаются с
+      `script-src 'self'` (ARCHITECTURE §6.3.1, §12 п. 11), и под эту политику
+      не проходят ни карта импорта, ни встроенный модуль — прежняя страница в
+      игре не запускалась вовсе (решение Co-128). Поэтому один файл с того же
+      источника: он монтирует экран и сам решает, подключать ли горячую
+      перезагрузку. Имя пакета фасада развязано при сборке относительным
+      путём (`scripts/relink.mjs`), карта импорта больше не нужна.
+    -->
+    <script type="module" src="./dist/boot.js"></script>
+  </body>
+</html>

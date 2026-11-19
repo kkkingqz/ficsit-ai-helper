@@ -7,6 +7,12 @@ import {
   type ApiEventName,
   type ApiEvents,
   type ApiStatus,
+  type ChatCancelArgs,
+  type ChatCancelResult,
+  type ChatHistoryArgs,
+  type ChatHistoryResult,
+  type ChatSendArgs,
+  type ChatSendResult,
   type ListMetricsArgs,
   type ListMetricsResult,
   type ListScopesArgs,
@@ -43,6 +49,18 @@ export interface FicsitAIApi {
   listScopes(args: ListScopesArgs): Promise<ListScopesResult>;
   queryMetric(args: QueryMetricArgs): Promise<MetricValue>;
   querySeries(args: QuerySeriesArgs): Promise<MetricSeries>;
+  /**
+   * Отправляет ход чата (0.5.0). Возвращает `turnId`; ответ приходит
+   * событиями `chat.*` с этим же `turnId`, а не из этого промиса.
+   */
+  chatSend(args: ChatSendArgs): Promise<ChatSendResult>;
+  /**
+   * Останавливает показ хода. Это не «остановить ответ»: Foreman дочитывает
+   * ход, и ответ всё равно окажется в истории (§Чат, протокол канала).
+   */
+  chatCancel(args: ChatCancelArgs): Promise<ChatCancelResult>;
+  /** История текущего сохранения, от старых к новым. */
+  chatHistory(args?: ChatHistoryArgs): Promise<ChatHistoryResult>;
   /** Подписка на событие API v0; возвращает отписку. */
   on<K extends ApiEventName>(event: K, handler: (data: ApiEvents[K]) => void): () => void;
   close(): void;
@@ -156,6 +174,25 @@ export function createApi(options: CreateApiOptions = {}): FicsitAIApi {
 
     async querySeries(args: QuerySeriesArgs): Promise<MetricSeries> {
       return await call<MetricSeries>("querySeries", { ...args });
+    },
+
+    // Три запроса чата проходят насквозь, как и остальные: ни проверки длины
+    // текста, ни диапазона `limit` здесь нет. Правила хода — у мода и
+    // сайдкара, и вторая их копия в фасаде разошлась бы с первой. Отказ
+    // приходит кодом контракта: `SIDECAR_UNAVAILABLE` без связи с сайдкаром,
+    // `TURN_IN_PROGRESS` на второй ход, `INVALID_ARGUMENT` на `limit` вне
+    // диапазона.
+
+    async chatSend(args: ChatSendArgs): Promise<ChatSendResult> {
+      return await call<ChatSendResult>("chatSend", { ...args });
+    },
+
+    async chatCancel(args: ChatCancelArgs): Promise<ChatCancelResult> {
+      return await call<ChatCancelResult>("chatCancel", { ...args });
+    },
+
+    async chatHistory(args: ChatHistoryArgs = {}): Promise<ChatHistoryResult> {
+      return await call<ChatHistoryResult>("chatHistory", { ...args });
     },
 
     on<K extends ApiEventName>(event: K, handler: (data: ApiEvents[K]) => void): () => void {

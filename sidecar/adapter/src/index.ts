@@ -15,7 +15,7 @@ import {
 import { LIMITS, ModChannel } from "./channel.js";
 import { loadConfig, mcpUrlFor, normalizerUrlFor, type Config } from "./config.js";
 import { ForemanSession, loadOrCreateAccount } from "./foreman.js";
-import { createLogger, safeUrl, type Logger } from "./log.js";
+import { createLogger, isConnectionRefused, safeUrl, type Logger } from "./log.js";
 import { createNormalizerApp } from "./normalizer.js";
 import { tokenMatches } from "./token.js";
 import { ChatTurns } from "./turns.js";
@@ -267,6 +267,17 @@ async function main(): Promise<void> {
   // не должен падать, если Foreman отстал или перезапускается. Первый запрос
   // мода войдёт сам.
   void foreman.authenticate().catch((err: unknown) => {
+    if (isConnectionRefused(err)) {
+      // Обычный холодный старт: лаунчер запускает три процесса подряд, и
+      // ff-server ещё не слушает. Прежде сюда падал сырой `TypeError: fetch
+      // failed`, и каждый запуск выглядел как сбой — строка, которая должна
+      // значить беду, не значила ничего (Co2-54).
+      log.info(
+        `ff-server на ${safeUrl(config.foremanBaseUrl)} ещё не слушает — ` +
+          "это обычно при холодном старте, войду при первом запросе мода",
+      );
+      return;
+    }
     log.warn("вход в Foreman при запуске не удался — повторю при первом запросе", err);
   });
 

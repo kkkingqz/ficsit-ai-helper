@@ -39,6 +39,27 @@ export function safeUrl(value: string): string {
   }
 }
 
+/**
+ * Отличает «на том конце ещё никто не слушает» от настоящей ошибки.
+ *
+ * `fetch` в Node отдаёт на отказ соединения `TypeError: fetch failed`, а
+ * причину прячет в `cause.code`. В логе это выглядит как сбой, хотя при
+ * холодном старте это норма: лаунчер поднимает три процесса подряд и ждёт
+ * порты только после этого, поэтому адаптер успевает постучаться в ff-server
+ * раньше, чем тот начал слушать (Co2-54). Строка, которая должна значить
+ * беду, не должна появляться там, где беды нет.
+ */
+export function isConnectionRefused(value: unknown): boolean {
+  const codes = new Set(["ECONNREFUSED", "ENOTFOUND", "EHOSTUNREACH", "ECONNRESET", "UND_ERR_SOCKET"]);
+  let current: unknown = value;
+  for (let depth = 0; depth < 5 && current !== null && typeof current === "object"; depth += 1) {
+    const code = (current as { code?: unknown }).code;
+    if (typeof code === "string" && codes.has(code)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
+}
+
 function safeStringify(value: unknown): string {
   if (value instanceof Error) return `${value.name}: ${value.message}`;
   try {
